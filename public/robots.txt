@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://ragecheck.com/sitemap.xml
