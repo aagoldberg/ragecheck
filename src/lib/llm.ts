@@ -9,6 +9,8 @@ export interface LLMAnalysis {
   adjustedScore: number;
   reasons: string[];
   contextNotes?: string;
+  sharingPatterns?: string[];
+  techniqueExplanations?: string[];
 }
 
 const SYSTEM_PROMPT = `You are an expert at detecting outrage bait and manipulative framing in media. Your job is to analyze text and identify patterns designed to provoke emotional reactions rather than inform.
@@ -82,13 +84,15 @@ Respond with this exact JSON structure:
 {
   "adjustedScore": <number 0-100, adjust rule-based score based on context>,
   "reasons": [<3-5 concise bullet points explaining the score>],
-  "contextNotes": "<optional: note if rule-based score was misleading due to context>"
+  "contextNotes": "<optional: note if rule-based score was misleading due to context>",
+  "sharingPatterns": [<2-3 reasons why content like this tends to spread, e.g. "Validates pre-existing fears about X", "Creates strong in-group identification", "Outrage drives more engagement than nuance">],
+  "techniqueExplanations": [<2-3 specific manipulation techniques used, with brief explanations, e.g. "Fear appeal: Uses threat of harm to bypass rational evaluation", "Loaded framing: Describes neutral facts using emotionally charged language">]
 }`;
 
   try {
     const response = await client.messages.create({
       model: "claude-3-5-haiku-20241022",
-      max_tokens: 500,
+      max_tokens: 800,
       messages: [
         {
           role: "user",
@@ -116,6 +120,8 @@ Respond with this exact JSON structure:
       adjustedScore: Math.min(100, Math.max(0, parsed.adjustedScore)),
       reasons: parsed.reasons || [],
       contextNotes: parsed.contextNotes,
+      sharingPatterns: parsed.sharingPatterns || [],
+      techniqueExplanations: parsed.techniqueExplanations || [],
     };
   } catch (error) {
     console.error("LLM analysis failed:", error);

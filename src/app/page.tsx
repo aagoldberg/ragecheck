@@ -30,6 +30,8 @@ interface AnalysisResult {
   textPreview?: string;
   llmEnhanced?: boolean;
   contextNotes?: string;
+  sharingPatterns?: string[];
+  techniqueExplanations?: string[];
 }
 
 const EXAMPLE_URL = "https://www.bbc.com/news/world-us-canada-68416845";
@@ -508,7 +510,7 @@ export default function Home() {
                     <div className="relative h-full">
                       <div className="max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
                         {result.sourceDomain?.match(/twitter|x\.com|bsky|threads/) ? (
-                           <SocialPostCard 
+                           <SocialPostCard
                               title={result.title || ""}
                               text={result.textPreview || ""}
                               highlights={result.highlights || []}
@@ -537,6 +539,48 @@ export default function Home() {
                     </div>
                   </BentoCard>
                 </div>
+
+                {/* AI Insights Row - Only show when LLM enhanced */}
+                {result.llmEnhanced && (result.sharingPatterns?.length || result.techniqueExplanations?.length) && (
+                  <div className="md:col-span-12 grid grid-cols-1 md:grid-cols-2 gap-6">
+
+                    {/* Why This Spreads */}
+                    {result.sharingPatterns && result.sharingPatterns.length > 0 && (
+                      <BentoCard title="Why This Spreads">
+                        <div className="space-y-3">
+                          <p className="text-xs text-zinc-500 mb-4">
+                            Common reasons content like this tends to get shared widely:
+                          </p>
+                          {result.sharingPatterns.map((pattern, i) => (
+                            <div key={i} className="flex gap-3 items-start">
+                              <div className="flex-shrink-0 w-6 h-6 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
+                                <span className="text-purple-600 dark:text-purple-400 text-xs font-bold">{i + 1}</span>
+                              </div>
+                              <p className="text-sm text-zinc-700 dark:text-zinc-300 leading-relaxed">{pattern}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </BentoCard>
+                    )}
+
+                    {/* Manipulation Techniques */}
+                    {result.techniqueExplanations && result.techniqueExplanations.length > 0 && (
+                      <BentoCard title="Techniques Detected">
+                        <div className="space-y-3">
+                          <p className="text-xs text-zinc-500 mb-4">
+                            Specific persuasion techniques identified in this content:
+                          </p>
+                          {result.techniqueExplanations.map((technique, i) => (
+                            <div key={i} className="p-3 bg-zinc-50 dark:bg-zinc-800/50 rounded-lg border border-zinc-100 dark:border-zinc-800">
+                              <p className="text-sm text-zinc-700 dark:text-zinc-300 leading-relaxed">{technique}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </BentoCard>
+                    )}
+
+                  </div>
+                )}
 
               </div>
             )}

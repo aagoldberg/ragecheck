@@ -16,6 +16,8 @@ export interface AnalyzeResponse {
   textPreview?: string;
   llmEnhanced?: boolean;
   contextNotes?: string;
+  sharingPatterns?: string[];
+  techniqueExplanations?: string[];
 }
 
 function getLabel(score: number): "Low" | "Medium" | "High" {
@@ -73,6 +75,8 @@ export async function POST(request: NextRequest): Promise<NextResponse<AnalyzeRe
     let finalReasons = ruleAnalysis.reasons;
     let llmEnhanced = false;
     let contextNotes: string | undefined;
+    let sharingPatterns: string[] | undefined;
+    let techniqueExplanations: string[] | undefined;
 
     if (isLLMAvailable()) {
       const llmResult = await enhanceWithLLM({
@@ -87,6 +91,8 @@ export async function POST(request: NextRequest): Promise<NextResponse<AnalyzeRe
         finalScore = llmResult.adjustedScore;
         finalReasons = llmResult.reasons;
         contextNotes = llmResult.contextNotes;
+        sharingPatterns = llmResult.sharingPatterns;
+        techniqueExplanations = llmResult.techniqueExplanations;
         llmEnhanced = true;
       }
     }
@@ -103,6 +109,8 @@ export async function POST(request: NextRequest): Promise<NextResponse<AnalyzeRe
       textPreview,
       llmEnhanced,
       contextNotes,
+      sharingPatterns,
+      techniqueExplanations,
     });
   } catch (error) {
     console.error("Analyze error:", error);
