@@ -262,7 +262,7 @@ export default function AdminDashboard() {
                 <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-4">
                   Top Analyzed Domains
                 </h3>
-                <div className="space-y-2">
+                <div className="space-y-2 max-h-[300px] overflow-y-auto">
                   {stats.topDomains.length === 0 ? (
                     <p className="text-zinc-500 text-sm">No data yet</p>
                   ) : (
