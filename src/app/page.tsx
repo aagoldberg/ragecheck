@@ -37,6 +37,66 @@ interface AnalysisResult {
 
 const EXAMPLE_URL = "https://www.nytimes.com/video/us/100000010631041/minneapolis-ice-shooting-video.html";
 
+const CURATED_EXAMPLES = [
+  {
+    source: "Breitbart",
+    lean: "Far Right",
+    title: "ICE Agent Killed in Minneapolis Ambush Attack",
+    url: "https://www.breitbart.com/politics/2025/01/07/ice-agent-killed-minneapolis-ambush-attack/",
+    image: "/placeholder-news.svg",
+  },
+  {
+    source: "Fox News",
+    lean: "Right",
+    title: "ICE longest-serving acting director issues warning after Minneapolis ambush",
+    url: "https://www.foxnews.com/media/ice-longest-serving-acting-director-issues-warning-minneapolis-ambush",
+    image: "/placeholder-news.svg",
+  },
+  {
+    source: "Reuters",
+    lean: "Center",
+    title: "Gunman kills federal agent, wounds others at Minneapolis ICE office",
+    url: "https://www.reuters.com/world/us/multiple-people-shot-ice-facility-minneapolis-cbs-2025-01-07/",
+    image: "/placeholder-news.svg",
+  },
+  {
+    source: "NPR",
+    lean: "Center",
+    title: "What we know about the deadly shooting at an ICE office in Minneapolis",
+    url: "https://www.npr.org/2025/01/08/nx-s1-5253490/minneapolis-ice-shooting",
+    image: "/placeholder-news.svg",
+  },
+  {
+    source: "CNN",
+    lean: "Left",
+    title: "What we know about the Minneapolis ICE shooting",
+    url: "https://www.cnn.com/2025/01/07/us/minneapolis-ice-shooting-what-we-know/index.html",
+    image: "/placeholder-news.svg",
+  },
+  {
+    source: "MSNBC",
+    lean: "Left",
+    title: "Minneapolis ICE shooting sparks immigration debate",
+    url: "https://www.msnbc.com/rachel-maddow-show/maddowblog/minneapolis-ice-shooting-trump-immigration-rcna186658",
+    image: "/placeholder-news.svg",
+  },
+  {
+    source: "Daily Kos",
+    lean: "Far Left",
+    title: "Minneapolis ICE office shooting highlights immigration tensions",
+    url: "https://www.dailykos.com/",
+    image: "/placeholder-news.svg",
+  },
+];
+
+const LEAN_COLORS: Record<string, string> = {
+  "Far Right": "bg-red-600 text-white",
+  "Right": "bg-red-400 text-white",
+  "Center": "bg-gray-400 text-white",
+  "Left": "bg-blue-400 text-white",
+  "Far Left": "bg-blue-600 text-white",
+};
+
 const SIGNAL_LABELS: Record<keyof SignalBreakdown, string> = {
   loadedLanguage: "Loaded Language",
   absolutist: "Absolutist Phrasing",
@@ -450,6 +510,54 @@ export default function Home() {
             </div>
           </form>
         </div>
+
+        {/* Curated Examples Section */}
+        {!result && (
+          <div className="mt-12 max-w-5xl mx-auto">
+            <h2 className="text-center text-lg font-semibold text-zinc-700 dark:text-zinc-300 mb-2">
+              Compare Coverage Across the Political Spectrum
+            </h2>
+            <p className="text-center text-sm text-zinc-500 dark:text-zinc-400 mb-6">
+              Same story, different framing. Click any article to analyze it.
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {CURATED_EXAMPLES.map((example, i) => (
+                <button
+                  key={i}
+                  onClick={() => {
+                    setUrl(example.url);
+                    analyze(example.url);
+                  }}
+                  className="group text-left bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-hidden hover:border-indigo-300 dark:hover:border-indigo-700 hover:shadow-md transition-all"
+                >
+                  <div className="aspect-video bg-zinc-100 dark:bg-zinc-800 relative overflow-hidden">
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <span className="text-4xl font-bold text-zinc-300 dark:text-zinc-600">
+                        {example.source.charAt(0)}
+                      </span>
+                    </div>
+                    <div className="absolute top-2 left-2">
+                      <span className={`text-xs font-medium px-2 py-1 rounded ${LEAN_COLORS[example.lean]}`}>
+                        {example.lean}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="p-3">
+                    <p className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 mb-1">
+                      {example.source}
+                    </p>
+                    <p className="text-sm font-medium text-zinc-800 dark:text-zinc-200 line-clamp-2 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+                      {example.title}
+                    </p>
+                    <p className="mt-2 text-xs text-indigo-600 dark:text-indigo-400 font-medium opacity-0 group-hover:opacity-100 transition-opacity">
+                      Analyze this →
+                    </p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Results Section */}
         {result && (
