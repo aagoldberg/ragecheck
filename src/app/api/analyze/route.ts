@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { extractContent } from "@/lib/extract";
 import { analyzeText, SignalBreakdown, Highlight } from "@/lib/score";
 import { enhanceWithLLM, isLLMAvailable } from "@/lib/llm";
+import { logAnalysis } from "@/lib/db";
 
 export interface AnalyzeResponse {
   success: boolean;
@@ -52,6 +53,14 @@ export async function POST(request: NextRequest): Promise<NextResponse<AnalyzeRe
     const extracted = await extractContent(url);
 
     if (!extracted.success) {
+      // Log failed extraction
+      logAnalysis({
+        url,
+        sourceDomain: extracted.sourceDomain,
+        success: false,
+        error: extracted.error || "Failed to extract content",
+      });
+
       return NextResponse.json(
         {
           success: false,
@@ -97,10 +106,23 @@ export async function POST(request: NextRequest): Promise<NextResponse<AnalyzeRe
       }
     }
 
+    const label = getLabel(finalScore);
+
+    // Log successful analysis
+    logAnalysis({
+      url,
+      sourceDomain: extracted.sourceDomain,
+      score: finalScore,
+      label,
+      llmEnhanced,
+      signalBreakdown: ruleAnalysis.signalBreakdown,
+      success: true,
+    });
+
     return NextResponse.json({
       success: true,
       score: finalScore,
-      label: getLabel(finalScore),
+      label,
       reasons: finalReasons,
       highlights: ruleAnalysis.highlights,
       signalBreakdown: ruleAnalysis.signalBreakdown,
