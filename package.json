@@ -12,6 +12,7 @@
     "@anthropic-ai/sdk": "^0.71.2",
     "@mozilla/readability": "^0.6.0",
     "@neondatabase/serverless": "^1.0.2",
+    "@vercel/analytics": "^1.6.1",
     "@vercel/og": "^0.8.6",
     "cheerio": "^1.1.2",
     "linkedom": "^0.18.12",
