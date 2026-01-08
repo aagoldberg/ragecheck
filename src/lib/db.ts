@@ -20,9 +20,21 @@ export async function initDB() {
       signal_engagement_bait INTEGER,
       success BOOLEAN DEFAULT TRUE,
       error TEXT,
-      created_at TIMESTAMP DEFAULT NOW()
+      created_at TIMESTAMP DEFAULT NOW(),
+      ip_address TEXT,
+      user_agent TEXT,
+      country TEXT
     )
   `;
+
+  // Add columns if they don't exist (for existing tables)
+  try {
+    await sql`ALTER TABLE ragecheck_analyses ADD COLUMN IF NOT EXISTS ip_address TEXT`;
+    await sql`ALTER TABLE ragecheck_analyses ADD COLUMN IF NOT EXISTS user_agent TEXT`;
+    await sql`ALTER TABLE ragecheck_analyses ADD COLUMN IF NOT EXISTS country TEXT`;
+  } catch {
+    // Columns may already exist
+  }
 }
 
 export interface AnalysisLog {
@@ -41,6 +53,9 @@ export interface AnalysisLog {
   };
   success: boolean;
   error?: string;
+  ipAddress?: string;
+  userAgent?: string;
+  country?: string;
 }
 
 function detectPlatform(domain: string): string {
@@ -60,7 +75,8 @@ export async function logAnalysis(data: AnalysisLog) {
       INSERT INTO ragecheck_analyses (
         url, source_domain, platform, score, label, llm_enhanced,
         signal_loaded_language, signal_absolutist, signal_threat_panic,
-        signal_us_vs_them, signal_engagement_bait, success, error
+        signal_us_vs_them, signal_engagement_bait, success, error,
+        ip_address, user_agent, country
       ) VALUES (
         ${data.url},
         ${data.sourceDomain || null},
@@ -74,7 +90,10 @@ export async function logAnalysis(data: AnalysisLog) {
         ${data.signalBreakdown?.usVsThem || null},
         ${data.signalBreakdown?.engagementBait || null},
         ${data.success},
-        ${data.error || null}
+        ${data.error || null},
+        ${data.ipAddress || null},
+        ${data.userAgent || null},
+        ${data.country || null}
       )
     `;
   } catch (error) {
@@ -106,6 +125,9 @@ export interface DashboardStats {
     score: number;
     label: string;
     createdAt: Date;
+    ipAddress: string | null;
+    userAgent: string | null;
+    country: string | null;
   }[];
 }
 
@@ -167,7 +189,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
 
   // Recent analyses
   const recentRows = await sql`
-    SELECT url, source_domain, score, label, created_at, success
+    SELECT url, source_domain, score, label, created_at, success, ip_address, user_agent, country
     FROM ragecheck_analyses
     ORDER BY created_at DESC
     LIMIT 100
@@ -178,6 +200,9 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     score: Number(row.score),
     label: row.label || "Unknown",
     createdAt: row.created_at,
+    ipAddress: row.ip_address || null,
+    userAgent: row.user_agent || null,
+    country: row.country || null,
   }));
 
   return {

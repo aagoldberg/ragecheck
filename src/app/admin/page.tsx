@@ -25,6 +25,9 @@ interface DashboardStats {
     score: number;
     label: string;
     createdAt: string;
+    ipAddress: string | null;
+    userAgent: string | null;
+    country: string | null;
   }[];
 }
 
@@ -298,13 +301,15 @@ export default function AdminDashboard() {
                       <th className="text-left py-3 px-3 text-zinc-500 font-medium">URL</th>
                       <th className="text-left py-3 px-3 text-zinc-500 font-medium">Domain</th>
                       <th className="text-left py-3 px-3 text-zinc-500 font-medium">Score</th>
+                      <th className="text-left py-3 px-3 text-zinc-500 font-medium">Country</th>
+                      <th className="text-left py-3 px-3 text-zinc-500 font-medium">IP</th>
                       <th className="text-left py-3 px-3 text-zinc-500 font-medium">Time</th>
                     </tr>
                   </thead>
                   <tbody>
                     {stats.recentAnalyses.length === 0 ? (
                       <tr>
-                        <td colSpan={4} className="py-4 text-zinc-500 text-center">No analyses yet</td>
+                        <td colSpan={6} className="py-4 text-zinc-500 text-center">No analyses yet</td>
                       </tr>
                     ) : (
                       stats.recentAnalyses.map((a, i) => (
@@ -323,6 +328,12 @@ export default function AdminDashboard() {
                             }`}>
                               {a.score}
                             </span>
+                          </td>
+                          <td className="py-2 px-3 text-zinc-600 dark:text-zinc-400 text-xs">
+                            {a.country || "-"}
+                          </td>
+                          <td className="py-2 px-3 text-zinc-500 text-xs font-mono" title={a.userAgent || undefined}>
+                            {a.ipAddress || "-"}
                           </td>
                           <td className="py-2 px-3 text-zinc-500 text-xs whitespace-nowrap">
                             {new Date(a.createdAt).toLocaleString()}

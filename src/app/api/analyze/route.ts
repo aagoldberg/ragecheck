@@ -31,6 +31,13 @@ export async function POST(request: NextRequest): Promise<NextResponse<AnalyzeRe
     const body = await request.json();
     const { url } = body;
 
+    // Capture visitor info from headers
+    const ipAddress = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
+      || request.headers.get("x-real-ip")
+      || null;
+    const userAgent = request.headers.get("user-agent") || null;
+    const country = request.headers.get("x-vercel-ip-country") || null;
+
     if (!url || typeof url !== "string") {
       return NextResponse.json(
         { success: false, error: "URL is required" },
@@ -58,6 +65,9 @@ export async function POST(request: NextRequest): Promise<NextResponse<AnalyzeRe
         sourceDomain: extracted.sourceDomain,
         success: false,
         error: extracted.error || "Failed to extract content",
+        ipAddress: ipAddress || undefined,
+        userAgent: userAgent || undefined,
+        country: country || undefined,
       });
 
       return NextResponse.json(
@@ -116,6 +126,9 @@ export async function POST(request: NextRequest): Promise<NextResponse<AnalyzeRe
       llmEnhanced,
       signalBreakdown: ruleAnalysis.signalBreakdown,
       success: true,
+      ipAddress: ipAddress || undefined,
+      userAgent: userAgent || undefined,
+      country: country || undefined,
     });
 
     return NextResponse.json({
