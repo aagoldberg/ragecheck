@@ -87,45 +87,45 @@ const CURATED_EXAMPLES = [
     url: "https://www.msnbc.com/rachel-maddow-show/maddowblog/minneapolis-ice-shooting-trump-immigration-rcna186658",
     image: "https://logo.clearbit.com/msnbc.com",
   },
-  // Tweets
+  // Tweets - actual posts about ICE/immigration
   {
     source: "@TuckerCarlson",
     lean: "Far Right",
     type: "tweet",
-    title: "Tucker Carlson on X",
-    url: "https://x.com/TuckerCarlson",
+    title: "\"The U.S. could be on the verge of civil war...\"",
+    url: "https://x.com/TuckerCarlson/status/1976082862878367967",
     image: "https://unavatar.io/twitter/TuckerCarlson",
   },
   {
-    source: "@DonaldJTrumpJr",
+    source: "@FoxNews",
     lean: "Right",
     type: "tweet",
-    title: "Donald Trump Jr. on X",
-    url: "https://x.com/DonaldJTrumpJr",
-    image: "https://unavatar.io/twitter/DonaldJTrumpJr",
+    title: "\"President Trump reacts to the deadly ICE-involved shooting in Minneapolis...\"",
+    url: "https://x.com/FoxNews/status/2009002750810411250",
+    image: "https://unavatar.io/twitter/FoxNews",
   },
   {
-    source: "@AP",
+    source: "@MayorFrey",
     lean: "Center",
     type: "tweet",
-    title: "Associated Press on X",
-    url: "https://x.com/AP",
-    image: "https://unavatar.io/twitter/AP",
+    title: "\"The presence of federal immigration enforcement agents is causing chaos...\"",
+    url: "https://x.com/MayorFrey/status/2008945355925364762",
+    image: "https://unavatar.io/twitter/MayorFrey",
   },
   {
     source: "@AOC",
     lean: "Left",
     type: "tweet",
-    title: "Alexandria Ocasio-Cortez on X",
-    url: "https://x.com/AOC",
+    title: "\"Members of Congress have legal authority to enter ICE facilities...\"",
+    url: "https://x.com/AOC/status/1921269087398765013",
     image: "https://unavatar.io/twitter/AOC",
   },
   {
     source: "@BernieSanders",
     lean: "Far Left",
     type: "tweet",
-    title: "Bernie Sanders on X",
-    url: "https://x.com/BernieSanders",
+    title: "\"Trump's authoritarianism in real time: Conduct massive illegal raids...\"",
+    url: "https://x.com/BernieSanders/status/1931727686952526003",
     image: "https://unavatar.io/twitter/BernieSanders",
   },
 ];
@@ -642,10 +642,13 @@ export default function Home() {
                         {example.lean}
                       </span>
                     </div>
-                    <p className="text-sm font-medium text-zinc-800 dark:text-zinc-200 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+                    <p className="text-xs font-semibold text-zinc-500 dark:text-zinc-400">
                       {example.source}
                     </p>
-                    <p className="mt-1 text-xs text-indigo-600 dark:text-indigo-400 font-medium opacity-0 group-hover:opacity-100 transition-opacity">
+                    <p className="text-sm text-zinc-700 dark:text-zinc-300 line-clamp-2 mt-1 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+                      {example.title}
+                    </p>
+                    <p className="mt-2 text-xs text-indigo-600 dark:text-indigo-400 font-medium opacity-0 group-hover:opacity-100 transition-opacity">
                       Analyze →
                     </p>
                   </button>
