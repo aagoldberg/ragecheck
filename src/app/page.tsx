@@ -343,8 +343,8 @@ export default function Home() {
             <span className="font-bold text-lg tracking-tight">RageCheck</span>
           </div>
           <div className="flex gap-4 text-sm font-medium text-zinc-500">
-            <a href="#" className="hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors">Methodology</a>
-            <a href="#" className="hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors">About</a>
+            <a href="/methodology" className="hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors">Methodology</a>
+            <a href="/about" className="hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors">About</a>
           </div>
         </div>
       </nav>
