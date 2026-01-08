@@ -288,19 +288,64 @@ async function extractThreads(urlString: string): Promise<ExtractedContent | nul
 // ============ TRUTH SOCIAL SUPPORT ============
 
 async function extractTruthSocial(urlString: string): Promise<ExtractedContent | null> {
-  // Parse Truth Social URL: https://truthsocial.com/@{username}/posts/{postId}
-  const match = urlString.match(/truthsocial\.com\/@([^/]+)\/posts\/(\d+)/);
+  // Parse Truth Social URL formats:
+  // https://truthsocial.com/@{username}/posts/{postId}
+  // https://truthsocial.com/@{username}/{postId}
+  const match = urlString.match(/truthsocial\.com\/@([^/]+)(?:\/posts)?\/(\d+)/);
   if (!match) return null;
 
-  const [, username] = match;
+  const [, username, postId] = match;
   const sourceDomain = "truthsocial.com";
 
+  // Try multiple approaches since Truth Social blocks many requests
+
+  // Method 1: Try their API directly (Mastodon-compatible)
   try {
-    // Try to get content via page fetch (Truth Social doesn't have a public API)
+    const apiUrl = `https://truthsocial.com/api/v1/statuses/${postId}`;
+    const response = await fetch(apiUrl, {
+      headers: {
+        "Accept": "application/json",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+      },
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      if (data.content) {
+        // Strip HTML tags from content
+        const text = data.content
+          .replace(/<[^>]+>/g, ' ')
+          .replace(/&quot;/g, '"')
+          .replace(/&amp;/g, '&')
+          .replace(/&lt;/g, '<')
+          .replace(/&gt;/g, '>')
+          .replace(/&#x27;/g, "'")
+          .replace(/&#39;/g, "'")
+          .replace(/\s+/g, ' ')
+          .trim();
+
+        if (text.length > 5) {
+          return {
+            title: `Truth by @${data.account?.username || username}`,
+            text: text,
+            sourceDomain,
+            success: true,
+          };
+        }
+      }
+    }
+  } catch {
+    // API failed, try next method
+  }
+
+  // Method 2: Try page fetch with browser-like headers
+  try {
     const response = await fetch(urlString, {
       headers: {
-        "User-Agent": "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
-        "Accept": "text/html",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.5",
+        "Cache-Control": "no-cache",
       },
     });
 
@@ -328,21 +373,24 @@ async function extractTruthSocial(urlString: string): Promise<ExtractedContent |
         }
       }
 
-      // Fallback: try to find content in JSON-LD or other structured data
-      const jsonLdMatch = html.match(/<script[^>]*type="application\/ld\+json"[^>]*>([^<]+)<\/script>/);
-      if (jsonLdMatch) {
-        try {
-          const jsonLd = JSON.parse(jsonLdMatch[1]);
-          if (jsonLd.articleBody || jsonLd.text) {
-            return {
-              title: `Truth by @${username}`,
-              text: jsonLd.articleBody || jsonLd.text,
-              sourceDomain,
-              success: true,
-            };
-          }
-        } catch {
-          // JSON parse failed, continue
+      // Try twitter:description as fallback
+      const twitterDescMatch = html.match(/<meta[^>]*name="twitter:description"[^>]*content="([^"]+)"/);
+      if (twitterDescMatch && twitterDescMatch[1]) {
+        const text = twitterDescMatch[1]
+          .replace(/&quot;/g, '"')
+          .replace(/&amp;/g, '&')
+          .replace(/&lt;/g, '<')
+          .replace(/&gt;/g, '>')
+          .replace(/&#x27;/g, "'")
+          .replace(/&#39;/g, "'");
+
+        if (text.length > 10) {
+          return {
+            title: `Truth by @${username}`,
+            text: text,
+            sourceDomain,
+            success: true,
+          };
         }
       }
     }
@@ -355,7 +403,7 @@ async function extractTruthSocial(urlString: string): Promise<ExtractedContent |
     text: "",
     sourceDomain,
     success: false,
-    error: "Could not extract Truth Social post content.",
+    error: "Could not extract Truth Social post. The platform may be blocking automated requests.",
   };
 }
 
