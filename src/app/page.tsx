@@ -45,6 +45,7 @@ const CURATED_EXAMPLES = [
     type: "article",
     title: "ICE Agent Killed in Minneapolis Ambush Attack",
     url: "https://www.breitbart.com/politics/2025/01/07/ice-agent-killed-minneapolis-ambush-attack/",
+    image: "https://logo.clearbit.com/breitbart.com",
   },
   {
     source: "Fox News",
@@ -52,6 +53,7 @@ const CURATED_EXAMPLES = [
     type: "article",
     title: "ICE longest-serving acting director issues warning after Minneapolis ambush",
     url: "https://www.foxnews.com/media/ice-longest-serving-acting-director-issues-warning-minneapolis-ambush",
+    image: "https://logo.clearbit.com/foxnews.com",
   },
   {
     source: "Reuters",
@@ -59,6 +61,7 @@ const CURATED_EXAMPLES = [
     type: "article",
     title: "Gunman kills federal agent, wounds others at Minneapolis ICE office",
     url: "https://www.reuters.com/world/us/multiple-people-shot-ice-facility-minneapolis-cbs-2025-01-07/",
+    image: "https://logo.clearbit.com/reuters.com",
   },
   {
     source: "NPR",
@@ -66,6 +69,7 @@ const CURATED_EXAMPLES = [
     type: "article",
     title: "What we know about the deadly shooting at an ICE office in Minneapolis",
     url: "https://www.npr.org/2025/01/08/nx-s1-5253490/minneapolis-ice-shooting",
+    image: "https://logo.clearbit.com/npr.org",
   },
   {
     source: "CNN",
@@ -73,6 +77,7 @@ const CURATED_EXAMPLES = [
     type: "article",
     title: "What we know about the Minneapolis ICE shooting",
     url: "https://www.cnn.com/2025/01/07/us/minneapolis-ice-shooting-what-we-know/index.html",
+    image: "https://logo.clearbit.com/cnn.com",
   },
   {
     source: "MSNBC",
@@ -80,6 +85,7 @@ const CURATED_EXAMPLES = [
     type: "article",
     title: "Minneapolis ICE shooting sparks immigration debate",
     url: "https://www.msnbc.com/rachel-maddow-show/maddowblog/minneapolis-ice-shooting-trump-immigration-rcna186658",
+    image: "https://logo.clearbit.com/msnbc.com",
   },
   // Tweets
   {
@@ -88,6 +94,7 @@ const CURATED_EXAMPLES = [
     type: "tweet",
     title: "Tucker Carlson on X",
     url: "https://x.com/TuckerCarlson",
+    image: "https://unavatar.io/twitter/TuckerCarlson",
   },
   {
     source: "@DonaldJTrumpJr",
@@ -95,6 +102,7 @@ const CURATED_EXAMPLES = [
     type: "tweet",
     title: "Donald Trump Jr. on X",
     url: "https://x.com/DonaldJTrumpJr",
+    image: "https://unavatar.io/twitter/DonaldJTrumpJr",
   },
   {
     source: "@AP",
@@ -102,6 +110,7 @@ const CURATED_EXAMPLES = [
     type: "tweet",
     title: "Associated Press on X",
     url: "https://x.com/AP",
+    image: "https://unavatar.io/twitter/AP",
   },
   {
     source: "@AOC",
@@ -109,6 +118,7 @@ const CURATED_EXAMPLES = [
     type: "tweet",
     title: "Alexandria Ocasio-Cortez on X",
     url: "https://x.com/AOC",
+    image: "https://unavatar.io/twitter/AOC",
   },
   {
     source: "@BernieSanders",
@@ -116,6 +126,7 @@ const CURATED_EXAMPLES = [
     type: "tweet",
     title: "Bernie Sanders on X",
     url: "https://x.com/BernieSanders",
+    image: "https://unavatar.io/twitter/BernieSanders",
   },
 ];
 
@@ -569,12 +580,15 @@ export default function Home() {
                     }}
                     className="group text-left bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-hidden hover:border-indigo-300 dark:hover:border-indigo-700 hover:shadow-md transition-all"
                   >
-                    <div className="h-24 bg-zinc-100 dark:bg-zinc-800 relative overflow-hidden">
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <span className="text-3xl font-bold text-zinc-300 dark:text-zinc-600">
-                          {example.source.charAt(0)}
-                        </span>
-                      </div>
+                    <div className="h-20 bg-zinc-100 dark:bg-zinc-800 relative overflow-hidden flex items-center justify-center">
+                      <img
+                        src={example.image}
+                        alt={example.source}
+                        className="h-10 w-auto object-contain"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).style.display = 'none';
+                        }}
+                      />
                       <div className="absolute top-2 left-2">
                         <span className={`text-xs font-medium px-2 py-1 rounded ${LEAN_COLORS[example.lean]}`}>
                           {example.lean}
@@ -616,9 +630,14 @@ export default function Home() {
                     className="group text-left bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-3 hover:border-indigo-300 dark:hover:border-indigo-700 hover:shadow-md transition-all"
                   >
                     <div className="flex items-center gap-2 mb-2">
-                      <div className="w-8 h-8 rounded-full bg-zinc-200 dark:bg-zinc-700 flex items-center justify-center text-sm font-bold text-zinc-500 dark:text-zinc-400">
-                        {example.source.charAt(1).toUpperCase()}
-                      </div>
+                      <img
+                        src={example.image}
+                        alt={example.source}
+                        className="w-10 h-10 rounded-full object-cover bg-zinc-200 dark:bg-zinc-700"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${example.source.slice(1)}&background=random`;
+                        }}
+                      />
                       <span className={`text-xs font-medium px-2 py-0.5 rounded ${LEAN_COLORS[example.lean]}`}>
                         {example.lean}
                       </span>
