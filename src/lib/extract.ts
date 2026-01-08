@@ -389,7 +389,7 @@ export async function extractContent(urlString: string): Promise<ExtractedConten
     const response = await fetch(urlString, {
       signal: controller.signal,
       headers: {
-        "User-Agent": "Mozilla/5.0 (compatible; BaitCheck/1.0; +https://baitcheck.app)",
+        "User-Agent": "Mozilla/5.0 (compatible; RageCheck/1.0; +https://baitcheck.app)",
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
       },
     });

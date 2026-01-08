@@ -176,7 +176,7 @@ export default function Home() {
 
   const copyShareCard = () => {
     if (!result?.success || result.score === undefined) return;
-    const text = `BaitCheck score: ${result.score}/100 - ${result.sourceDomain}`;
+    const text = `RageCheck score: ${result.score}/100 - ${result.sourceDomain}`;
     navigator.clipboard.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -188,7 +188,7 @@ export default function Home() {
         {/* Header */}
         <header className="text-center mb-10">
           <h1 className="text-4xl font-bold text-zinc-900 dark:text-zinc-100 mb-2">
-            BaitCheck
+            RageCheck
           </h1>
           <p className="text-zinc-600 dark:text-zinc-400">
             Detect outrage-bait patterns in media
@@ -348,7 +348,7 @@ export default function Home() {
 
         {/* Footer */}
         <footer className="mt-12 text-center text-sm text-zinc-500">
-          <p>BaitCheck - Pattern detector for manipulative outrage framing</p>
+          <p>RageCheck - Pattern detector for manipulative outrage framing</p>
         </footer>
       </div>
     </div>

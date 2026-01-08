@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "BaitCheck - Detect Outrage Bait Patterns",
+  title: "RageCheck - Detect Outrage Bait Patterns",
   description: "A pattern detector for manipulative outrage framing in media. Analyze articles for loaded language, us-vs-them framing, and engagement bait.",
 };
 
