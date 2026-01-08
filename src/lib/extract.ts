@@ -1,5 +1,5 @@
 import { Readability } from "@mozilla/readability";
-import { JSDOM } from "jsdom";
+import { parseHTML } from "linkedom";
 
 // In-memory cache for extracted content
 const cache = new Map<string, ExtractedContent>();
@@ -171,13 +171,13 @@ async function extractTwitter(urlString: string): Promise<ExtractedContent | nul
       const data = await response.json();
       if (data.html) {
         // Parse the HTML to extract text
-        const dom = new JSDOM(data.html);
-        const blockquote = dom.window.document.querySelector("blockquote");
+        const { document } = parseHTML(data.html);
+        const blockquote = document.querySelector("blockquote");
         if (blockquote) {
           // Remove the author link at the end
           const links = blockquote.querySelectorAll("a");
-          links.forEach(link => {
-            if (link.textContent?.includes("@") || link.href?.includes("/status/")) {
+          links.forEach((link: Element) => {
+            if (link.textContent?.includes("@") || (link as HTMLAnchorElement).href?.includes("/status/")) {
               link.remove();
             }
           });
@@ -198,40 +198,7 @@ async function extractTwitter(urlString: string): Promise<ExtractedContent | nul
     // Continue to next method
   }
 
-  // Method 2: Try syndication API
-  try {
-    const syndicationUrl = `https://syndication.twitter.com/srv/timeline-profile/screen-name/${username}`;
-    const response = await fetch(syndicationUrl, {
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-      },
-    });
-
-    if (response.ok) {
-      const html = await response.text();
-      const dom = new JSDOM(html);
-
-      // Look for the specific tweet
-      const tweets = dom.window.document.querySelectorAll('[data-tweet-id]');
-      for (const tweet of tweets) {
-        if (tweet.getAttribute('data-tweet-id') === tweetId) {
-          const textEl = tweet.querySelector('.tweet-text');
-          if (textEl?.textContent) {
-            return {
-              title: `Tweet by @${username}`,
-              text: textEl.textContent.trim(),
-              sourceDomain,
-              success: true,
-            };
-          }
-        }
-      }
-    }
-  } catch {
-    // Continue to next method
-  }
-
-  // Method 3: Try FxTwitter/VxTwitter API (third-party but reliable)
+  // Method 2: Try FxTwitter/VxTwitter API (third-party but reliable)
   try {
     const fxUrl = `https://api.fxtwitter.com/status/${tweetId}`;
     const response = await fetch(fxUrl, {
@@ -388,7 +355,7 @@ export async function extractContent(urlString: string): Promise<ExtractedConten
     const response = await fetch(urlString, {
       signal: controller.signal,
       headers: {
-        "User-Agent": "Mozilla/5.0 (compatible; RageCheck/1.0; +https://baitcheck.app)",
+        "User-Agent": "Mozilla/5.0 (compatible; RageCheck/1.0; +https://ragecheck.vercel.app)",
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
       },
     });
@@ -431,16 +398,15 @@ export async function extractContent(urlString: string): Promise<ExtractedConten
 
     const html = await response.text();
 
-    // Parse with jsdom
-    const dom = new JSDOM(html, { url: urlString });
-    const document = dom.window.document;
+    // Parse with linkedom (serverless-friendly alternative to jsdom)
+    const { document } = parseHTML(html);
 
     // Remove script and style elements
     const scripts = document.querySelectorAll("script, style, noscript, iframe");
-    scripts.forEach((el) => el.remove());
+    scripts.forEach((el: Element) => el.remove());
 
     // Use Readability to extract content
-    const reader = new Readability(document);
+    const reader = new Readability(document as unknown as Document);
     const article = reader.parse();
 
     if (!article || !article.textContent) {
