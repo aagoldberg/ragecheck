@@ -469,6 +469,23 @@ export default function Home() {
                       </div>
                     )}
 
+                    {/* Engagement Economics callout - shows on high scores */}
+                    {result.score && result.score >= 50 && (
+                      <div className="mt-6 pt-6 border-t border-zinc-100 dark:border-zinc-800 w-full">
+                        <div className="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/50 rounded-lg">
+                          <h4 className="text-xs font-semibold text-amber-800 dark:text-amber-300 mb-2 flex items-center gap-1.5">
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            Engagement Economics
+                          </h4>
+                          <p className="text-xs text-amber-700 dark:text-amber-400 leading-relaxed">
+                            High-scoring content often performs well algorithmically because outrage drives engagement. Consider whether sharing amplifies a message you actually endorse.
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
                     {/* Footer note */}
                     <div className="mt-6 pt-4 border-t border-zinc-100 dark:border-zinc-800 w-full">
                       <p className="text-xs text-zinc-400 leading-snug text-center">
