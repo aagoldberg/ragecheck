@@ -176,3 +176,4 @@ const signalBreakdown: SignalBreakdown = {
 ## License
 
 MIT
+
