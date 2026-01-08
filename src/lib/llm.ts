@@ -1,0 +1,128 @@
+import Anthropic from "@anthropic-ai/sdk";
+import { SignalBreakdown, Highlight } from "./score";
+
+const client = process.env.ANTHROPIC_API_KEY
+  ? new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+  : null;
+
+export interface LLMAnalysis {
+  adjustedScore: number;
+  reasons: string[];
+  contextNotes?: string;
+}
+
+const SYSTEM_PROMPT = `You are an expert at detecting outrage bait and manipulative framing in media. Your job is to analyze text and identify patterns designed to provoke emotional reactions rather than inform.
+
+You are NOT a fact-checker or political bias detector. You detect MANIPULATION TACTICS regardless of political leaning.
+
+Key patterns to look for:
+1. **Loaded Language**: Emotionally charged words meant to provoke (insults, dehumanization, inflammatory adjectives)
+2. **Us-vs-Them Framing**: Creating in-group/out-group divisions, tribal language
+3. **Threat/Panic Framing**: Fear-mongering, catastrophizing, existential threats
+4. **Absolutist Language**: "Always", "never", "everyone knows" - black-and-white thinking
+5. **Engagement Bait**: Clickbait phrases, calls to share, "you won't believe"
+
+IMPORTANT CONTEXT CONSIDERATIONS:
+- Quoting someone else's outrage is different from expressing outrage
+- Reporting on a controversial topic neutrally should score LOW
+- Academic or analytical discussion of extremism should score LOW
+- The same words can be manipulative or neutral depending on context
+
+Respond in JSON format only.`;
+
+interface AnalysisRequest {
+  text: string;
+  title: string;
+  ruleBasedScore: number;
+  signalBreakdown: SignalBreakdown;
+  highlights: Highlight[];
+}
+
+export async function enhanceWithLLM(
+  request: AnalysisRequest
+): Promise<LLMAnalysis | null> {
+  if (!client) {
+    return null;
+  }
+
+  // Truncate text to save tokens (keep first 3000 chars)
+  const truncatedText =
+    request.text.length > 3000
+      ? request.text.substring(0, 3000) + "..."
+      : request.text;
+
+  // Build context about rule-based findings
+  const ruleContext = `
+Rule-based analysis found:
+- Loaded Language: ${request.signalBreakdown.loadedLanguage}/100
+- Us-vs-Them: ${request.signalBreakdown.usVsThem}/100
+- Threat/Panic: ${request.signalBreakdown.threatPanic}/100
+- Absolutist: ${request.signalBreakdown.absolutist}/100
+- Engagement Bait: ${request.signalBreakdown.engagementBait}/100
+- Overall rule-based score: ${request.ruleBasedScore}/100
+
+Flagged phrases: ${request.highlights.slice(0, 10).map((h) => `"${h.text}"`).join(", ")}
+`;
+
+  const userPrompt = `Analyze this content for outrage bait patterns:
+
+TITLE: ${request.title}
+
+CONTENT:
+${truncatedText}
+
+${ruleContext}
+
+Consider:
+1. Is the flagged language being USED manipulatively, or is it being REPORTED/QUOTED/DISCUSSED academically?
+2. Are there manipulation tactics the rules missed?
+3. What's the overall intent - to inform or to provoke?
+
+Respond with this exact JSON structure:
+{
+  "adjustedScore": <number 0-100, adjust rule-based score based on context>,
+  "reasons": [<3-5 concise bullet points explaining the score>],
+  "contextNotes": "<optional: note if rule-based score was misleading due to context>"
+}`;
+
+  try {
+    const response = await client.messages.create({
+      model: "claude-3-5-haiku-20241022",
+      max_tokens: 500,
+      messages: [
+        {
+          role: "user",
+          content: userPrompt,
+        },
+      ],
+      system: SYSTEM_PROMPT,
+    });
+
+    // Extract text from response
+    const content = response.content[0];
+    if (content.type !== "text") {
+      return null;
+    }
+
+    // Parse JSON from response
+    const jsonMatch = content.text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      return null;
+    }
+
+    const parsed = JSON.parse(jsonMatch[0]);
+
+    return {
+      adjustedScore: Math.min(100, Math.max(0, parsed.adjustedScore)),
+      reasons: parsed.reasons || [],
+      contextNotes: parsed.contextNotes,
+    };
+  } catch (error) {
+    console.error("LLM analysis failed:", error);
+    return null;
+  }
+}
+
+export function isLLMAvailable(): boolean {
+  return client !== null;
+}

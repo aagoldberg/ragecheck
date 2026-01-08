@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { extractContent } from "@/lib/extract";
 import { analyzeText, SignalBreakdown, Highlight } from "@/lib/score";
+import { enhanceWithLLM, isLLMAvailable } from "@/lib/llm";
 
 export interface AnalyzeResponse {
   success: boolean;
@@ -13,6 +14,14 @@ export interface AnalyzeResponse {
   title?: string;
   sourceDomain?: string;
   textPreview?: string;
+  llmEnhanced?: boolean;
+  contextNotes?: string;
+}
+
+function getLabel(score: number): "Low" | "Medium" | "High" {
+  if (score <= 33) return "Low";
+  if (score <= 66) return "Medium";
+  return "High";
 }
 
 export async function POST(request: NextRequest): Promise<NextResponse<AnalyzeResponse>> {
@@ -51,24 +60,49 @@ export async function POST(request: NextRequest): Promise<NextResponse<AnalyzeRe
       );
     }
 
-    // Analyze the text
-    const analysis = analyzeText(extracted.text);
+    // Analyze the text with rules
+    const ruleAnalysis = analyzeText(extracted.text);
 
     // Create a preview of the text (first 500 chars)
     const textPreview = extracted.text.length > 500
       ? extracted.text.substring(0, 500) + "..."
       : extracted.text;
 
+    // Try to enhance with LLM if available
+    let finalScore = ruleAnalysis.score;
+    let finalReasons = ruleAnalysis.reasons;
+    let llmEnhanced = false;
+    let contextNotes: string | undefined;
+
+    if (isLLMAvailable()) {
+      const llmResult = await enhanceWithLLM({
+        text: extracted.text,
+        title: extracted.title,
+        ruleBasedScore: ruleAnalysis.score,
+        signalBreakdown: ruleAnalysis.signalBreakdown,
+        highlights: ruleAnalysis.highlights,
+      });
+
+      if (llmResult) {
+        finalScore = llmResult.adjustedScore;
+        finalReasons = llmResult.reasons;
+        contextNotes = llmResult.contextNotes;
+        llmEnhanced = true;
+      }
+    }
+
     return NextResponse.json({
       success: true,
-      score: analysis.score,
-      label: analysis.label,
-      reasons: analysis.reasons,
-      highlights: analysis.highlights,
-      signalBreakdown: analysis.signalBreakdown,
+      score: finalScore,
+      label: getLabel(finalScore),
+      reasons: finalReasons,
+      highlights: ruleAnalysis.highlights,
+      signalBreakdown: ruleAnalysis.signalBreakdown,
       title: extracted.title,
       sourceDomain: extracted.sourceDomain,
       textPreview,
+      llmEnhanced,
+      contextNotes,
     });
   } catch (error) {
     console.error("Analyze error:", error);

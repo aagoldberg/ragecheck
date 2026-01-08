@@ -28,6 +28,8 @@ interface AnalysisResult {
   title?: string;
   sourceDomain?: string;
   textPreview?: string;
+  llmEnhanced?: boolean;
+  contextNotes?: string;
 }
 
 const EXAMPLE_URL = "https://www.bbc.com/news/world-us-canada-68416845";
@@ -250,9 +252,16 @@ export default function Home() {
                 {/* Score */}
                 <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-6 bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800">
                   <div>
-                    <h3 className="text-sm font-medium text-zinc-500 dark:text-zinc-400 mb-2">
-                      Outrage Likelihood
-                    </h3>
+                    <div className="flex items-center gap-2 mb-2">
+                      <h3 className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
+                        Outrage Likelihood
+                      </h3>
+                      {result.llmEnhanced && (
+                        <span className="px-2 py-0.5 text-xs bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300 rounded-full">
+                          AI Enhanced
+                        </span>
+                      )}
+                    </div>
                     <ScoreBadge score={result.score!} label={result.label!} />
                   </div>
                   <button
@@ -262,6 +271,16 @@ export default function Home() {
                     {copied ? "Copied!" : "Copy share card"}
                   </button>
                 </div>
+
+                {/* Context Notes (from LLM) */}
+                {result.contextNotes && (
+                  <div className="p-4 bg-purple-50 dark:bg-purple-950 border border-purple-200 dark:border-purple-800 rounded-lg">
+                    <p className="text-sm text-purple-800 dark:text-purple-200">
+                      <span className="font-medium">Context: </span>
+                      {result.contextNotes}
+                    </p>
+                  </div>
+                )}
 
                 {/* Reasons */}
                 <div className="p-6 bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800">
