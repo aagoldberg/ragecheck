@@ -123,18 +123,18 @@ export async function getDashboardStats(): Promise<DashboardStats> {
   const [medCount] = await sql`SELECT COUNT(*) as count FROM ragecheck_analyses WHERE score IS NOT NULL AND score > 33 AND score <= 66`;
   const [highCount] = await sql`SELECT COUNT(*) as count FROM ragecheck_analyses WHERE score IS NOT NULL AND score > 66`;
 
-  // Platform breakdown (only successful analyses)
-  const platformRows = await sql`SELECT platform, COUNT(*) as count FROM ragecheck_analyses WHERE success = true AND score IS NOT NULL GROUP BY platform`;
+  // Platform breakdown
+  const platformRows = await sql`SELECT platform, COUNT(*) as count FROM ragecheck_analyses GROUP BY platform`;
   const platformBreakdown: Record<string, number> = {};
   for (const row of platformRows) {
     platformBreakdown[row.platform || "unknown"] = Number(row.count);
   }
 
-  // Top domains (only successful analyses)
+  // Top domains
   const topDomainRows = await sql`
     SELECT source_domain as domain, COUNT(*) as count, AVG(score) as avg_score
     FROM ragecheck_analyses
-    WHERE source_domain IS NOT NULL AND success = true AND score IS NOT NULL
+    WHERE source_domain IS NOT NULL
     GROUP BY source_domain
     ORDER BY count DESC
     LIMIT 10
