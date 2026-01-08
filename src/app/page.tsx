@@ -418,9 +418,9 @@ export default function Home() {
                 
                 {/* Score & Context Card */}
                 <BentoCard className="md:col-span-4" title="Risk Assessment">
-                  <div className="flex flex-col items-center justify-center h-full text-center">
+                  <div className="flex flex-col items-center justify-center text-center">
                     <ScoreGauge score={result.score!} label={result.label!} />
-                    
+
                     <div className="mt-8 space-y-4 w-full">
                        <div className="grid grid-cols-2 gap-2 text-center text-xs text-zinc-500">
                           <div className="p-2 rounded bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-100 dark:border-zinc-800">
@@ -432,12 +432,48 @@ export default function Home() {
                             Method
                           </div>
                        </div>
-                       
-                       <div className="pt-4 border-t border-zinc-100 dark:border-zinc-800">
-                         <p className="text-xs text-zinc-400 leading-snug">
-                           RageCheck measures the density of manipulative linguistic patterns relative to neutral reporting.
-                         </p>
-                       </div>
+                    </div>
+
+                    {/* Techniques Detected - in sidebar */}
+                    {result.llmEnhanced && result.techniqueExplanations && result.techniqueExplanations.length > 0 && (
+                      <div className="mt-6 pt-6 border-t border-zinc-100 dark:border-zinc-800 w-full text-left">
+                        <h4 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-3">
+                          Techniques Detected
+                        </h4>
+                        <div className="space-y-2">
+                          {result.techniqueExplanations.map((technique, i) => (
+                            <div key={i} className="p-2 bg-zinc-50 dark:bg-zinc-800/50 rounded border border-zinc-100 dark:border-zinc-800">
+                              <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed">{technique}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Why This Spreads - in sidebar */}
+                    {result.llmEnhanced && result.sharingPatterns && result.sharingPatterns.length > 0 && (
+                      <div className="mt-6 pt-6 border-t border-zinc-100 dark:border-zinc-800 w-full text-left">
+                        <h4 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-3">
+                          Why This Spreads
+                        </h4>
+                        <div className="space-y-2">
+                          {result.sharingPatterns.map((pattern, i) => (
+                            <div key={i} className="flex gap-2 items-start">
+                              <span className="flex-shrink-0 w-5 h-5 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center text-purple-600 dark:text-purple-400 text-[10px] font-bold">
+                                {i + 1}
+                              </span>
+                              <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed">{pattern}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Footer note */}
+                    <div className="mt-6 pt-4 border-t border-zinc-100 dark:border-zinc-800 w-full">
+                      <p className="text-xs text-zinc-400 leading-snug text-center">
+                        RageCheck measures the density of manipulative linguistic patterns relative to neutral reporting.
+                      </p>
                     </div>
                   </div>
                 </BentoCard>
@@ -540,47 +576,6 @@ export default function Home() {
                   </BentoCard>
                 </div>
 
-                {/* AI Insights Row - Only show when LLM enhanced */}
-                {result.llmEnhanced && (result.sharingPatterns?.length || result.techniqueExplanations?.length) && (
-                  <div className="md:col-span-12 grid grid-cols-1 md:grid-cols-2 gap-6">
-
-                    {/* Why This Spreads */}
-                    {result.sharingPatterns && result.sharingPatterns.length > 0 && (
-                      <BentoCard title="Why This Spreads">
-                        <div className="space-y-3">
-                          <p className="text-xs text-zinc-500 mb-4">
-                            Common reasons content like this tends to get shared widely:
-                          </p>
-                          {result.sharingPatterns.map((pattern, i) => (
-                            <div key={i} className="flex gap-3 items-start">
-                              <div className="flex-shrink-0 w-6 h-6 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
-                                <span className="text-purple-600 dark:text-purple-400 text-xs font-bold">{i + 1}</span>
-                              </div>
-                              <p className="text-sm text-zinc-700 dark:text-zinc-300 leading-relaxed">{pattern}</p>
-                            </div>
-                          ))}
-                        </div>
-                      </BentoCard>
-                    )}
-
-                    {/* Manipulation Techniques */}
-                    {result.techniqueExplanations && result.techniqueExplanations.length > 0 && (
-                      <BentoCard title="Techniques Detected">
-                        <div className="space-y-3">
-                          <p className="text-xs text-zinc-500 mb-4">
-                            Specific persuasion techniques identified in this content:
-                          </p>
-                          {result.techniqueExplanations.map((technique, i) => (
-                            <div key={i} className="p-3 bg-zinc-50 dark:bg-zinc-800/50 rounded-lg border border-zinc-100 dark:border-zinc-800">
-                              <p className="text-sm text-zinc-700 dark:text-zinc-300 leading-relaxed">{technique}</p>
-                            </div>
-                          ))}
-                        </div>
-                      </BentoCard>
-                    )}
-
-                  </div>
-                )}
 
               </div>
             )}
