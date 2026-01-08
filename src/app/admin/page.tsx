@@ -285,17 +285,20 @@ export default function AdminDashboard() {
 
             {/* Recent Analyses */}
             <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6">
-              <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-4">
-                Recent Analyses
-              </h3>
-              <div className="overflow-x-auto">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+                  Recent Analyses
+                </h3>
+                <span className="text-xs text-zinc-400">Last {stats.recentAnalyses.length} results</span>
+              </div>
+              <div className="overflow-x-auto max-h-[500px] overflow-y-auto border border-zinc-100 dark:border-zinc-800 rounded-lg">
                 <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-zinc-200 dark:border-zinc-800">
-                      <th className="text-left py-2 text-zinc-500 font-medium">URL</th>
-                      <th className="text-left py-2 text-zinc-500 font-medium">Domain</th>
-                      <th className="text-left py-2 text-zinc-500 font-medium">Score</th>
-                      <th className="text-left py-2 text-zinc-500 font-medium">Time</th>
+                  <thead className="sticky top-0 bg-zinc-50 dark:bg-zinc-800">
+                    <tr className="border-b border-zinc-200 dark:border-zinc-700">
+                      <th className="text-left py-3 px-3 text-zinc-500 font-medium">URL</th>
+                      <th className="text-left py-3 px-3 text-zinc-500 font-medium">Domain</th>
+                      <th className="text-left py-3 px-3 text-zinc-500 font-medium">Score</th>
+                      <th className="text-left py-3 px-3 text-zinc-500 font-medium">Time</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -305,14 +308,14 @@ export default function AdminDashboard() {
                       </tr>
                     ) : (
                       stats.recentAnalyses.map((a, i) => (
-                        <tr key={i} className="border-b border-zinc-100 dark:border-zinc-800 last:border-0">
-                          <td className="py-2 max-w-[300px] truncate">
+                        <tr key={i} className="border-b border-zinc-100 dark:border-zinc-800 last:border-0 hover:bg-zinc-50 dark:hover:bg-zinc-800/50">
+                          <td className="py-2 px-3 max-w-[300px] truncate">
                             <a href={a.url} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline">
                               {a.url}
                             </a>
                           </td>
-                          <td className="py-2 text-zinc-600 dark:text-zinc-400">{a.sourceDomain}</td>
-                          <td className="py-2">
+                          <td className="py-2 px-3 text-zinc-600 dark:text-zinc-400">{a.sourceDomain}</td>
+                          <td className="py-2 px-3">
                             <span className={`text-xs font-medium px-2 py-0.5 rounded ${
                               a.score > 66 ? "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300" :
                               a.score > 33 ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300" :
@@ -321,7 +324,7 @@ export default function AdminDashboard() {
                               {a.score}
                             </span>
                           </td>
-                          <td className="py-2 text-zinc-500 text-xs">
+                          <td className="py-2 px-3 text-zinc-500 text-xs whitespace-nowrap">
                             {new Date(a.createdAt).toLocaleString()}
                           </td>
                         </tr>

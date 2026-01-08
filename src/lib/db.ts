@@ -171,7 +171,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     FROM ragecheck_analyses
     WHERE success = true AND score IS NOT NULL
     ORDER BY created_at DESC
-    LIMIT 20
+    LIMIT 100
   `;
   const recentAnalyses = recentRows.map((row) => ({
     url: row.url,
