@@ -167,9 +167,8 @@ export async function getDashboardStats(): Promise<DashboardStats> {
 
   // Recent analyses
   const recentRows = await sql`
-    SELECT url, source_domain, score, label, created_at
+    SELECT url, source_domain, score, label, created_at, success
     FROM ragecheck_analyses
-    WHERE success = true AND score IS NOT NULL
     ORDER BY created_at DESC
     LIMIT 100
   `;
