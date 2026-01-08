@@ -60,6 +60,267 @@ function isPrivateUrl(urlString: string): boolean {
   }
 }
 
+// ============ BLUESKY SUPPORT ============
+// Bluesky has a public API via AT Protocol
+
+interface BlueskyPost {
+  thread: {
+    post: {
+      author: {
+        handle: string;
+        displayName?: string;
+      };
+      record: {
+        text: string;
+        createdAt: string;
+      };
+    };
+  };
+}
+
+async function extractBluesky(urlString: string): Promise<ExtractedContent | null> {
+  // Parse Bluesky URL: https://bsky.app/profile/{handle}/post/{postId}
+  const match = urlString.match(/bsky\.app\/profile\/([^/]+)\/post\/([^/?]+)/);
+  if (!match) return null;
+
+  const [, handle, postId] = match;
+  const sourceDomain = "bsky.app";
+
+  try {
+    // First, resolve handle to DID if it's not already a DID
+    let did = handle;
+    if (!handle.startsWith("did:")) {
+      const resolveRes = await fetch(
+        `https://public.api.bsky.app/xrpc/com.atproto.identity.resolveHandle?handle=${encodeURIComponent(handle)}`,
+        { headers: { "Accept": "application/json" } }
+      );
+      if (resolveRes.ok) {
+        const resolved = await resolveRes.json();
+        did = resolved.did;
+      }
+    }
+
+    // Fetch the post thread
+    const uri = `at://${did}/app.bsky.feed.post/${postId}`;
+    const response = await fetch(
+      `https://public.api.bsky.app/xrpc/app.bsky.feed.getPostThread?uri=${encodeURIComponent(uri)}&depth=0`,
+      { headers: { "Accept": "application/json" } }
+    );
+
+    if (!response.ok) {
+      return {
+        title: "",
+        text: "",
+        sourceDomain,
+        success: false,
+        error: `Bluesky API error: ${response.status}`,
+      };
+    }
+
+    const data: BlueskyPost = await response.json();
+    const post = data.thread?.post;
+
+    if (!post?.record?.text) {
+      return {
+        title: "",
+        text: "",
+        sourceDomain,
+        success: false,
+        error: "Could not extract post content",
+      };
+    }
+
+    const author = post.author?.displayName || post.author?.handle || handle;
+    const text = post.record.text;
+
+    return {
+      title: `Post by @${post.author?.handle || handle}`,
+      text: text,
+      sourceDomain,
+      success: true,
+    };
+  } catch (err) {
+    return {
+      title: "",
+      text: "",
+      sourceDomain,
+      success: false,
+      error: `Bluesky extraction failed: ${err instanceof Error ? err.message : "Unknown error"}`,
+    };
+  }
+}
+
+// ============ TWITTER/X SUPPORT ============
+// Try multiple methods: oEmbed API, syndication, Nitter
+
+async function extractTwitter(urlString: string): Promise<ExtractedContent | null> {
+  // Parse Twitter URL: https://twitter.com/{user}/status/{id} or https://x.com/{user}/status/{id}
+  const match = urlString.match(/(?:twitter\.com|x\.com)\/([^/]+)\/status\/(\d+)/);
+  if (!match) return null;
+
+  const [, username, tweetId] = match;
+  const sourceDomain = urlString.includes("x.com") ? "x.com" : "twitter.com";
+
+  // Method 1: Try Twitter's oEmbed API (still works for public tweets)
+  try {
+    const oembedUrl = `https://publish.twitter.com/oembed?url=${encodeURIComponent(urlString)}&omit_script=true`;
+    const response = await fetch(oembedUrl, {
+      headers: { "Accept": "application/json" },
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      if (data.html) {
+        // Parse the HTML to extract text
+        const dom = new JSDOM(data.html);
+        const blockquote = dom.window.document.querySelector("blockquote");
+        if (blockquote) {
+          // Remove the author link at the end
+          const links = blockquote.querySelectorAll("a");
+          links.forEach(link => {
+            if (link.textContent?.includes("@") || link.href?.includes("/status/")) {
+              link.remove();
+            }
+          });
+
+          const text = blockquote.textContent?.trim();
+          if (text && text.length > 10) {
+            return {
+              title: `Tweet by @${username}`,
+              text: text,
+              sourceDomain,
+              success: true,
+            };
+          }
+        }
+      }
+    }
+  } catch {
+    // Continue to next method
+  }
+
+  // Method 2: Try syndication API
+  try {
+    const syndicationUrl = `https://syndication.twitter.com/srv/timeline-profile/screen-name/${username}`;
+    const response = await fetch(syndicationUrl, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+      },
+    });
+
+    if (response.ok) {
+      const html = await response.text();
+      const dom = new JSDOM(html);
+
+      // Look for the specific tweet
+      const tweets = dom.window.document.querySelectorAll('[data-tweet-id]');
+      for (const tweet of tweets) {
+        if (tweet.getAttribute('data-tweet-id') === tweetId) {
+          const textEl = tweet.querySelector('.tweet-text');
+          if (textEl?.textContent) {
+            return {
+              title: `Tweet by @${username}`,
+              text: textEl.textContent.trim(),
+              sourceDomain,
+              success: true,
+            };
+          }
+        }
+      }
+    }
+  } catch {
+    // Continue to next method
+  }
+
+  // Method 3: Try FxTwitter/VxTwitter API (third-party but reliable)
+  try {
+    const fxUrl = `https://api.fxtwitter.com/status/${tweetId}`;
+    const response = await fetch(fxUrl, {
+      headers: { "Accept": "application/json" },
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      if (data.tweet?.text) {
+        return {
+          title: `Tweet by @${data.tweet.author?.screen_name || username}`,
+          text: data.tweet.text,
+          sourceDomain,
+          success: true,
+        };
+      }
+    }
+  } catch {
+    // All methods failed
+  }
+
+  return {
+    title: "",
+    text: "",
+    sourceDomain,
+    success: false,
+    error: "Could not extract tweet. Twitter/X has restricted API access.",
+  };
+}
+
+// ============ THREADS SUPPORT ============
+
+async function extractThreads(urlString: string): Promise<ExtractedContent | null> {
+  // Parse Threads URL: https://www.threads.net/@{user}/post/{id}
+  const match = urlString.match(/threads\.net\/@([^/]+)\/post\/([^/?]+)/);
+  if (!match) return null;
+
+  const [, username] = match;
+  const sourceDomain = "threads.net";
+
+  // Threads doesn't have a public API, but we can try oEmbed
+  try {
+    // Try to get content via their page (limited success)
+    const response = await fetch(urlString, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
+        "Accept": "text/html",
+      },
+    });
+
+    if (response.ok) {
+      const html = await response.text();
+
+      // Look for meta tags with content
+      const ogDescMatch = html.match(/<meta[^>]*property="og:description"[^>]*content="([^"]+)"/);
+      if (ogDescMatch && ogDescMatch[1]) {
+        const text = ogDescMatch[1]
+          .replace(/&quot;/g, '"')
+          .replace(/&amp;/g, '&')
+          .replace(/&lt;/g, '<')
+          .replace(/&gt;/g, '>')
+          .replace(/&#x27;/g, "'");
+
+        if (text.length > 20) {
+          return {
+            title: `Thread by @${username}`,
+            text: text,
+            sourceDomain,
+            success: true,
+          };
+        }
+      }
+    }
+  } catch {
+    // Failed
+  }
+
+  return {
+    title: "",
+    text: "",
+    sourceDomain,
+    success: false,
+    error: "Could not extract Threads post content.",
+  };
+}
+
+// ============ MAIN EXTRACTION FUNCTION ============
+
 export async function extractContent(urlString: string): Promise<ExtractedContent> {
   // Check cache first
   const cached = cache.get(urlString);
@@ -94,6 +355,32 @@ export async function extractContent(urlString: string): Promise<ExtractedConten
 
   const sourceDomain = url.hostname;
 
+  // Try platform-specific extractors first
+  if (sourceDomain.includes("bsky.app")) {
+    const result = await extractBluesky(urlString);
+    if (result) {
+      if (result.success) cache.set(urlString, result);
+      return result;
+    }
+  }
+
+  if (sourceDomain.includes("twitter.com") || sourceDomain.includes("x.com")) {
+    const result = await extractTwitter(urlString);
+    if (result) {
+      if (result.success) cache.set(urlString, result);
+      return result;
+    }
+  }
+
+  if (sourceDomain.includes("threads.net")) {
+    const result = await extractThreads(urlString);
+    if (result) {
+      if (result.success) cache.set(urlString, result);
+      return result;
+    }
+  }
+
+  // Default: use Readability for regular web pages
   try {
     // Fetch with timeout and size limits
     const controller = new AbortController();
