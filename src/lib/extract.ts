@@ -285,6 +285,80 @@ async function extractThreads(urlString: string): Promise<ExtractedContent | nul
   };
 }
 
+// ============ TRUTH SOCIAL SUPPORT ============
+
+async function extractTruthSocial(urlString: string): Promise<ExtractedContent | null> {
+  // Parse Truth Social URL: https://truthsocial.com/@{username}/posts/{postId}
+  const match = urlString.match(/truthsocial\.com\/@([^/]+)\/posts\/(\d+)/);
+  if (!match) return null;
+
+  const [, username] = match;
+  const sourceDomain = "truthsocial.com";
+
+  try {
+    // Try to get content via page fetch (Truth Social doesn't have a public API)
+    const response = await fetch(urlString, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
+        "Accept": "text/html",
+      },
+    });
+
+    if (response.ok) {
+      const html = await response.text();
+
+      // Look for og:description meta tag
+      const ogDescMatch = html.match(/<meta[^>]*property="og:description"[^>]*content="([^"]+)"/);
+      if (ogDescMatch && ogDescMatch[1]) {
+        const text = ogDescMatch[1]
+          .replace(/&quot;/g, '"')
+          .replace(/&amp;/g, '&')
+          .replace(/&lt;/g, '<')
+          .replace(/&gt;/g, '>')
+          .replace(/&#x27;/g, "'")
+          .replace(/&#39;/g, "'");
+
+        if (text.length > 10) {
+          return {
+            title: `Truth by @${username}`,
+            text: text,
+            sourceDomain,
+            success: true,
+          };
+        }
+      }
+
+      // Fallback: try to find content in JSON-LD or other structured data
+      const jsonLdMatch = html.match(/<script[^>]*type="application\/ld\+json"[^>]*>([^<]+)<\/script>/);
+      if (jsonLdMatch) {
+        try {
+          const jsonLd = JSON.parse(jsonLdMatch[1]);
+          if (jsonLd.articleBody || jsonLd.text) {
+            return {
+              title: `Truth by @${username}`,
+              text: jsonLd.articleBody || jsonLd.text,
+              sourceDomain,
+              success: true,
+            };
+          }
+        } catch {
+          // JSON parse failed, continue
+        }
+      }
+    }
+  } catch {
+    // Failed
+  }
+
+  return {
+    title: "",
+    text: "",
+    sourceDomain,
+    success: false,
+    error: "Could not extract Truth Social post content.",
+  };
+}
+
 // ============ FARCASTER/WARPCAST SUPPORT ============
 
 interface NeynarCast {
@@ -419,6 +493,14 @@ export async function extractContent(urlString: string): Promise<ExtractedConten
 
   if (sourceDomain.includes("threads.net")) {
     const result = await extractThreads(urlString);
+    if (result) {
+      if (result.success) cache.set(urlString, result);
+      return result;
+    }
+  }
+
+  if (sourceDomain.includes("truthsocial.com")) {
+    const result = await extractTruthSocial(urlString);
     if (result) {
       if (result.success) cache.set(urlString, result);
       return result;

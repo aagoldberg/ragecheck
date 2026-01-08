@@ -48,6 +48,7 @@ function detectPlatform(domain: string): string {
   if (domain.includes("bsky.app")) return "bluesky";
   if (domain.includes("threads.net")) return "threads";
   if (domain.includes("warpcast.com") || domain.includes("farcaster")) return "farcaster";
+  if (domain.includes("truthsocial.com")) return "truthsocial";
   return "web";
 }
 

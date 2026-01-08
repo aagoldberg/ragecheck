@@ -222,6 +222,7 @@ function SocialPostCard({
   const isTwitter = sourceDomain.includes("twitter.com") || sourceDomain.includes("x.com");
   const isBluesky = sourceDomain.includes("bsky.app");
   const isThreads = sourceDomain.includes("threads.net");
+  const isTruthSocial = sourceDomain.includes("truthsocial.com");
 
   return (
     <div className="mx-auto max-w-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow">
@@ -232,7 +233,8 @@ function SocialPostCard({
             ${isTwitter ? "bg-black dark:bg-white dark:text-black" : ""}
             ${isBluesky ? "bg-blue-500" : ""}
             ${isThreads ? "bg-zinc-900 dark:bg-zinc-100 dark:text-zinc-900" : ""}
-            ${!isTwitter && !isBluesky && !isThreads ? "bg-zinc-500" : ""}
+            ${isTruthSocial ? "bg-purple-700" : ""}
+            ${!isTwitter && !isBluesky && !isThreads && !isTruthSocial ? "bg-zinc-500" : ""}
           `}>
             {handle[0].toUpperCase()}
           </div>
@@ -249,6 +251,9 @@ function SocialPostCard({
            )}
            {isBluesky && (
              <svg className="w-5 h-5 text-blue-500" fill="currentColor" viewBox="0 0 512 512"><path d="M111.8 62.2C170.2 105.9 226.3 199.6 256 256c29.7-56.4 85.8-150.1 144.2-193.8 38.8-29.1 82.7-44.4 111.8-62.2s48.6-26.6 48.6-26.6-23.7 87.7-93.7 182.7c-5.8 7.9-10.7 16.6-13.8 25.8-10.3 30.7-3.5 59.8 17.3 84.8 55.4 66.8 41.3 175.7 41.3 175.7s-70-22.3-157.9-108.5c-30.7-30.1-60.8-63.5-74.1-73.4-3.2-2.4-7.8-1.5-10.1 1.9L256 278.5l-13.5-16.1c-2.3-3.4-6.9-4.3-10.1-1.9-13.3 9.9-43.4 43.3-74.1 73.4-87.9 86.2-157.9 108.5-157.9 108.5s-14.1-108.9 41.3-175.7c20.8-25 27.6-54.1 17.3-84.8-3.1-9.2-8-17.9-13.8-25.8C47.7 62.2 24 0 24 0s19.5 8.8 48.6 26.6c29.1 17.8 73 33.1 111.8 62.2z"/></svg>
+           )}
+           {isTruthSocial && (
+             <svg className="w-5 h-5 text-purple-700" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
            )}
         </div>
       </div>
@@ -559,10 +564,10 @@ export default function Home() {
                   </BentoCard>
 
                   {/* Bottom Row: Highlights */}
-                  <BentoCard title={result.sourceDomain?.match(/twitter|x\.com|bsky|threads/) ? "Analysis Target" : "Key Excerpts"} className="flex-1 min-h-[300px]">
+                  <BentoCard title={result.sourceDomain?.match(/twitter|x\.com|bsky|threads|truthsocial/) ? "Analysis Target" : "Key Excerpts"} className="flex-1 min-h-[300px]">
                     <div className="relative h-full">
                       <div className="max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
-                        {result.sourceDomain?.match(/twitter|x\.com|bsky|threads/) ? (
+                        {result.sourceDomain?.match(/twitter|x\.com|bsky|threads|truthsocial/) ? (
                            <SocialPostCard
                               title={result.title || ""}
                               text={result.textPreview || ""}
