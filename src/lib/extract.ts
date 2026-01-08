@@ -10,6 +10,7 @@ export interface ExtractedContent {
   sourceDomain: string;
   success: boolean;
   error?: string;
+  image?: string;
 }
 
 // Private IP ranges to block (SSRF protection)
@@ -131,12 +132,21 @@ async function extractBluesky(urlString: string): Promise<ExtractedContent | nul
     }
 
     const text = post.record.text;
+    
+    // Extract image if available
+    let image: string | undefined;
+    // @ts-ignore - Basic type safety for dynamic API response
+    if (post.embed?.images?.[0]?.fullsize) {
+      // @ts-ignore
+      image = post.embed.images[0].fullsize;
+    }
 
     return {
       title: `Post by @${post.author?.handle || handle}`,
       text: text,
       sourceDomain,
       success: true,
+      image,
     };
   } catch (err) {
     return {
@@ -213,6 +223,7 @@ async function extractTwitter(urlString: string): Promise<ExtractedContent | nul
           text: data.tweet.text,
           sourceDomain,
           success: true,
+          image: data.tweet.media?.photos?.[0]?.url,
         };
       }
     }
@@ -262,12 +273,15 @@ async function extractThreads(urlString: string): Promise<ExtractedContent | nul
           .replace(/&gt;/g, '>')
           .replace(/&#x27;/g, "'");
 
+        const ogImage = html.match(/<meta[^>]*property="og:image"[^>]*content="([^"]+)"/)?.[1];
+
         if (text.length > 20) {
           return {
             title: `Thread by @${username}`,
             text: text,
             sourceDomain,
             success: true,
+            image: ogImage,
           };
         }
       }
@@ -626,6 +640,10 @@ export async function extractContent(urlString: string): Promise<ExtractedConten
     const reader = new Readability(document as unknown as Document);
     const article = reader.parse();
 
+    // Extract OG Image
+    const ogImage = document.querySelector('meta[property="og:image"]')?.getAttribute("content") 
+                 || document.querySelector('meta[name="twitter:image"]')?.getAttribute("content");
+
     if (!article || !article.textContent) {
       return {
         title: document.title || "",
@@ -656,6 +674,7 @@ export async function extractContent(urlString: string): Promise<ExtractedConten
       text: cleanText,
       sourceDomain,
       success: true,
+      image: ogImage || undefined,
     };
 
     // Cache the result

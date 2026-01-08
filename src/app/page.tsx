@@ -32,6 +32,7 @@ interface AnalysisResult {
   contextNotes?: string;
   sharingPatterns?: string[];
   techniqueExplanations?: string[];
+  image?: string;
 }
 
 const EXAMPLE_URL = "https://www.bbc.com/news/world-us-canada-68416845";
@@ -201,18 +202,20 @@ function HighlightedText({
   );
 }
 
-function SocialPostCard({ 
-  title, 
-  text, 
-  highlights, 
-  sourceDomain, 
-  activeFilter 
-}: { 
-  title: string; 
-  text: string; 
-  highlights: Highlight[]; 
-  sourceDomain: string; 
-  activeFilter: string | null; 
+function SocialPostCard({
+  title,
+  text,
+  highlights,
+  sourceDomain,
+  activeFilter,
+  image
+}: {
+  title: string;
+  text: string;
+  highlights: Highlight[];
+  sourceDomain: string;
+  activeFilter: string | null;
+  image?: string;
 }) {
   // Extract handle from title (e.g., "Tweet by @username")
   const handleMatch = title.match(/@([a-zA-Z0-9_.-]+)/);
@@ -267,8 +270,14 @@ function SocialPostCard({
         />
       </div>
 
-      {/* Fake Metrics */}
-      <div className="flex items-center gap-6 pt-3 border-t border-zinc-100 dark:border-zinc-800 text-zinc-500 text-sm">
+      {/* Image Attachment */}
+      {image && (
+        <div className="mb-3 rounded-lg overflow-hidden border border-zinc-200 dark:border-zinc-800">
+          <img src={image} alt="Post attachment" className="w-full h-auto object-cover max-h-80" />
+        </div>
+      )}
+
+      {/* Fake Metrics */}      <div className="flex items-center gap-6 pt-3 border-t border-zinc-100 dark:border-zinc-800 text-zinc-500 text-sm">
         <div className="flex items-center gap-1.5 hover:text-rose-500 transition-colors cursor-pointer group">
            <span className="group-hover:bg-rose-50 dark:group-hover:bg-rose-900/20 p-1.5 -ml-1.5 rounded-full transition-colors">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path></svg>
@@ -329,12 +338,44 @@ export default function Home() {
     analyze(EXAMPLE_URL);
   };
 
+  const getShareUrl = () => {
+    if (!result?.success || result.score === undefined) return "";
+    const params = new URLSearchParams({
+      url: url,
+      score: String(result.score),
+      domain: result.sourceDomain || "",
+      title: result.title || "",
+    });
+    return `${window.location.origin}/share?${params.toString()}`;
+  };
+
   const copyShareCard = () => {
     if (!result?.success || result.score === undefined) return;
-    const text = `RageCheck score: ${result.score}/100 - ${result.sourceDomain}`;
-    navigator.clipboard.writeText(text);
+    const shareUrl = getShareUrl();
+    navigator.clipboard.writeText(shareUrl);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleShare = async () => {
+    if (!result?.success || result.score === undefined) return;
+    const shareUrl = getShareUrl();
+    const shareData = {
+      title: `RageCheck: ${result.score}/100`,
+      text: `${result.title || "Content"} scored ${result.score}/100 for manipulative patterns`,
+      url: shareUrl,
+    };
+
+    if (navigator.share && navigator.canShare?.(shareData)) {
+      try {
+        await navigator.share(shareData);
+      } catch {
+        // User cancelled or error - fall back to copy
+        copyShareCard();
+      }
+    } else {
+      copyShareCard();
+    }
   };
 
   return (
@@ -568,14 +609,14 @@ export default function Home() {
                     <div className="relative h-full">
                       <div className="max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
                         {result.sourceDomain?.match(/twitter|x\.com|bsky|threads|truthsocial/) ? (
-                           <SocialPostCard
-                              title={result.title || ""}
-                              text={result.textPreview || ""}
-                              highlights={result.highlights || []}
-                              sourceDomain={result.sourceDomain || ""}
-                              activeFilter={activeFilter}
-                           />
-                        ) : (
+                                                      <SocialPostCard 
+                                                         title={result.title || ""}
+                                                         text={result.textPreview || ""}
+                                                         highlights={result.highlights || []}
+                                                         sourceDomain={result.sourceDomain || ""}
+                                                         activeFilter={activeFilter}
+                                                         image={result.image}
+                                                      />                        ) : (
                           <HighlightedText
                             text={result.textPreview || ""}
                             highlights={result.highlights || []}
@@ -588,12 +629,23 @@ export default function Home() {
                        <span className="text-xs text-zinc-400">
                          {activeFilter ? `Showing "${SIGNAL_LABELS[activeFilter as keyof SignalBreakdown]}" only` : "Showing all detected patterns"}
                        </span>
-                       <button
-                        onClick={copyShareCard}
-                        className="text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 transition-colors"
-                      >
-                        {copied ? "Copied!" : "Copy Link"}
-                      </button>
+                       <div className="flex items-center gap-3">
+                         <button
+                           onClick={copyShareCard}
+                           className="text-xs font-medium text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 transition-colors"
+                         >
+                           {copied ? "Copied!" : "Copy Link"}
+                         </button>
+                         <button
+                           onClick={handleShare}
+                           className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium rounded-lg transition-colors"
+                         >
+                           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                           </svg>
+                           Share
+                         </button>
+                       </div>
                     </div>
                   </BentoCard>
                 </div>

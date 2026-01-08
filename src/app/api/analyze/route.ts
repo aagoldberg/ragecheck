@@ -17,8 +17,7 @@ export interface AnalyzeResponse {
   textPreview?: string;
   llmEnhanced?: boolean;
   contextNotes?: string;
-  sharingPatterns?: string[];
-  techniqueExplanations?: string[];
+  image?: string;
 }
 
 function getLabel(score: number): "Low" | "Medium" | "High" {
@@ -131,6 +130,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<AnalyzeRe
       textPreview,
       llmEnhanced,
       contextNotes,
+      image: extracted.image,
       sharingPatterns,
       techniqueExplanations,
     });
