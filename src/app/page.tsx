@@ -38,54 +38,84 @@ interface AnalysisResult {
 const EXAMPLE_URL = "https://www.nytimes.com/video/us/100000010631041/minneapolis-ice-shooting-video.html";
 
 const CURATED_EXAMPLES = [
+  // News Articles
   {
     source: "Breitbart",
     lean: "Far Right",
+    type: "article",
     title: "ICE Agent Killed in Minneapolis Ambush Attack",
     url: "https://www.breitbart.com/politics/2025/01/07/ice-agent-killed-minneapolis-ambush-attack/",
-    image: "/placeholder-news.svg",
   },
   {
     source: "Fox News",
     lean: "Right",
+    type: "article",
     title: "ICE longest-serving acting director issues warning after Minneapolis ambush",
     url: "https://www.foxnews.com/media/ice-longest-serving-acting-director-issues-warning-minneapolis-ambush",
-    image: "/placeholder-news.svg",
   },
   {
     source: "Reuters",
     lean: "Center",
+    type: "article",
     title: "Gunman kills federal agent, wounds others at Minneapolis ICE office",
     url: "https://www.reuters.com/world/us/multiple-people-shot-ice-facility-minneapolis-cbs-2025-01-07/",
-    image: "/placeholder-news.svg",
   },
   {
     source: "NPR",
     lean: "Center",
+    type: "article",
     title: "What we know about the deadly shooting at an ICE office in Minneapolis",
     url: "https://www.npr.org/2025/01/08/nx-s1-5253490/minneapolis-ice-shooting",
-    image: "/placeholder-news.svg",
   },
   {
     source: "CNN",
     lean: "Left",
+    type: "article",
     title: "What we know about the Minneapolis ICE shooting",
     url: "https://www.cnn.com/2025/01/07/us/minneapolis-ice-shooting-what-we-know/index.html",
-    image: "/placeholder-news.svg",
   },
   {
     source: "MSNBC",
     lean: "Left",
+    type: "article",
     title: "Minneapolis ICE shooting sparks immigration debate",
     url: "https://www.msnbc.com/rachel-maddow-show/maddowblog/minneapolis-ice-shooting-trump-immigration-rcna186658",
-    image: "/placeholder-news.svg",
+  },
+  // Tweets
+  {
+    source: "@TuckerCarlson",
+    lean: "Far Right",
+    type: "tweet",
+    title: "Tucker Carlson on X",
+    url: "https://x.com/TuckerCarlson",
   },
   {
-    source: "Daily Kos",
+    source: "@DonaldJTrumpJr",
+    lean: "Right",
+    type: "tweet",
+    title: "Donald Trump Jr. on X",
+    url: "https://x.com/DonaldJTrumpJr",
+  },
+  {
+    source: "@AP",
+    lean: "Center",
+    type: "tweet",
+    title: "Associated Press on X",
+    url: "https://x.com/AP",
+  },
+  {
+    source: "@AOC",
+    lean: "Left",
+    type: "tweet",
+    title: "Alexandria Ocasio-Cortez on X",
+    url: "https://x.com/AOC",
+  },
+  {
+    source: "@BernieSanders",
     lean: "Far Left",
-    title: "Minneapolis ICE office shooting highlights immigration tensions",
-    url: "https://www.dailykos.com/",
-    image: "/placeholder-news.svg",
+    type: "tweet",
+    title: "Bernie Sanders on X",
+    url: "https://x.com/BernieSanders",
   },
 ];
 
@@ -517,44 +547,91 @@ export default function Home() {
             <h2 className="text-center text-lg font-semibold text-zinc-700 dark:text-zinc-300 mb-2">
               Compare Coverage Across the Political Spectrum
             </h2>
-            <p className="text-center text-sm text-zinc-500 dark:text-zinc-400 mb-6">
-              Same story, different framing. Click any article to analyze it.
+            <p className="text-center text-sm text-zinc-500 dark:text-zinc-400 mb-8">
+              Same story, different framing. Click any to analyze.
             </p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {CURATED_EXAMPLES.map((example, i) => (
-                <button
-                  key={i}
-                  onClick={() => {
-                    setUrl(example.url);
-                    analyze(example.url);
-                  }}
-                  className="group text-left bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-hidden hover:border-indigo-300 dark:hover:border-indigo-700 hover:shadow-md transition-all"
-                >
-                  <div className="aspect-video bg-zinc-100 dark:bg-zinc-800 relative overflow-hidden">
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <span className="text-4xl font-bold text-zinc-300 dark:text-zinc-600">
-                        {example.source.charAt(0)}
-                      </span>
+
+            {/* News Articles */}
+            <div className="mb-8">
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-4 flex items-center gap-2">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" />
+                </svg>
+                News Articles
+              </h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {CURATED_EXAMPLES.filter(e => e.type === "article").map((example, i) => (
+                  <button
+                    key={i}
+                    onClick={() => {
+                      setUrl(example.url);
+                      analyze(example.url);
+                    }}
+                    className="group text-left bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-hidden hover:border-indigo-300 dark:hover:border-indigo-700 hover:shadow-md transition-all"
+                  >
+                    <div className="h-24 bg-zinc-100 dark:bg-zinc-800 relative overflow-hidden">
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <span className="text-3xl font-bold text-zinc-300 dark:text-zinc-600">
+                          {example.source.charAt(0)}
+                        </span>
+                      </div>
+                      <div className="absolute top-2 left-2">
+                        <span className={`text-xs font-medium px-2 py-1 rounded ${LEAN_COLORS[example.lean]}`}>
+                          {example.lean}
+                        </span>
+                      </div>
                     </div>
-                    <div className="absolute top-2 left-2">
-                      <span className={`text-xs font-medium px-2 py-1 rounded ${LEAN_COLORS[example.lean]}`}>
+                    <div className="p-3">
+                      <p className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 mb-1">
+                        {example.source}
+                      </p>
+                      <p className="text-sm font-medium text-zinc-800 dark:text-zinc-200 line-clamp-2 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+                        {example.title}
+                      </p>
+                      <p className="mt-2 text-xs text-indigo-600 dark:text-indigo-400 font-medium opacity-0 group-hover:opacity-100 transition-opacity">
+                        Analyze this →
+                      </p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Tweets */}
+            <div>
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-4 flex items-center gap-2">
+                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+                </svg>
+                Posts on X
+              </h3>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+                {CURATED_EXAMPLES.filter(e => e.type === "tweet").map((example, i) => (
+                  <button
+                    key={i}
+                    onClick={() => {
+                      setUrl(example.url);
+                      analyze(example.url);
+                    }}
+                    className="group text-left bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-3 hover:border-indigo-300 dark:hover:border-indigo-700 hover:shadow-md transition-all"
+                  >
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="w-8 h-8 rounded-full bg-zinc-200 dark:bg-zinc-700 flex items-center justify-center text-sm font-bold text-zinc-500 dark:text-zinc-400">
+                        {example.source.charAt(1).toUpperCase()}
+                      </div>
+                      <span className={`text-xs font-medium px-2 py-0.5 rounded ${LEAN_COLORS[example.lean]}`}>
                         {example.lean}
                       </span>
                     </div>
-                  </div>
-                  <div className="p-3">
-                    <p className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 mb-1">
+                    <p className="text-sm font-medium text-zinc-800 dark:text-zinc-200 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
                       {example.source}
                     </p>
-                    <p className="text-sm font-medium text-zinc-800 dark:text-zinc-200 line-clamp-2 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
-                      {example.title}
+                    <p className="mt-1 text-xs text-indigo-600 dark:text-indigo-400 font-medium opacity-0 group-hover:opacity-100 transition-opacity">
+                      Analyze →
                     </p>
-                    <p className="mt-2 text-xs text-indigo-600 dark:text-indigo-400 font-medium opacity-0 group-hover:opacity-100 transition-opacity">
-                      Analyze this →
-                    </p>
-                  </div>
-                </button>
-              ))}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         )}
