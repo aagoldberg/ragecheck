@@ -287,61 +287,68 @@ async function extractThreads(urlString: string): Promise<ExtractedContent | nul
 
 // ============ FARCASTER/WARPCAST SUPPORT ============
 
+interface NeynarCast {
+  cast: {
+    author: {
+      username: string;
+      display_name?: string;
+    };
+    text: string;
+  };
+}
+
 async function extractFarcaster(urlString: string): Promise<ExtractedContent | null> {
-  // Parse Warpcast URL: https://warpcast.com/{username}/{hash} or https://warpcast.com/~/conversations/{hash}
-  const match = urlString.match(/warpcast\.com\/(?:~\/conversations\/|([^/]+)\/)([a-zA-Z0-9]+)/);
+  // Parse Farcaster/Warpcast URL: https://warpcast.com/{username}/{hash} or https://farcaster.xyz/{username}/{hash}
+  const match = urlString.match(/(?:warpcast\.com|farcaster\.xyz)\/([^/]+)\/([a-zA-Z0-9x]+)/);
   if (!match) return null;
 
   const [, username, hash] = match;
-  const sourceDomain = "warpcast.com";
+  const sourceDomain = urlString.includes("farcaster.xyz") ? "farcaster.xyz" : "warpcast.com";
 
+  // Try Neynar's public cast lookup API
   try {
-    // Try to get content via og:description from the page
-    const response = await fetch(urlString, {
+    // Neynar has a free endpoint for cast lookups by URL
+    const neynarUrl = `https://api.neynar.com/v2/farcaster/cast?identifier=${encodeURIComponent(urlString)}&type=url`;
+
+    const response = await fetch(neynarUrl, {
       headers: {
-        "User-Agent": "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
-        "Accept": "text/html",
+        "Accept": "application/json",
+        // Neynar requires an API key, but has a public demo key
+        "api_key": "NEYNAR_API_DOCS",
       },
     });
 
     if (response.ok) {
-      const html = await response.text();
+      const data: NeynarCast = await response.json();
+      if (data.cast?.text) {
+        return {
+          title: `Cast by @${data.cast.author?.username || username}`,
+          text: data.cast.text,
+          sourceDomain,
+          success: true,
+        };
+      }
+    }
+  } catch {
+    // Try fallback
+  }
 
-      // Look for og:description meta tag
-      const ogDescMatch = html.match(/<meta[^>]*property="og:description"[^>]*content="([^"]+)"/);
-      // Also try twitter:description
-      const twitterDescMatch = html.match(/<meta[^>]*name="twitter:description"[^>]*content="([^"]+)"/);
-      // Get the title/author from og:title
-      const ogTitleMatch = html.match(/<meta[^>]*property="og:title"[^>]*content="([^"]+)"/);
+  // Fallback: Try to extract from Supercast embed API
+  try {
+    const embedUrl = `https://client.warpcast.com/v2/cast?hash=${hash}`;
+    const response = await fetch(embedUrl, {
+      headers: { "Accept": "application/json" },
+    });
 
-      const descContent = ogDescMatch?.[1] || twitterDescMatch?.[1];
-
-      if (descContent) {
-        const text = descContent
-          .replace(/&quot;/g, '"')
-          .replace(/&amp;/g, '&')
-          .replace(/&lt;/g, '<')
-          .replace(/&gt;/g, '>')
-          .replace(/&#x27;/g, "'")
-          .replace(/&#39;/g, "'");
-
-        // Extract username from og:title if available (format: "Username on Warpcast")
-        let author = username || "user";
-        if (ogTitleMatch?.[1]) {
-          const titleAuthorMatch = ogTitleMatch[1].match(/^([^"]+?)(?:\s+on\s+Warpcast)?$/i);
-          if (titleAuthorMatch) {
-            author = titleAuthorMatch[1].trim();
-          }
-        }
-
-        if (text.length > 5) {
-          return {
-            title: `Cast by @${author}`,
-            text: text,
-            sourceDomain,
-            success: true,
-          };
-        }
+    if (response.ok) {
+      const data = await response.json();
+      if (data.result?.cast?.text) {
+        return {
+          title: `Cast by @${data.result.cast.author?.username || username}`,
+          text: data.result.cast.text,
+          sourceDomain,
+          success: true,
+        };
       }
     }
   } catch {
@@ -353,7 +360,7 @@ async function extractFarcaster(urlString: string): Promise<ExtractedContent | n
     text: "",
     sourceDomain,
     success: false,
-    error: "Could not extract Farcaster cast content.",
+    error: "Could not extract Farcaster cast. Try using a Neynar API key for reliable access.",
   };
 }
 
