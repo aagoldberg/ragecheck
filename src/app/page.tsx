@@ -35,7 +35,7 @@ interface AnalysisResult {
   image?: string;
 }
 
-const EXAMPLE_URL = "https://www.bbc.com/news/world-us-canada-68416845";
+const EXAMPLE_URL = "https://www.nytimes.com/video/us/100000010631041/minneapolis-ice-shooting-video.html";
 
 const SIGNAL_LABELS: Record<keyof SignalBreakdown, string> = {
   loadedLanguage: "Loaded Language",
