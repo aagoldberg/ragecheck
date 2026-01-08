@@ -63,9 +63,9 @@ export async function POST(request: NextRequest): Promise<NextResponse<AnalyzeRe
     // Analyze the text with rules
     const ruleAnalysis = analyzeText(extracted.text);
 
-    // Create a preview of the text (first 500 chars)
-    const textPreview = extracted.text.length > 500
-      ? extracted.text.substring(0, 500) + "..."
+    // Create a preview of the text (limit to 5000 chars to avoid payload issues)
+    const textPreview = extracted.text.length > 5000
+      ? extracted.text.substring(0, 5000) + "..."
       : extracted.text;
 
     // Try to enhance with LLM if available

@@ -130,7 +130,6 @@ async function extractBluesky(urlString: string): Promise<ExtractedContent | nul
       };
     }
 
-    const author = post.author?.displayName || post.author?.handle || handle;
     const text = post.record.text;
 
     return {
