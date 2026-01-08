@@ -285,6 +285,78 @@ async function extractThreads(urlString: string): Promise<ExtractedContent | nul
   };
 }
 
+// ============ FARCASTER/WARPCAST SUPPORT ============
+
+async function extractFarcaster(urlString: string): Promise<ExtractedContent | null> {
+  // Parse Warpcast URL: https://warpcast.com/{username}/{hash} or https://warpcast.com/~/conversations/{hash}
+  const match = urlString.match(/warpcast\.com\/(?:~\/conversations\/|([^/]+)\/)([a-zA-Z0-9]+)/);
+  if (!match) return null;
+
+  const [, username, hash] = match;
+  const sourceDomain = "warpcast.com";
+
+  try {
+    // Try to get content via og:description from the page
+    const response = await fetch(urlString, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
+        "Accept": "text/html",
+      },
+    });
+
+    if (response.ok) {
+      const html = await response.text();
+
+      // Look for og:description meta tag
+      const ogDescMatch = html.match(/<meta[^>]*property="og:description"[^>]*content="([^"]+)"/);
+      // Also try twitter:description
+      const twitterDescMatch = html.match(/<meta[^>]*name="twitter:description"[^>]*content="([^"]+)"/);
+      // Get the title/author from og:title
+      const ogTitleMatch = html.match(/<meta[^>]*property="og:title"[^>]*content="([^"]+)"/);
+
+      const descContent = ogDescMatch?.[1] || twitterDescMatch?.[1];
+
+      if (descContent) {
+        const text = descContent
+          .replace(/&quot;/g, '"')
+          .replace(/&amp;/g, '&')
+          .replace(/&lt;/g, '<')
+          .replace(/&gt;/g, '>')
+          .replace(/&#x27;/g, "'")
+          .replace(/&#39;/g, "'");
+
+        // Extract username from og:title if available (format: "Username on Warpcast")
+        let author = username || "user";
+        if (ogTitleMatch?.[1]) {
+          const titleAuthorMatch = ogTitleMatch[1].match(/^([^"]+?)(?:\s+on\s+Warpcast)?$/i);
+          if (titleAuthorMatch) {
+            author = titleAuthorMatch[1].trim();
+          }
+        }
+
+        if (text.length > 5) {
+          return {
+            title: `Cast by @${author}`,
+            text: text,
+            sourceDomain,
+            success: true,
+          };
+        }
+      }
+    }
+  } catch {
+    // Failed
+  }
+
+  return {
+    title: "",
+    text: "",
+    sourceDomain,
+    success: false,
+    error: "Could not extract Farcaster cast content.",
+  };
+}
+
 // ============ MAIN EXTRACTION FUNCTION ============
 
 export async function extractContent(urlString: string): Promise<ExtractedContent> {
@@ -340,6 +412,14 @@ export async function extractContent(urlString: string): Promise<ExtractedConten
 
   if (sourceDomain.includes("threads.net")) {
     const result = await extractThreads(urlString);
+    if (result) {
+      if (result.success) cache.set(urlString, result);
+      return result;
+    }
+  }
+
+  if (sourceDomain.includes("warpcast.com")) {
+    const result = await extractFarcaster(urlString);
     if (result) {
       if (result.success) cache.set(urlString, result);
       return result;
