@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { extractContent } from "@/lib/extract";
 import { analyzeText, SignalBreakdown, Highlight } from "@/lib/score";
-import { enhanceWithLLM, isLLMAvailable } from "@/lib/llm";
+import { enhanceWithLLM, isLLMAvailable, analyzeImageWithVision } from "@/lib/llm";
 import { logAnalysis } from "@/lib/db";
 
 export interface AnalyzeResponse {
@@ -18,7 +18,11 @@ export interface AnalyzeResponse {
   llmEnhanced?: boolean;
   contextNotes?: string;
   image?: string;
+  sharingPatterns?: string[];
+  techniqueExplanations?: string[];
 }
+
+const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5MB
 
 function getLabel(score: number): "Low" | "Medium" | "High" {
   if (score <= 33) return "Low";
@@ -29,7 +33,7 @@ function getLabel(score: number): "Low" | "Medium" | "High" {
 export async function POST(request: NextRequest): Promise<NextResponse<AnalyzeResponse>> {
   try {
     const body = await request.json();
-    const { url } = body;
+    const { url, image } = body;
 
     // Capture visitor info from headers
     const ipAddress = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
@@ -38,9 +42,79 @@ export async function POST(request: NextRequest): Promise<NextResponse<AnalyzeRe
     const userAgent = request.headers.get("user-agent") || null;
     const country = request.headers.get("x-vercel-ip-country") || null;
 
+    // Handle image upload
+    if (image && typeof image === "string") {
+      // Validate image format
+      if (!image.startsWith("data:image/")) {
+        return NextResponse.json(
+          { success: false, error: "Invalid image format" },
+          { status: 400 }
+        );
+      }
+
+      // Check approximate size (base64 is ~4/3 larger than binary)
+      const base64Data = image.split(",")[1];
+      if (base64Data && base64Data.length * 0.75 > MAX_IMAGE_SIZE) {
+        return NextResponse.json(
+          { success: false, error: "Image too large (max 5MB)" },
+          { status: 400 }
+        );
+      }
+
+      // Analyze with Vision API
+      const result = await analyzeImageWithVision(image);
+
+      if (!result.success) {
+        logAnalysis({
+          url: "image-upload",
+          sourceDomain: "image",
+          success: false,
+          error: result.error || "Failed to analyze image",
+          ipAddress: ipAddress || undefined,
+          userAgent: userAgent || undefined,
+          country: country || undefined,
+        });
+
+        return NextResponse.json(
+          { success: false, error: result.error || "Failed to analyze image" },
+          { status: 422 }
+        );
+      }
+
+      // Log successful image analysis
+      logAnalysis({
+        url: "image-upload",
+        sourceDomain: result.platform || "image",
+        score: result.score,
+        label: result.label,
+        llmEnhanced: true,
+        signalBreakdown: result.signalBreakdown,
+        success: true,
+        ipAddress: ipAddress || undefined,
+        userAgent: userAgent || undefined,
+        country: country || undefined,
+      });
+
+      return NextResponse.json({
+        success: true,
+        score: result.score,
+        label: result.label,
+        reasons: result.reasons,
+        highlights: result.highlights,
+        signalBreakdown: result.signalBreakdown,
+        title: "Uploaded Screenshot",
+        sourceDomain: result.platform || "image",
+        textPreview: result.extractedText,
+        llmEnhanced: true,
+        sharingPatterns: result.sharingPatterns,
+        techniqueExplanations: result.techniqueExplanations,
+      });
+    }
+
+    // Handle URL analysis (existing logic)
     if (!url || typeof url !== "string") {
       return NextResponse.json(
-        { success: false, error: "URL is required" },
+        { success: false, error: "URL or image is required" },
         { status: 400 }
       );
     }

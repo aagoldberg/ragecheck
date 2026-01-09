@@ -413,6 +413,8 @@ export default function Home() {
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
   const [headlines, setHeadlines] = useState<Headline[]>([]);
   const [headlinesLoading, setHeadlinesLoading] = useState(true);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [imageError, setImageError] = useState<string | null>(null);
 
   // Track visitor and fetch headlines on page load
   useEffect(() => {
@@ -430,12 +432,80 @@ export default function Home() {
       .finally(() => setHeadlinesLoading(false));
   }, []);
 
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    setImageError(null);
+
+    if (!file) {
+      setImagePreview(null);
+      return;
+    }
+
+    // Validate file type
+    const allowedTypes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+    if (!allowedTypes.includes(file.type)) {
+      setImageError("Please upload a JPEG, PNG, GIF, or WebP image");
+      setImagePreview(null);
+      return;
+    }
+
+    // Validate file size (5MB max)
+    if (file.size > 5 * 1024 * 1024) {
+      setImageError("Image too large (max 5MB)");
+      setImagePreview(null);
+      return;
+    }
+
+    // Read and preview
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      setImagePreview(event.target?.result as string);
+      setUrl(""); // Clear URL when image is selected
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const clearImage = () => {
+    setImagePreview(null);
+    setImageError(null);
+    // Reset file input
+    const fileInput = document.getElementById("image-upload") as HTMLInputElement;
+    if (fileInput) fileInput.value = "";
+  };
+
+  const analyzeImage = async () => {
+    if (!imagePreview) return;
+
+    setLoading(true);
+    setResult(null);
+    setActiveFilter(null);
+
+    try {
+      const response = await fetch("/api/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image: imagePreview }),
+      });
+
+      const data = await response.json();
+      setResult(data);
+    } catch {
+      setResult({
+        success: false,
+        error: "Failed to connect to server",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const analyze = async (targetUrl: string) => {
     if (!targetUrl.trim()) return;
 
     setLoading(true);
     setResult(null);
     setActiveFilter(null);
+    clearImage(); // Clear any selected image
 
     try {
       const response = await fetch("/api/analyze", {
@@ -537,45 +607,115 @@ export default function Home() {
 
           {/* Search Input */}
           <form onSubmit={handleSubmit} className="relative max-w-xl mx-auto">
-            <div className="relative group">
-               <div className="absolute -inset-0.5 bg-gradient-to-r from-rose-500 to-indigo-600 rounded-lg blur opacity-30 group-focus-within:opacity-100 transition duration-1000"></div>
-               <div className="relative flex items-center bg-white dark:bg-zinc-900 rounded-lg shadow-sm">
-                  <input
-                    type="url"
-                    value={url}
-                    onChange={(e) => setUrl(e.target.value)}
-                    placeholder="Paste an article URL to analyze..."
-                    className="flex-1 w-full px-4 py-4 bg-transparent border-0 focus:ring-0 text-zinc-900 dark:text-zinc-100 placeholder-zinc-400"
-                    required
+            {/* Image Preview */}
+            {imagePreview && (
+              <div className="mb-4 relative">
+                <div className="relative rounded-lg overflow-hidden border border-zinc-200 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-800">
+                  <img
+                    src={imagePreview}
+                    alt="Screenshot preview"
+                    className="w-full max-h-48 object-contain"
                   />
-                  <div className="pr-2">
-                    <button
-                      type="submit"
-                      disabled={loading || !url.trim()}
-                      className="px-4 py-2 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 rounded-md text-sm font-medium hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {loading ? (
-                        <span className="flex items-center gap-2">
-                          <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                          </svg>
-                          Analyzing
-                        </span>
-                      ) : "Analyze"}
-                    </button>
+                  <button
+                    type="button"
+                    onClick={clearImage}
+                    className="absolute top-2 right-2 p-1 bg-zinc-900/80 hover:bg-zinc-900 text-white rounded-full transition-colors"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  onClick={analyzeImage}
+                  disabled={loading}
+                  className="mt-3 w-full px-4 py-3 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 rounded-lg font-medium hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-colors disabled:opacity-50"
+                >
+                  {loading ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      </svg>
+                      Analyzing Screenshot
+                    </span>
+                  ) : "Analyze Screenshot"}
+                </button>
+              </div>
+            )}
+
+            {/* URL Input + Upload Button */}
+            {!imagePreview && (
+              <>
+                <div className="relative group">
+                  <div className="absolute -inset-0.5 bg-gradient-to-r from-rose-500 to-indigo-600 rounded-lg blur opacity-30 group-focus-within:opacity-100 transition duration-1000"></div>
+                  <div className="relative flex items-center bg-white dark:bg-zinc-900 rounded-lg shadow-sm">
+                    <input
+                      type="url"
+                      value={url}
+                      onChange={(e) => setUrl(e.target.value)}
+                      placeholder="Paste an article URL to analyze..."
+                      className="flex-1 w-full px-4 py-4 bg-transparent border-0 focus:ring-0 text-zinc-900 dark:text-zinc-100 placeholder-zinc-400"
+                      required
+                    />
+                    <div className="pr-2 flex items-center gap-2">
+                      {/* Upload Button */}
+                      <label
+                        htmlFor="image-upload"
+                        className="p-2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 cursor-pointer transition-colors"
+                        title="Upload screenshot"
+                      >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                        <input
+                          id="image-upload"
+                          type="file"
+                          accept="image/jpeg,image/png,image/gif,image/webp"
+                          onChange={handleImageSelect}
+                          className="hidden"
+                        />
+                      </label>
+                      <button
+                        type="submit"
+                        disabled={loading || !url.trim()}
+                        className="px-4 py-2 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 rounded-md text-sm font-medium hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {loading ? (
+                          <span className="flex items-center gap-2">
+                            <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                            </svg>
+                            Analyzing
+                          </span>
+                        ) : "Analyze"}
+                      </button>
+                    </div>
                   </div>
-               </div>
-            </div>
-            <div className="mt-4 text-center">
-              <button
-                type="button"
-                onClick={tryExample}
-                className="text-xs font-medium text-zinc-500 hover:text-indigo-600 transition-colors"
-              >
-                Try an example article →
-              </button>
-            </div>
+                </div>
+                {imageError && (
+                  <p className="mt-2 text-sm text-rose-600 dark:text-rose-400 text-center">{imageError}</p>
+                )}
+                <div className="mt-4 flex items-center justify-center gap-4 text-xs text-zinc-500">
+                  <button
+                    type="button"
+                    onClick={tryExample}
+                    className="font-medium hover:text-indigo-600 transition-colors"
+                  >
+                    Try an example article →
+                  </button>
+                  <span className="text-zinc-300 dark:text-zinc-600">or</span>
+                  <label
+                    htmlFor="image-upload"
+                    className="font-medium hover:text-indigo-600 transition-colors cursor-pointer"
+                  >
+                    Upload a screenshot
+                  </label>
+                </div>
+              </>
+            )}
           </form>
         </div>
 

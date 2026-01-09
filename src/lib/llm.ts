@@ -132,3 +132,141 @@ Respond with this exact JSON structure:
 export function isLLMAvailable(): boolean {
   return client !== null;
 }
+
+export interface ImageAnalysisResult {
+  success: boolean;
+  error?: string;
+  extractedText?: string;
+  platform?: string;
+  score?: number;
+  label?: "Low" | "Medium" | "High";
+  signalBreakdown?: SignalBreakdown;
+  reasons?: string[];
+  highlights?: Highlight[];
+  sharingPatterns?: string[];
+  techniqueExplanations?: string[];
+}
+
+const IMAGE_ANALYSIS_PROMPT = `You are analyzing a screenshot of a social media post or article. Your task is to:
+
+1. EXTRACT all visible text from the image (post content, username, comments, etc.)
+2. IDENTIFY the platform (Twitter/X, Facebook, Instagram, TikTok, Reddit, Threads, Bluesky, news article, or "unknown")
+3. ANALYZE the content for outrage bait and manipulation patterns
+
+Key patterns to detect:
+- **Loaded Language**: Emotionally charged words meant to provoke
+- **Us-vs-Them Framing**: Creating in-group/out-group divisions
+- **Threat/Panic Framing**: Fear-mongering, catastrophizing
+- **Absolutist Language**: "Always", "never", "everyone knows"
+- **Engagement Bait**: Clickbait phrases, calls to share
+
+IMPORTANT: You are detecting MANIPULATION TACTICS, not political bias. Score the manipulation level regardless of the political viewpoint.
+
+Respond with this exact JSON structure:
+{
+  "extractedText": "<all visible text from the image>",
+  "platform": "<detected platform>",
+  "score": <number 0-100, where 0=neutral/informative, 100=extreme outrage bait>,
+  "signalBreakdown": {
+    "loadedLanguage": <0-100>,
+    "absolutist": <0-100>,
+    "threatPanic": <0-100>,
+    "usVsThem": <0-100>,
+    "engagementBait": <0-100>
+  },
+  "reasons": [<3-5 concise bullet points explaining the score>],
+  "highlights": [{"text": "<problematic phrase>", "category": "<signal category>"}],
+  "sharingPatterns": [<2-3 reasons why this content spreads>],
+  "techniqueExplanations": [<2-3 specific manipulation techniques used>]
+}`;
+
+export async function analyzeImageWithVision(
+  imageBase64: string
+): Promise<ImageAnalysisResult> {
+  if (!client) {
+    return { success: false, error: "LLM not available" };
+  }
+
+  // Extract media type and base64 data from data URL
+  const match = imageBase64.match(/^data:(image\/\w+);base64,(.+)$/);
+  if (!match) {
+    return { success: false, error: "Invalid image format" };
+  }
+
+  const mediaType = match[1] as "image/jpeg" | "image/png" | "image/gif" | "image/webp";
+  const base64Data = match[2];
+
+  // Validate media type
+  const allowedTypes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+  if (!allowedTypes.includes(mediaType)) {
+    return { success: false, error: "Unsupported image type" };
+  }
+
+  try {
+    const response = await client.messages.create({
+      model: "claude-3-5-haiku-20241022",
+      max_tokens: 1500,
+      messages: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "image",
+              source: {
+                type: "base64",
+                media_type: mediaType,
+                data: base64Data,
+              },
+            },
+            {
+              type: "text",
+              text: "Analyze this social media screenshot for outrage bait patterns. " + IMAGE_ANALYSIS_PROMPT,
+            },
+          ],
+        },
+      ],
+    });
+
+    // Extract text from response
+    const content = response.content[0];
+    if (content.type !== "text") {
+      return { success: false, error: "Unexpected response format" };
+    }
+
+    // Parse JSON from response
+    const jsonMatch = content.text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      return { success: false, error: "Failed to parse analysis" };
+    }
+
+    const parsed = JSON.parse(jsonMatch[0]);
+    const score = Math.min(100, Math.max(0, parsed.score || 0));
+
+    return {
+      success: true,
+      extractedText: parsed.extractedText || "",
+      platform: parsed.platform || "unknown",
+      score,
+      label: score <= 33 ? "Low" : score <= 66 ? "Medium" : "High",
+      signalBreakdown: {
+        loadedLanguage: Math.min(100, Math.max(0, parsed.signalBreakdown?.loadedLanguage || 0)),
+        absolutist: Math.min(100, Math.max(0, parsed.signalBreakdown?.absolutist || 0)),
+        threatPanic: Math.min(100, Math.max(0, parsed.signalBreakdown?.threatPanic || 0)),
+        usVsThem: Math.min(100, Math.max(0, parsed.signalBreakdown?.usVsThem || 0)),
+        engagementBait: Math.min(100, Math.max(0, parsed.signalBreakdown?.engagementBait || 0)),
+      },
+      reasons: parsed.reasons || [],
+      highlights: (parsed.highlights || []).map((h: { text: string; category: string }) => ({
+        text: h.text,
+        category: h.category as Highlight["category"],
+        start: 0,
+        end: h.text.length,
+      })),
+      sharingPatterns: parsed.sharingPatterns || [],
+      techniqueExplanations: parsed.techniqueExplanations || [],
+    };
+  } catch (error) {
+    console.error("Image analysis failed:", error);
+    return { success: false, error: "Failed to analyze image" };
+  }
+}
