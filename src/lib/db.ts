@@ -1,6 +1,12 @@
 import { neon } from "@neondatabase/serverless";
 
-const sql = neon(process.env.DATABASE_URL!);
+// Lazy initialization - only connect when needed (not at build time)
+function getDb() {
+  if (!process.env.DATABASE_URL) {
+    throw new Error("DATABASE_URL not configured");
+  }
+  return neon(process.env.DATABASE_URL);
+}
 
 // Bot detection patterns
 const BOT_PATTERNS = [
@@ -26,7 +32,7 @@ export function isBot(userAgent: string | null | undefined): boolean {
 
 // Initialize table if it doesn't exist
 export async function initDB() {
-  await sql`
+  await getDb()`
     CREATE TABLE IF NOT EXISTS ragecheck_analyses (
       id SERIAL PRIMARY KEY,
       url TEXT NOT NULL,
@@ -50,7 +56,7 @@ export async function initDB() {
   `;
 
   // Create visitors table
-  await sql`
+  await getDb()`
     CREATE TABLE IF NOT EXISTS ragecheck_visitors (
       id SERIAL PRIMARY KEY,
       ip_address TEXT,
@@ -63,11 +69,11 @@ export async function initDB() {
 
   // Add columns if they don't exist (for existing tables)
   try {
-    await sql`ALTER TABLE ragecheck_analyses ADD COLUMN IF NOT EXISTS ip_address TEXT`;
-    await sql`ALTER TABLE ragecheck_analyses ADD COLUMN IF NOT EXISTS user_agent TEXT`;
-    await sql`ALTER TABLE ragecheck_analyses ADD COLUMN IF NOT EXISTS country TEXT`;
-    await sql`ALTER TABLE ragecheck_analyses ADD COLUMN IF NOT EXISTS is_bot BOOLEAN DEFAULT FALSE`;
-    await sql`ALTER TABLE ragecheck_visitors ADD COLUMN IF NOT EXISTS is_bot BOOLEAN DEFAULT FALSE`;
+    await getDb()`ALTER TABLE ragecheck_analyses ADD COLUMN IF NOT EXISTS ip_address TEXT`;
+    await getDb()`ALTER TABLE ragecheck_analyses ADD COLUMN IF NOT EXISTS user_agent TEXT`;
+    await getDb()`ALTER TABLE ragecheck_analyses ADD COLUMN IF NOT EXISTS country TEXT`;
+    await getDb()`ALTER TABLE ragecheck_analyses ADD COLUMN IF NOT EXISTS is_bot BOOLEAN DEFAULT FALSE`;
+    await getDb()`ALTER TABLE ragecheck_visitors ADD COLUMN IF NOT EXISTS is_bot BOOLEAN DEFAULT FALSE`;
   } catch {
     // Columns may already exist
   }
@@ -108,7 +114,7 @@ export async function logAnalysis(data: AnalysisLog) {
     const platform = data.sourceDomain ? detectPlatform(data.sourceDomain) : "unknown";
     const isBotUser = isBot(data.userAgent);
 
-    await sql`
+    await getDb()`
       INSERT INTO ragecheck_analyses (
         url, source_domain, platform, score, label, llm_enhanced,
         signal_loaded_language, signal_absolutist, signal_threat_panic,
@@ -183,27 +189,27 @@ export interface DashboardStats {
 
 export async function getDashboardStats(): Promise<DashboardStats> {
   // Total counts
-  const [totalResult] = await sql`SELECT COUNT(*) as count FROM ragecheck_analyses`;
-  const [todayResult] = await sql`SELECT COUNT(*) as count FROM ragecheck_analyses WHERE created_at > NOW() - INTERVAL '1 day'`;
-  const [weekResult] = await sql`SELECT COUNT(*) as count FROM ragecheck_analyses WHERE created_at > NOW() - INTERVAL '7 days'`;
+  const [totalResult] = await getDb()`SELECT COUNT(*) as count FROM ragecheck_analyses`;
+  const [todayResult] = await getDb()`SELECT COUNT(*) as count FROM ragecheck_analyses WHERE created_at > NOW() - INTERVAL '1 day'`;
+  const [weekResult] = await getDb()`SELECT COUNT(*) as count FROM ragecheck_analyses WHERE created_at > NOW() - INTERVAL '7 days'`;
 
   // Average score
-  const [avgResult] = await sql`SELECT AVG(score) as avg FROM ragecheck_analyses WHERE score IS NOT NULL`;
+  const [avgResult] = await getDb()`SELECT AVG(score) as avg FROM ragecheck_analyses WHERE score IS NOT NULL`;
 
   // Score distribution
-  const [lowCount] = await sql`SELECT COUNT(*) as count FROM ragecheck_analyses WHERE score IS NOT NULL AND score <= 33`;
-  const [medCount] = await sql`SELECT COUNT(*) as count FROM ragecheck_analyses WHERE score IS NOT NULL AND score > 33 AND score <= 66`;
-  const [highCount] = await sql`SELECT COUNT(*) as count FROM ragecheck_analyses WHERE score IS NOT NULL AND score > 66`;
+  const [lowCount] = await getDb()`SELECT COUNT(*) as count FROM ragecheck_analyses WHERE score IS NOT NULL AND score <= 33`;
+  const [medCount] = await getDb()`SELECT COUNT(*) as count FROM ragecheck_analyses WHERE score IS NOT NULL AND score > 33 AND score <= 66`;
+  const [highCount] = await getDb()`SELECT COUNT(*) as count FROM ragecheck_analyses WHERE score IS NOT NULL AND score > 66`;
 
   // Platform breakdown
-  const platformRows = await sql`SELECT platform, COUNT(*) as count FROM ragecheck_analyses GROUP BY platform`;
+  const platformRows = await getDb()`SELECT platform, COUNT(*) as count FROM ragecheck_analyses GROUP BY platform`;
   const platformBreakdown: Record<string, number> = {};
   for (const row of platformRows) {
     platformBreakdown[row.platform || "unknown"] = Number(row.count);
   }
 
   // Top domains
-  const topDomainRows = await sql`
+  const topDomainRows = await getDb()`
     SELECT source_domain as domain, COUNT(*) as count, AVG(score) as avg_score
     FROM ragecheck_analyses
     WHERE source_domain IS NOT NULL
@@ -218,7 +224,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
   }));
 
   // Signal averages
-  const [signalAvgs] = await sql`
+  const [signalAvgs] = await getDb()`
     SELECT
       AVG(signal_loaded_language) as loaded_language,
       AVG(signal_absolutist) as absolutist,
@@ -230,21 +236,21 @@ export async function getDashboardStats(): Promise<DashboardStats> {
   `;
 
   // Success rate
-  const [successResult] = await sql`SELECT COUNT(*) as count FROM ragecheck_analyses WHERE success = true`;
+  const [successResult] = await getDb()`SELECT COUNT(*) as count FROM ragecheck_analyses WHERE success = true`;
   const successRate = totalResult.count > 0 ? (Number(successResult.count) / Number(totalResult.count)) * 100 : 0;
 
   // LLM enhanced rate
-  const [llmResult] = await sql`SELECT COUNT(*) as count FROM ragecheck_analyses WHERE llm_enhanced = true`;
+  const [llmResult] = await getDb()`SELECT COUNT(*) as count FROM ragecheck_analyses WHERE llm_enhanced = true`;
   const llmEnhancedRate = totalResult.count > 0 ? (Number(llmResult.count) / Number(totalResult.count)) * 100 : 0;
 
   // Bot stats
-  const [botCount] = await sql`SELECT COUNT(*) as count FROM ragecheck_analyses WHERE is_bot = true`;
+  const [botCount] = await getDb()`SELECT COUNT(*) as count FROM ragecheck_analyses WHERE is_bot = true`;
   const totalBots = Number(botCount?.count || 0);
   const totalHumans = Number(totalResult.count) - totalBots;
   const botRate = totalResult.count > 0 ? (totalBots / Number(totalResult.count)) * 100 : 0;
 
   // Recent analyses
-  const recentRows = await sql`
+  const recentRows = await getDb()`
     SELECT url, source_domain, score, label, created_at, success, ip_address, user_agent, country, is_bot
     FROM ragecheck_analyses
     ORDER BY created_at DESC
@@ -263,7 +269,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
   }));
 
   // Top users by analysis count
-  const topUserRows = await sql`
+  const topUserRows = await getDb()`
     SELECT ip_address, country, COUNT(*) as analysis_count, AVG(score) as avg_score
     FROM ragecheck_analyses
     WHERE ip_address IS NOT NULL
@@ -312,7 +318,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
 export async function isDBAvailable(): Promise<boolean> {
   if (!process.env.DATABASE_URL) return false;
   try {
-    await sql`SELECT 1`;
+    await getDb()`SELECT 1`;
     return true;
   } catch {
     return false;
@@ -329,7 +335,7 @@ export interface VisitorLog {
 export async function logVisitor(data: VisitorLog) {
   try {
     const isBotUser = isBot(data.userAgent);
-    await sql`
+    await getDb()`
       INSERT INTO ragecheck_visitors (ip_address, user_agent, country, referrer, is_bot)
       VALUES (${data.ipAddress || null}, ${data.userAgent || null}, ${data.country || null}, ${data.referrer || null}, ${isBotUser})
     `;
@@ -385,7 +391,7 @@ export interface ClearviewCache {
 
 export async function initClearviewTable() {
   try {
-    await sql`
+    await getDb()`
       CREATE TABLE IF NOT EXISTS ragecheck_clearview (
         id SERIAL PRIMARY KEY,
         data JSONB NOT NULL,
@@ -404,10 +410,10 @@ export async function saveClearviewData(stories: ClearviewStory[]): Promise<void
     const generatedAt = new Date().toISOString();
 
     // Delete old entries (keep only the latest)
-    await sql`DELETE FROM ragecheck_clearview WHERE generated_at < NOW() - INTERVAL '1 day'`;
+    await getDb()`DELETE FROM ragecheck_clearview WHERE generated_at < NOW() - INTERVAL '1 day'`;
 
     // Insert new entry
-    await sql`
+    await getDb()`
       INSERT INTO ragecheck_clearview (data, generated_at)
       VALUES (${data}::jsonb, ${generatedAt})
     `;
@@ -421,7 +427,7 @@ export async function getClearviewData(maxAgeHours: number = 4): Promise<Clearvi
     // Calculate the cutoff time
     const cutoffTime = new Date(Date.now() - maxAgeHours * 60 * 60 * 1000).toISOString();
 
-    const [result] = await sql`
+    const [result] = await getDb()`
       SELECT data, generated_at
       FROM ragecheck_clearview
       WHERE generated_at > ${cutoffTime}
@@ -446,17 +452,17 @@ export async function getClearviewData(maxAgeHours: number = 4): Promise<Clearvi
 
 export async function getVisitorStats(): Promise<VisitorStats> {
   try {
-    const [totalResult] = await sql`SELECT COUNT(*) as count FROM ragecheck_visitors`;
-    const [todayResult] = await sql`SELECT COUNT(*) as count FROM ragecheck_visitors WHERE created_at > NOW() - INTERVAL '1 day'`;
-    const [weekResult] = await sql`SELECT COUNT(*) as count FROM ragecheck_visitors WHERE created_at > NOW() - INTERVAL '7 days'`;
+    const [totalResult] = await getDb()`SELECT COUNT(*) as count FROM ragecheck_visitors`;
+    const [todayResult] = await getDb()`SELECT COUNT(*) as count FROM ragecheck_visitors WHERE created_at > NOW() - INTERVAL '1 day'`;
+    const [weekResult] = await getDb()`SELECT COUNT(*) as count FROM ragecheck_visitors WHERE created_at > NOW() - INTERVAL '7 days'`;
 
-    const [analysesToday] = await sql`SELECT COUNT(*) as count FROM ragecheck_analyses WHERE created_at > NOW() - INTERVAL '1 day'`;
+    const [analysesToday] = await getDb()`SELECT COUNT(*) as count FROM ragecheck_analyses WHERE created_at > NOW() - INTERVAL '1 day'`;
 
     const conversionRate = Number(todayResult.count) > 0
       ? (Number(analysesToday.count) / Number(todayResult.count)) * 100
       : 0;
 
-    const recentRows = await sql`
+    const recentRows = await getDb()`
       SELECT ip_address, country, referrer, created_at, is_bot
       FROM ragecheck_visitors
       ORDER BY created_at DESC
@@ -472,7 +478,7 @@ export async function getVisitorStats(): Promise<VisitorStats> {
     }));
 
     // Time series for last 14 days
-    const visitorTimeSeries = await sql`
+    const visitorTimeSeries = await getDb()`
       SELECT DATE(created_at) as date, COUNT(*) as count
       FROM ragecheck_visitors
       WHERE created_at > NOW() - INTERVAL '14 days'
@@ -480,7 +486,7 @@ export async function getVisitorStats(): Promise<VisitorStats> {
       ORDER BY date ASC
     `;
 
-    const analysisTimeSeries = await sql`
+    const analysisTimeSeries = await getDb()`
       SELECT DATE(created_at) as date, COUNT(*) as count
       FROM ragecheck_analyses
       WHERE created_at > NOW() - INTERVAL '14 days'
