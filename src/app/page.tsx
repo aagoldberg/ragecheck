@@ -661,7 +661,23 @@ export default function Home() {
         {/* Results Section */}
         {result && (
           <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-6">
-            
+
+            {/* Back Button */}
+            <div className="flex justify-center">
+              <button
+                onClick={() => {
+                  setResult(null);
+                  setUrl("");
+                }}
+                className="text-sm text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 flex items-center gap-1 transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                </svg>
+                New Analysis
+              </button>
+            </div>
+
             {!result.success ? (
               <div className="max-w-xl mx-auto p-4 bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 rounded-lg text-center text-sm text-rose-700 dark:text-rose-300">
                 <p className="font-medium">{result.error}</p>
