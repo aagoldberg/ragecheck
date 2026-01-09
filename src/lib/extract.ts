@@ -500,6 +500,216 @@ async function extractFarcaster(urlString: string): Promise<ExtractedContent | n
   };
 }
 
+// ============ TIKTOK SUPPORT ============
+// TikTok has an oEmbed API
+
+async function extractTikTok(urlString: string): Promise<ExtractedContent | null> {
+  const sourceDomain = "tiktok.com";
+
+  try {
+    const oembedUrl = `https://www.tiktok.com/oembed?url=${encodeURIComponent(urlString)}`;
+
+    const response = await fetch(oembedUrl, {
+      headers: { "Accept": "application/json" },
+    });
+
+    if (!response.ok) return null;
+
+    const data = await response.json();
+
+    if (data.title) {
+      return {
+        title: `TikTok by @${data.author_name || "unknown"}`,
+        text: data.title,
+        sourceDomain,
+        success: true,
+        image: data.thumbnail_url,
+      };
+    }
+
+    return null;
+  } catch (error) {
+    console.error("TikTok extraction failed:", error);
+    return null;
+  }
+}
+
+// ============ MASTODON SUPPORT ============
+// Mastodon instances have a public API
+
+async function extractMastodon(urlString: string): Promise<ExtractedContent | null> {
+  try {
+    const url = new URL(urlString);
+    const sourceDomain = url.hostname;
+
+    // Extract status ID from URL (format: /@user/123456 or /users/user/statuses/123456)
+    const match = urlString.match(/\/@[^/]+\/(\d+)|\/statuses\/(\d+)/);
+    if (!match) return null;
+
+    const statusId = match[1] || match[2];
+
+    // Try the Mastodon API
+    const apiUrl = `https://${sourceDomain}/api/v1/statuses/${statusId}`;
+
+    const response = await fetch(apiUrl, {
+      headers: { "Accept": "application/json" },
+    });
+
+    if (!response.ok) return null;
+
+    const data = await response.json();
+
+    if (data.content) {
+      // Strip HTML tags from content
+      const text = data.content.replace(/<[^>]*>/g, "").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">");
+
+      return {
+        title: `Post by @${data.account?.username || "unknown"}@${sourceDomain}`,
+        text,
+        sourceDomain,
+        success: true,
+        image: data.media_attachments?.[0]?.preview_url,
+      };
+    }
+
+    return null;
+  } catch (error) {
+    console.error("Mastodon extraction failed:", error);
+    return null;
+  }
+}
+
+// ============ YOUTUBE SUPPORT ============
+// YouTube has an oEmbed API for video info
+
+async function extractYouTube(urlString: string): Promise<ExtractedContent | null> {
+  const sourceDomain = "youtube.com";
+
+  try {
+    const oembedUrl = `https://www.youtube.com/oembed?url=${encodeURIComponent(urlString)}&format=json`;
+
+    const response = await fetch(oembedUrl, {
+      headers: { "Accept": "application/json" },
+    });
+
+    if (!response.ok) return null;
+
+    const data = await response.json();
+
+    if (data.title) {
+      return {
+        title: data.title,
+        text: `YouTube video by ${data.author_name || "unknown"}: "${data.title}"`,
+        sourceDomain,
+        success: true,
+        image: data.thumbnail_url,
+      };
+    }
+
+    return null;
+  } catch (error) {
+    console.error("YouTube extraction failed:", error);
+    return null;
+  }
+}
+
+// ============ REDDIT SUPPORT ============
+// Reddit provides JSON data by appending .json to URLs
+
+interface RedditPost {
+  data: {
+    title: string;
+    selftext: string;
+    author: string;
+    subreddit: string;
+    url?: string;
+  };
+}
+
+interface RedditComment {
+  data: {
+    body: string;
+    author: string;
+  };
+}
+
+interface RedditListing {
+  kind: string;
+  data: {
+    children: Array<{ kind: string; data: RedditPost["data"] | RedditComment["data"] }>;
+  };
+}
+
+async function extractReddit(urlString: string): Promise<ExtractedContent | null> {
+  const sourceDomain = "reddit.com";
+
+  try {
+    // Clean URL and append .json
+    let jsonUrl = urlString.replace(/\?.*$/, ""); // Remove query params
+    if (!jsonUrl.endsWith("/")) jsonUrl += "/";
+    jsonUrl += ".json";
+
+    const response = await fetch(jsonUrl, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (compatible; RageCheck/1.0; +https://ragecheck.com)",
+        "Accept": "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      return null; // Fall back to regular extraction
+    }
+
+    const data: RedditListing[] = await response.json();
+
+    // Handle post pages (array with post and comments)
+    if (Array.isArray(data) && data.length > 0) {
+      const postListing = data[0];
+      if (postListing?.data?.children?.[0]?.data) {
+        const post = postListing.data.children[0].data as RedditPost["data"];
+        const title = post.title || "Reddit Post";
+        const subreddit = post.subreddit || "";
+        const author = post.author || "[deleted]";
+
+        // Get post text (selftext for text posts)
+        let text = post.selftext || "";
+
+        // If it's a link post with no selftext, note that
+        if (!text && post.url) {
+          text = `[Link post to: ${post.url}]`;
+        }
+
+        // Add top comments if available
+        if (data.length > 1 && data[1]?.data?.children) {
+          const comments = data[1].data.children
+            .filter((c) => c.kind === "t1" && (c.data as RedditComment["data"]).body)
+            .slice(0, 5)
+            .map((c) => {
+              const comment = c.data as RedditComment["data"];
+              return `[Comment by u/${comment.author}]: ${comment.body}`;
+            });
+
+          if (comments.length > 0) {
+            text += "\n\n--- Top Comments ---\n" + comments.join("\n\n");
+          }
+        }
+
+        return {
+          title: `r/${subreddit}: ${title}`,
+          text: text || title,
+          sourceDomain,
+          success: true,
+        };
+      }
+    }
+
+    return null;
+  } catch (error) {
+    console.error("Reddit extraction failed:", error);
+    return null;
+  }
+}
+
 // ============ MAIN EXTRACTION FUNCTION ============
 
 export async function extractContent(urlString: string): Promise<ExtractedContent> {
@@ -571,6 +781,47 @@ export async function extractContent(urlString: string): Promise<ExtractedConten
 
   if (sourceDomain.includes("warpcast.com")) {
     const result = await extractFarcaster(urlString);
+    if (result) {
+      if (result.success) cache.set(urlString, result);
+      return result;
+    }
+  }
+
+  if (sourceDomain.includes("reddit.com")) {
+    const result = await extractReddit(urlString);
+    if (result) {
+      if (result.success) cache.set(urlString, result);
+      return result;
+    }
+  }
+
+  if (sourceDomain.includes("tiktok.com")) {
+    const result = await extractTikTok(urlString);
+    if (result) {
+      if (result.success) cache.set(urlString, result);
+      return result;
+    }
+  }
+
+  if (sourceDomain.includes("youtube.com") || sourceDomain.includes("youtu.be")) {
+    const result = await extractYouTube(urlString);
+    if (result) {
+      if (result.success) cache.set(urlString, result);
+      return result;
+    }
+  }
+
+  // Check for Mastodon-like instances (have /api/v1/statuses endpoint)
+  // Common Mastodon instances and forks
+  const mastodonInstances = [
+    "mastodon.social", "mastodon.online", "mstdn.social", "mas.to",
+    "fosstodon.org", "hachyderm.io", "infosec.exchange", "techhub.social",
+  ];
+  const isMastodonLike = mastodonInstances.some(instance => sourceDomain.includes(instance)) ||
+    urlString.match(/\/@[^/]+\/\d+/); // Common Mastodon URL pattern
+
+  if (isMastodonLike) {
+    const result = await extractMastodon(urlString);
     if (result) {
       if (result.success) cache.set(urlString, result);
       return result;
