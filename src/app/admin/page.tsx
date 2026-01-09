@@ -19,6 +19,11 @@ interface DashboardStats {
   };
   successRate: number;
   llmEnhancedRate: number;
+  botStats: {
+    totalBots: number;
+    totalHumans: number;
+    botRate: number;
+  };
   recentAnalyses: {
     url: string;
     sourceDomain: string;
@@ -28,6 +33,7 @@ interface DashboardStats {
     ipAddress: string | null;
     userAgent: string | null;
     country: string | null;
+    isBot: boolean;
   }[];
   topUsers: {
     ipAddress: string;
@@ -272,6 +278,20 @@ export default function AdminDashboard() {
                     <span className="text-zinc-600 dark:text-zinc-400">AI Enhanced</span>
                     <span className="font-medium text-purple-600">{stats.llmEnhancedRate}%</span>
                   </div>
+                  <div className="border-t border-zinc-100 dark:border-zinc-800 pt-3 mt-3">
+                    <div className="flex justify-between mb-2">
+                      <span className="text-zinc-600 dark:text-zinc-400">Humans</span>
+                      <span className="font-medium text-emerald-600">{stats.botStats.totalHumans}</span>
+                    </div>
+                    <div className="flex justify-between mb-2">
+                      <span className="text-zinc-600 dark:text-zinc-400">Bots</span>
+                      <span className="font-medium text-orange-600">{stats.botStats.totalBots}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-zinc-600 dark:text-zinc-400">Bot Rate</span>
+                      <span className="font-medium text-orange-600">{stats.botStats.botRate}%</span>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -378,13 +398,14 @@ export default function AdminDashboard() {
                         <th className="text-left py-3 px-3 text-zinc-500 font-medium">URL</th>
                         <th className="text-left py-3 px-3 text-zinc-500 font-medium">Score</th>
                         <th className="text-left py-3 px-3 text-zinc-500 font-medium">Country</th>
+                        <th className="text-left py-3 px-3 text-zinc-500 font-medium">Bot</th>
                         <th className="text-left py-3 px-3 text-zinc-500 font-medium">Time</th>
                       </tr>
                     </thead>
                     <tbody>
                       {stats.recentAnalyses.length === 0 ? (
                         <tr>
-                          <td colSpan={4} className="py-4 text-zinc-500 text-center">No analyses yet</td>
+                          <td colSpan={5} className="py-4 text-zinc-500 text-center">No analyses yet</td>
                         </tr>
                       ) : (
                         stats.recentAnalyses.map((a, i) => (
@@ -405,6 +426,13 @@ export default function AdminDashboard() {
                             </td>
                             <td className="py-2 px-3 text-zinc-600 dark:text-zinc-400 text-xs">
                               {a.country || "-"}
+                            </td>
+                            <td className="py-2 px-3">
+                              {a.isBot ? (
+                                <span className="text-xs font-medium px-2 py-0.5 rounded bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300">Bot</span>
+                              ) : (
+                                <span className="text-xs text-zinc-400">-</span>
+                              )}
                             </td>
                             <td className="py-2 px-3 text-zinc-500 text-xs whitespace-nowrap">
                               {new Date(a.createdAt).toLocaleString()}

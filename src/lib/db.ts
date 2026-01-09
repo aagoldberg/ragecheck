@@ -2,6 +2,28 @@ import { neon } from "@neondatabase/serverless";
 
 const sql = neon(process.env.DATABASE_URL!);
 
+// Bot detection patterns
+const BOT_PATTERNS = [
+  // Search engines
+  /googlebot/i, /bingbot/i, /slurp/i, /duckduckbot/i, /baiduspider/i, /yandexbot/i,
+  // Social media
+  /facebookexternalhit/i, /twitterbot/i, /linkedinbot/i, /pinterest/i, /slackbot/i, /discordbot/i,
+  // Tools & libraries
+  /python-requests/i, /python-urllib/i, /curl/i, /wget/i, /scrapy/i, /httpx/i,
+  /node-fetch/i, /axios/i, /go-http-client/i, /java/i, /ruby/i, /perl/i,
+  // Generic bots
+  /bot/i, /crawler/i, /spider/i, /scraper/i, /headless/i, /phantom/i, /selenium/i,
+  // Monitoring & SEO
+  /uptimerobot/i, /pingdom/i, /ahrefsbot/i, /semrushbot/i, /mj12bot/i, /dotbot/i,
+  // Preview generators
+  /prerender/i, /lighthouse/i, /pagespeed/i,
+];
+
+export function isBot(userAgent: string | null | undefined): boolean {
+  if (!userAgent || userAgent.trim() === "") return true; // Empty UA = likely bot
+  return BOT_PATTERNS.some((pattern) => pattern.test(userAgent));
+}
+
 // Initialize table if it doesn't exist
 export async function initDB() {
   await sql`
@@ -44,6 +66,8 @@ export async function initDB() {
     await sql`ALTER TABLE ragecheck_analyses ADD COLUMN IF NOT EXISTS ip_address TEXT`;
     await sql`ALTER TABLE ragecheck_analyses ADD COLUMN IF NOT EXISTS user_agent TEXT`;
     await sql`ALTER TABLE ragecheck_analyses ADD COLUMN IF NOT EXISTS country TEXT`;
+    await sql`ALTER TABLE ragecheck_analyses ADD COLUMN IF NOT EXISTS is_bot BOOLEAN DEFAULT FALSE`;
+    await sql`ALTER TABLE ragecheck_visitors ADD COLUMN IF NOT EXISTS is_bot BOOLEAN DEFAULT FALSE`;
   } catch {
     // Columns may already exist
   }
@@ -82,13 +106,14 @@ function detectPlatform(domain: string): string {
 export async function logAnalysis(data: AnalysisLog) {
   try {
     const platform = data.sourceDomain ? detectPlatform(data.sourceDomain) : "unknown";
+    const isBotUser = isBot(data.userAgent);
 
     await sql`
       INSERT INTO ragecheck_analyses (
         url, source_domain, platform, score, label, llm_enhanced,
         signal_loaded_language, signal_absolutist, signal_threat_panic,
         signal_us_vs_them, signal_engagement_bait, success, error,
-        ip_address, user_agent, country
+        ip_address, user_agent, country, is_bot
       ) VALUES (
         ${data.url},
         ${data.sourceDomain || null},
@@ -105,7 +130,8 @@ export async function logAnalysis(data: AnalysisLog) {
         ${data.error || null},
         ${data.ipAddress || null},
         ${data.userAgent || null},
-        ${data.country || null}
+        ${data.country || null},
+        ${isBotUser}
       )
     `;
   } catch (error) {
@@ -131,6 +157,11 @@ export interface DashboardStats {
   };
   successRate: number;
   llmEnhancedRate: number;
+  botStats: {
+    totalBots: number;
+    totalHumans: number;
+    botRate: number;
+  };
   recentAnalyses: {
     url: string;
     sourceDomain: string;
@@ -140,6 +171,7 @@ export interface DashboardStats {
     ipAddress: string | null;
     userAgent: string | null;
     country: string | null;
+    isBot: boolean;
   }[];
   topUsers: {
     ipAddress: string;
@@ -205,9 +237,15 @@ export async function getDashboardStats(): Promise<DashboardStats> {
   const [llmResult] = await sql`SELECT COUNT(*) as count FROM ragecheck_analyses WHERE llm_enhanced = true`;
   const llmEnhancedRate = totalResult.count > 0 ? (Number(llmResult.count) / Number(totalResult.count)) * 100 : 0;
 
+  // Bot stats
+  const [botCount] = await sql`SELECT COUNT(*) as count FROM ragecheck_analyses WHERE is_bot = true`;
+  const totalBots = Number(botCount?.count || 0);
+  const totalHumans = Number(totalResult.count) - totalBots;
+  const botRate = totalResult.count > 0 ? (totalBots / Number(totalResult.count)) * 100 : 0;
+
   // Recent analyses
   const recentRows = await sql`
-    SELECT url, source_domain, score, label, created_at, success, ip_address, user_agent, country
+    SELECT url, source_domain, score, label, created_at, success, ip_address, user_agent, country, is_bot
     FROM ragecheck_analyses
     ORDER BY created_at DESC
     LIMIT 100
@@ -221,6 +259,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     ipAddress: row.ip_address || null,
     userAgent: row.user_agent || null,
     country: row.country || null,
+    isBot: row.is_bot || false,
   }));
 
   // Top users by analysis count
@@ -260,6 +299,11 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     },
     successRate: Math.round(successRate),
     llmEnhancedRate: Math.round(llmEnhancedRate),
+    botStats: {
+      totalBots,
+      totalHumans,
+      botRate: Math.round(botRate),
+    },
     recentAnalyses,
     topUsers,
   };
@@ -284,9 +328,10 @@ export interface VisitorLog {
 
 export async function logVisitor(data: VisitorLog) {
   try {
+    const isBotUser = isBot(data.userAgent);
     await sql`
-      INSERT INTO ragecheck_visitors (ip_address, user_agent, country, referrer)
-      VALUES (${data.ipAddress || null}, ${data.userAgent || null}, ${data.country || null}, ${data.referrer || null})
+      INSERT INTO ragecheck_visitors (ip_address, user_agent, country, referrer, is_bot)
+      VALUES (${data.ipAddress || null}, ${data.userAgent || null}, ${data.country || null}, ${data.referrer || null}, ${isBotUser})
     `;
   } catch (error) {
     console.error("Failed to log visitor:", error);
