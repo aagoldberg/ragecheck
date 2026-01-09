@@ -45,7 +45,7 @@ const CURATED_EXAMPLES = [
     type: "article",
     title: "ICE Agent Killed in Minneapolis Ambush Attack",
     url: "https://www.breitbart.com/politics/2025/01/07/ice-agent-killed-minneapolis-ambush-attack/",
-    image: "https://logo.clearbit.com/breitbart.com",
+    color: "#f97316",
   },
   {
     source: "Fox News",
@@ -53,7 +53,7 @@ const CURATED_EXAMPLES = [
     type: "article",
     title: "ICE longest-serving acting director issues warning after Minneapolis ambush",
     url: "https://www.foxnews.com/media/ice-longest-serving-acting-director-issues-warning-minneapolis-ambush",
-    image: "https://logo.clearbit.com/foxnews.com",
+    color: "#003366",
   },
   {
     source: "Reuters",
@@ -61,7 +61,7 @@ const CURATED_EXAMPLES = [
     type: "article",
     title: "Gunman kills federal agent, wounds others at Minneapolis ICE office",
     url: "https://www.reuters.com/world/us/multiple-people-shot-ice-facility-minneapolis-cbs-2025-01-07/",
-    image: "https://logo.clearbit.com/reuters.com",
+    color: "#ff8000",
   },
   {
     source: "NPR",
@@ -69,7 +69,7 @@ const CURATED_EXAMPLES = [
     type: "article",
     title: "What we know about the deadly shooting at an ICE office in Minneapolis",
     url: "https://www.npr.org/2025/01/08/nx-s1-5253490/minneapolis-ice-shooting",
-    image: "https://logo.clearbit.com/npr.org",
+    color: "#5a5a5a",
   },
   {
     source: "CNN",
@@ -77,7 +77,7 @@ const CURATED_EXAMPLES = [
     type: "article",
     title: "What we know about the Minneapolis ICE shooting",
     url: "https://www.cnn.com/2025/01/07/us/minneapolis-ice-shooting-what-we-know/index.html",
-    image: "https://logo.clearbit.com/cnn.com",
+    color: "#cc0000",
   },
   {
     source: "MSNBC",
@@ -85,7 +85,7 @@ const CURATED_EXAMPLES = [
     type: "article",
     title: "Minneapolis ICE shooting sparks immigration debate",
     url: "https://www.msnbc.com/rachel-maddow-show/maddowblog/minneapolis-ice-shooting-trump-immigration-rcna186658",
-    image: "https://logo.clearbit.com/msnbc.com",
+    color: "#0089d0",
   },
   // Tweets - actual posts about ICE/immigration
   {
@@ -580,15 +580,13 @@ export default function Home() {
                     }}
                     className="group text-left bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-hidden hover:border-indigo-300 dark:hover:border-indigo-700 hover:shadow-md transition-all"
                   >
-                    <div className="h-20 bg-zinc-100 dark:bg-zinc-800 relative overflow-hidden flex items-center justify-center">
-                      <img
-                        src={example.image}
-                        alt={example.source}
-                        className="h-10 w-auto object-contain"
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).style.display = 'none';
-                        }}
-                      />
+                    <div
+                      className="h-16 relative overflow-hidden flex items-center justify-center"
+                      style={{ backgroundColor: example.color }}
+                    >
+                      <span className="text-2xl font-bold text-white/90">
+                        {example.source}
+                      </span>
                       <div className="absolute top-2 left-2">
                         <span className={`text-xs font-medium px-2 py-1 rounded ${LEAN_COLORS[example.lean]}`}>
                           {example.lean}
@@ -596,9 +594,6 @@ export default function Home() {
                       </div>
                     </div>
                     <div className="p-3">
-                      <p className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 mb-1">
-                        {example.source}
-                      </p>
                       <p className="text-sm font-medium text-zinc-800 dark:text-zinc-200 line-clamp-2 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
                         {example.title}
                       </p>
