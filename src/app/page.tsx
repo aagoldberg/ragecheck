@@ -46,7 +46,6 @@ const CURATED_EXAMPLES = [
     title: "ICE Agent Killed in Minneapolis Ambush Attack",
     url: "https://www.breitbart.com/politics/2025/01/07/ice-agent-killed-minneapolis-ambush-attack/",
     color: "#f97316",
-    image: "https://images.unsplash.com/photo-1453873531674-2151bcd01707?auto=format&fit=crop&w=800&q=80"
   },
   {
     source: "Fox News",
@@ -55,7 +54,6 @@ const CURATED_EXAMPLES = [
     title: "ICE longest-serving acting director issues warning after Minneapolis ambush",
     url: "https://www.foxnews.com/media/ice-longest-serving-acting-director-issues-warning-minneapolis-ambush",
     color: "#003366",
-    image: "https://images.unsplash.com/photo-1461685265823-f8d5d0b08b9b?auto=format&fit=crop&w=800&q=80"
   },
   {
     source: "Reuters",
@@ -64,7 +62,6 @@ const CURATED_EXAMPLES = [
     title: "Gunman kills federal agent, wounds others at Minneapolis ICE office",
     url: "https://www.reuters.com/world/us/multiple-people-shot-ice-facility-minneapolis-cbs-2025-01-07/",
     color: "#ff8000",
-    image: "https://images.unsplash.com/photo-1554469384-e58fac16e23a?auto=format&fit=crop&w=800&q=80"
   },
   {
     source: "NPR",
@@ -73,7 +70,6 @@ const CURATED_EXAMPLES = [
     title: "What we know about the deadly shooting at an ICE office in Minneapolis",
     url: "https://www.npr.org/2025/01/08/nx-s1-5253490/minneapolis-ice-shooting",
     color: "#5a5a5a",
-    image: "https://images.unsplash.com/photo-1554469384-e58fac16e23a?auto=format&fit=crop&w=800&q=80"
   },
   {
     source: "CNN",
@@ -82,7 +78,6 @@ const CURATED_EXAMPLES = [
     title: "What we know about the Minneapolis ICE shooting",
     url: "https://www.cnn.com/2025/01/07/us/minneapolis-ice-shooting-what-we-know/index.html",
     color: "#cc0000",
-    image: "https://images.unsplash.com/photo-1504711434969-e33886168f5c?auto=format&fit=crop&w=800&q=80"
   },
   {
     source: "MSNBC",
@@ -91,7 +86,6 @@ const CURATED_EXAMPLES = [
     title: "Minneapolis ICE shooting sparks immigration debate",
     url: "https://www.msnbc.com/rachel-maddow-show/maddowblog/minneapolis-ice-shooting-trump-immigration-rcna186658",
     color: "#0089d0",
-    image: "https://images.unsplash.com/photo-1504711434969-e33886168f5c?auto=format&fit=crop&w=800&q=80"
   },
   // Tweets - actual posts about ICE/immigration
   {
@@ -589,33 +583,25 @@ export default function Home() {
                       setUrl(example.url);
                       analyze(example.url);
                     }}
-                    className="group text-left bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-hidden hover:border-indigo-300 dark:hover:border-indigo-700 hover:shadow-md transition-all"
+                    className="group text-left bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-hidden hover:border-indigo-300 dark:hover:border-indigo-700 hover:shadow-md transition-all flex flex-col"
                   >
-                    <div className="h-40 relative overflow-hidden group-hover:opacity-90 transition-opacity bg-zinc-200 dark:bg-zinc-800">
-                      <img
-                        src={example.image || "https://images.unsplash.com/photo-1504711434969-e33886168f5c?auto=format&fit=crop&w=800"}
-                        alt={example.source}
-                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
-                      <div className="absolute top-3 left-3">
-                        <span className={`text-[10px] font-bold px-2 py-1 rounded shadow-sm ${LEAN_COLORS[example.lean]}`}>
+                    <div className="px-4 py-4 border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/50 flex flex-col gap-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider bg-zinc-200 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-300">
+                          {example.source}
+                        </span>
+                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded shadow-sm ${LEAN_COLORS[example.lean]}`}>
                           {example.lean}
                         </span>
                       </div>
-                      <div className="absolute bottom-3 left-3">
-                         <span className="text-sm font-bold text-white tracking-wide drop-shadow-md">
-                           {example.source}
-                         </span>
-                      </div>
                     </div>
-                    <div className="p-3">
-                      <p className="text-sm font-medium text-zinc-800 dark:text-zinc-200 line-clamp-2 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+                    <div className="p-4 flex-1 flex flex-col justify-between">
+                      <p className="text-sm font-semibold text-zinc-800 dark:text-zinc-200 line-clamp-3 leading-snug group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
                         {example.title}
                       </p>
-                      <p className="mt-2 text-xs text-indigo-600 dark:text-indigo-400 font-medium opacity-0 group-hover:opacity-100 transition-opacity">
-                        Analyze this →
-                      </p>
+                      <div className="mt-4 flex items-center gap-1 text-[10px] font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-all transform translate-x-[-4px] group-hover:translate-x-0">
+                        Analyze Pattern <span>→</span>
+                      </div>
                     </div>
                   </button>
                 ))}
