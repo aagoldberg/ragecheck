@@ -47,7 +47,7 @@ interface Headline {
 const EXAMPLES = {
   news: "https://www.foxnews.com/politics",
   tweet: "https://x.com/BernieSanders/status/1931727686952526003",
-  bluesky: "https://bsky.app/profile/aoc.bsky.social/post/3lfrblfjhms2d",
+  bluesky: "https://bsky.app/profile/aoc.bsky.social/post/3mbjqcdvqh22q",
 };
 
 const CURATED_EXAMPLES = [
