@@ -159,13 +159,13 @@ function BentoCard({ children, className = "", title }: { children: React.ReactN
   return (
     <div className={`bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-sm flex flex-col ${className}`}>
       {title && (
-        <div className="px-6 py-4 border-b border-zinc-100 dark:border-zinc-800">
+        <div className="px-4 py-3 md:px-6 md:py-4 border-b border-zinc-100 dark:border-zinc-800">
           <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
             {title}
           </h3>
         </div>
       )}
-      <div className="p-6 flex-1">{children}</div>
+      <div className="p-4 md:p-6 flex-1">{children}</div>
     </div>
   );
 }
@@ -505,7 +505,7 @@ export default function Home() {
         
         {/* Hero Section */}
         <div className="text-center max-w-2xl mx-auto mb-16">
-          <h1 className="text-4xl md:text-5xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100 mb-6">
+          <h1 className="text-3xl md:text-5xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100 mb-6">
             Analyze content for <br/>
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-rose-500 to-indigo-600">manipulative patterns</span>
           </h1>
