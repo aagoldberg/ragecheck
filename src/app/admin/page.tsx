@@ -101,17 +101,44 @@ function TimeSeriesChart({ data }: { data: { date: string; visitors: number; ana
   if (!data || data.length === 0) return null;
 
   const maxValue = Math.max(...data.map(d => Math.max(d.visitors, d.analyses)), 1);
-  const width = 100;
-  const height = 40;
-  const padding = { top: 2, right: 2, bottom: 2, left: 2 };
+  const width = 800;
+  const height = 300;
+  const padding = { top: 20, right: 20, bottom: 20, left: 20 };
   const chartWidth = width - padding.left - padding.right;
   const chartHeight = height - padding.top - padding.bottom;
 
   const getX = (i: number) => padding.left + (i / (data.length - 1)) * chartWidth;
   const getY = (value: number) => padding.top + chartHeight - (value / maxValue) * chartHeight;
 
-  const visitorsPath = data.map((d, i) => `${i === 0 ? 'M' : 'L'} ${getX(i)} ${getY(d.visitors)}`).join(' ');
-  const analysesPath = data.map((d, i) => `${i === 0 ? 'M' : 'L'} ${getX(i)} ${getY(d.analyses)}`).join(' ');
+  // Catmull-Rom spline interpolation for smooth curves
+  const catmullRomSpline = (points: { x: number; y: number }[], tension = 0.5): string => {
+    if (points.length < 2) return '';
+    if (points.length === 2) return `M ${points[0].x} ${points[0].y} L ${points[1].x} ${points[1].y}`;
+
+    let path = `M ${points[0].x} ${points[0].y}`;
+
+    for (let i = 0; i < points.length - 1; i++) {
+      const p0 = points[Math.max(0, i - 1)];
+      const p1 = points[i];
+      const p2 = points[i + 1];
+      const p3 = points[Math.min(points.length - 1, i + 2)];
+
+      const cp1x = p1.x + (p2.x - p0.x) * tension / 6;
+      const cp1y = p1.y + (p2.y - p0.y) * tension / 6;
+      const cp2x = p2.x - (p3.x - p1.x) * tension / 6;
+      const cp2y = p2.y - (p3.y - p1.y) * tension / 6;
+
+      path += ` C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${p2.x} ${p2.y}`;
+    }
+
+    return path;
+  };
+
+  const visitorsPoints = data.map((d, i) => ({ x: getX(i), y: getY(d.visitors) }));
+  const analysesPoints = data.map((d, i) => ({ x: getX(i), y: getY(d.analyses) }));
+
+  const visitorsPath = catmullRomSpline(visitorsPoints);
+  const analysesPath = catmullRomSpline(analysesPoints);
 
   return (
     <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 mb-8">
@@ -131,7 +158,7 @@ function TimeSeriesChart({ data }: { data: { date: string; visitors: number; ana
         </div>
       </div>
       <div className="relative">
-        <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-48" preserveAspectRatio="none">
+        <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-48" preserveAspectRatio="xMidYMid meet">
           {/* Grid lines */}
           {[0, 0.25, 0.5, 0.75, 1].map((ratio) => (
             <line
@@ -142,7 +169,7 @@ function TimeSeriesChart({ data }: { data: { date: string; visitors: number; ana
               y2={padding.top + chartHeight * (1 - ratio)}
               stroke="currentColor"
               className="text-zinc-100 dark:text-zinc-800"
-              strokeWidth="0.1"
+              strokeWidth="1"
             />
           ))}
           {/* Visitors line */}
@@ -150,7 +177,7 @@ function TimeSeriesChart({ data }: { data: { date: string; visitors: number; ana
             d={visitorsPath}
             fill="none"
             stroke="#6366f1"
-            strokeWidth="0.4"
+            strokeWidth="3"
             strokeLinecap="round"
             strokeLinejoin="round"
           />
@@ -159,7 +186,7 @@ function TimeSeriesChart({ data }: { data: { date: string; visitors: number; ana
             d={analysesPath}
             fill="none"
             stroke="#10b981"
-            strokeWidth="0.4"
+            strokeWidth="3"
             strokeLinecap="round"
             strokeLinejoin="round"
           />
@@ -169,7 +196,7 @@ function TimeSeriesChart({ data }: { data: { date: string; visitors: number; ana
               key={`v-${i}`}
               cx={getX(i)}
               cy={getY(d.visitors)}
-              r="0.6"
+              r="5"
               fill="#6366f1"
             />
           ))}
@@ -179,7 +206,7 @@ function TimeSeriesChart({ data }: { data: { date: string; visitors: number; ana
               key={`a-${i}`}
               cx={getX(i)}
               cy={getY(d.analyses)}
-              r="0.6"
+              r="5"
               fill="#10b981"
             />
           ))}
