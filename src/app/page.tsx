@@ -50,6 +50,53 @@ const EXAMPLES = {
   bluesky: "https://bsky.app/profile/aoc.bsky.social/post/3mbjqcdvqh22q",
 };
 
+// Demo result shown on page load to demonstrate value
+const DEMO_RESULT: AnalysisResult = {
+  success: true,
+  score: 68,
+  label: "High",
+  title: "EXPOSED: The Radical Left's Secret Plan to Destroy America",
+  sourceDomain: "example-news.com",
+  textPreview: "Wake up, patriots! The radical left is DESTROYING everything we hold dear. They want to take YOUR guns, YOUR freedom, and YOUR children's future. This is not a drill—it's an all-out WAR on American values. The mainstream media won't tell you this, but we will. Share this before it's too late! Every real American needs to see this. They're coming for everything you love, and if we don't act NOW, our country is FINISHED.",
+  llmEnhanced: true,
+  signalBreakdown: {
+    loadedLanguage: 85,
+    usVsThem: 78,
+    threatPanic: 82,
+    absolutist: 65,
+    engagementBait: 72,
+  },
+  highlights: [
+    { start: 0, end: 8, category: "engagementBait", text: "Wake up" },
+    { start: 22, end: 34, category: "loadedLanguage", text: "radical left" },
+    { start: 38, end: 48, category: "loadedLanguage", text: "DESTROYING" },
+    { start: 78, end: 82, category: "usVsThem", text: "They" },
+    { start: 96, end: 100, category: "usVsThem", text: "YOUR" },
+    { start: 171, end: 174, category: "threatPanic", text: "WAR" },
+    { start: 296, end: 320, category: "engagementBait", text: "Share this before it's too late" },
+    { start: 328, end: 345, category: "usVsThem", text: "Every real American" },
+    { start: 362, end: 368, category: "usVsThem", text: "They're" },
+    { start: 420, end: 428, category: "absolutist", text: "FINISHED" },
+  ],
+  reasons: [
+    "Heavy use of emotionally charged language ('DESTROYING', 'WAR', 'FINISHED')",
+    "Strong us-vs-them framing ('They want to take YOUR...', 'radical left')",
+    "Fear-based messaging with urgency ('This is not a drill', 'before it's too late')",
+    "Call to share creates viral pressure without informational value",
+  ],
+  contextNotes: "This content uses multiple manipulation techniques designed to provoke emotional reactions rather than inform.",
+  sharingPatterns: [
+    "Creates fear that motivates sharing as a 'warning'",
+    "In-group identity ('real Americans') drives tribal sharing",
+    "Urgency bypasses critical thinking",
+  ],
+  techniqueExplanations: [
+    "Fear Appeal: Uses existential threats to bypass rational evaluation",
+    "Tribal Framing: Divides audience into 'us' vs 'them' to build loyalty",
+    "Urgency Manipulation: 'Act NOW' language pressures immediate action",
+  ],
+};
+
 const CURATED_EXAMPLES = [
   // News Articles
   {
@@ -412,7 +459,8 @@ function SocialPostCard({
 export default function Home() {
   const [url, setUrl] = useState("");
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<AnalysisResult | null>(null);
+  const [result, setResult] = useState<AnalysisResult | null>(DEMO_RESULT);
+  const [isDemo, setIsDemo] = useState(true);
   const [copied, setCopied] = useState(false);
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
   const [headlines, setHeadlines] = useState<Headline[]>([]);
@@ -487,6 +535,7 @@ export default function Home() {
 
     setLoading(true);
     setResult(null);
+    setIsDemo(false);
     setActiveFilter(null);
 
     try {
@@ -513,6 +562,7 @@ export default function Home() {
 
     setLoading(true);
     setResult(null);
+    setIsDemo(false);
     setActiveFilter(null);
     clearImage(); // Clear any selected image
 
@@ -754,8 +804,8 @@ export default function Home() {
           </form>
         </div>
 
-        {/* Live Headlines Section */}
-        {!result && (
+        {/* Live Headlines Section - show when no result OR in demo mode */}
+        {(!result || isDemo) && (
           <div className="mt-12 max-w-5xl mx-auto">
             <h2 className="text-center text-lg font-semibold text-zinc-700 dark:text-zinc-300 mb-2">
               Analyze Today&apos;s Headlines
@@ -867,21 +917,49 @@ export default function Home() {
         {result && (
           <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-6">
 
-            {/* Back Button */}
-            <div className="flex justify-center">
-              <button
-                onClick={() => {
-                  setResult(null);
-                  setUrl("");
-                }}
-                className="text-sm text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 flex items-center gap-1 transition-colors"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                </svg>
-                New Analysis
-              </button>
-            </div>
+            {/* Demo Banner */}
+            {isDemo && (
+              <div className="max-w-4xl mx-auto bg-gradient-to-r from-indigo-500 to-purple-600 rounded-xl p-4 text-white text-center shadow-lg">
+                <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+                  <div className="flex items-center gap-2">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span className="font-medium">This is a demo showing how RageCheck analyzes content</span>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setResult(null);
+                      setIsDemo(false);
+                      // Scroll to top and focus input
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }}
+                    className="px-4 py-1.5 bg-white text-indigo-600 rounded-lg font-semibold text-sm hover:bg-indigo-50 transition-colors whitespace-nowrap"
+                  >
+                    Try Your Own URL →
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Back Button - only show for real analyses */}
+            {!isDemo && (
+              <div className="flex justify-center">
+                <button
+                  onClick={() => {
+                    setResult(DEMO_RESULT);
+                    setIsDemo(true);
+                    setUrl("");
+                  }}
+                  className="text-sm text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 flex items-center gap-1 transition-colors"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                  </svg>
+                  New Analysis
+                </button>
+              </div>
+            )}
 
             {!result.success ? (
               <div className="max-w-xl mx-auto p-4 bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 rounded-lg text-center text-sm text-rose-700 dark:text-rose-300">
