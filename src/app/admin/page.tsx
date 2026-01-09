@@ -29,6 +29,12 @@ interface DashboardStats {
     userAgent: string | null;
     country: string | null;
   }[];
+  topUsers: {
+    ipAddress: string;
+    country: string | null;
+    analysisCount: number;
+    avgScore: number;
+  }[];
 }
 
 interface VisitorStats {
@@ -309,6 +315,49 @@ export default function AdminDashboard() {
                     ))
                   )}
                 </div>
+              </div>
+            </div>
+
+            {/* Top Users */}
+            <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 mb-8">
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-4">
+                Top Users by Analyses
+              </h3>
+              <div className="overflow-x-auto max-h-[300px] overflow-y-auto border border-zinc-100 dark:border-zinc-800 rounded-lg">
+                <table className="w-full text-sm">
+                  <thead className="sticky top-0 bg-zinc-50 dark:bg-zinc-800">
+                    <tr className="border-b border-zinc-200 dark:border-zinc-700">
+                      <th className="text-left py-3 px-3 text-zinc-500 font-medium">IP Address</th>
+                      <th className="text-left py-3 px-3 text-zinc-500 font-medium">Country</th>
+                      <th className="text-left py-3 px-3 text-zinc-500 font-medium">Analyses</th>
+                      <th className="text-left py-3 px-3 text-zinc-500 font-medium">Avg Score</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {stats.topUsers.length === 0 ? (
+                      <tr>
+                        <td colSpan={4} className="py-4 text-zinc-500 text-center">No data yet</td>
+                      </tr>
+                    ) : (
+                      stats.topUsers.map((u, i) => (
+                        <tr key={i} className="border-b border-zinc-100 dark:border-zinc-800 last:border-0 hover:bg-zinc-50 dark:hover:bg-zinc-800/50">
+                          <td className="py-2 px-3 text-zinc-500 text-xs font-mono">{u.ipAddress}</td>
+                          <td className="py-2 px-3 text-zinc-600 dark:text-zinc-400 text-xs">{u.country || "-"}</td>
+                          <td className="py-2 px-3 text-zinc-900 dark:text-zinc-100 font-medium">{u.analysisCount}</td>
+                          <td className="py-2 px-3">
+                            <span className={`text-xs font-medium px-2 py-0.5 rounded ${
+                              u.avgScore > 66 ? "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300" :
+                              u.avgScore > 33 ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300" :
+                              "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300"
+                            }`}>
+                              {u.avgScore}
+                            </span>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
               </div>
             </div>
 

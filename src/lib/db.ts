@@ -141,6 +141,12 @@ export interface DashboardStats {
     userAgent: string | null;
     country: string | null;
   }[];
+  topUsers: {
+    ipAddress: string;
+    country: string | null;
+    analysisCount: number;
+    avgScore: number;
+  }[];
 }
 
 export async function getDashboardStats(): Promise<DashboardStats> {
@@ -217,6 +223,22 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     country: row.country || null,
   }));
 
+  // Top users by analysis count
+  const topUserRows = await sql`
+    SELECT ip_address, country, COUNT(*) as analysis_count, AVG(score) as avg_score
+    FROM ragecheck_analyses
+    WHERE ip_address IS NOT NULL
+    GROUP BY ip_address, country
+    ORDER BY analysis_count DESC
+    LIMIT 15
+  `;
+  const topUsers = topUserRows.map((row) => ({
+    ipAddress: row.ip_address,
+    country: row.country || null,
+    analysisCount: Number(row.analysis_count),
+    avgScore: Math.round(Number(row.avg_score) || 0),
+  }));
+
   return {
     totalAnalyses: Number(totalResult.count),
     todayAnalyses: Number(todayResult.count),
@@ -239,6 +261,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     successRate: Math.round(successRate),
     llmEnhancedRate: Math.round(llmEnhancedRate),
     recentAnalyses,
+    topUsers,
   };
 }
 
