@@ -90,15 +90,50 @@ async function fetchAllHeadlines(): Promise<HeadlineItem[]> {
   // Fetch all feeds in parallel
   const results = await Promise.all(FEED_SOURCES.map(fetchFeed));
 
-  // Flatten and get one item per source for variety
-  const headlines: HeadlineItem[] = [];
-  const maxPerSource = 2;
+  // Group results by political lean category
+  const byLean: Record<string, HeadlineItem[]> = {
+    right: [],   // Far Right + Right
+    center: [],  // Center
+    left: [],    // Left + Far Left
+  };
 
-  for (const sourceResults of results) {
-    headlines.push(...sourceResults.slice(0, maxPerSource));
+  FEED_SOURCES.forEach((source, index) => {
+    const items = results[index];
+    if (source.lean === "Far Right" || source.lean === "Right") {
+      byLean.right.push(...items);
+    } else if (source.lean === "Center") {
+      byLean.center.push(...items);
+    } else {
+      byLean.left.push(...items);
+    }
+  });
+
+  // Ensure at least 2 from each category, then fill remaining slots
+  const headlines: HeadlineItem[] = [];
+  const minPerCategory = 2;
+  const maxTotal = 10;
+
+  // Take minimum from each category first
+  for (const category of ["right", "center", "left"]) {
+    const items = byLean[category].slice(0, minPerCategory);
+    headlines.push(...items);
   }
 
-  // Sort by date, most recent first
+  // Fill remaining slots with whatever is available, rotating through categories
+  const remaining = maxTotal - headlines.length;
+  if (remaining > 0) {
+    const extras: HeadlineItem[] = [];
+    for (const category of ["right", "center", "left"]) {
+      extras.push(...byLean[category].slice(minPerCategory));
+    }
+    // Sort extras by date and take what we need
+    extras.sort((a, b) =>
+      new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()
+    );
+    headlines.push(...extras.slice(0, remaining));
+  }
+
+  // Sort final list by date, most recent first
   headlines.sort((a, b) =>
     new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()
   );
