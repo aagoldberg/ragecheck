@@ -15,12 +15,25 @@ interface FeedSource {
   feedUrl: string;
 }
 
+// One source per political lean for the spectrum display
 const FEED_SOURCES: FeedSource[] = [
   {
-    name: "Breitbart",
-    lean: "Far Right",
+    name: "Jacobin",
+    lean: "Far Left",
+    color: "#dc2626",
+    feedUrl: "https://jacobin.com/feed",
+  },
+  {
+    name: "MSNBC",
+    lean: "Left",
+    color: "#0369a1",
+    feedUrl: "https://www.msnbc.com/feeds/latest",
+  },
+  {
+    name: "Reuters",
+    lean: "Center",
     color: "#f97316",
-    feedUrl: "https://feeds.feedburner.com/breitbart",
+    feedUrl: "https://www.reutersagency.com/feed/?best-topics=political-general",
   },
   {
     name: "Fox News",
@@ -29,24 +42,15 @@ const FEED_SOURCES: FeedSource[] = [
     feedUrl: "https://moxie.foxnews.com/google-publisher/politics.xml",
   },
   {
-    name: "NPR",
-    lean: "Center",
-    color: "#5a5a5a",
-    feedUrl: "https://feeds.npr.org/1001/rss.xml",
-  },
-  {
-    name: "CNN",
-    lean: "Left",
-    color: "#cc0000",
-    feedUrl: "https://rss.cnn.com/rss/cnn_topstories.rss",
-  },
-  {
-    name: "AP News",
-    lean: "Center",
-    color: "#ff322e",
-    feedUrl: "https://rsshub.app/apnews/topics/apf-topnews",
+    name: "Breitbart",
+    lean: "Far Right",
+    color: "#b91c1c",
+    feedUrl: "https://feeds.feedburner.com/breitbart",
   },
 ];
+
+// Political lean order for display (left to right)
+const LEAN_ORDER: FeedSource["lean"][] = ["Far Left", "Left", "Center", "Right", "Far Right"];
 
 interface HeadlineItem {
   source: string;
@@ -90,53 +94,21 @@ async function fetchAllHeadlines(): Promise<HeadlineItem[]> {
   // Fetch all feeds in parallel
   const results = await Promise.all(FEED_SOURCES.map(fetchFeed));
 
-  // Group results by political lean category
-  const byLean: Record<string, HeadlineItem[]> = {
-    right: [],   // Far Right + Right
-    center: [],  // Center
-    left: [],    // Left + Far Left
-  };
-
+  // Build a map of lean -> headlines
+  const byLean: Record<string, HeadlineItem[]> = {};
   FEED_SOURCES.forEach((source, index) => {
-    const items = results[index];
-    if (source.lean === "Far Right" || source.lean === "Right") {
-      byLean.right.push(...items);
-    } else if (source.lean === "Center") {
-      byLean.center.push(...items);
-    } else {
-      byLean.left.push(...items);
-    }
+    byLean[source.lean] = results[index];
   });
 
-  // Ensure at least 2 from each category, then fill remaining slots
+  // Get exactly one headline per lean, in order from Far Left to Far Right
   const headlines: HeadlineItem[] = [];
-  const minPerCategory = 2;
-  const maxTotal = 10;
-
-  // Take minimum from each category first
-  for (const category of ["right", "center", "left"]) {
-    const items = byLean[category].slice(0, minPerCategory);
-    headlines.push(...items);
-  }
-
-  // Fill remaining slots with whatever is available, rotating through categories
-  const remaining = maxTotal - headlines.length;
-  if (remaining > 0) {
-    const extras: HeadlineItem[] = [];
-    for (const category of ["right", "center", "left"]) {
-      extras.push(...byLean[category].slice(minPerCategory));
+  for (const lean of LEAN_ORDER) {
+    const items = byLean[lean];
+    if (items && items.length > 0) {
+      // Take the most recent headline from this lean
+      headlines.push(items[0]);
     }
-    // Sort extras by date and take what we need
-    extras.sort((a, b) =>
-      new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()
-    );
-    headlines.push(...extras.slice(0, remaining));
   }
-
-  // Sort final list by date, most recent first
-  headlines.sort((a, b) =>
-    new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()
-  );
 
   // Cache the results
   cachedHeadlines = headlines;
