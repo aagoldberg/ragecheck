@@ -1,11 +1,52 @@
-import { neon } from "@neondatabase/serverless";
+import { neon, NeonQueryFunction } from "@neondatabase/serverless";
+
+// Cache the database connection
+let dbInstance: NeonQueryFunction<false, false> | null = null;
 
 // Lazy initialization - only connect when needed (not at build time)
-function getDb() {
+function getDb(): NeonQueryFunction<false, false> {
   if (!process.env.DATABASE_URL) {
     throw new Error("DATABASE_URL not configured");
   }
-  return neon(process.env.DATABASE_URL);
+  if (!dbInstance) {
+    dbInstance = neon(process.env.DATABASE_URL);
+  }
+  return dbInstance;
+}
+
+// Retry wrapper for database operations with exponential backoff
+async function withRetry<T>(
+  operation: () => Promise<T>,
+  maxRetries: number = 3,
+  baseDelayMs: number = 100
+): Promise<T> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      return await operation();
+    } catch (error) {
+      lastError = error;
+      const isRetryable = error instanceof Error &&
+        (error.message.includes("fetch failed") ||
+         error.message.includes("ECONNRESET") ||
+         error.message.includes("socket disconnected"));
+
+      if (!isRetryable || attempt === maxRetries - 1) {
+        throw error;
+      }
+
+      // Exponential backoff
+      const delay = baseDelayMs * Math.pow(2, attempt);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+  throw lastError;
+}
+
+// Helper to ensure integer values
+function toInt(value: number | undefined | null): number | null {
+  if (value === undefined || value === null) return null;
+  return Math.round(Number(value));
 }
 
 // Bot detection patterns
@@ -114,32 +155,34 @@ export async function logAnalysis(data: AnalysisLog) {
     const platform = data.sourceDomain ? detectPlatform(data.sourceDomain) : "unknown";
     const isBotUser = isBot(data.userAgent);
 
-    await getDb()`
-      INSERT INTO ragecheck_analyses (
-        url, source_domain, platform, score, label, llm_enhanced,
-        signal_loaded_language, signal_absolutist, signal_threat_panic,
-        signal_us_vs_them, signal_engagement_bait, success, error,
-        ip_address, user_agent, country, is_bot
-      ) VALUES (
-        ${data.url},
-        ${data.sourceDomain || null},
-        ${platform},
-        ${data.score || null},
-        ${data.label || null},
-        ${data.llmEnhanced || false},
-        ${data.signalBreakdown?.loadedLanguage || null},
-        ${data.signalBreakdown?.absolutist || null},
-        ${data.signalBreakdown?.threatPanic || null},
-        ${data.signalBreakdown?.usVsThem || null},
-        ${data.signalBreakdown?.engagementBait || null},
-        ${data.success},
-        ${data.error || null},
-        ${data.ipAddress || null},
-        ${data.userAgent || null},
-        ${data.country || null},
-        ${isBotUser}
-      )
-    `;
+    await withRetry(async () => {
+      await getDb()`
+        INSERT INTO ragecheck_analyses (
+          url, source_domain, platform, score, label, llm_enhanced,
+          signal_loaded_language, signal_absolutist, signal_threat_panic,
+          signal_us_vs_them, signal_engagement_bait, success, error,
+          ip_address, user_agent, country, is_bot
+        ) VALUES (
+          ${data.url},
+          ${data.sourceDomain || null},
+          ${platform},
+          ${toInt(data.score)},
+          ${data.label || null},
+          ${data.llmEnhanced || false},
+          ${toInt(data.signalBreakdown?.loadedLanguage)},
+          ${toInt(data.signalBreakdown?.absolutist)},
+          ${toInt(data.signalBreakdown?.threatPanic)},
+          ${toInt(data.signalBreakdown?.usVsThem)},
+          ${toInt(data.signalBreakdown?.engagementBait)},
+          ${data.success},
+          ${data.error || null},
+          ${data.ipAddress || null},
+          ${data.userAgent || null},
+          ${data.country || null},
+          ${isBotUser}
+        )
+      `;
+    });
   } catch (error) {
     console.error("Failed to log analysis:", error);
     // Don't throw - logging shouldn't break the main flow
@@ -335,10 +378,12 @@ export interface VisitorLog {
 export async function logVisitor(data: VisitorLog) {
   try {
     const isBotUser = isBot(data.userAgent);
-    await getDb()`
-      INSERT INTO ragecheck_visitors (ip_address, user_agent, country, referrer, is_bot)
-      VALUES (${data.ipAddress || null}, ${data.userAgent || null}, ${data.country || null}, ${data.referrer || null}, ${isBotUser})
-    `;
+    await withRetry(async () => {
+      await getDb()`
+        INSERT INTO ragecheck_visitors (ip_address, user_agent, country, referrer, is_bot)
+        VALUES (${data.ipAddress || null}, ${data.userAgent || null}, ${data.country || null}, ${data.referrer || null}, ${isBotUser})
+      `;
+    });
   } catch (error) {
     console.error("Failed to log visitor:", error);
   }
@@ -409,14 +454,16 @@ export async function saveClearviewData(stories: ClearviewStory[]): Promise<void
     const data = JSON.stringify({ stories });
     const generatedAt = new Date().toISOString();
 
-    // Delete old entries (keep only the latest)
-    await getDb()`DELETE FROM ragecheck_clearview WHERE generated_at < NOW() - INTERVAL '1 day'`;
+    await withRetry(async () => {
+      // Delete old entries (keep only the latest)
+      await getDb()`DELETE FROM ragecheck_clearview WHERE generated_at < NOW() - INTERVAL '1 day'`;
 
-    // Insert new entry
-    await getDb()`
-      INSERT INTO ragecheck_clearview (data, generated_at)
-      VALUES (${data}::jsonb, ${generatedAt})
-    `;
+      // Insert new entry
+      await getDb()`
+        INSERT INTO ragecheck_clearview (data, generated_at)
+        VALUES (${data}::jsonb, ${generatedAt})
+      `;
+    });
   } catch (error) {
     console.error("Failed to save clearview data:", error);
   }
@@ -427,13 +474,16 @@ export async function getClearviewData(maxAgeHours: number = 4): Promise<Clearvi
     // Calculate the cutoff time
     const cutoffTime = new Date(Date.now() - maxAgeHours * 60 * 60 * 1000).toISOString();
 
-    const [result] = await getDb()`
-      SELECT data, generated_at
-      FROM ragecheck_clearview
-      WHERE generated_at > ${cutoffTime}
-      ORDER BY generated_at DESC
-      LIMIT 1
-    `;
+    const result = await withRetry(async () => {
+      const [row] = await getDb()`
+        SELECT data, generated_at
+        FROM ragecheck_clearview
+        WHERE generated_at > ${cutoffTime}
+        ORDER BY generated_at DESC
+        LIMIT 1
+      `;
+      return row;
+    });
 
     if (result) {
       const data = typeof result.data === "string" ? JSON.parse(result.data) : result.data;
