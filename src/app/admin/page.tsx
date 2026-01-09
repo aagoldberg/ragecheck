@@ -381,6 +381,7 @@ export default function AdminDashboard() {
                     <table className="w-full text-sm">
                       <thead className="sticky top-0 bg-zinc-50 dark:bg-zinc-800">
                         <tr className="border-b border-zinc-200 dark:border-zinc-700">
+                          <th className="text-left py-3 px-3 text-zinc-500 font-medium">IP</th>
                           <th className="text-left py-3 px-3 text-zinc-500 font-medium">Country</th>
                           <th className="text-left py-3 px-3 text-zinc-500 font-medium">Referrer</th>
                           <th className="text-left py-3 px-3 text-zinc-500 font-medium">Time</th>
@@ -389,11 +390,14 @@ export default function AdminDashboard() {
                       <tbody>
                         {visitorStats.recentVisitors.length === 0 ? (
                           <tr>
-                            <td colSpan={3} className="py-4 text-zinc-500 text-center">No visitors yet</td>
+                            <td colSpan={4} className="py-4 text-zinc-500 text-center">No visitors yet</td>
                           </tr>
                         ) : (
                           visitorStats.recentVisitors.map((v, i) => (
                             <tr key={i} className="border-b border-zinc-100 dark:border-zinc-800 last:border-0 hover:bg-zinc-50 dark:hover:bg-zinc-800/50">
+                              <td className="py-2 px-3 text-zinc-500 text-xs font-mono">
+                                {v.ipAddress || "-"}
+                              </td>
                               <td className="py-2 px-3 text-zinc-600 dark:text-zinc-400 text-xs">
                                 {v.country || "-"}
                               </td>
