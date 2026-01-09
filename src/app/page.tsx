@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 
 interface Highlight {
   start: number;
@@ -402,6 +402,11 @@ export default function Home() {
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [copied, setCopied] = useState(false);
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
+
+  // Track visitor on page load
+  useEffect(() => {
+    fetch("/api/visit", { method: "POST" }).catch(() => {});
+  }, []);
 
   const analyze = async (targetUrl: string) => {
     if (!targetUrl.trim()) return;

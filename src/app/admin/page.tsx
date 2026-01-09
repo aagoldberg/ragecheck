@@ -31,10 +31,24 @@ interface DashboardStats {
   }[];
 }
 
+interface VisitorStats {
+  totalVisitors: number;
+  todayVisitors: number;
+  weekVisitors: number;
+  conversionRate: number;
+  recentVisitors: {
+    ipAddress: string | null;
+    country: string | null;
+    referrer: string | null;
+    createdAt: string;
+  }[];
+}
+
 interface ApiResponse {
   success?: boolean;
   error?: string;
   stats?: DashboardStats;
+  visitorStats?: VisitorStats;
   dbAvailable?: boolean;
 }
 
@@ -71,6 +85,7 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [visitorStats, setVisitorStats] = useState<VisitorStats | null>(null);
 
   const fetchStats = async (adminKey: string) => {
     setLoading(true);
@@ -88,6 +103,7 @@ export default function AdminDashboard() {
 
       if (data.stats) {
         setStats(data.stats);
+        setVisitorStats(data.visitorStats || null);
         setAuthenticated(true);
         // Save key to localStorage
         localStorage.setItem("ragecheck-admin-key", adminKey);
@@ -199,6 +215,16 @@ export default function AdminDashboard() {
               <StatCard title="Avg Score" value={stats.avgScore} subtitle="/100" />
             </div>
 
+            {/* Visitor Stats */}
+            {visitorStats && (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+                <StatCard title="Total Visitors" value={visitorStats.totalVisitors} />
+                <StatCard title="Visitors Today" value={visitorStats.todayVisitors} />
+                <StatCard title="Visitors This Week" value={visitorStats.weekVisitors} />
+                <StatCard title="Conversion Rate" value={`${visitorStats.conversionRate}%`} subtitle="visitors → analyses" />
+              </div>
+            )}
+
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
               {/* Score Distribution */}
               <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6">
@@ -286,64 +312,105 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-            {/* Recent Analyses */}
-            <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-                  Recent Analyses
-                </h3>
-                <span className="text-xs text-zinc-400">Last {stats.recentAnalyses.length} results</span>
-              </div>
-              <div className="overflow-x-auto max-h-[500px] overflow-y-auto border border-zinc-100 dark:border-zinc-800 rounded-lg">
-                <table className="w-full text-sm">
-                  <thead className="sticky top-0 bg-zinc-50 dark:bg-zinc-800">
-                    <tr className="border-b border-zinc-200 dark:border-zinc-700">
-                      <th className="text-left py-3 px-3 text-zinc-500 font-medium">URL</th>
-                      <th className="text-left py-3 px-3 text-zinc-500 font-medium">Domain</th>
-                      <th className="text-left py-3 px-3 text-zinc-500 font-medium">Score</th>
-                      <th className="text-left py-3 px-3 text-zinc-500 font-medium">Country</th>
-                      <th className="text-left py-3 px-3 text-zinc-500 font-medium">IP</th>
-                      <th className="text-left py-3 px-3 text-zinc-500 font-medium">Time</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {stats.recentAnalyses.length === 0 ? (
-                      <tr>
-                        <td colSpan={6} className="py-4 text-zinc-500 text-center">No analyses yet</td>
+            {/* Recent Analyses & Visitors */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Recent Analyses */}
+              <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+                    Recent Analyses
+                  </h3>
+                  <span className="text-xs text-zinc-400">Last {stats.recentAnalyses.length}</span>
+                </div>
+                <div className="overflow-x-auto max-h-[400px] overflow-y-auto border border-zinc-100 dark:border-zinc-800 rounded-lg">
+                  <table className="w-full text-sm">
+                    <thead className="sticky top-0 bg-zinc-50 dark:bg-zinc-800">
+                      <tr className="border-b border-zinc-200 dark:border-zinc-700">
+                        <th className="text-left py-3 px-3 text-zinc-500 font-medium">URL</th>
+                        <th className="text-left py-3 px-3 text-zinc-500 font-medium">Score</th>
+                        <th className="text-left py-3 px-3 text-zinc-500 font-medium">Country</th>
+                        <th className="text-left py-3 px-3 text-zinc-500 font-medium">Time</th>
                       </tr>
-                    ) : (
-                      stats.recentAnalyses.map((a, i) => (
-                        <tr key={i} className="border-b border-zinc-100 dark:border-zinc-800 last:border-0 hover:bg-zinc-50 dark:hover:bg-zinc-800/50">
-                          <td className="py-2 px-3 max-w-[300px] truncate">
-                            <a href={a.url} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline">
-                              {a.url}
-                            </a>
-                          </td>
-                          <td className="py-2 px-3 text-zinc-600 dark:text-zinc-400">{a.sourceDomain}</td>
-                          <td className="py-2 px-3">
-                            <span className={`text-xs font-medium px-2 py-0.5 rounded ${
-                              a.score > 66 ? "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300" :
-                              a.score > 33 ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300" :
-                              "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300"
-                            }`}>
-                              {a.score}
-                            </span>
-                          </td>
-                          <td className="py-2 px-3 text-zinc-600 dark:text-zinc-400 text-xs">
-                            {a.country || "-"}
-                          </td>
-                          <td className="py-2 px-3 text-zinc-500 text-xs font-mono" title={a.userAgent || undefined}>
-                            {a.ipAddress || "-"}
-                          </td>
-                          <td className="py-2 px-3 text-zinc-500 text-xs whitespace-nowrap">
-                            {new Date(a.createdAt).toLocaleString()}
-                          </td>
+                    </thead>
+                    <tbody>
+                      {stats.recentAnalyses.length === 0 ? (
+                        <tr>
+                          <td colSpan={4} className="py-4 text-zinc-500 text-center">No analyses yet</td>
                         </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
+                      ) : (
+                        stats.recentAnalyses.map((a, i) => (
+                          <tr key={i} className="border-b border-zinc-100 dark:border-zinc-800 last:border-0 hover:bg-zinc-50 dark:hover:bg-zinc-800/50">
+                            <td className="py-2 px-3 max-w-[200px] truncate">
+                              <a href={a.url} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline">
+                                {a.sourceDomain || a.url}
+                              </a>
+                            </td>
+                            <td className="py-2 px-3">
+                              <span className={`text-xs font-medium px-2 py-0.5 rounded ${
+                                a.score > 66 ? "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300" :
+                                a.score > 33 ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300" :
+                                "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300"
+                              }`}>
+                                {a.score}
+                              </span>
+                            </td>
+                            <td className="py-2 px-3 text-zinc-600 dark:text-zinc-400 text-xs">
+                              {a.country || "-"}
+                            </td>
+                            <td className="py-2 px-3 text-zinc-500 text-xs whitespace-nowrap">
+                              {new Date(a.createdAt).toLocaleString()}
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               </div>
+
+              {/* Recent Visitors */}
+              {visitorStats && (
+                <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+                      Recent Visitors
+                    </h3>
+                    <span className="text-xs text-zinc-400">Last {visitorStats.recentVisitors.length}</span>
+                  </div>
+                  <div className="overflow-x-auto max-h-[400px] overflow-y-auto border border-zinc-100 dark:border-zinc-800 rounded-lg">
+                    <table className="w-full text-sm">
+                      <thead className="sticky top-0 bg-zinc-50 dark:bg-zinc-800">
+                        <tr className="border-b border-zinc-200 dark:border-zinc-700">
+                          <th className="text-left py-3 px-3 text-zinc-500 font-medium">Country</th>
+                          <th className="text-left py-3 px-3 text-zinc-500 font-medium">Referrer</th>
+                          <th className="text-left py-3 px-3 text-zinc-500 font-medium">Time</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {visitorStats.recentVisitors.length === 0 ? (
+                          <tr>
+                            <td colSpan={3} className="py-4 text-zinc-500 text-center">No visitors yet</td>
+                          </tr>
+                        ) : (
+                          visitorStats.recentVisitors.map((v, i) => (
+                            <tr key={i} className="border-b border-zinc-100 dark:border-zinc-800 last:border-0 hover:bg-zinc-50 dark:hover:bg-zinc-800/50">
+                              <td className="py-2 px-3 text-zinc-600 dark:text-zinc-400 text-xs">
+                                {v.country || "-"}
+                              </td>
+                              <td className="py-2 px-3 text-zinc-500 text-xs max-w-[200px] truncate" title={v.referrer || undefined}>
+                                {v.referrer || "-"}
+                              </td>
+                              <td className="py-2 px-3 text-zinc-500 text-xs whitespace-nowrap">
+                                {new Date(v.createdAt).toLocaleString()}
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
             </div>
           </>
         ) : null}

@@ -27,6 +27,18 @@ export async function initDB() {
     )
   `;
 
+  // Create visitors table
+  await sql`
+    CREATE TABLE IF NOT EXISTS ragecheck_visitors (
+      id SERIAL PRIMARY KEY,
+      ip_address TEXT,
+      user_agent TEXT,
+      country TEXT,
+      referrer TEXT,
+      created_at TIMESTAMP DEFAULT NOW()
+    )
+  `;
+
   // Add columns if they don't exist (for existing tables)
   try {
     await sql`ALTER TABLE ragecheck_analyses ADD COLUMN IF NOT EXISTS ip_address TEXT`;
@@ -237,5 +249,81 @@ export async function isDBAvailable(): Promise<boolean> {
     return true;
   } catch {
     return false;
+  }
+}
+
+export interface VisitorLog {
+  ipAddress?: string;
+  userAgent?: string;
+  country?: string;
+  referrer?: string;
+}
+
+export async function logVisitor(data: VisitorLog) {
+  try {
+    await sql`
+      INSERT INTO ragecheck_visitors (ip_address, user_agent, country, referrer)
+      VALUES (${data.ipAddress || null}, ${data.userAgent || null}, ${data.country || null}, ${data.referrer || null})
+    `;
+  } catch (error) {
+    console.error("Failed to log visitor:", error);
+  }
+}
+
+export interface VisitorStats {
+  totalVisitors: number;
+  todayVisitors: number;
+  weekVisitors: number;
+  conversionRate: number;
+  recentVisitors: {
+    ipAddress: string | null;
+    country: string | null;
+    referrer: string | null;
+    createdAt: Date;
+  }[];
+}
+
+export async function getVisitorStats(): Promise<VisitorStats> {
+  try {
+    const [totalResult] = await sql`SELECT COUNT(*) as count FROM ragecheck_visitors`;
+    const [todayResult] = await sql`SELECT COUNT(*) as count FROM ragecheck_visitors WHERE created_at > NOW() - INTERVAL '1 day'`;
+    const [weekResult] = await sql`SELECT COUNT(*) as count FROM ragecheck_visitors WHERE created_at > NOW() - INTERVAL '7 days'`;
+
+    const [analysesToday] = await sql`SELECT COUNT(*) as count FROM ragecheck_analyses WHERE created_at > NOW() - INTERVAL '1 day'`;
+
+    const conversionRate = Number(todayResult.count) > 0
+      ? (Number(analysesToday.count) / Number(todayResult.count)) * 100
+      : 0;
+
+    const recentRows = await sql`
+      SELECT ip_address, country, referrer, created_at
+      FROM ragecheck_visitors
+      ORDER BY created_at DESC
+      LIMIT 50
+    `;
+
+    const recentVisitors = recentRows.map((row) => ({
+      ipAddress: row.ip_address || null,
+      country: row.country || null,
+      referrer: row.referrer || null,
+      createdAt: row.created_at,
+    }));
+
+    return {
+      totalVisitors: Number(totalResult.count),
+      todayVisitors: Number(todayResult.count),
+      weekVisitors: Number(weekResult.count),
+      conversionRate: Math.round(conversionRate),
+      recentVisitors,
+    };
+  } catch (error) {
+    console.error("Failed to get visitor stats:", error);
+    return {
+      totalVisitors: 0,
+      todayVisitors: 0,
+      weekVisitors: 0,
+      conversionRate: 0,
+      recentVisitors: [],
+    };
   }
 }
