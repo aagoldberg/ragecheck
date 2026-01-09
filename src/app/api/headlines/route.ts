@@ -1,0 +1,129 @@
+import { NextResponse } from "next/server";
+import Parser from "rss-parser";
+
+const parser = new Parser({
+  timeout: 10000,
+  headers: {
+    "User-Agent": "Mozilla/5.0 (compatible; RageCheck/1.0)",
+  },
+});
+
+interface FeedSource {
+  name: string;
+  lean: "Far Right" | "Right" | "Center" | "Left" | "Far Left";
+  color: string;
+  feedUrl: string;
+}
+
+const FEED_SOURCES: FeedSource[] = [
+  {
+    name: "Breitbart",
+    lean: "Far Right",
+    color: "#f97316",
+    feedUrl: "https://feeds.feedburner.com/breitbart",
+  },
+  {
+    name: "Fox News",
+    lean: "Right",
+    color: "#003366",
+    feedUrl: "https://moxie.foxnews.com/google-publisher/politics.xml",
+  },
+  {
+    name: "NPR",
+    lean: "Center",
+    color: "#5a5a5a",
+    feedUrl: "https://feeds.npr.org/1001/rss.xml",
+  },
+  {
+    name: "CNN",
+    lean: "Left",
+    color: "#cc0000",
+    feedUrl: "https://rss.cnn.com/rss/cnn_topstories.rss",
+  },
+  {
+    name: "AP News",
+    lean: "Center",
+    color: "#ff322e",
+    feedUrl: "https://rsshub.app/apnews/topics/apf-topnews",
+  },
+];
+
+interface HeadlineItem {
+  source: string;
+  lean: string;
+  color: string;
+  title: string;
+  url: string;
+  publishedAt: string;
+}
+
+// Simple in-memory cache
+let cachedHeadlines: HeadlineItem[] | null = null;
+let cacheTimestamp = 0;
+const CACHE_DURATION = 60 * 60 * 1000; // 1 hour
+
+async function fetchFeed(source: FeedSource): Promise<HeadlineItem[]> {
+  try {
+    const feed = await parser.parseURL(source.feedUrl);
+
+    // Get top 3 items from each feed
+    return feed.items.slice(0, 3).map((item) => ({
+      source: source.name,
+      lean: source.lean,
+      color: source.color,
+      title: item.title || "Untitled",
+      url: item.link || "",
+      publishedAt: item.pubDate || new Date().toISOString(),
+    }));
+  } catch (error) {
+    console.error(`Failed to fetch ${source.name} feed:`, error);
+    return [];
+  }
+}
+
+async function fetchAllHeadlines(): Promise<HeadlineItem[]> {
+  // Check cache
+  if (cachedHeadlines && Date.now() - cacheTimestamp < CACHE_DURATION) {
+    return cachedHeadlines;
+  }
+
+  // Fetch all feeds in parallel
+  const results = await Promise.all(FEED_SOURCES.map(fetchFeed));
+
+  // Flatten and get one item per source for variety
+  const headlines: HeadlineItem[] = [];
+  const maxPerSource = 2;
+
+  for (const sourceResults of results) {
+    headlines.push(...sourceResults.slice(0, maxPerSource));
+  }
+
+  // Sort by date, most recent first
+  headlines.sort((a, b) =>
+    new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()
+  );
+
+  // Cache the results
+  cachedHeadlines = headlines;
+  cacheTimestamp = Date.now();
+
+  return headlines;
+}
+
+export async function GET() {
+  try {
+    const headlines = await fetchAllHeadlines();
+
+    return NextResponse.json({
+      success: true,
+      headlines,
+      cachedAt: new Date(cacheTimestamp).toISOString(),
+    });
+  } catch (error) {
+    console.error("Headlines API error:", error);
+    return NextResponse.json(
+      { success: false, error: "Failed to fetch headlines" },
+      { status: 500 }
+    );
+  }
+}

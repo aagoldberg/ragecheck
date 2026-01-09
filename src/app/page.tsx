@@ -35,6 +35,15 @@ interface AnalysisResult {
   image?: string;
 }
 
+interface Headline {
+  source: string;
+  lean: string;
+  color: string;
+  title: string;
+  url: string;
+  publishedAt: string;
+}
+
 const EXAMPLE_URL = "https://www.nytimes.com/video/us/100000010631041/minneapolis-ice-shooting-video.html";
 
 const CURATED_EXAMPLES = [
@@ -402,10 +411,23 @@ export default function Home() {
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [copied, setCopied] = useState(false);
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
+  const [headlines, setHeadlines] = useState<Headline[]>([]);
+  const [headlinesLoading, setHeadlinesLoading] = useState(true);
 
-  // Track visitor on page load
+  // Track visitor and fetch headlines on page load
   useEffect(() => {
     fetch("/api/visit", { method: "POST" }).catch(() => {});
+
+    // Fetch live headlines
+    fetch("/api/headlines")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success && data.headlines) {
+          setHeadlines(data.headlines);
+        }
+      })
+      .catch(() => {})
+      .finally(() => setHeadlinesLoading(false));
   }, []);
 
   const analyze = async (targetUrl: string) => {
@@ -557,55 +579,74 @@ export default function Home() {
           </form>
         </div>
 
-        {/* Curated Examples Section */}
+        {/* Live Headlines Section */}
         {!result && (
           <div className="mt-12 max-w-5xl mx-auto">
             <h2 className="text-center text-lg font-semibold text-zinc-700 dark:text-zinc-300 mb-2">
-              Compare Coverage Across the Political Spectrum
+              Analyze Today&apos;s Headlines
             </h2>
             <p className="text-center text-sm text-zinc-500 dark:text-zinc-400 mb-8">
-              Same story, different framing. Click any to analyze.
+              Live from across the political spectrum. Click any to analyze.
             </p>
 
-            {/* News Articles */}
+            {/* Live Headlines */}
             <div className="mb-8">
               <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-4 flex items-center gap-2">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" />
                 </svg>
-                News Articles
+                Latest Headlines
+                {headlinesLoading && <span className="text-zinc-400 font-normal">(loading...)</span>}
               </h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {CURATED_EXAMPLES.filter(e => e.type === "article").map((example, i) => (
-                  <button
-                    key={i}
-                    onClick={() => {
-                      setUrl(example.url);
-                      analyze(example.url);
-                    }}
-                    className="group text-left bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-hidden hover:border-indigo-300 dark:hover:border-indigo-700 hover:shadow-md transition-all flex flex-col"
-                  >
-                    <div className="px-4 py-4 border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/50 flex flex-col gap-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider bg-zinc-200 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-300">
-                          {example.source}
-                        </span>
-                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded shadow-sm ${LEAN_COLORS[example.lean]}`}>
-                          {example.lean}
-                        </span>
+              {headlinesLoading ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {[1, 2, 3, 4, 5, 6].map((i) => (
+                    <div key={i} className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-hidden animate-pulse">
+                      <div className="px-4 py-4 border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/50">
+                        <div className="h-4 bg-zinc-200 dark:bg-zinc-700 rounded w-20" />
+                      </div>
+                      <div className="p-4">
+                        <div className="h-4 bg-zinc-200 dark:bg-zinc-700 rounded w-full mb-2" />
+                        <div className="h-4 bg-zinc-200 dark:bg-zinc-700 rounded w-3/4" />
                       </div>
                     </div>
-                    <div className="p-4 flex-1 flex flex-col justify-between">
-                      <p className="text-sm font-semibold text-zinc-800 dark:text-zinc-200 line-clamp-3 leading-snug group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
-                        {example.title}
-                      </p>
-                      <div className="mt-4 flex items-center gap-1 text-[10px] font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-all transform translate-x-[-4px] group-hover:translate-x-0">
-                        Analyze Pattern <span>→</span>
+                  ))}
+                </div>
+              ) : headlines.length > 0 ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {headlines.map((headline, i) => (
+                    <button
+                      key={i}
+                      onClick={() => {
+                        setUrl(headline.url);
+                        analyze(headline.url);
+                      }}
+                      className="group text-left bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-hidden hover:border-indigo-300 dark:hover:border-indigo-700 hover:shadow-md transition-all flex flex-col"
+                    >
+                      <div className="px-4 py-4 border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/50 flex flex-col gap-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider bg-zinc-200 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-300">
+                            {headline.source}
+                          </span>
+                          <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded shadow-sm ${LEAN_COLORS[headline.lean] || "bg-gray-400 text-white"}`}>
+                            {headline.lean}
+                          </span>
+                        </div>
                       </div>
-                    </div>
-                  </button>
-                ))}
-              </div>
+                      <div className="p-4 flex-1 flex flex-col justify-between">
+                        <p className="text-sm font-semibold text-zinc-800 dark:text-zinc-200 line-clamp-3 leading-snug group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+                          {headline.title}
+                        </p>
+                        <div className="mt-4 flex items-center gap-1 text-[10px] font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-all transform translate-x-[-4px] group-hover:translate-x-0">
+                          Analyze Pattern <span>→</span>
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-center text-zinc-500 py-8">Unable to load headlines. Try the example above.</p>
+              )}
             </div>
 
             {/* Tweets */}
