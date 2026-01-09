@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import Parser from "rss-parser";
 import Anthropic from "@anthropic-ai/sdk";
+import { getClearviewData, saveClearviewData, initClearviewTable, isDBAvailable } from "@/lib/db";
 
 const parser = new Parser({
   timeout: 15000,
@@ -84,10 +85,8 @@ interface ClearviewResponse {
   error?: string;
 }
 
-// Cache for expensive AI analysis
-let cachedResponse: ClearviewResponse | null = null;
-let cacheTimestamp = 0;
-const CACHE_DURATION = 4 * 60 * 60 * 1000; // 4 hours
+// Cache duration in hours
+const CACHE_HOURS = 4;
 
 async function fetchAllHeadlines(): Promise<RawHeadline[]> {
   const headlines: RawHeadline[] = [];
@@ -207,17 +206,33 @@ Important:
 
 export async function GET() {
   try {
-    // Check cache first
-    if (cachedResponse && Date.now() - cacheTimestamp < CACHE_DURATION) {
-      return NextResponse.json(cachedResponse);
+    // Check database cache first
+    const dbAvailable = await isDBAvailable();
+
+    if (dbAvailable) {
+      await initClearviewTable();
+      const cached = await getClearviewData(CACHE_HOURS);
+
+      if (cached && cached.stories.length > 0) {
+        console.log("Returning cached Clearview data from DB");
+        return NextResponse.json({
+          success: true,
+          stories: cached.stories,
+          generatedAt: cached.generatedAt,
+          cached: true,
+        });
+      }
     }
 
+    // No cache - need to generate fresh content
     if (!client) {
       return NextResponse.json(
         { success: false, error: "Analysis service unavailable" },
         { status: 503 }
       );
     }
+
+    console.log("Generating fresh Clearview analysis...");
 
     // Fetch all headlines
     const headlines = await fetchAllHeadlines();
@@ -238,9 +253,11 @@ export async function GET() {
       generatedAt: new Date().toISOString(),
     };
 
-    // Cache the response
-    cachedResponse = response;
-    cacheTimestamp = Date.now();
+    // Save to database for persistence
+    if (dbAvailable) {
+      await saveClearviewData(stories);
+      console.log("Saved Clearview data to DB");
+    }
 
     return NextResponse.json(response);
   } catch (error) {

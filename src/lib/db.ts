@@ -357,6 +357,93 @@ export interface VisitorStats {
   }[];
 }
 
+// Clearview cache storage
+export interface ClearviewStory {
+  id: string;
+  topic: string;
+  summary: string;
+  whatHappened: string;
+  sources: {
+    name: string;
+    lean: string;
+    title: string;
+    url: string;
+    framing: string;
+    manipulationTechniques: string[];
+  }[];
+  perspectives: {
+    lean: string;
+    viewpoint: string;
+  }[];
+  keyTakeaway: string;
+}
+
+export interface ClearviewCache {
+  stories: ClearviewStory[];
+  generatedAt: string;
+}
+
+export async function initClearviewTable() {
+  try {
+    await sql`
+      CREATE TABLE IF NOT EXISTS ragecheck_clearview (
+        id SERIAL PRIMARY KEY,
+        data JSONB NOT NULL,
+        generated_at TIMESTAMP NOT NULL,
+        created_at TIMESTAMP DEFAULT NOW()
+      )
+    `;
+  } catch (error) {
+    console.error("Failed to create clearview table:", error);
+  }
+}
+
+export async function saveClearviewData(stories: ClearviewStory[]): Promise<void> {
+  try {
+    const data = JSON.stringify({ stories });
+    const generatedAt = new Date().toISOString();
+
+    // Delete old entries (keep only the latest)
+    await sql`DELETE FROM ragecheck_clearview WHERE generated_at < NOW() - INTERVAL '1 day'`;
+
+    // Insert new entry
+    await sql`
+      INSERT INTO ragecheck_clearview (data, generated_at)
+      VALUES (${data}::jsonb, ${generatedAt})
+    `;
+  } catch (error) {
+    console.error("Failed to save clearview data:", error);
+  }
+}
+
+export async function getClearviewData(maxAgeHours: number = 4): Promise<ClearviewCache | null> {
+  try {
+    // Calculate the cutoff time
+    const cutoffTime = new Date(Date.now() - maxAgeHours * 60 * 60 * 1000).toISOString();
+
+    const [result] = await sql`
+      SELECT data, generated_at
+      FROM ragecheck_clearview
+      WHERE generated_at > ${cutoffTime}
+      ORDER BY generated_at DESC
+      LIMIT 1
+    `;
+
+    if (result) {
+      const data = typeof result.data === "string" ? JSON.parse(result.data) : result.data;
+      return {
+        stories: data.stories || [],
+        generatedAt: result.generated_at.toISOString(),
+      };
+    }
+
+    return null;
+  } catch (error) {
+    console.error("Failed to get clearview data:", error);
+    return null;
+  }
+}
+
 export async function getVisitorStats(): Promise<VisitorStats> {
   try {
     const [totalResult] = await sql`SELECT COUNT(*) as count FROM ragecheck_visitors`;
