@@ -348,6 +348,12 @@ export interface VisitorStats {
     country: string | null;
     referrer: string | null;
     createdAt: Date;
+    isBot: boolean;
+  }[];
+  timeSeries: {
+    date: string;
+    visitors: number;
+    analyses: number;
   }[];
 }
 
@@ -364,7 +370,7 @@ export async function getVisitorStats(): Promise<VisitorStats> {
       : 0;
 
     const recentRows = await sql`
-      SELECT ip_address, country, referrer, created_at
+      SELECT ip_address, country, referrer, created_at, is_bot
       FROM ragecheck_visitors
       ORDER BY created_at DESC
       LIMIT 50
@@ -375,7 +381,54 @@ export async function getVisitorStats(): Promise<VisitorStats> {
       country: row.country || null,
       referrer: row.referrer || null,
       createdAt: row.created_at,
+      isBot: row.is_bot || false,
     }));
+
+    // Time series for last 14 days
+    const visitorTimeSeries = await sql`
+      SELECT DATE(created_at) as date, COUNT(*) as count
+      FROM ragecheck_visitors
+      WHERE created_at > NOW() - INTERVAL '14 days'
+      GROUP BY DATE(created_at)
+      ORDER BY date ASC
+    `;
+
+    const analysisTimeSeries = await sql`
+      SELECT DATE(created_at) as date, COUNT(*) as count
+      FROM ragecheck_analyses
+      WHERE created_at > NOW() - INTERVAL '14 days'
+      GROUP BY DATE(created_at)
+      ORDER BY date ASC
+    `;
+
+    // Merge into single time series
+    const dateMap = new Map<string, { visitors: number; analyses: number }>();
+
+    // Initialize last 14 days
+    for (let i = 13; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const dateStr = d.toISOString().split("T")[0];
+      dateMap.set(dateStr, { visitors: 0, analyses: 0 });
+    }
+
+    for (const row of visitorTimeSeries) {
+      const dateStr = new Date(row.date).toISOString().split("T")[0];
+      const existing = dateMap.get(dateStr) || { visitors: 0, analyses: 0 };
+      existing.visitors = Number(row.count);
+      dateMap.set(dateStr, existing);
+    }
+
+    for (const row of analysisTimeSeries) {
+      const dateStr = new Date(row.date).toISOString().split("T")[0];
+      const existing = dateMap.get(dateStr) || { visitors: 0, analyses: 0 };
+      existing.analyses = Number(row.count);
+      dateMap.set(dateStr, existing);
+    }
+
+    const timeSeries = Array.from(dateMap.entries())
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([date, data]) => ({ date, ...data }));
 
     return {
       totalVisitors: Number(totalResult.count),
@@ -383,6 +436,7 @@ export async function getVisitorStats(): Promise<VisitorStats> {
       weekVisitors: Number(weekResult.count),
       conversionRate: Math.round(conversionRate),
       recentVisitors,
+      timeSeries,
     };
   } catch (error) {
     console.error("Failed to get visitor stats:", error);
@@ -392,6 +446,7 @@ export async function getVisitorStats(): Promise<VisitorStats> {
       weekVisitors: 0,
       conversionRate: 0,
       recentVisitors: [],
+      timeSeries: [],
     };
   }
 }

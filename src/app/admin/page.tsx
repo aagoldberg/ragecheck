@@ -53,6 +53,12 @@ interface VisitorStats {
     country: string | null;
     referrer: string | null;
     createdAt: string;
+    isBot: boolean;
+  }[];
+  timeSeries: {
+    date: string;
+    visitors: number;
+    analyses: number;
   }[];
 }
 
@@ -86,6 +92,108 @@ function ProgressBar({ label, value, max, color }: { label: string; value: numbe
       </div>
       <div className="h-2 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
         <div className={`h-full ${color} rounded-full`} style={{ width: `${percent}%` }} />
+      </div>
+    </div>
+  );
+}
+
+function TimeSeriesChart({ data }: { data: { date: string; visitors: number; analyses: number }[] }) {
+  if (!data || data.length === 0) return null;
+
+  const maxValue = Math.max(...data.map(d => Math.max(d.visitors, d.analyses)), 1);
+  const width = 100;
+  const height = 40;
+  const padding = { top: 2, right: 2, bottom: 2, left: 2 };
+  const chartWidth = width - padding.left - padding.right;
+  const chartHeight = height - padding.top - padding.bottom;
+
+  const getX = (i: number) => padding.left + (i / (data.length - 1)) * chartWidth;
+  const getY = (value: number) => padding.top + chartHeight - (value / maxValue) * chartHeight;
+
+  const visitorsPath = data.map((d, i) => `${i === 0 ? 'M' : 'L'} ${getX(i)} ${getY(d.visitors)}`).join(' ');
+  const analysesPath = data.map((d, i) => `${i === 0 ? 'M' : 'L'} ${getX(i)} ${getY(d.analyses)}`).join(' ');
+
+  return (
+    <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 mb-8">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+          Activity (Last 14 Days)
+        </h3>
+        <div className="flex items-center gap-4 text-xs">
+          <div className="flex items-center gap-1.5">
+            <div className="w-3 h-0.5 bg-indigo-500 rounded" />
+            <span className="text-zinc-500">Visitors</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-3 h-0.5 bg-emerald-500 rounded" />
+            <span className="text-zinc-500">Analyses</span>
+          </div>
+        </div>
+      </div>
+      <div className="relative">
+        <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-48" preserveAspectRatio="none">
+          {/* Grid lines */}
+          {[0, 0.25, 0.5, 0.75, 1].map((ratio) => (
+            <line
+              key={ratio}
+              x1={padding.left}
+              y1={padding.top + chartHeight * (1 - ratio)}
+              x2={width - padding.right}
+              y2={padding.top + chartHeight * (1 - ratio)}
+              stroke="currentColor"
+              className="text-zinc-100 dark:text-zinc-800"
+              strokeWidth="0.1"
+            />
+          ))}
+          {/* Visitors line */}
+          <path
+            d={visitorsPath}
+            fill="none"
+            stroke="#6366f1"
+            strokeWidth="0.4"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          {/* Analyses line */}
+          <path
+            d={analysesPath}
+            fill="none"
+            stroke="#10b981"
+            strokeWidth="0.4"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          {/* Data points - Visitors */}
+          {data.map((d, i) => (
+            <circle
+              key={`v-${i}`}
+              cx={getX(i)}
+              cy={getY(d.visitors)}
+              r="0.6"
+              fill="#6366f1"
+            />
+          ))}
+          {/* Data points - Analyses */}
+          {data.map((d, i) => (
+            <circle
+              key={`a-${i}`}
+              cx={getX(i)}
+              cy={getY(d.analyses)}
+              r="0.6"
+              fill="#10b981"
+            />
+          ))}
+        </svg>
+        {/* X-axis labels */}
+        <div className="flex justify-between mt-2 text-xs text-zinc-400">
+          <span>{data[0]?.date.slice(5)}</span>
+          <span>{data[Math.floor(data.length / 2)]?.date.slice(5)}</span>
+          <span>{data[data.length - 1]?.date.slice(5)}</span>
+        </div>
+        {/* Y-axis label */}
+        <div className="absolute top-0 right-0 text-xs text-zinc-400">
+          max: {maxValue}
+        </div>
       </div>
     </div>
   );
@@ -235,6 +343,11 @@ export default function AdminDashboard() {
                 <StatCard title="Visitors This Week" value={visitorStats.weekVisitors} />
                 <StatCard title="Conversion Rate" value={`${visitorStats.conversionRate}%`} subtitle="visitors → analyses" />
               </div>
+            )}
+
+            {/* Time Series Chart */}
+            {visitorStats && visitorStats.timeSeries.length > 0 && (
+              <TimeSeriesChart data={visitorStats.timeSeries} />
             )}
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
@@ -461,13 +574,14 @@ export default function AdminDashboard() {
                           <th className="text-left py-3 px-3 text-zinc-500 font-medium">IP</th>
                           <th className="text-left py-3 px-3 text-zinc-500 font-medium">Country</th>
                           <th className="text-left py-3 px-3 text-zinc-500 font-medium">Referrer</th>
+                          <th className="text-left py-3 px-3 text-zinc-500 font-medium">Bot</th>
                           <th className="text-left py-3 px-3 text-zinc-500 font-medium">Time</th>
                         </tr>
                       </thead>
                       <tbody>
                         {visitorStats.recentVisitors.length === 0 ? (
                           <tr>
-                            <td colSpan={4} className="py-4 text-zinc-500 text-center">No visitors yet</td>
+                            <td colSpan={5} className="py-4 text-zinc-500 text-center">No visitors yet</td>
                           </tr>
                         ) : (
                           visitorStats.recentVisitors.map((v, i) => (
@@ -480,6 +594,13 @@ export default function AdminDashboard() {
                               </td>
                               <td className="py-2 px-3 text-zinc-500 text-xs max-w-[200px] truncate" title={v.referrer || undefined}>
                                 {v.referrer || "-"}
+                              </td>
+                              <td className="py-2 px-3">
+                                {v.isBot ? (
+                                  <span className="text-xs font-medium px-2 py-0.5 rounded bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300">Bot</span>
+                                ) : (
+                                  <span className="text-xs text-zinc-400">-</span>
+                                )}
                               </td>
                               <td className="py-2 px-3 text-zinc-500 text-xs whitespace-nowrap">
                                 {new Date(v.createdAt).toLocaleString()}
