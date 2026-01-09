@@ -422,7 +422,12 @@ export default function Home() {
 
   // Track visitor and fetch headlines on page load
   useEffect(() => {
-    fetch("/api/visit", { method: "POST" }).catch(() => {});
+    // Send document.referrer to capture where the visitor came from
+    fetch("/api/visit", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ referrer: document.referrer || null }),
+    }).catch(() => {});
 
     // Fetch live headlines
     fetch("/api/headlines")

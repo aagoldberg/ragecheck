@@ -10,13 +10,27 @@ export async function POST(request: NextRequest) {
 
     await initDB();
 
+    // Get referrer from request body (sent by frontend with document.referrer)
+    let referrer: string | null = null;
+    try {
+      const body = await request.json();
+      if (body.referrer && typeof body.referrer === "string") {
+        // Only store external referrers (filter out own domain)
+        const refUrl = new URL(body.referrer);
+        if (!refUrl.hostname.includes("ragecheck")) {
+          referrer = body.referrer;
+        }
+      }
+    } catch {
+      // No body or invalid JSON - that's fine
+    }
+
     const ipAddress =
       request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
       request.headers.get("x-real-ip") ||
       null;
     const userAgent = request.headers.get("user-agent") || null;
     const country = request.headers.get("x-vercel-ip-country") || null;
-    const referrer = request.headers.get("referer") || null;
 
     await logVisitor({
       ipAddress: ipAddress || undefined,
