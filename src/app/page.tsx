@@ -44,7 +44,11 @@ interface Headline {
   publishedAt: string;
 }
 
-const EXAMPLE_URL = "https://www.nytimes.com/video/us/100000010631041/minneapolis-ice-shooting-video.html";
+const EXAMPLES = {
+  news: "https://www.foxnews.com/politics",
+  tweet: "https://x.com/elikitten/status/1876818505704726724",
+  bluesky: "https://bsky.app/profile/aoc.bsky.social/post/3lflhbrwnlk25",
+};
 
 const CURATED_EXAMPLES = [
   // News Articles
@@ -531,9 +535,15 @@ export default function Home() {
     analyze(url);
   };
 
-  const tryExample = () => {
-    setUrl(EXAMPLE_URL);
-    analyze(EXAMPLE_URL);
+  const tryExample = (type: "news" | "tweet" | "bluesky") => {
+    const exampleUrl = EXAMPLES[type];
+    setUrl(exampleUrl);
+    analyze(exampleUrl);
+  };
+
+  const triggerImageUpload = () => {
+    const fileInput = document.getElementById("image-upload") as HTMLInputElement;
+    if (fileInput) fileInput.click();
   };
 
   const getShareUrl = () => {
@@ -602,7 +612,7 @@ export default function Home() {
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-rose-500 to-indigo-600">manipulative patterns</span>
           </h1>
           <p className="text-lg text-zinc-600 dark:text-zinc-400 mb-8 leading-relaxed">
-            RageCheck uses linguistic analysis to detect loaded language, fear-mongering, and outrage bait in news and media.
+            Detect loaded language, fear-mongering, and outrage bait in news articles, tweets, social posts, or uploaded screenshots.
           </p>
 
           {/* Search Input */}
@@ -655,7 +665,7 @@ export default function Home() {
                       type="url"
                       value={url}
                       onChange={(e) => setUrl(e.target.value)}
-                      placeholder="Paste an article URL to analyze..."
+                      placeholder="Paste any URL (news, tweet, social post)..."
                       className="flex-1 w-full px-4 py-4 bg-transparent border-0 focus:ring-0 text-zinc-900 dark:text-zinc-100 placeholder-zinc-400"
                       required
                     />
@@ -698,21 +708,41 @@ export default function Home() {
                 {imageError && (
                   <p className="mt-2 text-sm text-rose-600 dark:text-rose-400 text-center">{imageError}</p>
                 )}
-                <div className="mt-4 flex items-center justify-center gap-4 text-xs text-zinc-500">
-                  <button
-                    type="button"
-                    onClick={tryExample}
-                    className="font-medium hover:text-indigo-600 transition-colors"
-                  >
-                    Try an example article →
-                  </button>
-                  <span className="text-zinc-300 dark:text-zinc-600">or</span>
-                  <label
-                    htmlFor="image-upload"
-                    className="font-medium hover:text-indigo-600 transition-colors cursor-pointer"
-                  >
-                    Upload a screenshot
-                  </label>
+                <div className="mt-4 text-xs text-zinc-500">
+                  <div className="flex items-center justify-center gap-1 flex-wrap">
+                    <span>Try:</span>
+                    <button
+                      type="button"
+                      onClick={() => tryExample("news")}
+                      className="font-medium hover:text-indigo-600 transition-colors px-1"
+                    >
+                      News article
+                    </button>
+                    <span className="text-zinc-300 dark:text-zinc-600">·</span>
+                    <button
+                      type="button"
+                      onClick={() => tryExample("tweet")}
+                      className="font-medium hover:text-indigo-600 transition-colors px-1"
+                    >
+                      Tweet
+                    </button>
+                    <span className="text-zinc-300 dark:text-zinc-600">·</span>
+                    <button
+                      type="button"
+                      onClick={() => tryExample("bluesky")}
+                      className="font-medium hover:text-indigo-600 transition-colors px-1"
+                    >
+                      Bluesky
+                    </button>
+                    <span className="text-zinc-300 dark:text-zinc-600">·</span>
+                    <button
+                      type="button"
+                      onClick={triggerImageUpload}
+                      className="font-medium hover:text-indigo-600 transition-colors px-1"
+                    >
+                      Screenshot
+                    </button>
+                  </div>
                 </div>
               </>
             )}
