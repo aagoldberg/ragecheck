@@ -16,6 +16,7 @@ interface FeedSource {
 }
 
 // One source per political lean for the spectrum display
+// Using feeds verified to return 200 status codes
 const FEED_SOURCES: FeedSource[] = [
   {
     name: "Jacobin",
@@ -24,16 +25,16 @@ const FEED_SOURCES: FeedSource[] = [
     feedUrl: "https://jacobin.com/feed",
   },
   {
-    name: "MSNBC",
+    name: "NPR",
     lean: "Left",
-    color: "#0369a1",
-    feedUrl: "https://www.msnbc.com/feeds/latest",
+    color: "#5a8dc5",
+    feedUrl: "https://feeds.npr.org/1014/rss.xml", // NPR Politics
   },
   {
-    name: "Reuters",
+    name: "PBS",
     lean: "Center",
-    color: "#f97316",
-    feedUrl: "https://www.reutersagency.com/feed/?best-topics=political-general",
+    color: "#1d4a8c",
+    feedUrl: "https://www.pbs.org/newshour/feeds/rss/headlines",
   },
   {
     name: "Fox News",
