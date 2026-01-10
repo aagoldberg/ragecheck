@@ -151,6 +151,8 @@ export async function POST(request: NextRequest): Promise<NextResponse<AnalyzeRe
         textPreview: cached.textPreview || "",
         llmEnhanced: cached.llmEnhanced,
         contextNotes: cached.contextNotes || undefined,
+        sharingPatterns: cached.sharingPatterns,
+        techniqueExplanations: cached.techniqueExplanations,
         cached: true,
       });
     }
@@ -234,6 +236,8 @@ export async function POST(request: NextRequest): Promise<NextResponse<AnalyzeRe
       highlights: ruleAnalysis.highlights,
       contextNotes,
       textPreview,
+      sharingPatterns,
+      techniqueExplanations,
     });
 
     return NextResponse.json({

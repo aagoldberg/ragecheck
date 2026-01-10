@@ -134,6 +134,8 @@ export async function initDB() {
     await getDb()`ALTER TABLE ragecheck_analyses ADD COLUMN IF NOT EXISTS highlights JSONB`;
     await getDb()`ALTER TABLE ragecheck_analyses ADD COLUMN IF NOT EXISTS context_notes TEXT`;
     await getDb()`ALTER TABLE ragecheck_analyses ADD COLUMN IF NOT EXISTS text_preview TEXT`;
+    await getDb()`ALTER TABLE ragecheck_analyses ADD COLUMN IF NOT EXISTS sharing_patterns JSONB`;
+    await getDb()`ALTER TABLE ragecheck_analyses ADD COLUMN IF NOT EXISTS technique_explanations JSONB`;
   } catch {
     // Columns may already exist
   }
@@ -165,6 +167,8 @@ export interface AnalysisLog {
   highlights?: { start: number; end: number; category: string; text: string }[];
   contextNotes?: string;
   textPreview?: string;
+  sharingPatterns?: string[];
+  techniqueExplanations?: string[];
 }
 
 function detectPlatform(domain: string): string {
@@ -195,7 +199,8 @@ export async function logAnalysis(data: AnalysisLog) {
           signal_loaded_language, signal_absolutist, signal_threat_panic,
           signal_us_vs_them, signal_engagement_bait, success, error,
           ip_address, user_agent, country, is_bot,
-          title, reasons, highlights, context_notes, text_preview
+          title, reasons, highlights, context_notes, text_preview,
+          sharing_patterns, technique_explanations
         ) VALUES (
           ${data.url},
           ${data.sourceDomain || null},
@@ -218,7 +223,9 @@ export async function logAnalysis(data: AnalysisLog) {
           ${data.reasons ? JSON.stringify(data.reasons) : null},
           ${data.highlights ? JSON.stringify(data.highlights) : null},
           ${data.contextNotes || null},
-          ${data.textPreview || null}
+          ${data.textPreview || null},
+          ${data.sharingPatterns ? JSON.stringify(data.sharingPatterns) : null},
+          ${data.techniqueExplanations ? JSON.stringify(data.techniqueExplanations) : null}
         )
       `;
     });
@@ -427,6 +434,8 @@ export interface CachedAnalysis {
   highlights: { start: number; end: number; category: string; text: string }[];
   contextNotes: string | null;
   textPreview: string | null;
+  sharingPatterns: string[];
+  techniqueExplanations: string[];
 }
 
 // Invalidate incomplete cache entries (those without textPreview)
@@ -464,7 +473,8 @@ export async function getCachedAnalysis(url: string): Promise<CachedAnalysis | n
           url, source_domain, score, label, llm_enhanced,
           signal_loaded_language, signal_absolutist, signal_threat_panic,
           signal_us_vs_them, signal_engagement_bait, created_at,
-          title, reasons, highlights, context_notes, text_preview
+          title, reasons, highlights, context_notes, text_preview,
+          sharing_patterns, technique_explanations
         FROM ragecheck_analyses
         WHERE url = ${url}
           AND success = true
@@ -480,12 +490,20 @@ export async function getCachedAnalysis(url: string): Promise<CachedAnalysis | n
       // Parse JSON fields
       let reasons: string[] = [];
       let highlights: { start: number; end: number; category: string; text: string }[] = [];
+      let sharingPatterns: string[] = [];
+      let techniqueExplanations: string[] = [];
 
       if (result.reasons) {
         reasons = typeof result.reasons === 'string' ? JSON.parse(result.reasons) : result.reasons;
       }
       if (result.highlights) {
         highlights = typeof result.highlights === 'string' ? JSON.parse(result.highlights) : result.highlights;
+      }
+      if (result.sharing_patterns) {
+        sharingPatterns = typeof result.sharing_patterns === 'string' ? JSON.parse(result.sharing_patterns) : result.sharing_patterns;
+      }
+      if (result.technique_explanations) {
+        techniqueExplanations = typeof result.technique_explanations === 'string' ? JSON.parse(result.technique_explanations) : result.technique_explanations;
       }
 
       return {
@@ -507,6 +525,8 @@ export async function getCachedAnalysis(url: string): Promise<CachedAnalysis | n
         highlights,
         contextNotes: result.context_notes || null,
         textPreview: result.text_preview || null,
+        sharingPatterns,
+        techniqueExplanations,
       };
     }
 
