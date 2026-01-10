@@ -93,6 +93,8 @@ Your task:
    - How each source is framing/spinning the story
    - What manipulation techniques (if any) each source is using
    - The key perspectives from different political viewpoints
+   - CRITICAL: Identify if there's scientific/expert consensus on the underlying facts
+   - Distinguish between factual disputes vs policy/values debates
 
 Respond with this exact JSON structure:
 {
@@ -122,17 +124,45 @@ Respond with this exact JSON structure:
           "viewpoint": "How the right generally sees this issue and why"
         }
       ],
-      "keyTakeaway": "One sentence helping the reader understand the story without the spin"
+      "keyTakeaway": "One sentence helping the reader understand the story without the spin",
+      "factualContext": {
+        "hasScientificConsensus": true/false,
+        "consensusStatement": "What scientific/expert consensus says (if applicable)",
+        "confidenceLevel": "high|moderate|low|contested",
+        "expertSources": ["CDC", "peer-reviewed research", etc.]
+      },
+      "debateType": "factual|policy|values|mixed",
+      "debateQuestion": "The actual question being debated (e.g., 'Should vaccines be mandated?' not 'Are vaccines safe?')",
+      "commonGround": ["Facts both sides agree on"],
+      "factualDisputes": [
+        {
+          "claim": "The disputed claim",
+          "leftPosition": "What left-leaning sources claim",
+          "rightPosition": "What right-leaning sources claim",
+          "evidenceStatus": "supported|mixed|unsupported|misleading"
+        }
+      ]
     }
   ]
 }
 
-Important:
+CRITICAL GUIDELINES:
 - Only include stories covered by 2+ sources
 - Be genuinely neutral in your summaries
 - Identify manipulation techniques like: loaded language, fear-mongering, omission of context, false equivalence, appeal to emotion, etc.
 - Include the actual URLs from the headlines data
-- If a story only has one source, skip it`;
+- If a story only has one source, skip it
+
+FACTUAL CONTEXT RULES:
+- If there's established scientific consensus (vaccines work, climate change is real, etc.), set hasScientificConsensus to true and state it clearly
+- debateType should be:
+  - "factual" if the debate is about what happened/is true
+  - "policy" if the facts are agreed but the debate is about what to do
+  - "values" if it's about competing moral/ethical priorities
+  - "mixed" if it involves multiple types
+- For factualDisputes, honestly assess whether claims are supported by evidence
+- evidenceStatus "misleading" means the claim contains some truth but is framed deceptively
+- Don't create false balance: if one side's claims contradict scientific consensus, say so`;
 
   const response = await client.messages.create({
     model: "claude-sonnet-4-20250514",

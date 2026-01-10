@@ -19,6 +19,20 @@ interface Perspective {
   viewpoint: string;
 }
 
+interface FactualContext {
+  hasScientificConsensus: boolean;
+  consensusStatement?: string;
+  confidenceLevel: "high" | "moderate" | "low" | "contested";
+  expertSources?: string[];
+}
+
+interface FactualDispute {
+  claim: string;
+  leftPosition: string;
+  rightPosition: string;
+  evidenceStatus: "supported" | "mixed" | "unsupported" | "misleading";
+}
+
 interface StoryCluster {
   id: string;
   topic: string;
@@ -27,6 +41,11 @@ interface StoryCluster {
   sources: SourceAnalysis[];
   perspectives: Perspective[];
   keyTakeaway: string;
+  factualContext?: FactualContext;
+  debateType?: "factual" | "policy" | "values" | "mixed";
+  debateQuestion?: string;
+  commonGround?: string[];
+  factualDisputes?: FactualDispute[];
 }
 
 // --- Constants & Utils ---
@@ -75,6 +94,175 @@ function BiasSpectrum({ sources }: { sources: SourceAnalysis[] }) {
         <div style={{ width: `${(counts.right / total) * 100}%` }} className="bg-rose-500 h-full" />
       </div>
       <span>{total} Sources Analysis</span>
+    </div>
+  );
+}
+
+function DebateTypeBadge({ type }: { type: string }) {
+  const config: Record<string, { bg: string; text: string; label: string; icon: string }> = {
+    factual: { bg: "bg-amber-100 dark:bg-amber-900/30", text: "text-amber-700 dark:text-amber-300", label: "Factual Dispute", icon: "❓" },
+    policy: { bg: "bg-blue-100 dark:bg-blue-900/30", text: "text-blue-700 dark:text-blue-300", label: "Policy Debate", icon: "⚖️" },
+    values: { bg: "bg-purple-100 dark:bg-purple-900/30", text: "text-purple-700 dark:text-purple-300", label: "Values Debate", icon: "💭" },
+    mixed: { bg: "bg-zinc-100 dark:bg-zinc-800", text: "text-zinc-700 dark:text-zinc-300", label: "Mixed", icon: "🔀" },
+  };
+  const c = config[type] || config.mixed;
+  return (
+    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${c.bg} ${c.text}`}>
+      <span>{c.icon}</span>
+      {c.label}
+    </span>
+  );
+}
+
+function EvidenceStatusBadge({ status }: { status: string }) {
+  const config: Record<string, { bg: string; text: string; label: string }> = {
+    supported: { bg: "bg-emerald-100 dark:bg-emerald-900/30", text: "text-emerald-700 dark:text-emerald-300", label: "✓ Evidence Supported" },
+    mixed: { bg: "bg-amber-100 dark:bg-amber-900/30", text: "text-amber-700 dark:text-amber-300", label: "~ Mixed Evidence" },
+    unsupported: { bg: "bg-rose-100 dark:bg-rose-900/30", text: "text-rose-700 dark:text-rose-300", label: "✗ Not Supported" },
+    misleading: { bg: "bg-orange-100 dark:bg-orange-900/30", text: "text-orange-700 dark:text-orange-300", label: "⚠ Misleading" },
+  };
+  const c = config[status] || config.mixed;
+  return (
+    <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold ${c.bg} ${c.text}`}>
+      {c.label}
+    </span>
+  );
+}
+
+function FactualContextBox({ context, debateType, debateQuestion }: {
+  context?: FactualContext;
+  debateType?: string;
+  debateQuestion?: string;
+}) {
+  if (!context) return null;
+
+  const confidenceConfig: Record<string, { color: string; label: string }> = {
+    high: { color: "text-emerald-600 dark:text-emerald-400", label: "High confidence" },
+    moderate: { color: "text-amber-600 dark:text-amber-400", label: "Moderate confidence" },
+    low: { color: "text-orange-600 dark:text-orange-400", label: "Low confidence" },
+    contested: { color: "text-rose-600 dark:text-rose-400", label: "Actively contested" },
+  };
+
+  const conf = confidenceConfig[context.confidenceLevel] || confidenceConfig.contested;
+
+  return (
+    <div className={`p-4 rounded-xl border ${
+      context.hasScientificConsensus
+        ? "bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-900/50"
+        : "bg-amber-50/50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-900/50"
+    }`}>
+      <div className="flex items-start gap-3">
+        <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
+          context.hasScientificConsensus
+            ? "bg-emerald-100 dark:bg-emerald-900/50"
+            : "bg-amber-100 dark:bg-amber-900/50"
+        }`}>
+          {context.hasScientificConsensus ? (
+            <svg className="w-4 h-4 text-emerald-600 dark:text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          ) : (
+            <svg className="w-4 h-4 text-amber-600 dark:text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          )}
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-1 flex-wrap">
+            <h4 className={`font-bold text-sm ${
+              context.hasScientificConsensus
+                ? "text-emerald-900 dark:text-emerald-100"
+                : "text-amber-900 dark:text-amber-100"
+            }`}>
+              {context.hasScientificConsensus ? "Scientific Consensus Exists" : "No Clear Scientific Consensus"}
+            </h4>
+            <span className={`text-xs ${conf.color}`}>({conf.label})</span>
+          </div>
+
+          {context.consensusStatement && (
+            <p className="text-sm text-zinc-700 dark:text-zinc-300 mb-2">
+              {context.consensusStatement}
+            </p>
+          )}
+
+          {context.expertSources && context.expertSources.length > 0 && (
+            <div className="flex flex-wrap gap-1 mb-2">
+              {context.expertSources.map((src, i) => (
+                <span key={i} className="px-1.5 py-0.5 bg-white/50 dark:bg-zinc-800/50 text-zinc-600 dark:text-zinc-400 text-[10px] rounded border border-zinc-200 dark:border-zinc-700">
+                  {src}
+                </span>
+              ))}
+            </div>
+          )}
+
+          {debateType && debateQuestion && (
+            <div className="mt-3 pt-3 border-t border-zinc-200/50 dark:border-zinc-700/50">
+              <div className="flex items-center gap-2 mb-1">
+                <DebateTypeBadge type={debateType} />
+              </div>
+              <p className="text-xs text-zinc-600 dark:text-zinc-400 italic">
+                The real question: "{debateQuestion}"
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CommonGroundSection({ commonGround }: { commonGround?: string[] }) {
+  if (!commonGround || commonGround.length === 0) return null;
+
+  return (
+    <div className="p-4 bg-zinc-50 dark:bg-zinc-900/50 rounded-xl border border-zinc-200 dark:border-zinc-800">
+      <h4 className="font-semibold text-sm text-zinc-900 dark:text-zinc-100 mb-2 flex items-center gap-2">
+        <svg className="w-4 h-4 text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+        </svg>
+        Common Ground (Both Sides Agree)
+      </h4>
+      <ul className="space-y-1">
+        {commonGround.map((item, i) => (
+          <li key={i} className="text-sm text-zinc-600 dark:text-zinc-400 flex items-start gap-2">
+            <span className="text-emerald-500 mt-0.5">✓</span>
+            {item}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function FactualDisputesSection({ disputes }: { disputes?: FactualDispute[] }) {
+  if (!disputes || disputes.length === 0) return null;
+
+  return (
+    <div className="space-y-3">
+      <h4 className="font-semibold text-sm text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+        <svg className="w-4 h-4 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+        </svg>
+        Disputed Claims
+      </h4>
+      {disputes.map((dispute, i) => (
+        <div key={i} className="p-4 bg-white dark:bg-zinc-900/50 rounded-lg border border-zinc-200 dark:border-zinc-800">
+          <div className="flex items-start justify-between gap-2 mb-3">
+            <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">"{dispute.claim}"</p>
+            <EvidenceStatusBadge status={dispute.evidenceStatus} />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="p-2 rounded bg-blue-50/50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-900/30">
+              <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase">Left Position</span>
+              <p className="text-xs text-zinc-700 dark:text-zinc-300 mt-1">{dispute.leftPosition}</p>
+            </div>
+            <div className="p-2 rounded bg-rose-50/50 dark:bg-rose-900/10 border border-rose-100 dark:border-rose-900/30">
+              <span className="text-[10px] font-bold text-rose-600 dark:text-rose-400 uppercase">Right Position</span>
+              <p className="text-xs text-zinc-700 dark:text-zinc-300 mt-1">{dispute.rightPosition}</p>
+            </div>
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
@@ -185,6 +373,13 @@ function StoryCard({ story }: { story: StoryCluster }) {
                 </div>
             </div>
 
+            {/* Factual Context - NEW */}
+            <FactualContextBox
+              context={story.factualContext}
+              debateType={story.debateType}
+              debateQuestion={story.debateQuestion}
+            />
+
             <div>
                 <h3 className="font-semibold text-zinc-900 dark:text-zinc-100 text-sm flex items-center gap-2 mb-2">
                     <svg className="w-4 h-4 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -237,13 +432,19 @@ function StoryCard({ story }: { story: StoryCluster }) {
       {/* Expanded Analysis */}
       {expanded && (
         <div className="border-t border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/30 p-6 md:p-8 space-y-8 animate-in slide-in-from-top-4 duration-300">
-            
+
             {/* Mobile Perspectives (Visible only on mobile) */}
             <div className="md:hidden space-y-4">
                  <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">Divergent Perspectives</h3>
                  <div className="grid gap-4">
                     {story.perspectives.map((p, i) => <PerspectiveCard key={i} perspective={p} />)}
                  </div>
+            </div>
+
+            {/* Common Ground & Factual Disputes - NEW */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <CommonGroundSection commonGround={story.commonGround} />
+              <FactualDisputesSection disputes={story.factualDisputes} />
             </div>
 
             {/* Source Grid */}
