@@ -1,24 +1,21 @@
-// Canvas-based share image generator for Twitter/social media
+// Canvas-based share image generator for social media
+// Optimized for virality: hook line + score + top bars + triggers
 
-interface ShareImageData {
+import { getHookLine, getTriggersLine, SIGNAL_SHORT_LABELS } from "@/lib/share";
+import type { SignalBreakdown } from "@/lib/score";
+
+export interface ShareImageData {
   score: number;
   title: string;
   domain: string;
-  signalBreakdown: {
-    arousal: number;
-    enemy_construction: number;
-    moral_condemnation: number;
-    simplification: number;
-    call_to_conflict: number;
-  };
+  signalBreakdown: SignalBreakdown;
 }
 
-const SIGNAL_LABELS: Record<string, string> = {
-  arousal: "Emotional Arousal",
-  enemy_construction: "Enemy Construction",
-  moral_condemnation: "Moral Condemnation",
-  simplification: "Oversimplification",
-  call_to_conflict: "Call-to-Conflict",
+export type ImageSize = "x" | "bluesky";
+
+const SIZE_CONFIGS: Record<ImageSize, { width: number; height: number }> = {
+  x: { width: 1200, height: 675 },      // 16:9 for X
+  bluesky: { width: 1200, height: 630 }, // Slightly shorter for Bluesky
 };
 
 function getScoreColor(score: number): string {
@@ -28,9 +25,9 @@ function getScoreColor(score: number): string {
 }
 
 function getScoreLabel(score: number): string {
-  if (score <= 33) return "Low";
-  if (score <= 66) return "Medium";
-  return "High";
+  if (score <= 33) return "Low Risk";
+  if (score <= 66) return "Borderline";
+  return "High Bait";
 }
 
 function drawRoundedRect(
@@ -54,7 +51,11 @@ function drawRoundedRect(
   ctx.closePath();
 }
 
-export function generateShareImage(data: ShareImageData, format: "jpeg" | "png" = "jpeg"): Promise<Blob> {
+export function generateShareImage(
+  data: ShareImageData,
+  format: "jpeg" | "png" = "jpeg",
+  size: ImageSize = "x"
+): Promise<Blob> {
   return new Promise((resolve, reject) => {
     const canvas = document.createElement("canvas");
     const ctx = canvas.getContext("2d");
@@ -63,9 +64,7 @@ export function generateShareImage(data: ShareImageData, format: "jpeg" | "png" 
       return;
     }
 
-    // Twitter optimal image size
-    const width = 1200;
-    const height = 628;
+    const { width, height } = SIZE_CONFIGS[size];
     canvas.width = width;
     canvas.height = height;
 
@@ -77,33 +76,46 @@ export function generateShareImage(data: ShareImageData, format: "jpeg" | "png" 
     ctx.fillRect(0, 0, width, height);
 
     // Subtle pattern overlay
-    ctx.fillStyle = "rgba(255,255,255,0.02)";
-    for (let i = 0; i < width; i += 40) {
-      for (let j = 0; j < height; j += 40) {
-        if ((i + j) % 80 === 0) {
-          ctx.fillRect(i, j, 20, 20);
+    ctx.fillStyle = "rgba(255,255,255,0.015)";
+    for (let i = 0; i < width; i += 50) {
+      for (let j = 0; j < height; j += 50) {
+        if ((i + j) % 100 === 0) {
+          ctx.fillRect(i, j, 25, 25);
         }
       }
     }
 
-    // Score circle background
     const scoreColor = getScoreColor(data.score);
-    const centerX = 200;
-    const centerY = height / 2;
-    const radius = 120;
+
+    // === HOOK LINE (top, prominent) ===
+    const { hookLine, topSignals } = getHookLine(data.score, data.signalBreakdown);
+
+    ctx.fillStyle = "#fafafa";
+    ctx.font = "bold 42px system-ui, -apple-system, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "top";
+    ctx.fillText(hookLine, width / 2, 50);
+
+    // === SCORE GAUGE (centered) ===
+    const centerX = width / 2;
+    const centerY = 260;
+    const radius = 100;
 
     // Glow effect
-    const glowGradient = ctx.createRadialGradient(centerX, centerY, radius * 0.5, centerX, centerY, radius * 1.5);
-    glowGradient.addColorStop(0, scoreColor + "40");
+    const glowGradient = ctx.createRadialGradient(
+      centerX, centerY, radius * 0.5,
+      centerX, centerY, radius * 1.4
+    );
+    glowGradient.addColorStop(0, scoreColor + "30");
     glowGradient.addColorStop(1, "transparent");
     ctx.fillStyle = glowGradient;
     ctx.beginPath();
-    ctx.arc(centerX, centerY, radius * 1.5, 0, Math.PI * 2);
+    ctx.arc(centerX, centerY, radius * 1.4, 0, Math.PI * 2);
     ctx.fill();
 
     // Score arc background
     ctx.strokeStyle = "#3f3f46"; // zinc-700
-    ctx.lineWidth = 16;
+    ctx.lineWidth = 14;
     ctx.lineCap = "round";
     ctx.beginPath();
     ctx.arc(centerX, centerY, radius, 0.75 * Math.PI, 2.25 * Math.PI);
@@ -114,149 +126,104 @@ export function generateShareImage(data: ShareImageData, format: "jpeg" | "png" 
     const startAngle = 0.75 * Math.PI;
     const endAngle = startAngle + progress * 1.5 * Math.PI;
     ctx.strokeStyle = scoreColor;
-    ctx.lineWidth = 16;
+    ctx.lineWidth = 14;
     ctx.beginPath();
     ctx.arc(centerX, centerY, radius, startAngle, endAngle);
     ctx.stroke();
 
     // Score number
     ctx.fillStyle = "#fafafa";
-    ctx.font = "bold 72px system-ui, -apple-system, sans-serif";
+    ctx.font = "bold 64px system-ui, -apple-system, sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText(String(data.score), centerX, centerY - 10);
+    ctx.fillText(String(data.score), centerX, centerY - 8);
 
     // Score label
-    ctx.fillStyle = "#a1a1aa"; // zinc-400
-    ctx.font = "600 18px system-ui, -apple-system, sans-serif";
-    ctx.fillText("BAIT SCORE", centerX, centerY + 45);
+    ctx.fillStyle = "#a1a1aa";
+    ctx.font = "600 16px system-ui, -apple-system, sans-serif";
+    ctx.fillText("BAIT SCORE", centerX, centerY + 38);
 
     // Risk level badge
     const label = getScoreLabel(data.score);
     ctx.font = "bold 14px system-ui, -apple-system, sans-serif";
-    const badgeWidth = ctx.measureText(label).width + 24;
-    drawRoundedRect(ctx, centerX - badgeWidth / 2, centerY + 70, badgeWidth, 28, 14);
-    ctx.fillStyle = scoreColor + "30";
+    const badgeWidth = ctx.measureText(label).width + 28;
+    drawRoundedRect(ctx, centerX - badgeWidth / 2, centerY + 60, badgeWidth, 30, 15);
+    ctx.fillStyle = scoreColor + "25";
     ctx.fill();
     ctx.fillStyle = scoreColor;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText(label, centerX, centerY + 84);
+    ctx.fillText(label, centerX, centerY + 75);
 
-    // Right side content
-    const contentX = 380;
-    const contentWidth = width - contentX - 60;
+    // === TOP BARS (only top 2-3) ===
+    const sortedSignals = (Object.keys(data.signalBreakdown) as (keyof SignalBreakdown)[])
+      .map(key => ({ key, value: data.signalBreakdown[key] }))
+      .sort((a, b) => b.value - a.value)
+      .filter(s => s.value >= 20) // Only show significant signals
+      .slice(0, 3); // Max 3 bars
 
-    // Domain badge
-    ctx.fillStyle = "#27272a"; // zinc-800
-    drawRoundedRect(ctx, contentX, 80, Math.min(ctx.measureText(data.domain.toUpperCase()).width + 24, 200), 32, 6);
-    ctx.fill();
-    ctx.fillStyle = "#a1a1aa";
-    ctx.font = "600 12px system-ui, -apple-system, sans-serif";
-    ctx.textAlign = "left";
-    ctx.textBaseline = "middle";
-    ctx.fillText(data.domain.toUpperCase().slice(0, 25), contentX + 12, 96);
+    if (sortedSignals.length > 0) {
+      const barsStartY = 400;
+      const barHeight = 10;
+      const barSpacing = 50;
+      const barWidth = 500;
+      const barsX = (width - barWidth) / 2;
 
-    // Title
-    ctx.fillStyle = "#fafafa";
-    ctx.font = "bold 32px system-ui, -apple-system, sans-serif";
-    ctx.textAlign = "left";
-    ctx.textBaseline = "top";
+      sortedSignals.forEach((signal, i) => {
+        const barY = barsStartY + i * barSpacing;
 
-    // Word wrap title
-    const words = data.title.split(" ");
-    let line = "";
-    let y = 130;
-    const maxWidth = contentWidth;
-    const lineHeight = 40;
-    let lineCount = 0;
-    const maxLines = 3;
+        // Label
+        ctx.fillStyle = "#a1a1aa";
+        ctx.font = "500 14px system-ui, -apple-system, sans-serif";
+        ctx.textAlign = "left";
+        ctx.textBaseline = "bottom";
+        ctx.fillText(SIGNAL_SHORT_LABELS[signal.key], barsX, barY - 8);
 
-    for (const word of words) {
-      const testLine = line + word + " ";
-      const metrics = ctx.measureText(testLine);
-      if (metrics.width > maxWidth && line !== "") {
-        ctx.fillText(line.trim(), contentX, y);
-        line = word + " ";
-        y += lineHeight;
-        lineCount++;
-        if (lineCount >= maxLines) {
-          line = line.trim().slice(0, -3) + "...";
-          break;
-        }
-      } else {
-        line = testLine;
-      }
-    }
-    if (lineCount < maxLines && line.trim()) {
-      ctx.fillText(line.trim(), contentX, y);
-    }
+        // Percentage
+        ctx.textAlign = "right";
+        ctx.fillText(`${signal.value}%`, barsX + barWidth, barY - 8);
 
-    // Signal bars
-    const barsY = 280;
-    const barHeight = 8;
-    const barSpacing = 50;
-    const barWidth = contentWidth - 100;
-    const signals = [
-      { key: "arousal", value: data.signalBreakdown.arousal },
-      { key: "enemy_construction", value: data.signalBreakdown.enemy_construction },
-      { key: "moral_condemnation", value: data.signalBreakdown.moral_condemnation },
-      { key: "simplification", value: data.signalBreakdown.simplification },
-      { key: "call_to_conflict", value: data.signalBreakdown.call_to_conflict },
-    ];
-
-    signals.forEach((signal, i) => {
-      const signalY = barsY + i * barSpacing;
-
-      // Label
-      ctx.fillStyle = "#a1a1aa";
-      ctx.font = "500 14px system-ui, -apple-system, sans-serif";
-      ctx.textAlign = "left";
-      ctx.textBaseline = "bottom";
-      ctx.fillText(SIGNAL_LABELS[signal.key], contentX, signalY - 6);
-
-      // Percentage
-      ctx.textAlign = "right";
-      ctx.fillText(`${signal.value}%`, contentX + barWidth, signalY - 6);
-
-      // Bar background
-      drawRoundedRect(ctx, contentX, signalY, barWidth, barHeight, 4);
-      ctx.fillStyle = "#3f3f46";
-      ctx.fill();
-
-      // Bar fill
-      const fillWidth = (signal.value / 100) * barWidth;
-      if (fillWidth > 0) {
-        drawRoundedRect(ctx, contentX, signalY, Math.max(fillWidth, 8), barHeight, 4);
-        const barColor = signal.value > 66 ? "#ef4444" : signal.value > 33 ? "#f59e0b" : "#10b981";
-        ctx.fillStyle = barColor;
+        // Bar background
+        drawRoundedRect(ctx, barsX, barY, barWidth, barHeight, 5);
+        ctx.fillStyle = "#3f3f46";
         ctx.fill();
-      }
-    });
 
-    // Footer
-    const footerY = height - 50;
+        // Bar fill
+        const fillWidth = (signal.value / 100) * barWidth;
+        if (fillWidth > 0) {
+          drawRoundedRect(ctx, barsX, barY, Math.max(fillWidth, 10), barHeight, 5);
+          const barColor = signal.value > 66 ? "#ef4444" : signal.value > 33 ? "#f59e0b" : "#10b981";
+          ctx.fillStyle = barColor;
+          ctx.fill();
+        }
+      });
+    }
 
-    // RageCheck logo/text
-    ctx.fillStyle = "#fafafa";
-    ctx.font = "bold 20px system-ui, -apple-system, sans-serif";
-    ctx.textAlign = "left";
-    ctx.textBaseline = "middle";
+    // === TRIGGERS LINE ===
+    const triggersLine = getTriggersLine(topSignals);
+    if (triggersLine) {
+      ctx.fillStyle = "#71717a";
+      ctx.font = "500 16px system-ui, -apple-system, sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "top";
+      ctx.fillText(triggersLine, width / 2, height - 100);
+    }
 
-    // Logo square
+    // === FOOTER ===
+    const footerY = height - 45;
+
+    // RageCheck logo
     ctx.fillStyle = "#fafafa";
     drawRoundedRect(ctx, 60, footerY - 12, 24, 24, 6);
     ctx.fill();
 
     ctx.fillStyle = "#fafafa";
+    ctx.font = "bold 20px system-ui, -apple-system, sans-serif";
+    ctx.textAlign = "left";
+    ctx.textBaseline = "middle";
     ctx.fillText("RageCheck", 94, footerY);
 
-    // Tagline
-    ctx.fillStyle = "#71717a"; // zinc-500
-    ctx.font = "400 16px system-ui, -apple-system, sans-serif";
-    ctx.fillText("See what reactions it's built to trigger", 220, footerY);
-
-    // URL
+    // URL (right side)
     ctx.textAlign = "right";
     ctx.fillStyle = "#a1a1aa";
     ctx.font = "500 16px system-ui, -apple-system, sans-serif";
@@ -277,8 +244,12 @@ export function generateShareImage(data: ShareImageData, format: "jpeg" | "png" 
   });
 }
 
-export async function downloadShareImage(data: ShareImageData, filename?: string): Promise<void> {
-  const blob = await generateShareImage(data);
+export async function downloadShareImage(
+  data: ShareImageData,
+  filename?: string,
+  size: ImageSize = "x"
+): Promise<void> {
+  const blob = await generateShareImage(data, "jpeg", size);
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
@@ -289,10 +260,13 @@ export async function downloadShareImage(data: ShareImageData, filename?: string
   URL.revokeObjectURL(url);
 }
 
-export async function copyShareImageToClipboard(data: ShareImageData): Promise<boolean> {
+export async function copyShareImageToClipboard(
+  data: ShareImageData,
+  size: ImageSize = "x"
+): Promise<boolean> {
   try {
     // Clipboard API requires PNG format
-    const blob = await generateShareImage(data, "png");
+    const blob = await generateShareImage(data, "png", size);
     await navigator.clipboard.write([
       new ClipboardItem({
         "image/png": blob,
