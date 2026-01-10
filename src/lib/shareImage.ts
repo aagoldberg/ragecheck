@@ -54,7 +54,7 @@ function drawRoundedRect(
   ctx.closePath();
 }
 
-export function generateShareImage(data: ShareImageData): Promise<Blob> {
+export function generateShareImage(data: ShareImageData, format: "jpeg" | "png" = "jpeg"): Promise<Blob> {
   return new Promise((resolve, reject) => {
     const canvas = document.createElement("canvas");
     const ctx = canvas.getContext("2d");
@@ -271,8 +271,8 @@ export function generateShareImage(data: ShareImageData): Promise<Blob> {
           reject(new Error("Failed to generate image"));
         }
       },
-      "image/jpeg",
-      0.95
+      format === "png" ? "image/png" : "image/jpeg",
+      format === "png" ? undefined : 0.95
     );
   });
 }
@@ -291,7 +291,8 @@ export async function downloadShareImage(data: ShareImageData, filename?: string
 
 export async function copyShareImageToClipboard(data: ShareImageData): Promise<boolean> {
   try {
-    const blob = await generateShareImage(data);
+    // Clipboard API requires PNG format
+    const blob = await generateShareImage(data, "png");
     await navigator.clipboard.write([
       new ClipboardItem({
         "image/png": blob,
