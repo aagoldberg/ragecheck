@@ -452,6 +452,80 @@ function SocialPostCard({
   );
 }
 
+const ANALYSIS_STEPS = [
+  { label: "Fetching content", duration: 1500 },
+  { label: "Extracting text", duration: 800 },
+  { label: "Scanning emotional arousal", duration: 600 },
+  { label: "Detecting enemy construction", duration: 600 },
+  { label: "Analyzing moral framing", duration: 600 },
+  { label: "Checking oversimplification", duration: 600 },
+  { label: "Identifying engagement bait", duration: 600 },
+  { label: "Calculating final score", duration: 400 },
+];
+
+function AnalyzingProgress() {
+  const [currentStep, setCurrentStep] = useState(0);
+  const [progress, setProgress] = useState(0);
+
+  useEffect(() => {
+    const totalDuration = ANALYSIS_STEPS.reduce((sum, s) => sum + s.duration, 0);
+    let elapsed = 0;
+
+    const interval = setInterval(() => {
+      elapsed += 50;
+
+      // Calculate which step we're on based on elapsed time
+      let accumulatedTime = 0;
+      let stepIndex = 0;
+      for (let i = 0; i < ANALYSIS_STEPS.length; i++) {
+        if (elapsed >= accumulatedTime && elapsed < accumulatedTime + ANALYSIS_STEPS[i].duration) {
+          stepIndex = i;
+          break;
+        }
+        accumulatedTime += ANALYSIS_STEPS[i].duration;
+        if (i === ANALYSIS_STEPS.length - 1) stepIndex = i;
+      }
+
+      setCurrentStep(stepIndex);
+      setProgress(Math.min(95, (elapsed / totalDuration) * 100)); // Cap at 95% until done
+    }, 50);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  const currentLabel = ANALYSIS_STEPS[currentStep]?.label || "Finalizing...";
+
+  return (
+    <div className="max-w-md mx-auto mt-12 animate-in fade-in duration-500">
+      <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-8 shadow-2xl">
+        <div className="flex items-center justify-between mb-3">
+          <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+            {currentLabel}
+          </span>
+          <span className="text-sm font-bold text-indigo-600 dark:text-indigo-400">
+            {Math.round(progress)}%
+          </span>
+        </div>
+
+        <div className="h-3 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden mb-4">
+          <div
+            className="h-full bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-600 rounded-full transition-all duration-100 ease-out"
+            style={{ width: `${progress}%` }}
+          />
+        </div>
+
+        <div className="flex items-center justify-center gap-2 text-xs text-zinc-400">
+          <svg className="animate-spin h-3 w-3" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+          </svg>
+          <span>Step {currentStep + 1} of {ANALYSIS_STEPS.length}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function Home() {
   const [url, setUrl] = useState("");
   const [loading, setLoading] = useState(false);
@@ -874,38 +948,7 @@ export default function Home() {
         )}
 
         {/* Loading State */}
-        {loading && (
-          <div className="max-w-xl mx-auto mt-12 animate-in fade-in duration-500">
-            <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-10 shadow-2xl text-center">
-              <div className="inline-block relative mb-8">
-                 <div className="absolute inset-0 bg-indigo-500 blur-xl opacity-20 animate-pulse"></div>
-                 <svg className="relative animate-spin h-10 w-10 text-indigo-600 mx-auto" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                </svg>
-              </div>
-
-              <h3 className="text-xl font-bold text-zinc-900 dark:text-zinc-100 mb-2">Analyzing Patterns</h3>
-              <p className="text-zinc-500 mb-8">Scanning for manipulative framing...</p>
-
-              <div className="space-y-4 max-w-sm mx-auto">
-                {Object.entries(SIGNAL_LABELS).map(([key, label], index) => (
-                  <div key={key} className="flex items-center gap-4">
-                    <span className="text-xs font-medium text-zinc-400 w-32 text-right">{label}</span>
-                    <div className="flex-1 h-2 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full animate-loading-bar"
-                        style={{
-                          animationDelay: `${index * 200}ms`,
-                        }}
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
+        {loading && <AnalyzingProgress />}
 
         {/* Results Section */}
         {result && !loading && (
@@ -1157,14 +1200,6 @@ export default function Home() {
         }
         .dark .custom-scrollbar::-webkit-scrollbar-thumb {
           background: #3f3f46;
-        }
-        @keyframes loading-bar {
-          0% { width: 0%; }
-          50% { width: 100%; }
-          100% { width: 0%; }
-        }
-        .animate-loading-bar {
-          animation: loading-bar 1.5s ease-in-out infinite;
         }
       `}</style>
     </div>
