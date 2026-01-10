@@ -141,13 +141,14 @@ export async function POST(request: NextRequest): Promise<NextResponse<AnalyzeRe
         success: true,
         score: cached.score,
         label: cached.label as "Low" | "Medium" | "High",
-        reasons: ["Cached result from recent analysis"],
-        highlights: [],
+        reasons: cached.reasons.length > 0 ? cached.reasons : ["Analysis based on detected patterns"],
+        highlights: cached.highlights as Highlight[],
         signalBreakdown: cached.signalBreakdown,
-        title: "Cached Analysis",
+        title: cached.title || "Article Analysis",
         sourceDomain: cached.sourceDomain,
         textPreview: "",
         llmEnhanced: cached.llmEnhanced,
+        contextNotes: cached.contextNotes || undefined,
         cached: true,
       });
     }
@@ -214,7 +215,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<AnalyzeRe
 
     const label = getLabel(finalScore);
 
-    // Log successful analysis
+    // Log successful analysis with full data for caching
     logAnalysis({
       url,
       sourceDomain: extracted.sourceDomain,
@@ -226,6 +227,10 @@ export async function POST(request: NextRequest): Promise<NextResponse<AnalyzeRe
       ipAddress: ipAddress || undefined,
       userAgent: userAgent || undefined,
       country: country || undefined,
+      title: extracted.title,
+      reasons: finalReasons,
+      highlights: ruleAnalysis.highlights,
+      contextNotes,
     });
 
     return NextResponse.json({

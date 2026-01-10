@@ -116,6 +116,11 @@ export async function initDB() {
     await getDb()`ALTER TABLE ragecheck_analyses ADD COLUMN IF NOT EXISTS is_bot BOOLEAN DEFAULT FALSE`;
     await getDb()`ALTER TABLE ragecheck_visitors ADD COLUMN IF NOT EXISTS is_bot BOOLEAN DEFAULT FALSE`;
     await getDb()`ALTER TABLE ragecheck_visitors ADD COLUMN IF NOT EXISTS page_path TEXT`;
+    // Add columns for full analysis caching
+    await getDb()`ALTER TABLE ragecheck_analyses ADD COLUMN IF NOT EXISTS title TEXT`;
+    await getDb()`ALTER TABLE ragecheck_analyses ADD COLUMN IF NOT EXISTS reasons JSONB`;
+    await getDb()`ALTER TABLE ragecheck_analyses ADD COLUMN IF NOT EXISTS highlights JSONB`;
+    await getDb()`ALTER TABLE ragecheck_analyses ADD COLUMN IF NOT EXISTS context_notes TEXT`;
   } catch {
     // Columns may already exist
   }
@@ -141,6 +146,11 @@ export interface AnalysisLog {
   ipAddress?: string;
   userAgent?: string;
   country?: string;
+  // Full analysis data for caching
+  title?: string;
+  reasons?: string[];
+  highlights?: { start: number; end: number; category: string; text: string }[];
+  contextNotes?: string;
 }
 
 function detectPlatform(domain: string): string {
@@ -170,7 +180,8 @@ export async function logAnalysis(data: AnalysisLog) {
           url, source_domain, platform, score, label, llm_enhanced,
           signal_loaded_language, signal_absolutist, signal_threat_panic,
           signal_us_vs_them, signal_engagement_bait, success, error,
-          ip_address, user_agent, country, is_bot
+          ip_address, user_agent, country, is_bot,
+          title, reasons, highlights, context_notes
         ) VALUES (
           ${data.url},
           ${data.sourceDomain || null},
@@ -188,7 +199,11 @@ export async function logAnalysis(data: AnalysisLog) {
           ${data.ipAddress || null},
           ${data.userAgent || null},
           ${data.country || null},
-          ${isBotUser}
+          ${isBotUser},
+          ${data.title || null},
+          ${data.reasons ? JSON.stringify(data.reasons) : null},
+          ${data.highlights ? JSON.stringify(data.highlights) : null},
+          ${data.contextNotes || null}
         )
       `;
     });
@@ -392,6 +407,10 @@ export interface CachedAnalysis {
     call_to_conflict: number;
   };
   createdAt: Date;
+  title: string | null;
+  reasons: string[];
+  highlights: { start: number; end: number; category: string; text: string }[];
+  contextNotes: string | null;
 }
 
 // Get cached analysis for a URL (within last 24 hours)
@@ -404,7 +423,8 @@ export async function getCachedAnalysis(url: string): Promise<CachedAnalysis | n
         SELECT
           url, source_domain, score, label, llm_enhanced,
           signal_loaded_language, signal_absolutist, signal_threat_panic,
-          signal_us_vs_them, signal_engagement_bait, created_at
+          signal_us_vs_them, signal_engagement_bait, created_at,
+          title, reasons, highlights, context_notes
         FROM ragecheck_analyses
         WHERE url = ${url}
           AND success = true
@@ -417,6 +437,17 @@ export async function getCachedAnalysis(url: string): Promise<CachedAnalysis | n
     });
 
     if (result) {
+      // Parse JSON fields
+      let reasons: string[] = [];
+      let highlights: { start: number; end: number; category: string; text: string }[] = [];
+
+      if (result.reasons) {
+        reasons = typeof result.reasons === 'string' ? JSON.parse(result.reasons) : result.reasons;
+      }
+      if (result.highlights) {
+        highlights = typeof result.highlights === 'string' ? JSON.parse(result.highlights) : result.highlights;
+      }
+
       return {
         url: result.url,
         sourceDomain: result.source_domain || "unknown",
@@ -431,6 +462,10 @@ export async function getCachedAnalysis(url: string): Promise<CachedAnalysis | n
           call_to_conflict: Number(result.signal_engagement_bait) || 0,
         },
         createdAt: result.created_at,
+        title: result.title || null,
+        reasons,
+        highlights,
+        contextNotes: result.context_notes || null,
       };
     }
 
