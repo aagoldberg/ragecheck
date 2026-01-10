@@ -123,6 +123,8 @@ export async function POST(request: NextRequest): Promise<NextResponse<AnalyzeRe
       );
     }
 
+    const forceReanalyze = body.force === true;
+
     // Validate URL format
     try {
       new URL(url);
@@ -133,8 +135,8 @@ export async function POST(request: NextRequest): Promise<NextResponse<AnalyzeRe
       );
     }
 
-    // Check cache first (results from last 24 hours)
-    const cached = await getCachedAnalysis(url);
+    // Check cache first (results from last 24 hours) unless force re-analyze
+    const cached = !forceReanalyze ? await getCachedAnalysis(url) : null;
     if (cached) {
       console.log(`Cache hit for ${url}`);
       return NextResponse.json({

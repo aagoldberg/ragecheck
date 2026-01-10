@@ -429,6 +429,30 @@ export interface CachedAnalysis {
   textPreview: string | null;
 }
 
+// Invalidate incomplete cache entries (those without textPreview)
+export async function invalidateIncompleteCache(): Promise<number> {
+  if (!process.env.DATABASE_URL) return 0;
+
+  try {
+    const result = await withRetry(async () => {
+      const res = await getDb()`
+        UPDATE ragecheck_analyses
+        SET created_at = created_at - INTERVAL '25 hours'
+        WHERE success = true
+          AND score IS NOT NULL
+          AND text_preview IS NULL
+          AND created_at > NOW() - INTERVAL '24 hours'
+      `;
+      return res;
+    });
+    // postgres.js returns array with count property
+    return (result as unknown as { count: number }).count || 0;
+  } catch (error) {
+    console.error("Failed to invalidate incomplete cache:", error);
+    return 0;
+  }
+}
+
 // Get cached analysis for a URL (within last 24 hours)
 export async function getCachedAnalysis(url: string): Promise<CachedAnalysis | null> {
   if (!process.env.DATABASE_URL) return null;

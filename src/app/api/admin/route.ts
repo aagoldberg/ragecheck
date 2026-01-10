@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { initDB, getDashboardStats, getVisitorStats, getPageVisitorStats, getViralMetrics, isDBAvailable } from "@/lib/db";
+import { initDB, getDashboardStats, getVisitorStats, getPageVisitorStats, getViralMetrics, isDBAvailable, invalidateIncompleteCache } from "@/lib/db";
 
 export async function GET(request: NextRequest) {
   // Simple password protection via query param
@@ -44,6 +44,39 @@ export async function GET(request: NextRequest) {
     console.error("Admin API error:", error);
     return NextResponse.json(
       { error: "Failed to get stats", details: String(error) },
+      { status: 500 }
+    );
+  }
+}
+
+export async function POST(request: NextRequest) {
+  const { searchParams } = new URL(request.url);
+  const key = searchParams.get("key");
+  const adminKey = process.env.ADMIN_KEY || "ragecheck-admin-2024";
+
+  if (key !== adminKey) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  try {
+    const body = await request.json();
+    const { action } = body;
+
+    if (action === "invalidate_incomplete_cache") {
+      const count = await invalidateIncompleteCache();
+      return NextResponse.json({
+        success: true,
+        action,
+        invalidatedCount: count,
+        message: `Invalidated ${count} incomplete cache entries`,
+      });
+    }
+
+    return NextResponse.json({ error: "Unknown action" }, { status: 400 });
+  } catch (error) {
+    console.error("Admin POST error:", error);
+    return NextResponse.json(
+      { error: "Failed to execute action", details: String(error) },
       { status: 500 }
     );
   }
