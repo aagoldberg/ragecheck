@@ -161,8 +161,8 @@ export const ABSOLUTIST_TERMS = [
 ];
 
 export const FALSE_DILEMMA_PATTERNS = [
-  /either.*or/i,
-  /you're either.*or/i,
+  /either.{1,50}or/i,  // Limit to 50 chars between either/or
+  /you're either.{1,40}or/i,
   /only two (options|choices|ways)/i,
   /there are only two/i,
   /pick a side/i,

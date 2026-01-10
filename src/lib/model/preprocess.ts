@@ -56,7 +56,7 @@ export function countPunctuation(text: string): {
 }
 
 // Max text length for analysis (prevents crashes on very long articles)
-const MAX_TEXT_LENGTH = 50000; // ~7,000-10,000 words
+const MAX_TEXT_LENGTH = 15000; // ~2,500 words - keeps analysis fast
 
 /**
  * Full preprocessing pipeline
