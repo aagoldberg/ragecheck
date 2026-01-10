@@ -914,8 +914,48 @@ export default function Home() {
           </div>
         )}
 
+        {/* Analyzing Indicator */}
+        {loading && (
+          <div className="max-w-xl mx-auto animate-in fade-in duration-300">
+            <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-8 shadow-lg">
+              <div className="flex items-center justify-center gap-3 mb-6">
+                <svg className="animate-spin h-6 w-6 text-indigo-600" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+                <span className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">Analyzing content...</span>
+              </div>
+
+              {/* Animated signal bars */}
+              <div className="space-y-3">
+                {Object.entries(SIGNAL_LABELS).map(([key, label], index) => (
+                  <div key={key} className="group">
+                    <div className="flex justify-between mb-1.5">
+                      <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400">{label}</span>
+                    </div>
+                    <div className="h-2 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-gradient-to-r from-indigo-400 to-purple-500 rounded-full animate-pulse"
+                        style={{
+                          width: '100%',
+                          animationDelay: `${index * 150}ms`,
+                          opacity: 0.6
+                        }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <p className="mt-6 text-center text-xs text-zinc-400">
+                Scanning for manipulation patterns...
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Results Section */}
-        {result && (
+        {result && !loading && (
           <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-6">
 
             {/* Demo Banner */}
