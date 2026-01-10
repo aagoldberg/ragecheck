@@ -193,7 +193,7 @@ const CURATED_EXAMPLES = [
 const LEAN_COLORS: Record<string, string> = {
   "Far Right": "bg-red-600 text-white",
   "Right": "bg-red-400 text-white",
-  "Center": "bg-gray-400 text-white",
+  "Center": "bg-zinc-500 text-white",
   "Left": "bg-blue-400 text-white",
   "Far Left": "bg-blue-600 text-white",
 };
@@ -217,15 +217,15 @@ const CATEGORY_COLORS: Record<string, string> = {
 
 function BentoCard({ children, className = "", title }: { children: React.ReactNode; className?: string; title?: string }) {
   return (
-    <div className={`bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-sm flex flex-col ${className}`}>
+    <div className={`bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-sm hover:shadow-md transition-shadow duration-300 flex flex-col ${className}`}>
       {title && (
-        <div className="px-4 py-3 md:px-6 md:py-4 border-b border-zinc-100 dark:border-zinc-800">
+        <div className="px-5 py-4 border-b border-zinc-100 dark:border-zinc-800">
           <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
             {title}
           </h3>
         </div>
       )}
-      <div className="p-4 md:p-6 flex-1">{children}</div>
+      <div className="p-5 md:p-6 flex-1">{children}</div>
     </div>
   );
 }
@@ -246,8 +246,8 @@ function ScoreGauge({ score }: { score: number; label?: string }) {
   };
 
   return (
-    <div className="relative flex flex-col items-center justify-center">
-      <svg className="w-56 h-32" viewBox="0 0 100 55">
+    <div className="relative flex flex-col items-center justify-center py-2">
+      <svg className="w-64 h-36" viewBox="0 0 100 55">
         <path
           d="M 10 50 A 40 40 0 0 1 90 50"
           fill="none"
@@ -265,21 +265,21 @@ function ScoreGauge({ score }: { score: number; label?: string }) {
           className={`${getColor(score)} transition-all duration-1000 ease-out`}
           strokeLinecap="round"
         />
-        {/* Simple needle */}
+        {/* Needle */}
         <line
           x1="50" y1="50" x2="50" y2="15"
           stroke="currentColor"
-          strokeWidth="2"
-          className="text-zinc-800 dark:text-zinc-200 transition-transform duration-1000 ease-out"
+          strokeWidth="2.5"
+          className="text-zinc-800 dark:text-zinc-200 transition-transform duration-1000 ease-out origin-bottom"
           style={{ transformOrigin: '50px 50px', transform: `rotate(${rotation}deg)` }}
         />
-        <circle cx="50" cy="50" r="2" fill="currentColor" className="text-zinc-800 dark:text-zinc-200" />
+        <circle cx="50" cy="50" r="3" fill="currentColor" className="text-zinc-800 dark:text-zinc-200" />
       </svg>
-      <div className="text-center -mt-6">
-        <span className={`text-5xl font-bold tracking-tight ${getTextColor(score)}`}>
+      <div className="text-center -mt-8">
+        <span className={`text-6xl font-black tracking-tight ${getTextColor(score)}`}>
           {score}
         </span>
-        <div className="text-xs font-medium text-zinc-400 uppercase tracking-wide mt-1">
+        <div className="text-sm font-semibold text-zinc-400 uppercase tracking-widest mt-1">
           Bait Score
         </div>
       </div>
@@ -300,9 +300,9 @@ function SignalBar({ label, value }: { label: string; value: number }) {
         <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400 group-hover:text-zinc-900 dark:group-hover:text-zinc-200 transition-colors">
           {label}
         </span>
-        <span className="text-xs font-mono text-zinc-500">{Math.round(value)}%</span>
+        <span className="text-xs font-mono font-medium text-zinc-500">{Math.round(value)}%</span>
       </div>
-      <div className="h-2 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+      <div className="h-2.5 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
         <div
           className={`h-full ${getBarColor(value)} rounded-full transition-all duration-700 ease-out`}
           style={{ width: `${value}%` }}
@@ -330,7 +330,7 @@ function HighlightedText({
   }, [highlights, filterCategory]);
 
   if (!filteredHighlights || filteredHighlights.length === 0) {
-    return <p className="text-zinc-600 dark:text-zinc-400 leading-relaxed text-sm whitespace-pre-wrap">{text}</p>;
+    return <p className="text-zinc-600 dark:text-zinc-400 leading-relaxed text-[15px] whitespace-pre-wrap">{text}</p>;
   }
 
   const elements: React.ReactNode[] = [];
@@ -345,7 +345,7 @@ function HighlightedText({
     elements.push(
       <mark
         key={`highlight-${i}`}
-        className={`${CATEGORY_COLORS[h.category] || "bg-yellow-100 text-yellow-800"} px-0.5 rounded cursor-help transition-all hover:ring-1 ring-current`}
+        className={`${CATEGORY_COLORS[h.category] || "bg-yellow-100 text-yellow-800"} px-0.5 py-0.5 rounded cursor-help transition-all hover:brightness-95`}
         title={SIGNAL_LABELS[h.category as keyof SignalBreakdown] || h.category}
       >
         {text.substring(h.start, h.end)}
@@ -359,7 +359,7 @@ function HighlightedText({
   }
 
   return (
-    <p className="text-zinc-600 dark:text-zinc-400 leading-relaxed text-sm whitespace-pre-wrap font-serif sm:font-sans">{elements}</p>
+    <p className="text-zinc-600 dark:text-zinc-300 leading-relaxed text-[15px] whitespace-pre-wrap font-serif sm:font-sans">{elements}</p>
   );
 }
 
@@ -378,10 +378,9 @@ function SocialPostCard({
   activeFilter: string | null;
   image?: string;
 }) {
-  // Extract handle from title (e.g., "Tweet by @username")
   const handleMatch = title.match(/@([a-zA-Z0-9_.-]+)/);
   const handle = handleMatch ? handleMatch[1] : "user";
-  const displayName = handle; // Simplification since we don't have separate display name
+  const displayName = handle;
 
   const isTwitter = sourceDomain.includes("twitter.com") || sourceDomain.includes("x.com");
   const isBluesky = sourceDomain.includes("bsky.app");
@@ -389,11 +388,10 @@ function SocialPostCard({
   const isTruthSocial = sourceDomain.includes("truthsocial.com");
 
   return (
-    <div className="mx-auto max-w-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow">
-      {/* Social Header */}
+    <div className="mx-auto max-w-lg bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-5 shadow-sm hover:shadow-md transition-shadow">
       <div className="flex items-start justify-between mb-3">
         <div className="flex items-center gap-3">
-          <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-lg
+          <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-lg shadow-sm
             ${isTwitter ? "bg-black dark:bg-white dark:text-black" : ""}
             ${isBluesky ? "bg-blue-500" : ""}
             ${isThreads ? "bg-zinc-900 dark:bg-zinc-100 dark:text-zinc-900" : ""}
@@ -422,8 +420,7 @@ function SocialPostCard({
         </div>
       </div>
 
-      {/* Content */}
-      <div className="text-[15px] leading-normal text-zinc-900 dark:text-zinc-100 whitespace-pre-wrap mb-3">
+      <div className="text-[15px] leading-relaxed text-zinc-900 dark:text-zinc-100 whitespace-pre-wrap mb-3">
         <HighlightedText 
           text={text} 
           highlights={highlights} 
@@ -431,14 +428,13 @@ function SocialPostCard({
         />
       </div>
 
-      {/* Image Attachment */}
       {image && (
         <div className="mb-3 rounded-lg overflow-hidden border border-zinc-200 dark:border-zinc-800">
           <img src={image} alt="Post attachment" className="w-full h-auto object-cover max-h-80" />
         </div>
       )}
 
-      {/* Fake Metrics */}      <div className="flex items-center gap-6 pt-3 border-t border-zinc-100 dark:border-zinc-800 text-zinc-500 text-sm">
+      <div className="flex items-center gap-6 pt-3 border-t border-zinc-100 dark:border-zinc-800 text-zinc-500 text-sm">
         <div className="flex items-center gap-1.5 hover:text-rose-500 transition-colors cursor-pointer group">
            <span className="group-hover:bg-rose-50 dark:group-hover:bg-rose-900/20 p-1.5 -ml-1.5 rounded-full transition-colors">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path></svg>
@@ -468,16 +464,13 @@ export default function Home() {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageError, setImageError] = useState<string | null>(null);
 
-  // Track visitor and fetch headlines on page load
   useEffect(() => {
-    // Send document.referrer to capture where the visitor came from
     fetch("/api/visit", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ referrer: document.referrer || null }),
     }).catch(() => {});
 
-    // Fetch live headlines
     fetch("/api/headlines")
       .then((res) => res.json())
       .then((data) => {
@@ -485,7 +478,7 @@ export default function Home() {
           setHeadlines(data.headlines);
         }
       })
-      .catch(() => {})
+      .catch(() => {}) // Ignore errors for headlines
       .finally(() => setHeadlinesLoading(false));
   }, []);
 
@@ -498,7 +491,6 @@ export default function Home() {
       return;
     }
 
-    // Validate file type
     const allowedTypes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
     if (!allowedTypes.includes(file.type)) {
       setImageError("Please upload a JPEG, PNG, GIF, or WebP image");
@@ -506,18 +498,16 @@ export default function Home() {
       return;
     }
 
-    // Validate file size (5MB max)
     if (file.size > 5 * 1024 * 1024) {
       setImageError("Image too large (max 5MB)");
       setImagePreview(null);
       return;
     }
 
-    // Read and preview
     const reader = new FileReader();
     reader.onload = (event) => {
       setImagePreview(event.target?.result as string);
-      setUrl(""); // Clear URL when image is selected
+      setUrl("");
     };
     reader.readAsDataURL(file);
   };
@@ -525,7 +515,6 @@ export default function Home() {
   const clearImage = () => {
     setImagePreview(null);
     setImageError(null);
-    // Reset file input
     const fileInput = document.getElementById("image-upload") as HTMLInputElement;
     if (fileInput) fileInput.value = "";
   };
@@ -564,7 +553,7 @@ export default function Home() {
     setResult(null);
     setIsDemo(false);
     setActiveFilter(null);
-    clearImage(); // Clear any selected image
+    clearImage();
 
     try {
       const response = await fetch("/api/analyze", {
@@ -633,7 +622,6 @@ export default function Home() {
       try {
         await navigator.share(shareData);
       } catch {
-        // User cancelled or error - fall back to copy
         copyShareCard();
       }
     } else {
@@ -642,16 +630,16 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 font-sans">
+    <div className="min-h-screen bg-zinc-50 dark:bg-black text-zinc-900 dark:text-zinc-100 font-sans selection:bg-indigo-100 dark:selection:bg-indigo-900/50">
       
-      {/* Navigation / Brand */}
-      <nav className="border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900">
+      {/* Navigation */}
+      <nav className="sticky top-0 z-50 border-b border-zinc-200 dark:border-zinc-800 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md">
         <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-5 h-5 bg-zinc-900 dark:bg-zinc-100 rounded-sm" />
+          <div className="flex items-center gap-2.5">
+            <div className="w-6 h-6 bg-zinc-900 dark:bg-zinc-100 rounded-lg shadow-sm" />
             <span className="font-bold text-lg tracking-tight">RageCheck</span>
           </div>
-          <div className="flex gap-4 text-sm font-medium text-zinc-500">
+          <div className="flex gap-6 text-sm font-medium text-zinc-500">
             <a href="/clearview" className="hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors">Clearview</a>
             <a href="/methodology" className="hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors">Methodology</a>
             <a href="/about" className="hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors">About</a>
@@ -659,32 +647,31 @@ export default function Home() {
         </div>
       </nav>
 
-      <div className="max-w-6xl mx-auto px-4 py-12 md:py-20">
+      <div className="max-w-6xl mx-auto px-4 py-16 md:py-24">
         
         {/* Hero Section */}
-        <div className="text-center max-w-2xl mx-auto mb-16">
-          <h1 className="text-3xl md:text-5xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100 mb-6">
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-rose-500 to-indigo-600">Ragecheck</span> this post
+        <div className="text-center max-w-3xl mx-auto mb-20 animate-in fade-in slide-in-from-bottom-4 duration-700">
+          <h1 className="text-4xl md:text-6xl font-black tracking-tight text-zinc-900 dark:text-zinc-100 mb-6 leading-[1.1]">
+            Is that post <span className="text-transparent bg-clip-text bg-gradient-to-r from-rose-500 to-indigo-600">designed</span> to make you angry?
           </h1>
-          <p className="text-lg text-zinc-600 dark:text-zinc-400 mb-8 leading-relaxed">
-            See what reactions it's built to trigger.
+          <p className="text-xl text-zinc-600 dark:text-zinc-400 mb-10 leading-relaxed max-w-2xl mx-auto">
+            Identify engagement bait, fear-mongering, and manipulation patterns in news and social media instantly.
           </p>
 
           {/* Search Input */}
-          <form onSubmit={handleSubmit} className="relative max-w-xl mx-auto">
-            {/* Image Preview */}
+          <form onSubmit={handleSubmit} className="relative max-w-2xl mx-auto">
             {imagePreview && (
-              <div className="mb-4 relative">
-                <div className="relative rounded-lg overflow-hidden border border-zinc-200 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-800">
+              <div className="mb-6 relative animate-in fade-in zoom-in duration-300">
+                <div className="relative rounded-2xl overflow-hidden border border-zinc-200 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-800 shadow-lg">
                   <img
                     src={imagePreview}
                     alt="Screenshot preview"
-                    className="w-full max-h-48 object-contain"
+                    className="w-full max-h-64 object-contain"
                   />
                   <button
                     type="button"
                     onClick={clearImage}
-                    className="absolute top-2 right-2 p-1 bg-zinc-900/80 hover:bg-zinc-900 text-white rounded-full transition-colors"
+                    className="absolute top-3 right-3 p-1.5 bg-zinc-900/80 hover:bg-zinc-900 text-white rounded-full transition-colors backdrop-blur-sm"
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -695,146 +682,115 @@ export default function Home() {
                   type="button"
                   onClick={analyzeImage}
                   disabled={loading}
-                  className="mt-3 w-full px-4 py-3 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 rounded-lg font-medium hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-colors disabled:opacity-50"
+                  className="mt-4 w-full px-6 py-4 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 rounded-xl font-bold text-lg hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-all shadow-lg hover:shadow-xl disabled:opacity-70"
                 >
-                  {loading ? (
-                    <span className="flex items-center justify-center gap-2">
-                      <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                      </svg>
-                      Analyzing Screenshot
-                    </span>
-                  ) : "Analyze Screenshot"}
+                  {loading ? "Scanning Image..." : "Analyze Screenshot"}
                 </button>
               </div>
             )}
 
-            {/* URL Input + Upload Button */}
             {!imagePreview && (
-              <>
-                <div className="relative group">
-                  <div className="absolute -inset-0.5 bg-gradient-to-r from-rose-500 to-indigo-600 rounded-lg blur opacity-30 group-focus-within:opacity-100 transition duration-1000"></div>
-                  <div className="relative flex items-center bg-white dark:bg-zinc-900 rounded-lg shadow-sm">
-                    <input
-                      type="url"
-                      value={url}
-                      onChange={(e) => setUrl(e.target.value)}
-                      placeholder="Paste any URL (news, tweet, social post)..."
-                      className="flex-1 w-full px-4 py-4 bg-transparent border-0 focus:ring-0 text-zinc-900 dark:text-zinc-100 placeholder-zinc-400"
-                      required
-                    />
-                    <div className="pr-2 flex items-center gap-2">
-                      {/* Upload Button */}
-                      <label
-                        htmlFor="image-upload"
-                        className="p-2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 cursor-pointer transition-colors"
-                        title="Upload screenshot"
-                      >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                        </svg>
-                        <input
-                          id="image-upload"
-                          type="file"
-                          accept="image/jpeg,image/png,image/gif,image/webp"
-                          onChange={handleImageSelect}
-                          className="hidden"
-                        />
-                      </label>
-                      <button
-                        type="submit"
-                        disabled={loading || !url.trim()}
-                        className="px-4 py-2 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 rounded-md text-sm font-medium hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        {loading ? (
-                          <span className="flex items-center gap-2">
-                            <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                            </svg>
-                            Analyzing
-                          </span>
-                        ) : "Analyze"}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-                {imageError && (
-                  <p className="mt-2 text-sm text-rose-600 dark:text-rose-400 text-center">{imageError}</p>
-                )}
-                <div className="mt-4 text-xs text-zinc-500">
-                  <div className="flex items-center justify-center gap-1 flex-wrap">
-                    <span>Try:</span>
-                    <button
-                      type="button"
-                      onClick={() => tryExample("news")}
-                      className="font-medium hover:text-indigo-600 transition-colors px-1"
+              <div className="relative group">
+                <div className="absolute -inset-1 bg-gradient-to-r from-rose-500 to-indigo-600 rounded-2xl blur opacity-20 group-focus-within:opacity-40 transition duration-1000"></div>
+                <div className="relative flex items-center bg-white dark:bg-zinc-900 rounded-2xl shadow-xl transition-shadow ring-1 ring-zinc-200 dark:ring-zinc-800 group-focus-within:ring-zinc-300 dark:group-focus-within:ring-zinc-700">
+                  <input
+                    type="url"
+                    value={url}
+                    onChange={(e) => setUrl(e.target.value)}
+                    placeholder="Paste URL (article, tweet, bsky)..."
+                    className="flex-1 w-full pl-6 pr-4 py-5 bg-transparent border-0 focus:ring-0 text-lg text-zinc-900 dark:text-zinc-100 placeholder-zinc-400"
+                    required
+                  />
+                  <div className="pr-3 flex items-center gap-3">
+                    <label
+                      htmlFor="image-upload"
+                      className="p-2.5 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 cursor-pointer transition-colors bg-zinc-50 dark:bg-zinc-800 rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-700"
+                      title="Upload screenshot"
                     >
-                      News article
-                    </button>
-                    <span className="text-zinc-300 dark:text-zinc-600">·</span>
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                      <input
+                        id="image-upload"
+                        type="file"
+                        accept="image/jpeg,image/png,image/gif,image/webp"
+                        onChange={handleImageSelect}
+                        className="hidden"
+                      />
+                    </label>
                     <button
-                      type="button"
-                      onClick={() => tryExample("tweet")}
-                      className="font-medium hover:text-indigo-600 transition-colors px-1"
+                      type="submit"
+                      disabled={loading || !url.trim()}
+                      className="px-6 py-3 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 rounded-xl text-base font-bold hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-all shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
                     >
-                      Tweet
-                    </button>
-                    <span className="text-zinc-300 dark:text-zinc-600">·</span>
-                    <button
-                      type="button"
-                      onClick={() => tryExample("bluesky")}
-                      className="font-medium hover:text-indigo-600 transition-colors px-1"
-                    >
-                      Bluesky
-                    </button>
-                    <span className="text-zinc-300 dark:text-zinc-600">·</span>
-                    <button
-                      type="button"
-                      onClick={triggerImageUpload}
-                      className="font-medium hover:text-indigo-600 transition-colors px-1"
-                    >
-                      Screenshot
+                      {loading ? (
+                        <span className="flex items-center gap-2">
+                          <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                          </svg>
+                        </span>
+                      ) : "Analyze"}
                     </button>
                   </div>
                 </div>
-              </>
+              </div>
+            )}
+            
+            {imageError && (
+              <p className="mt-3 text-sm text-rose-600 dark:text-rose-400 font-medium animate-pulse">{imageError}</p>
+            )}
+
+            {!imagePreview && (
+              <div className="mt-6 flex flex-wrap items-center justify-center gap-2 text-sm text-zinc-500">
+                <span>Try an example:</span>
+                <button
+                  type="button"
+                  onClick={() => tryExample("news")}
+                  className="px-3 py-1 rounded-full bg-zinc-100 dark:bg-zinc-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors font-medium text-xs"
+                >
+                  News Article
+                </button>
+                <button
+                  type="button"
+                  onClick={() => tryExample("tweet")}
+                  className="px-3 py-1 rounded-full bg-zinc-100 dark:bg-zinc-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors font-medium text-xs"
+                >
+                  Viral Tweet
+                </button>
+                <button
+                  type="button"
+                  onClick={() => tryExample("bluesky")}
+                  className="px-3 py-1 rounded-full bg-zinc-100 dark:bg-zinc-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors font-medium text-xs"
+                >
+                  Bluesky Post
+                </button>
+              </div>
             )}
           </form>
         </div>
 
-        {/* Live Headlines Section - show when no result OR in demo mode */}
+        {/* Live Headlines Section */}
         {(!result || isDemo) && (
-          <div className="mt-12 max-w-5xl mx-auto">
-            <h2 className="text-center text-lg font-semibold text-zinc-700 dark:text-zinc-300 mb-2">
-              Analyze Today&apos;s Headlines
-            </h2>
-            <p className="text-center text-sm text-zinc-500 dark:text-zinc-400 mb-8">
-              Live from across the political spectrum. Click any to analyze.
-            </p>
+          <div className="mt-24 max-w-6xl mx-auto animate-in fade-in slide-in-from-bottom-8 duration-700">
+            <div className="flex items-center justify-between mb-8">
+              <h2 className="text-xl font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+                <span className="w-2 h-8 bg-indigo-500 rounded-full inline-block"></span>
+                Trending Headlines
+              </h2>
+              <span className="text-sm text-zinc-400 hidden sm:inline-block">Live from across the spectrum</span>
+            </div>
 
-            {/* Live Headlines - 5 columns from Far Left to Far Right */}
-            <div className="mb-8">
-              <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-4 flex items-center gap-2">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" />
-                </svg>
-                News Across the Spectrum
-                {headlinesLoading && <span className="text-zinc-400 font-normal">(loading...)</span>}
-              </h3>
+            {/* News Grid */}
+            <div className="mb-12">
               {headlinesLoading ? (
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
                   {[1, 2, 3, 4, 5].map((i) => (
-                    <div key={i} className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-3 animate-pulse">
-                      <div className="h-3 bg-zinc-200 dark:bg-zinc-700 rounded w-16 mb-2" />
-                      <div className="h-4 bg-zinc-200 dark:bg-zinc-700 rounded w-full mb-1" />
-                      <div className="h-4 bg-zinc-200 dark:bg-zinc-700 rounded w-3/4" />
-                    </div>
+                    <div key={i} className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-4 h-32 animate-pulse" />
                   ))}
                 </div>
               ) : headlines.length > 0 ? (
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
                   {headlines.map((headline, i) => (
                     <button
                       key={i}
@@ -842,39 +798,44 @@ export default function Home() {
                         setUrl(headline.url);
                         analyze(headline.url);
                       }}
-                      className="group text-left bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-3 hover:border-indigo-300 dark:hover:border-indigo-700 hover:shadow-md transition-all"
+                      className="group flex flex-col justify-between text-left bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-4 hover:border-indigo-300 dark:hover:border-indigo-700 hover:shadow-md transition-all h-full"
                     >
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
-                          {headline.source}
-                        </span>
-                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${LEAN_COLORS[headline.lean] || "bg-gray-400 text-white"}`}>
-                          {headline.lean}
-                        </span>
+                      <div>
+                        <div className="flex items-center justify-between mb-3">
+                          <span className="text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
+                            {headline.source}
+                          </span>
+                          <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${LEAN_COLORS[headline.lean] || "bg-gray-400 text-white"}`}>
+                            {headline.lean}
+                          </span>
+                        </div>
+                        <p className="text-sm font-semibold text-zinc-800 dark:text-zinc-200 line-clamp-3 leading-snug group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+                          {headline.title}
+                        </p>
                       </div>
-                      <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300 line-clamp-3 leading-snug group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
-                        {headline.title}
-                      </p>
-                      <p className="mt-2 text-xs text-indigo-600 dark:text-indigo-400 font-medium opacity-0 group-hover:opacity-100 transition-opacity">
-                        Analyze →
+                      <p className="mt-4 text-xs font-bold text-indigo-600 dark:text-indigo-400 opacity-0 group-hover:opacity-100 transition-opacity translate-y-2 group-hover:translate-y-0 duration-300">
+                        Analyze Pattern →
                       </p>
                     </button>
                   ))}
                 </div>
               ) : (
-                <p className="text-center text-zinc-500 py-8">Unable to load headlines. Try the example above.</p>
+                <div className="text-center py-12 bg-zinc-50 dark:bg-zinc-900/50 rounded-2xl border border-dashed border-zinc-200 dark:border-zinc-800">
+                  <p className="text-zinc-500">Could not load live headlines.</p>
+                </div>
               )}
             </div>
 
-            {/* Tweets */}
+            {/* Social Grid */}
             <div>
-              <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-4 flex items-center gap-2">
-                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
-                </svg>
-                Posts on X
-              </h3>
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+              <div className="flex items-center gap-3 mb-6">
+                 <h3 className="text-sm font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+                   Viral on Social Media
+                 </h3>
+                 <div className="h-px flex-1 bg-zinc-100 dark:bg-zinc-800"></div>
+              </div>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
                 {CURATED_EXAMPLES.filter(e => e.type === "tweet").map((example, i) => (
                   <button
                     key={i}
@@ -882,29 +843,28 @@ export default function Home() {
                       setUrl(example.url);
                       analyze(example.url);
                     }}
-                    className="group text-left bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-3 hover:border-indigo-300 dark:hover:border-indigo-700 hover:shadow-md transition-all"
+                    className="group text-left bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-4 hover:border-indigo-300 dark:hover:border-indigo-700 hover:shadow-md transition-all"
                   >
-                    <div className="flex items-center gap-2 mb-2">
+                    <div className="flex items-center gap-3 mb-3">
                       <img
                         src={example.image}
                         alt={example.source}
-                        className="w-10 h-10 rounded-full object-cover bg-zinc-200 dark:bg-zinc-700"
+                        className="w-8 h-8 rounded-full object-cover ring-2 ring-zinc-100 dark:ring-zinc-800"
                         onError={(e) => {
                           (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${example.source.slice(1)}&background=random`;
                         }}
                       />
-                      <span className={`text-xs font-medium px-2 py-0.5 rounded ${LEAN_COLORS[example.lean]}`}>
-                        {example.lean}
-                      </span>
+                      <div className="flex flex-col">
+                        <span className="text-xs font-bold text-zinc-900 dark:text-zinc-100">
+                          {example.source}
+                        </span>
+                        <span className={`text-[9px] w-fit font-medium px-1.5 py-px rounded ${LEAN_COLORS[example.lean]}`}>
+                          {example.lean}
+                        </span>
+                      </div>
                     </div>
-                    <p className="text-xs font-semibold text-zinc-500 dark:text-zinc-400">
-                      {example.source}
-                    </p>
-                    <p className="text-sm text-zinc-700 dark:text-zinc-300 line-clamp-2 mt-1 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+                    <p className="text-sm text-zinc-600 dark:text-zinc-300 line-clamp-2 leading-relaxed group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
                       {example.title}
-                    </p>
-                    <p className="mt-2 text-xs text-indigo-600 dark:text-indigo-400 font-medium opacity-0 group-hover:opacity-100 transition-opacity">
-                      Analyze →
                     </p>
                   </button>
                 ))}
@@ -913,28 +873,28 @@ export default function Home() {
           </div>
         )}
 
-        {/* Analyzing Indicator */}
+        {/* Loading State */}
         {loading && (
-          <div className="max-w-xl mx-auto animate-in fade-in duration-300">
-            <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-8 shadow-lg">
-              <div className="flex items-center justify-center gap-3 mb-6">
-                <svg className="animate-spin h-6 w-6 text-indigo-600" viewBox="0 0 24 24">
+          <div className="max-w-xl mx-auto mt-12 animate-in fade-in duration-500">
+            <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-10 shadow-2xl text-center">
+              <div className="inline-block relative mb-8">
+                 <div className="absolute inset-0 bg-indigo-500 blur-xl opacity-20 animate-pulse"></div>
+                 <svg className="relative animate-spin h-10 w-10 text-indigo-600 mx-auto" viewBox="0 0 24 24">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                 </svg>
-                <span className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">Analyzing content...</span>
               </div>
+              
+              <h3 className="text-xl font-bold text-zinc-900 dark:text-zinc-100 mb-2">Analyzing Patterns</h3>
+              <p className="text-zinc-500 mb-8">Our models are scanning for manipulative framing...</p>
 
-              {/* Animated signal bars */}
-              <div className="space-y-3">
+              <div className="space-y-4 max-w-sm mx-auto">
                 {Object.entries(SIGNAL_LABELS).map(([key, label], index) => (
-                  <div key={key} className="group">
-                    <div className="flex justify-between mb-1.5">
-                      <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400">{label}</span>
-                    </div>
-                    <div className="h-2 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+                  <div key={key} className="flex items-center gap-4">
+                    <span className="text-xs font-medium text-zinc-400 w-32 text-right">{label}</span>
+                    <div className="flex-1 h-1.5 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
                       <div
-                        className="h-full bg-gradient-to-r from-indigo-400 to-purple-500 rounded-full animate-pulse"
+                        className="h-full bg-indigo-500 rounded-full animate-shimmer"
                         style={{
                           width: '100%',
                           animationDelay: `${index * 150}ms`,
@@ -945,44 +905,41 @@ export default function Home() {
                   </div>
                 ))}
               </div>
-
-              <p className="mt-6 text-center text-xs text-zinc-400">
-                Scanning for manipulation patterns...
-              </p>
             </div>
           </div>
         )}
 
         {/* Results Section */}
         {result && !loading && (
-          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-6">
+          <div className="animate-in fade-in slide-in-from-bottom-8 duration-700 space-y-8 mt-12">
 
             {/* Demo Banner */}
             {isDemo && (
-              <div className="max-w-4xl mx-auto bg-gradient-to-r from-indigo-500 to-purple-600 rounded-xl p-4 text-white text-center shadow-lg">
-                <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
-                  <div className="flex items-center gap-2">
+              <div className="max-w-4xl mx-auto bg-indigo-600 text-white rounded-xl p-4 shadow-xl flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-white/20 rounded-lg">
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
-                    <span className="font-medium">This is a demo showing how RageCheck analyzes content</span>
                   </div>
-                  <button
-                    onClick={() => {
-                      setResult(null);
-                      setIsDemo(false);
-                      // Scroll to top and focus input
-                      window.scrollTo({ top: 0, behavior: 'smooth' });
-                    }}
-                    className="px-4 py-1.5 bg-white text-indigo-600 rounded-lg font-semibold text-sm hover:bg-indigo-50 transition-colors whitespace-nowrap"
-                  >
-                    Try Your Own URL →
-                  </button>
+                  <div>
+                    <p className="font-bold">Demo Mode</p>
+                    <p className="text-indigo-100 text-sm">Showing analysis for an example article.</p>
+                  </div>
                 </div>
+                <button
+                  onClick={() => {
+                    setResult(null);
+                    setIsDemo(false);
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
+                  className="px-5 py-2 bg-white text-indigo-600 rounded-lg font-bold text-sm hover:bg-indigo-50 transition-colors shadow-sm"
+                >
+                  Analyze Your Own Link
+                </button>
               </div>
             )}
 
-            {/* Back Button - only show for real analyses */}
             {!isDemo && (
               <div className="flex justify-center">
                 <button
@@ -991,122 +948,101 @@ export default function Home() {
                     setIsDemo(true);
                     setUrl("");
                   }}
-                  className="text-sm text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 flex items-center gap-1 transition-colors"
+                  className="group flex items-center gap-2 px-4 py-2 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-full text-sm font-medium text-zinc-600 dark:text-zinc-300 transition-colors"
                 >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-4 h-4 text-zinc-400 group-hover:text-zinc-600 dark:group-hover:text-zinc-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                   </svg>
-                  New Analysis
+                  Analyze Another
                 </button>
               </div>
             )}
 
             {!result.success ? (
-              <div className="max-w-xl mx-auto p-4 bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 rounded-lg text-center text-sm text-rose-700 dark:text-rose-300">
-                <p className="font-medium">{result.error}</p>
+              <div className="max-w-xl mx-auto p-6 bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 rounded-2xl text-center text-rose-700 dark:text-rose-300">
+                <svg className="w-12 h-12 mx-auto mb-4 text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                <p className="font-bold text-lg mb-1">Analysis Failed</p>
+                <p>{result.error}</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
                 
                 {/* Score & Context Card */}
-                <BentoCard className="md:col-span-4" title="Risk Assessment">
+                <BentoCard className="lg:col-span-4 lg:sticky lg:top-24 h-fit" title="Assessment">
                   <div className="flex flex-col items-center justify-center text-center">
                     <ScoreGauge score={result.score!} label={result.label!} />
 
                     <div className="mt-8 space-y-4 w-full">
-                       <div className="grid grid-cols-2 gap-2 text-center text-xs text-zinc-500">
-                          <div className="p-2 rounded bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-100 dark:border-zinc-800">
-                            <span className="block font-bold text-zinc-900 dark:text-zinc-100">{result.sourceDomain}</span>
+                       <div className="grid grid-cols-2 gap-3 text-center text-xs text-zinc-500">
+                          <div className="p-3 rounded-xl bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-100 dark:border-zinc-800">
+                            <span className="block font-bold text-lg text-zinc-900 dark:text-zinc-100 truncate mb-1">{result.sourceDomain}</span>
                             Source
                           </div>
-                          <div className="p-2 rounded bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-100 dark:border-zinc-800">
-                            <span className="block font-bold text-zinc-900 dark:text-zinc-100">{result.llmEnhanced ? "AI + Rules" : "Rules Only"}</span>
+                          <div className="p-3 rounded-xl bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-100 dark:border-zinc-800">
+                            <span className="block font-bold text-lg text-zinc-900 dark:text-zinc-100 mb-1">{result.llmEnhanced ? "AI + Rules" : "Rules"}</span>
                             Method
                           </div>
                        </div>
                     </div>
 
-                    {/* Techniques Detected - in sidebar */}
                     {result.llmEnhanced && result.techniqueExplanations && result.techniqueExplanations.length > 0 && (
-                      <div className="mt-6 pt-6 border-t border-zinc-100 dark:border-zinc-800 w-full text-left">
-                        <h4 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-3">
+                      <div className="mt-8 pt-6 border-t border-zinc-100 dark:border-zinc-800 w-full text-left">
+                        <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-4">
                           Techniques Detected
                         </h4>
-                        <div className="space-y-2">
+                        <div className="space-y-3">
                           {result.techniqueExplanations.map((technique, i) => (
-                            <div key={i} className="p-2 bg-zinc-50 dark:bg-zinc-800/50 rounded border border-zinc-100 dark:border-zinc-800">
-                              <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed">{technique}</p>
+                            <div key={i} className="flex gap-3">
+                              <div className="mt-1 w-1.5 h-1.5 rounded-full bg-rose-400 flex-shrink-0" />
+                              <p className="text-sm text-zinc-600 dark:text-zinc-400 leading-snug">{technique}</p>
                             </div>
                           ))}
                         </div>
                       </div>
                     )}
 
-                    {/* Why This Spreads - in sidebar */}
                     {result.llmEnhanced && result.sharingPatterns && result.sharingPatterns.length > 0 && (
-                      <div className="mt-6 pt-6 border-t border-zinc-100 dark:border-zinc-800 w-full text-left">
-                        <h4 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-3">
-                          Why This Spreads
+                      <div className="mt-8 pt-6 border-t border-zinc-100 dark:border-zinc-800 w-full text-left">
+                        <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-4">
+                          Viral Triggers
                         </h4>
-                        <div className="space-y-2">
+                        <div className="space-y-3">
                           {result.sharingPatterns.map((pattern, i) => (
-                            <div key={i} className="flex gap-2 items-start">
-                              <span className="flex-shrink-0 w-5 h-5 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center text-purple-600 dark:text-purple-400 text-[10px] font-bold">
+                            <div key={i} className="flex gap-3 items-start">
+                              <span className="flex-shrink-0 w-5 h-5 rounded-full bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center text-indigo-600 dark:text-indigo-400 text-[10px] font-bold">
                                 {i + 1}
                               </span>
-                              <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed">{pattern}</p>
+                              <p className="text-sm text-zinc-600 dark:text-zinc-400 leading-snug">{pattern}</p>
                             </div>
                           ))}
                         </div>
                       </div>
                     )}
-
-                    {/* Engagement Economics callout - shows on high scores */}
-                    {result.score && result.score >= 50 && (
-                      <div className="mt-6 pt-6 border-t border-zinc-100 dark:border-zinc-800 w-full">
-                        <div className="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/50 rounded-lg">
-                          <h4 className="text-xs font-semibold text-amber-800 dark:text-amber-300 mb-2 flex items-center gap-1.5">
-                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                            Engagement Economics
-                          </h4>
-                          <p className="text-xs text-amber-700 dark:text-amber-400 leading-relaxed">
-                            High-scoring content often performs well algorithmically because outrage drives engagement. Consider whether sharing amplifies a message you actually endorse.
-                          </p>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Footer note */}
-                    <div className="mt-6 pt-4 border-t border-zinc-100 dark:border-zinc-800 w-full">
-                      <p className="text-xs text-zinc-400 leading-snug text-center">
-                        RageCheck measures the density of manipulative linguistic patterns relative to neutral reporting.
-                      </p>
-                    </div>
                   </div>
                 </BentoCard>
 
                 {/* Analysis Breakdown */}
-                <div className="md:col-span-8 flex flex-col gap-6">
+                <div className="lg:col-span-8 flex flex-col gap-6">
                   {/* Top Row: Title & Signals */}
                   <BentoCard>
                     <div className="mb-8">
-                      <div className="flex items-center gap-2 mb-4">
-                        <span className="px-2 py-0.5 text-[10px] font-bold bg-zinc-100 dark:bg-zinc-800 text-zinc-500 rounded uppercase tracking-widest">
+                      <div className="flex items-center gap-3 mb-4">
+                        <span className="px-2.5 py-1 text-[11px] font-bold bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 rounded-lg uppercase tracking-wider">
                              {result.sourceDomain}
                         </span>
                         {result.llmEnhanced && (
-                            <span className="px-2 py-0.5 text-[10px] font-bold bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300 rounded uppercase tracking-widest">
+                            <span className="px-2.5 py-1 text-[11px] font-bold bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300 rounded-lg uppercase tracking-wider flex items-center gap-1">
+                              <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" /></svg>
                               AI Enhanced
                             </span>
                         )}
                       </div>
-                      <h2 className="text-3xl font-black tracking-tight text-zinc-900 dark:text-zinc-100 leading-tight mb-4">
+                      <h2 className="text-2xl md:text-3xl font-black tracking-tight text-zinc-900 dark:text-zinc-100 leading-tight mb-6">
                         {result.title}
                       </h2>
                       
-                      {/* Dominant Signal Banner */}
                       {result.signalBreakdown && (
                         (() => {
                            const dominantEntry = Object.entries(result.signalBreakdown).reduce((a, b) => a[1] > b[1] ? a : b);
@@ -1115,14 +1051,16 @@ export default function Home() {
                            
                            if (dominantValue > 40) {
                              return (
-                               <div className={`p-4 rounded-lg border-l-4 mb-6 ${
+                               <div className={`p-5 rounded-xl border-l-4 mb-8 ${ 
                                  dominantValue > 70 ? 'bg-rose-50 border-rose-500 dark:bg-rose-900/10' : 'bg-amber-50 border-amber-500 dark:bg-amber-900/10'
                                }`}>
-                                 <h3 className="flex items-center gap-2 font-bold text-lg text-zinc-900 dark:text-zinc-100">
-                                   <span className="text-2xl">⚠️</span>
+                                 <h3 className="flex items-center gap-2 font-bold text-lg text-zinc-900 dark:text-zinc-100 mb-2">
+                                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                   </svg>
                                    High Levels of {SIGNAL_LABELS[dominantSignal]}
                                  </h3>
-                                 <p className="mt-1 text-zinc-700 dark:text-zinc-300">
+                                 <p className="text-zinc-700 dark:text-zinc-300 leading-relaxed">
                                    {result.reasons?.[0] || `Significant density of ${SIGNAL_LABELS[dominantSignal].toLowerCase()} detected.`}
                                  </p>
                                </div>
@@ -1132,12 +1070,14 @@ export default function Home() {
                         })()
                       )}
 
-                      <p className="text-sm text-zinc-500 italic border-l-2 border-zinc-200 pl-4 py-1">
-                        &ldquo;{result.contextNotes || "This content exhibits multiple patterns associated with manipulative framing."}&rdquo;
-                      </p>
+                      <div className="pl-5 border-l-2 border-zinc-200 dark:border-zinc-800">
+                        <p className="text-lg text-zinc-500 italic font-serif">
+                          &ldquo;{result.contextNotes || "This content exhibits multiple patterns associated with manipulative framing."}"&rdquo;
+                        </p>
+                      </div>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4 pt-6 border-t border-zinc-100 dark:border-zinc-800">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-12 gap-y-6 pt-8 border-t border-zinc-100 dark:border-zinc-800">
                       {result.signalBreakdown && Object.entries(result.signalBreakdown).map(([key, value]) => (
                          <div 
                           key={key}
@@ -1150,19 +1090,20 @@ export default function Home() {
                     </div>
                   </BentoCard>
 
-                  {/* Bottom Row: Highlights */}
-                  <BentoCard title={result.sourceDomain?.match(/twitter|x\.com|bsky|threads|truthsocial/) ? "Analysis Target" : "Key Excerpts"} className="flex-1 min-h-[300px]">
-                    <div className="relative h-full">
-                      <div className="max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
-                        {result.sourceDomain?.match(/twitter|x\.com|bsky|threads|truthsocial/) ? (
-                                                      <SocialPostCard 
-                                                         title={result.title || ""}
-                                                         text={result.textPreview || ""}
-                                                         highlights={result.highlights || []}
-                                                         sourceDomain={result.sourceDomain || ""}
-                                                         activeFilter={activeFilter}
-                                                         image={result.image}
-                                                      />                        ) : (
+                  {/* Highlighted Text */}
+                  <BentoCard title={result.sourceDomain?.match(/twitter|x.com|bsky|threads|truthsocial/) ? "Social Context" : "Key Excerpts"} className="flex-1">
+                    <div className="relative">
+                      <div className="max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
+                        {result.sourceDomain?.match(/twitter|x.com|bsky|threads|truthsocial/) ? (
+                          <SocialPostCard 
+                             title={result.title || ""}
+                             text={result.textPreview || ""}
+                             highlights={result.highlights || []}
+                             sourceDomain={result.sourceDomain || ""}
+                             activeFilter={activeFilter}
+                             image={result.image}
+                          />
+                        ) : (
                           <HighlightedText
                             text={result.textPreview || ""}
                             highlights={result.highlights || []}
@@ -1171,32 +1112,30 @@ export default function Home() {
                         )}
                       </div>
                     </div>
-                    <div className="mt-4 pt-4 border-t border-zinc-100 dark:border-zinc-800 flex justify-between items-center">
-                       <span className="text-xs text-zinc-400">
-                         {activeFilter ? `Showing "${SIGNAL_LABELS[activeFilter as keyof SignalBreakdown]}" only` : "Showing all detected patterns"}
+                    <div className="mt-6 pt-4 border-t border-zinc-100 dark:border-zinc-800 flex justify-between items-center">
+                       <span className="text-xs font-medium text-zinc-400">
+                         {activeFilter ? `Filtering: ${SIGNAL_LABELS[activeFilter as keyof SignalBreakdown]}` : "Showing all detected patterns"}
                        </span>
                        <div className="flex items-center gap-3">
                          <button
                            onClick={copyShareCard}
-                           className="text-xs font-medium text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 transition-colors"
+                           className="text-xs font-bold text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 transition-colors"
                          >
                            {copied ? "Copied!" : "Copy Link"}
                          </button>
                          <button
                            onClick={handleShare}
-                           className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium rounded-lg transition-colors"
+                           className="flex items-center gap-2 px-4 py-2 bg-zinc-900 dark:bg-zinc-100 hover:bg-zinc-800 dark:hover:bg-zinc-200 text-white dark:text-zinc-900 text-xs font-bold rounded-lg transition-colors shadow-sm"
                          >
                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
                            </svg>
-                           Share
+                           Share Analysis
                          </button>
                        </div>
                     </div>
                   </BentoCard>
                 </div>
-
-
               </div>
             )}
           </div>
@@ -1206,20 +1145,27 @@ export default function Home() {
       
       <style jsx global>{`
         .custom-scrollbar::-webkit-scrollbar {
-          width: 4px;
+          width: 6px;
         }
         .custom-scrollbar::-webkit-scrollbar-track {
           background: transparent;
         }
         .custom-scrollbar::-webkit-scrollbar-thumb {
           background: #e4e4e7;
-          border-radius: 4px;
+          border-radius: 10px;
         }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover {
           background: #d4d4d8;
         }
         .dark .custom-scrollbar::-webkit-scrollbar-thumb {
           background: #3f3f46;
+        }
+        @keyframes shimmer {
+          0% { transform: translateX(-100%); }
+          100% { transform: translateX(100%); }
+        }
+        .animate-shimmer {
+          animation: shimmer 2s infinite;
         }
       `}</style>
     </div>
