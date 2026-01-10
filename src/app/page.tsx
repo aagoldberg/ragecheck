@@ -884,21 +884,19 @@ export default function Home() {
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                 </svg>
               </div>
-              
+
               <h3 className="text-xl font-bold text-zinc-900 dark:text-zinc-100 mb-2">Analyzing Patterns</h3>
-              <p className="text-zinc-500 mb-8">Our models are scanning for manipulative framing...</p>
+              <p className="text-zinc-500 mb-8">Scanning for manipulative framing...</p>
 
               <div className="space-y-4 max-w-sm mx-auto">
                 {Object.entries(SIGNAL_LABELS).map(([key, label], index) => (
                   <div key={key} className="flex items-center gap-4">
                     <span className="text-xs font-medium text-zinc-400 w-32 text-right">{label}</span>
-                    <div className="flex-1 h-1.5 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+                    <div className="flex-1 h-2 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
                       <div
-                        className="h-full bg-indigo-500 rounded-full animate-shimmer"
+                        className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full animate-loading-bar"
                         style={{
-                          width: '100%',
-                          animationDelay: `${index * 150}ms`,
-                          opacity: 0.6
+                          animationDelay: `${index * 200}ms`,
                         }}
                       />
                     </div>
@@ -1160,12 +1158,13 @@ export default function Home() {
         .dark .custom-scrollbar::-webkit-scrollbar-thumb {
           background: #3f3f46;
         }
-        @keyframes shimmer {
-          0% { transform: translateX(-100%); }
-          100% { transform: translateX(100%); }
+        @keyframes loading-bar {
+          0% { width: 0%; }
+          50% { width: 100%; }
+          100% { width: 0%; }
         }
-        .animate-shimmer {
-          animation: shimmer 2s infinite;
+        .animate-loading-bar {
+          animation: loading-bar 1.5s ease-in-out infinite;
         }
       `}</style>
     </div>
