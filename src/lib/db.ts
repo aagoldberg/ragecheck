@@ -127,12 +127,13 @@ export interface AnalysisLog {
   score?: number;
   label?: string;
   llmEnhanced?: boolean;
+  // New 5-bar model signal breakdown
   signalBreakdown?: {
-    loadedLanguage: number;
-    absolutist: number;
-    threatPanic: number;
-    usVsThem: number;
-    engagementBait: number;
+    arousal: number;
+    enemy_construction: number;
+    moral_condemnation: number;
+    simplification: number;
+    call_to_conflict: number;
   };
   success: boolean;
   error?: string;
@@ -155,6 +156,13 @@ export async function logAnalysis(data: AnalysisLog) {
     const platform = data.sourceDomain ? detectPlatform(data.sourceDomain) : "unknown";
     const isBotUser = isBot(data.userAgent);
 
+    // Map new 5-bar model to database columns (keeping old column names for backwards compat)
+    // arousal -> signal_loaded_language (emotional intensity)
+    // enemy_construction -> signal_us_vs_them (othering/division)
+    // moral_condemnation -> signal_threat_panic (moral outrage)
+    // simplification -> signal_absolutist (black-and-white thinking)
+    // call_to_conflict -> signal_engagement_bait (engagement tactics)
+
     await withRetry(async () => {
       await getDb()`
         INSERT INTO ragecheck_analyses (
@@ -169,11 +177,11 @@ export async function logAnalysis(data: AnalysisLog) {
           ${toInt(data.score)},
           ${data.label || null},
           ${data.llmEnhanced || false},
-          ${toInt(data.signalBreakdown?.loadedLanguage)},
-          ${toInt(data.signalBreakdown?.absolutist)},
-          ${toInt(data.signalBreakdown?.threatPanic)},
-          ${toInt(data.signalBreakdown?.usVsThem)},
-          ${toInt(data.signalBreakdown?.engagementBait)},
+          ${toInt(data.signalBreakdown?.arousal)},
+          ${toInt(data.signalBreakdown?.simplification)},
+          ${toInt(data.signalBreakdown?.moral_condemnation)},
+          ${toInt(data.signalBreakdown?.enemy_construction)},
+          ${toInt(data.signalBreakdown?.call_to_conflict)},
           ${data.success},
           ${data.error || null},
           ${data.ipAddress || null},

@@ -56,11 +56,11 @@ export async function enhanceWithLLM(
   // Build context about rule-based findings
   const ruleContext = `
 Rule-based analysis found:
-- Loaded Language: ${request.signalBreakdown.loadedLanguage}/100
-- Us-vs-Them: ${request.signalBreakdown.usVsThem}/100
-- Threat/Panic: ${request.signalBreakdown.threatPanic}/100
-- Absolutist: ${request.signalBreakdown.absolutist}/100
-- Engagement Bait: ${request.signalBreakdown.engagementBait}/100
+- Emotional Arousal: ${request.signalBreakdown.arousal}/100
+- Enemy Construction: ${request.signalBreakdown.enemy_construction}/100
+- Moral Condemnation: ${request.signalBreakdown.moral_condemnation}/100
+- Oversimplification: ${request.signalBreakdown.simplification}/100
+- Call-to-Conflict: ${request.signalBreakdown.call_to_conflict}/100
 - Overall rule-based score: ${request.ruleBasedScore}/100
 
 Flagged phrases: ${request.highlights.slice(0, 10).map((h) => `"${h.text}"`).join(", ")}
@@ -168,11 +168,11 @@ Respond with this exact JSON structure:
   "platform": "<detected platform>",
   "score": <number 0-100, where 0=neutral/informative, 100=extreme outrage bait>,
   "signalBreakdown": {
-    "loadedLanguage": <0-100>,
-    "absolutist": <0-100>,
-    "threatPanic": <0-100>,
-    "usVsThem": <0-100>,
-    "engagementBait": <0-100>
+    "arousal": <0-100>,
+    "enemy_construction": <0-100>,
+    "moral_condemnation": <0-100>,
+    "simplification": <0-100>,
+    "call_to_conflict": <0-100>
   },
   "reasons": [<3-5 concise bullet points explaining the score>],
   "highlights": [{"text": "<problematic phrase>", "category": "<signal category>"}],
@@ -249,11 +249,11 @@ export async function analyzeImageWithVision(
       score,
       label: score <= 33 ? "Low" : score <= 66 ? "Medium" : "High",
       signalBreakdown: {
-        loadedLanguage: Math.min(100, Math.max(0, parsed.signalBreakdown?.loadedLanguage || 0)),
-        absolutist: Math.min(100, Math.max(0, parsed.signalBreakdown?.absolutist || 0)),
-        threatPanic: Math.min(100, Math.max(0, parsed.signalBreakdown?.threatPanic || 0)),
-        usVsThem: Math.min(100, Math.max(0, parsed.signalBreakdown?.usVsThem || 0)),
-        engagementBait: Math.min(100, Math.max(0, parsed.signalBreakdown?.engagementBait || 0)),
+        arousal: Math.min(100, Math.max(0, parsed.signalBreakdown?.arousal || 0)),
+        enemy_construction: Math.min(100, Math.max(0, parsed.signalBreakdown?.enemy_construction || 0)),
+        moral_condemnation: Math.min(100, Math.max(0, parsed.signalBreakdown?.moral_condemnation || 0)),
+        simplification: Math.min(100, Math.max(0, parsed.signalBreakdown?.simplification || 0)),
+        call_to_conflict: Math.min(100, Math.max(0, parsed.signalBreakdown?.call_to_conflict || 0)),
       },
       reasons: parsed.reasons || [],
       highlights: (parsed.highlights || []).map((h: { text: string; category: string }) => ({

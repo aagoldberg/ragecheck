@@ -10,11 +10,11 @@ interface Highlight {
 }
 
 interface SignalBreakdown {
-  loadedLanguage: number;
-  absolutist: number;
-  threatPanic: number;
-  usVsThem: number;
-  engagementBait: number;
+  arousal: number;
+  enemy_construction: number;
+  moral_condemnation: number;
+  simplification: number;
+  call_to_conflict: number;
 }
 
 interface AnalysisResult {
@@ -60,23 +60,23 @@ const DEMO_RESULT: AnalysisResult = {
   textPreview: "Wake up, patriots! The radical left is DESTROYING everything we hold dear. They want to take YOUR guns, YOUR freedom, and YOUR children's future. This is not a drill—it's an all-out WAR on American values. The mainstream media won't tell you this, but we will. Share this before it's too late! Every real American needs to see this. They're coming for everything you love, and if we don't act NOW, our country is FINISHED.",
   llmEnhanced: true,
   signalBreakdown: {
-    loadedLanguage: 85,
-    usVsThem: 78,
-    threatPanic: 82,
-    absolutist: 65,
-    engagementBait: 72,
+    arousal: 85,
+    enemy_construction: 78,
+    moral_condemnation: 72,
+    simplification: 65,
+    call_to_conflict: 80,
   },
   highlights: [
-    { start: 0, end: 8, category: "engagementBait", text: "Wake up" },
-    { start: 22, end: 34, category: "loadedLanguage", text: "radical left" },
-    { start: 38, end: 48, category: "loadedLanguage", text: "DESTROYING" },
-    { start: 78, end: 82, category: "usVsThem", text: "They" },
-    { start: 96, end: 100, category: "usVsThem", text: "YOUR" },
-    { start: 171, end: 174, category: "threatPanic", text: "WAR" },
-    { start: 296, end: 320, category: "engagementBait", text: "Share this before it's too late" },
-    { start: 328, end: 345, category: "usVsThem", text: "Every real American" },
-    { start: 362, end: 368, category: "usVsThem", text: "They're" },
-    { start: 420, end: 428, category: "absolutist", text: "FINISHED" },
+    { start: 0, end: 8, category: "call_to_conflict", text: "Wake up" },
+    { start: 22, end: 34, category: "enemy_construction", text: "radical left" },
+    { start: 38, end: 48, category: "arousal", text: "DESTROYING" },
+    { start: 78, end: 82, category: "enemy_construction", text: "They" },
+    { start: 96, end: 100, category: "enemy_construction", text: "YOUR" },
+    { start: 171, end: 174, category: "arousal", text: "WAR" },
+    { start: 296, end: 320, category: "call_to_conflict", text: "Share this before it's too late" },
+    { start: 328, end: 345, category: "enemy_construction", text: "Every real American" },
+    { start: 362, end: 368, category: "enemy_construction", text: "They're" },
+    { start: 420, end: 428, category: "simplification", text: "FINISHED" },
   ],
   reasons: [
     "Heavy use of emotionally charged language ('DESTROYING', 'WAR', 'FINISHED')",
@@ -199,20 +199,20 @@ const LEAN_COLORS: Record<string, string> = {
 };
 
 const SIGNAL_LABELS: Record<keyof SignalBreakdown, string> = {
-  loadedLanguage: "Loaded Language",
-  absolutist: "Absolutist Phrasing",
-  threatPanic: "Threat & Panic",
-  usVsThem: "Us-vs-Them Framing",
-  engagementBait: "Engagement Bait",
+  arousal: "Emotional Arousal",
+  enemy_construction: "Enemy Construction",
+  moral_condemnation: "Moral Condemnation",
+  simplification: "Oversimplification",
+  call_to_conflict: "Call-to-Conflict",
 };
 
-// Professional Palette: Rose, Indigo, Emerald, Amber, Slate
+// Professional Palette for 5-bar model
 const CATEGORY_COLORS: Record<string, string> = {
-  loadedLanguage: "bg-rose-100 text-rose-800 dark:bg-rose-900/30 dark:text-rose-200",
-  absolutist: "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-200",
-  threatPanic: "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-200",
-  usVsThem: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-200",
-  engagementBait: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200",
+  arousal: "bg-rose-100 text-rose-800 dark:bg-rose-900/30 dark:text-rose-200",
+  enemy_construction: "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-200",
+  moral_condemnation: "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-200",
+  simplification: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-200",
+  call_to_conflict: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200",
 };
 
 function BentoCard({ children, className = "", title }: { children: React.ReactNode; className?: string; title?: string }) {
