@@ -1117,14 +1117,13 @@ export default function AdminDashboard() {
                         <th className="text-left py-3 px-3 text-zinc-500 font-medium">Score</th>
                         <th className="text-left py-3 px-3 text-zinc-500 font-medium">IP</th>
                         <th className="text-left py-3 px-3 text-zinc-500 font-medium">Country</th>
-                        <th className="text-left py-3 px-3 text-zinc-500 font-medium">Bot</th>
                         <th className="text-left py-3 px-3 text-zinc-500 font-medium">Time</th>
                       </tr>
                     </thead>
                     <tbody>
                       {stats.recentAnalyses.length === 0 ? (
                         <tr>
-                          <td colSpan={6} className="py-4 text-zinc-500 text-center">No analyses yet</td>
+                          <td colSpan={5} className="py-4 text-zinc-500 text-center">No analyses yet</td>
                         </tr>
                       ) : (
                         stats.recentAnalyses.map((a, i) => (
@@ -1148,13 +1147,6 @@ export default function AdminDashboard() {
                             </td>
                             <td className="py-2 px-3 text-zinc-600 dark:text-zinc-400 text-xs">
                               {a.country || "-"}
-                            </td>
-                            <td className="py-2 px-3">
-                              {a.isBot ? (
-                                <span className="text-xs font-medium px-2 py-0.5 rounded bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300">Bot</span>
-                              ) : (
-                                <span className="text-xs text-zinc-400">-</span>
-                              )}
                             </td>
                             <td className="py-2 px-3 text-zinc-500 text-xs whitespace-nowrap">
                               {new Date(a.createdAt).toLocaleString()}
@@ -1183,14 +1175,13 @@ export default function AdminDashboard() {
                           <th className="text-left py-3 px-3 text-zinc-500 font-medium">IP</th>
                           <th className="text-left py-3 px-3 text-zinc-500 font-medium">Country</th>
                           <th className="text-left py-3 px-3 text-zinc-500 font-medium">Referrer</th>
-                          <th className="text-left py-3 px-3 text-zinc-500 font-medium">Bot</th>
                           <th className="text-left py-3 px-3 text-zinc-500 font-medium">Time</th>
                         </tr>
                       </thead>
                       <tbody>
                         {visitorStats.recentVisitors.length === 0 ? (
                           <tr>
-                            <td colSpan={5} className="py-4 text-zinc-500 text-center">No visitors yet</td>
+                            <td colSpan={4} className="py-4 text-zinc-500 text-center">No visitors yet</td>
                           </tr>
                         ) : (
                           visitorStats.recentVisitors.map((v, i) => (
@@ -1203,13 +1194,6 @@ export default function AdminDashboard() {
                               </td>
                               <td className="py-2 px-3 text-zinc-500 text-xs max-w-[200px] truncate" title={v.referrer || undefined}>
                                 {v.referrer || "-"}
-                              </td>
-                              <td className="py-2 px-3">
-                                {v.isBot ? (
-                                  <span className="text-xs font-medium px-2 py-0.5 rounded bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300">Bot</span>
-                                ) : (
-                                  <span className="text-xs text-zinc-400">-</span>
-                                )}
                               </td>
                               <td className="py-2 px-3 text-zinc-500 text-xs whitespace-nowrap">
                                 {new Date(v.createdAt).toLocaleString()}
