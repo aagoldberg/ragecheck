@@ -1107,17 +1107,6 @@ export default function Home() {
                     {imageCopied ? "Image Copied!" : "Copy Image"}
                   </button>
                   <button
-                    onClick={handleDownloadImage}
-                    disabled={downloadingImage}
-                    className="flex items-center gap-1.5 px-3 py-2 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 text-xs font-bold rounded-lg transition-colors disabled:opacity-50"
-                    title="Download share image"
-                  >
-                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
-                    {downloadingImage ? "Generating..." : "Download Image"}
-                  </button>
-                  <button
                     onClick={handleShare}
                     className="flex items-center gap-2 px-4 py-2 bg-zinc-900 dark:bg-zinc-100 hover:bg-zinc-800 dark:hover:bg-zinc-200 text-white dark:text-zinc-900 text-xs font-bold rounded-lg transition-colors shadow-sm"
                   >
