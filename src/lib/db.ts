@@ -478,6 +478,11 @@ export interface VisitorStats {
     visitors: number;
     analyses: number;
   }[];
+  realtimeSeries: {
+    time: string;
+    visitors: number;
+    analyses: number;
+  }[];
 }
 
 // Clearview cache storage
@@ -645,6 +650,60 @@ export async function getVisitorStats(): Promise<VisitorStats> {
       .sort((a, b) => a[0].localeCompare(b[0]))
       .map(([date, data]) => ({ date, ...data }));
 
+    // Realtime series - 10 minute buckets for last 24 hours
+    const visitorRealtime = await getDb()`
+      SELECT
+        date_trunc('hour', created_at) +
+        (floor(extract(minute FROM created_at) / 10) * interval '10 minutes') as bucket,
+        COUNT(*) as count
+      FROM ragecheck_visitors
+      WHERE created_at > NOW() - INTERVAL '24 hours'
+      GROUP BY bucket
+      ORDER BY bucket ASC
+    `;
+
+    const analysisRealtime = await getDb()`
+      SELECT
+        date_trunc('hour', created_at) +
+        (floor(extract(minute FROM created_at) / 10) * interval '10 minutes') as bucket,
+        COUNT(*) as count
+      FROM ragecheck_analyses
+      WHERE created_at > NOW() - INTERVAL '24 hours'
+      GROUP BY bucket
+      ORDER BY bucket ASC
+    `;
+
+    // Merge realtime data into 10-minute buckets
+    const realtimeMap = new Map<string, { visitors: number; analyses: number }>();
+
+    // Initialize last 24 hours in 10-minute intervals
+    const now = new Date();
+    for (let i = 143; i >= 0; i--) {
+      const d = new Date(now.getTime() - i * 10 * 60 * 1000);
+      // Round down to 10-minute bucket
+      d.setMinutes(Math.floor(d.getMinutes() / 10) * 10, 0, 0);
+      const timeStr = d.toISOString();
+      realtimeMap.set(timeStr, { visitors: 0, analyses: 0 });
+    }
+
+    for (const row of visitorRealtime) {
+      const timeStr = new Date(row.bucket).toISOString();
+      const existing = realtimeMap.get(timeStr) || { visitors: 0, analyses: 0 };
+      existing.visitors = Number(row.count);
+      realtimeMap.set(timeStr, existing);
+    }
+
+    for (const row of analysisRealtime) {
+      const timeStr = new Date(row.bucket).toISOString();
+      const existing = realtimeMap.get(timeStr) || { visitors: 0, analyses: 0 };
+      existing.analyses = Number(row.count);
+      realtimeMap.set(timeStr, existing);
+    }
+
+    const realtimeSeries = Array.from(realtimeMap.entries())
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([time, data]) => ({ time, ...data }));
+
     return {
       totalVisitors: Number(totalResult.count),
       todayVisitors: Number(todayResult.count),
@@ -652,6 +711,7 @@ export async function getVisitorStats(): Promise<VisitorStats> {
       conversionRate: Math.round(conversionRate),
       recentVisitors,
       timeSeries,
+      realtimeSeries,
     };
   } catch (error) {
     console.error("Failed to get visitor stats:", error);
@@ -662,6 +722,7 @@ export async function getVisitorStats(): Promise<VisitorStats> {
       conversionRate: 0,
       recentVisitors: [],
       timeSeries: [],
+      realtimeSeries: [],
     };
   }
 }

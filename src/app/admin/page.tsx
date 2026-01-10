@@ -60,6 +60,11 @@ interface VisitorStats {
     visitors: number;
     analyses: number;
   }[];
+  realtimeSeries: {
+    time: string;
+    visitors: number;
+    analyses: number;
+  }[];
 }
 
 interface ApiResponse {
@@ -216,6 +221,119 @@ function TimeSeriesChart({ data }: { data: { date: string; visitors: number; ana
           <span>{data[0]?.date.slice(5)}</span>
           <span>{data[Math.floor(data.length / 2)]?.date.slice(5)}</span>
           <span>{data[data.length - 1]?.date.slice(5)}</span>
+        </div>
+        {/* Y-axis label */}
+        <div className="absolute top-0 right-0 text-xs text-zinc-400">
+          max: {maxValue}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function RealtimeChart({ data }: { data: { time: string; visitors: number; analyses: number }[] }) {
+  if (!data || data.length === 0) return null;
+
+  const maxValue = Math.max(...data.map(d => Math.max(d.visitors, d.analyses)), 1);
+  const width = 800;
+  const height = 200;
+  const padding = { top: 20, right: 20, bottom: 20, left: 20 };
+  const chartWidth = width - padding.left - padding.right;
+  const chartHeight = height - padding.top - padding.bottom;
+
+  const getX = (i: number) => padding.left + (i / (data.length - 1)) * chartWidth;
+  const getY = (value: number) => padding.top + chartHeight - (value / maxValue) * chartHeight;
+
+  // Create area fill path
+  const createAreaPath = (points: { x: number; y: number }[]): string => {
+    if (points.length < 2) return '';
+    let path = `M ${points[0].x} ${padding.top + chartHeight}`;
+    path += ` L ${points[0].x} ${points[0].y}`;
+    for (let i = 1; i < points.length; i++) {
+      path += ` L ${points[i].x} ${points[i].y}`;
+    }
+    path += ` L ${points[points.length - 1].x} ${padding.top + chartHeight}`;
+    path += ' Z';
+    return path;
+  };
+
+  const visitorsPoints = data.map((d, i) => ({ x: getX(i), y: getY(d.visitors) }));
+  const analysesPoints = data.map((d, i) => ({ x: getX(i), y: getY(d.analyses) }));
+
+  // Format time labels
+  const formatTime = (isoString: string) => {
+    const d = new Date(isoString);
+    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+
+  return (
+    <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 mb-8">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+          Realtime Activity (Last 24 Hours - 10 min intervals)
+        </h3>
+        <div className="flex items-center gap-4 text-xs">
+          <div className="flex items-center gap-1.5">
+            <div className="w-3 h-0.5 bg-indigo-500 rounded" />
+            <span className="text-zinc-500">Visitors</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-3 h-0.5 bg-emerald-500 rounded" />
+            <span className="text-zinc-500">Analyses</span>
+          </div>
+        </div>
+      </div>
+      <div className="relative">
+        <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-40" preserveAspectRatio="xMidYMid meet">
+          {/* Grid lines */}
+          {[0, 0.25, 0.5, 0.75, 1].map((ratio) => (
+            <line
+              key={ratio}
+              x1={padding.left}
+              y1={padding.top + chartHeight * (1 - ratio)}
+              x2={width - padding.right}
+              y2={padding.top + chartHeight * (1 - ratio)}
+              stroke="currentColor"
+              className="text-zinc-100 dark:text-zinc-800"
+              strokeWidth="1"
+            />
+          ))}
+          {/* Visitors area */}
+          <path
+            d={createAreaPath(visitorsPoints)}
+            fill="rgba(99, 102, 241, 0.15)"
+          />
+          {/* Analyses area */}
+          <path
+            d={createAreaPath(analysesPoints)}
+            fill="rgba(16, 185, 129, 0.15)"
+          />
+          {/* Visitors line */}
+          <polyline
+            points={visitorsPoints.map(p => `${p.x},${p.y}`).join(' ')}
+            fill="none"
+            stroke="#6366f1"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          {/* Analyses line */}
+          <polyline
+            points={analysesPoints.map(p => `${p.x},${p.y}`).join(' ')}
+            fill="none"
+            stroke="#10b981"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+        {/* X-axis labels */}
+        <div className="flex justify-between mt-2 text-xs text-zinc-400">
+          <span>{data[0] ? formatTime(data[0].time) : ''}</span>
+          <span>{data[Math.floor(data.length / 4)] ? formatTime(data[Math.floor(data.length / 4)].time) : ''}</span>
+          <span>{data[Math.floor(data.length / 2)] ? formatTime(data[Math.floor(data.length / 2)].time) : ''}</span>
+          <span>{data[Math.floor(data.length * 3 / 4)] ? formatTime(data[Math.floor(data.length * 3 / 4)].time) : ''}</span>
+          <span>{data[data.length - 1] ? formatTime(data[data.length - 1].time) : ''}</span>
         </div>
         {/* Y-axis label */}
         <div className="absolute top-0 right-0 text-xs text-zinc-400">
@@ -568,7 +686,12 @@ export default function AdminDashboard() {
               </div>
             )}
 
-            {/* Time Series Chart */}
+            {/* Realtime Chart (10-min intervals) */}
+            {visitorStats && visitorStats.realtimeSeries && visitorStats.realtimeSeries.length > 0 && (
+              <RealtimeChart data={visitorStats.realtimeSeries} />
+            )}
+
+            {/* Time Series Chart (daily) */}
             {visitorStats && visitorStats.timeSeries.length > 0 && (
               <TimeSeriesChart data={visitorStats.timeSeries} />
             )}
