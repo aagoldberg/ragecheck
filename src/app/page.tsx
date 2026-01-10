@@ -906,6 +906,9 @@ export default function Home() {
               </div>
             )}
           </form>
+
+          {/* Loading State - under input bar */}
+          {loading && <AnalyzingProgress />}
         </div>
 
         {/* Live Headlines Section */}
@@ -1010,9 +1013,6 @@ export default function Home() {
             </div>
           </div>
         )}
-
-        {/* Loading State */}
-        {loading && <AnalyzingProgress />}
 
         {/* Results Section */}
         {result && !loading && (
