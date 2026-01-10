@@ -53,11 +53,11 @@ interface StoryCluster {
 // --- Constants & Utils ---
 
 const LEAN_CONFIG: Record<string, { color: string; bg: string; border: string; label: string }> = {
-  "Far Left": { color: "text-indigo-900 dark:text-indigo-200", bg: "bg-indigo-100 dark:bg-indigo-900/40", border: "border-indigo-200 dark:border-indigo-800", label: "Far Left" },
-  "Left": { color: "text-blue-800 dark:text-blue-200", bg: "bg-blue-50 dark:bg-blue-900/20", border: "border-blue-200 dark:border-blue-800", label: "Left" },
-  "Center": { color: "text-zinc-700 dark:text-zinc-300", bg: "bg-zinc-100 dark:bg-zinc-800", border: "border-zinc-200 dark:border-zinc-700", label: "Center" },
-  "Right": { color: "text-rose-800 dark:text-rose-200", bg: "bg-rose-50 dark:bg-rose-900/20", border: "border-rose-200 dark:border-rose-800", label: "Right" },
-  "Far Right": { color: "text-orange-900 dark:text-orange-200", bg: "bg-orange-100 dark:bg-orange-900/40", border: "border-orange-200 dark:border-orange-800", label: "Far Right" },
+  "Far Left": { color: "text-blue-700 dark:text-blue-200", bg: "bg-blue-100 dark:bg-blue-900/40", border: "border-blue-200 dark:border-blue-800", label: "Far Left" },
+  "Left": { color: "text-blue-600 dark:text-blue-400", bg: "bg-blue-50 dark:bg-blue-900/20", border: "border-blue-200 dark:border-blue-800", label: "Left" },
+  "Center": { color: "text-zinc-600 dark:text-zinc-400", bg: "bg-zinc-100 dark:bg-zinc-800", border: "border-zinc-200 dark:border-zinc-700", label: "Center" },
+  "Right": { color: "text-rose-600 dark:text-rose-400", bg: "bg-rose-50 dark:bg-rose-900/20", border: "border-rose-200 dark:border-rose-800", label: "Right" },
+  "Far Right": { color: "text-rose-700 dark:text-rose-300", bg: "bg-rose-100 dark:bg-rose-900/40", border: "border-rose-200 dark:border-rose-800", label: "Far Right" },
 };
 
 function getLeanConfig(lean: string) {
@@ -69,7 +69,7 @@ function getLeanConfig(lean: string) {
 function BiasBadge({ lean }: { lean: string }) {
   const config = getLeanConfig(lean);
   return (
-    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${config.bg} ${config.color} border ${config.border} shadow-sm`}>
+    <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${config.bg} ${config.color} border ${config.border}`}>
       {lean}
     </span>
   );
@@ -88,67 +88,48 @@ function BiasSpectrum({ sources }: { sources: SourceAnalysis[] }) {
   if (total === 0) return null;
 
   return (
-    <div className="flex flex-col gap-1">
-      <div className="flex h-1.5 w-32 rounded-full overflow-hidden bg-zinc-100 dark:bg-zinc-800">
-        <div style={{ width: `${(counts.left / total) * 100}%` }} className="bg-blue-500/80" />
-        <div style={{ width: `${(counts.center / total) * 100}%` }} className="bg-zinc-400/50" />
-        <div style={{ width: `${(counts.right / total) * 100}%` }} className="bg-rose-500/80" />
+    <div className="flex items-center gap-2">
+      <div className="flex h-1.5 w-24 rounded-full overflow-hidden bg-zinc-100 dark:bg-zinc-800">
+        <div style={{ width: `${(counts.left / total) * 100}%` }} className="bg-blue-500" />
+        <div style={{ width: `${(counts.center / total) * 100}%` }} className="bg-zinc-400" />
+        <div style={{ width: `${(counts.right / total) * 100}%` }} className="bg-rose-500" />
       </div>
-      <span className="text-[10px] text-zinc-400 font-medium uppercase tracking-wider">{total} Sources</span>
+      <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider">{total} Sources</span>
     </div>
   );
 }
 
 function EvidenceStatusBadge({ status }: { status: string }) {
   const config: Record<string, { bg: string; text: string; label: string }> = {
-    supported: { bg: "bg-emerald-50 dark:bg-emerald-900/20", text: "text-emerald-700 dark:text-emerald-400", label: "Supported by Evidence" },
-    mixed: { bg: "bg-amber-50 dark:bg-amber-900/20", text: "text-amber-700 dark:text-amber-400", label: "Mixed Evidence" },
+    supported: { bg: "bg-emerald-50 dark:bg-emerald-900/20", text: "text-emerald-700 dark:text-emerald-400", label: "Supported" },
+    mixed: { bg: "bg-amber-50 dark:bg-amber-900/20", text: "text-amber-700 dark:text-amber-400", label: "Mixed" },
     unsupported: { bg: "bg-rose-50 dark:bg-rose-900/20", text: "text-rose-700 dark:text-rose-400", label: "Unsupported" },
-    misleading: { bg: "bg-orange-50 dark:bg-orange-900/20", text: "text-orange-700 dark:text-orange-400", label: "Misleading Context" },
+    misleading: { bg: "bg-orange-50 dark:bg-orange-900/20", text: "text-orange-700 dark:text-orange-400", label: "Misleading" },
   };
   const c = config[status] || config.mixed;
   return (
-    <span className={`inline-flex items-center px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wide border border-transparent ${c.bg} ${c.text}`}>
+    <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-tighter ${c.bg} ${c.text}`}>
       {c.label}
     </span>
   );
 }
 
-function ExpertConsensusMinimal({ consensus }: { consensus?: ExpertConsensus }) {
+function ExpertConsensusBox({ consensus }: { consensus?: ExpertConsensus }) {
   if (!consensus || consensus.type === "none" || !consensus.exists) return null;
 
-  const confidenceColor = 
-    consensus.confidenceLevel === "high" ? "text-emerald-600 dark:text-emerald-400" :
-    consensus.confidenceLevel === "moderate" ? "text-amber-600 dark:text-amber-400" :
-    "text-zinc-500";
-
   return (
-    <div className="flex items-start gap-3 p-4 bg-zinc-50 dark:bg-zinc-900/50 rounded-lg border border-zinc-100 dark:border-zinc-800/50">
-      <div className="shrink-0 mt-0.5 text-lg">⚖️</div>
-      <div className="space-y-1">
-        <p className="text-xs font-bold uppercase tracking-wider text-zinc-500">Expert Consensus ({consensus.type})</p>
-        <p className="text-sm font-medium text-zinc-800 dark:text-zinc-200 leading-snug">
-          {consensus.statement}
-        </p>
-        <p className={`text-xs ${confidenceColor}`}>Confidence: {consensus.confidenceLevel}</p>
+    <div className="p-4 bg-indigo-50/30 dark:bg-indigo-900/10 rounded-xl border border-indigo-100 dark:border-indigo-900/30">
+      <div className="flex items-start gap-3">
+        <span className="text-xl">⚖️</span>
+        <div>
+          <h4 className="text-xs font-bold uppercase tracking-wider text-indigo-900 dark:text-indigo-300 mb-1">
+            Expert Consensus ({consensus.type})
+          </h4>
+          <p className="text-sm text-zinc-800 dark:text-zinc-200 leading-relaxed font-medium">
+            {consensus.statement}
+          </p>
+        </div>
       </div>
-    </div>
-  );
-}
-
-function PerspectiveColumn({ perspective, align }: { perspective: Perspective; align: "left" | "right" }) {
-  const isLeft = align === "left";
-  const borderColor = isLeft ? "border-l-blue-500" : "border-l-rose-500";
-  const titleColor = isLeft ? "text-blue-700 dark:text-blue-400" : "text-rose-700 dark:text-rose-400";
-  
-  return (
-    <div className={`pl-4 border-l-2 ${borderColor}`}>
-      <h4 className={`text-xs font-bold uppercase tracking-wider mb-2 ${titleColor}`}>
-        {isLeft ? "The Left's Framing" : "The Right's Framing"}
-      </h4>
-      <p className="text-sm text-zinc-700 dark:text-zinc-300 leading-relaxed italic">
-        "{perspective.viewpoint}"
-      </p>
     </div>
   );
 }
@@ -160,79 +141,86 @@ function StoryCard({ story }: { story: StoryCluster }) {
   const rightPerspective = story.perspectives.find(p => p.lean.toLowerCase().includes("right"));
 
   return (
-    <article className="group bg-white dark:bg-zinc-950 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-sm hover:shadow-md transition-all duration-300">
+    <article className="bg-white dark:bg-zinc-950 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm overflow-hidden transition-shadow hover:shadow-md">
       
-      {/* Header / Meta */}
-      <div className="px-6 pt-6 flex items-center justify-between">
+      {/* Meta Header */}
+      <div className="px-6 py-4 bg-zinc-50/50 dark:bg-zinc-900/30 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
         <div className="flex items-center gap-3">
-             <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-zinc-100 dark:bg-zinc-900 text-zinc-500 font-serif font-bold text-sm">
-                #
-             </span>
-             <span className="text-xs font-medium text-zinc-400 uppercase tracking-widest">{story.debateType || "News"}</span>
+          <span className="px-2 py-0.5 bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 rounded text-[10px] font-bold uppercase tracking-widest">
+            {story.debateType || "Top Story"}
+          </span>
         </div>
         <BiasSpectrum sources={story.sources} />
       </div>
 
-      {/* Main Content */}
       <div className="p-6 md:p-8 space-y-8">
-        
-        {/* Headline & Core Facts */}
-        <div className="space-y-6">
-            <h2 className="text-3xl md:text-4xl font-serif font-bold text-zinc-900 dark:text-zinc-50 leading-tight">
-                {story.topic}
-            </h2>
+        {/* Headline */}
+        <h2 className="text-2xl md:text-3xl font-bold tracking-tight text-zinc-900 dark:text-white leading-tight">
+          {story.topic}
+        </h2>
 
-            <div className="prose prose-lg dark:prose-invert max-w-none">
-                 <p className="text-zinc-800 dark:text-zinc-300 leading-relaxed font-serif text-lg md:text-xl border-l-4 border-zinc-900 dark:border-zinc-100 pl-6 py-1">
-                    {story.whatHappened}
-                </p>
-            </div>
+        {/* Facts Box */}
+        <div className="bg-zinc-50 dark:bg-zinc-900/50 p-6 rounded-2xl border border-zinc-100 dark:border-zinc-800/50">
+           <h3 className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mb-3 flex items-center gap-2">
+             <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
+             The Core Facts
+           </h3>
+           <p className="text-lg text-zinc-800 dark:text-zinc-200 leading-relaxed">
+             {story.whatHappened}
+           </p>
         </div>
 
-        {/* Perspectives Split */}
-        {(leftPerspective || rightPerspective) && (
-            <div className="grid md:grid-cols-2 gap-8 pt-4 border-t border-zinc-100 dark:border-zinc-900">
-                {leftPerspective && <PerspectiveColumn perspective={leftPerspective} align="left" />}
-                {rightPerspective && <PerspectiveColumn perspective={rightPerspective} align="right" />}
+        {/* Perspectives */}
+        <div className="grid md:grid-cols-2 gap-6">
+          {leftPerspective && (
+            <div className="space-y-2">
+              <h4 className="text-[10px] font-bold uppercase tracking-widest text-blue-600 dark:text-blue-400">Left Focus</h4>
+              <p className="text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed italic border-l-2 border-blue-500/20 pl-4">
+                "{leftPerspective.viewpoint}"
+              </p>
             </div>
-        )}
+          )}
+          {rightPerspective && (
+            <div className="space-y-2">
+              <h4 className="text-[10px] font-bold uppercase tracking-widest text-rose-600 dark:text-rose-400">Right Focus</h4>
+              <p className="text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed italic border-l-2 border-rose-500/20 pl-4">
+                "{rightPerspective.viewpoint}"
+              </p>
+            </div>
+          )}
+        </div>
 
-        <ExpertConsensusMinimal consensus={story.expertConsensus} />
-
+        <ExpertConsensusBox consensus={story.expertConsensus} />
       </div>
 
-      {/* Footer / Actions */}
-      <div className="bg-zinc-50/50 dark:bg-zinc-900/30 px-6 py-4 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
-         <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Key Takeaway</span>
-            <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">{story.keyTakeaway}</span>
-         </div>
-         
-         <button 
-            onClick={() => setExpanded(!expanded)}
-            className="text-sm font-semibold text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors flex items-center gap-2"
-          >
-              {expanded ? "Close Analysis" : "View Sources & Disputes"}
-              <svg className={`w-4 h-4 transition-transform ${expanded ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-              </svg>
-          </button>
-      </div>
+      {/* Expand Bar */}
+      <button 
+        onClick={() => setExpanded(!expanded)}
+        className="w-full py-4 px-6 bg-zinc-50/50 dark:bg-zinc-900/50 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-between group hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+      >
+        <div className="flex items-center gap-4">
+           <span className="text-xs font-bold text-zinc-400 uppercase tracking-widest">Analysis</span>
+           <span className="text-sm font-medium text-zinc-600 dark:text-zinc-400 group-hover:text-zinc-900 dark:group-hover:text-zinc-200">
+             {story.keyTakeaway}
+           </span>
+        </div>
+        <svg className={`w-4 h-4 text-zinc-400 transition-transform ${expanded ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
 
-      {/* Expanded Section */}
       {expanded && (
-        <div className="border-t border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/20 p-6 md:p-8 animate-in slide-in-from-top-2">
+        <div className="p-6 md:p-8 bg-zinc-50 dark:bg-zinc-900/30 border-t border-zinc-100 dark:border-zinc-800 space-y-10 animate-in slide-in-from-top-2">
             
             {/* Common Ground & Disputes */}
-            <div className="grid md:grid-cols-2 gap-8 mb-10">
+            <div className="grid md:grid-cols-2 gap-10">
                 {story.commonGround && story.commonGround.length > 0 && (
                     <div className="space-y-4">
-                        <h4 className="text-sm font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
-                            <span className="text-emerald-500">✓</span> Common Ground
-                        </h4>
+                        <h4 className="text-xs font-bold text-zinc-900 dark:text-white uppercase tracking-widest">Common Ground</h4>
                         <ul className="space-y-2">
                             {story.commonGround.map((item, i) => (
-                                <li key={i} className="text-sm text-zinc-600 dark:text-zinc-400 pl-4 border-l border-zinc-200 dark:border-zinc-700">
+                                <li key={i} className="text-sm text-zinc-600 dark:text-zinc-400 flex gap-2">
+                                    <span className="text-emerald-500 font-bold">✓</span>
                                     {item}
                                 </li>
                             ))}
@@ -242,22 +230,20 @@ function StoryCard({ story }: { story: StoryCluster }) {
                 
                 {story.factualDisputes && story.factualDisputes.length > 0 && (
                     <div className="space-y-4">
-                        <h4 className="text-sm font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
-                            <span className="text-amber-500">⚠</span> Factual Disputes
-                        </h4>
+                        <h4 className="text-xs font-bold text-zinc-900 dark:text-white uppercase tracking-widest">Factual Disputes</h4>
                         <div className="space-y-3">
                             {story.factualDisputes.map((dispute, i) => (
-                                <div key={i} className="bg-white dark:bg-zinc-900 p-3 rounded border border-zinc-200 dark:border-zinc-800">
-                                    <div className="flex justify-between items-start mb-2">
+                                <div key={i} className="bg-white dark:bg-zinc-900 p-3 rounded-lg border border-zinc-200 dark:border-zinc-800 shadow-sm">
+                                    <div className="flex justify-between items-start gap-2 mb-2">
                                         <p className="text-xs font-bold text-zinc-700 dark:text-zinc-300">"{dispute.claim}"</p>
                                         <EvidenceStatusBadge status={dispute.evidenceStatus} />
                                     </div>
-                                    <div className="grid grid-cols-2 gap-2 text-xs">
-                                        <div className="text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/10 p-1.5 rounded">
-                                            L: {dispute.leftPosition}
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <div className="text-[10px] text-blue-700 dark:text-blue-400 bg-blue-50/50 dark:bg-blue-900/20 p-2 rounded">
+                                            {dispute.leftPosition}
                                         </div>
-                                        <div className="text-rose-700 dark:text-rose-400 bg-rose-50 dark:bg-rose-900/10 p-1.5 rounded">
-                                            R: {dispute.rightPosition}
+                                        <div className="text-[10px] text-rose-700 dark:text-rose-400 bg-rose-50/50 dark:bg-rose-900/20 p-2 rounded">
+                                            {dispute.rightPosition}
                                         </div>
                                     </div>
                                 </div>
@@ -267,11 +253,9 @@ function StoryCard({ story }: { story: StoryCluster }) {
                 )}
             </div>
 
-            {/* Source Grid */}
+            {/* Sources */}
             <div className="space-y-4">
-                <h4 className="text-sm font-bold text-zinc-900 dark:text-zinc-100 uppercase tracking-widest border-b border-zinc-200 dark:border-zinc-800 pb-2">
-                    Source Breakdown
-                </h4>
+                <h4 className="text-xs font-bold text-zinc-900 dark:text-white uppercase tracking-widest">Source Analysis</h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {story.sources.map((source, i) => (
                         <a 
@@ -279,27 +263,18 @@ function StoryCard({ story }: { story: StoryCluster }) {
                             href={source.url} 
                             target="_blank" 
                             rel="noopener noreferrer"
-                            className="block p-4 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg hover:border-zinc-400 dark:hover:border-zinc-600 transition-colors group/card"
+                            className="group/source block p-4 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl hover:border-zinc-400 dark:hover:border-zinc-600 transition-colors"
                         >
                             <div className="flex justify-between items-center mb-2">
-                                <span className="text-xs font-bold text-zinc-900 dark:text-zinc-100">{source.name}</span>
+                                <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">{source.name}</span>
                                 <BiasBadge lean={source.lean} />
                             </div>
-                            <p className="text-sm font-medium text-zinc-800 dark:text-zinc-200 mb-3 group-hover/card:underline decoration-zinc-400 underline-offset-2">
+                            <p className="text-sm font-bold text-zinc-900 dark:text-zinc-100 mb-2 group-hover/source:text-indigo-600 dark:group-hover/source:text-indigo-400">
                                 {source.title}
                             </p>
-                            <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-2">
-                                <span className="font-semibold text-zinc-400">Framing:</span> {source.framing}
+                            <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">
+                                <span className="text-zinc-400 font-medium">Framing:</span> {source.framing}
                             </p>
-                            {source.manipulationTechniques.length > 0 && (
-                                <div className="flex flex-wrap gap-1">
-                                    {source.manipulationTechniques.slice(0, 2).map((tech, t) => (
-                                        <span key={t} className="text-[9px] px-1.5 py-0.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-500 rounded border border-zinc-200 dark:border-zinc-700">
-                                            {tech}
-                                        </span>
-                                    ))}
-                                </div>
-                            )}
                         </a>
                     ))}
                 </div>
@@ -315,10 +290,10 @@ function LoadingSkeleton() {
   return (
     <div className="space-y-12">
       {[1, 2].map((i) => (
-        <div key={i} className="animate-pulse space-y-4">
-            <div className="h-6 w-32 bg-zinc-200 dark:bg-zinc-800 rounded" />
+        <div key={i} className="animate-pulse space-y-6">
+            <div className="h-4 w-32 bg-zinc-200 dark:bg-zinc-800 rounded" />
             <div className="h-10 w-3/4 bg-zinc-200 dark:bg-zinc-800 rounded" />
-            <div className="h-40 w-full bg-zinc-100 dark:bg-zinc-900 rounded-xl" />
+            <div className="h-48 w-full bg-zinc-100 dark:bg-zinc-900 rounded-3xl" />
         </div>
       ))}
     </div>
@@ -370,66 +345,78 @@ export default function ClearviewPage() {
       </nav>
 
       {/* Hero Section */}
-      <div className="relative pt-20 pb-16 px-4 border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950">
-        <div className="max-w-2xl mx-auto text-center space-y-6">
-            <div className="inline-flex items-center gap-2 px-3 py-1 bg-zinc-100 dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 rounded-full text-xs font-bold uppercase tracking-widest border border-zinc-200 dark:border-zinc-800">
-                Daily Briefing
-                {generatedAt && (
-                   <span className="text-zinc-400">| {new Date(generatedAt).toLocaleDateString()}</span>
-                )}
+      <header className="relative pt-24 pb-20 px-4 border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950">
+        <div className="max-w-3xl mx-auto text-center space-y-6">
+            <div className="inline-flex items-center gap-2 px-3 py-1 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 rounded-full text-[10px] font-bold uppercase tracking-widest border border-indigo-100 dark:border-indigo-900/30">
+                <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse" />
+                Daily Briefing Analysis
             </div>
             
-            <h1 className="text-5xl md:text-6xl font-serif font-bold tracking-tight text-zinc-900 dark:text-white leading-[1.1]">
-                What actually happened.
+            <h1 className="text-5xl md:text-6xl font-bold tracking-tight text-zinc-900 dark:text-white leading-[1.05]">
+                What actually happened. <br/>
+                <span className="text-zinc-400 dark:text-zinc-500">Minus the spin.</span>
             </h1>
             
-            <p className="text-xl text-zinc-500 dark:text-zinc-400 max-w-xl mx-auto leading-relaxed">
-                We read the spin so you don't have to. A cross-spectrum analysis of today's top stories.
+            <p className="text-lg md:text-xl text-zinc-500 dark:text-zinc-400 max-w-2xl mx-auto leading-relaxed">
+                We synthesize today's top stories from across the political spectrum to extract core facts and reveal framing differences.
             </p>
-        </div>
-      </div>
 
-      {/* Main Content */}
-      <div className="max-w-4xl mx-auto px-4 py-16">
+            {generatedAt && (
+              <div className="pt-4 flex items-center justify-center gap-2 text-[10px] font-bold text-zinc-400 uppercase tracking-widest">
+                 <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                 </svg>
+                 Updated {new Date(generatedAt).toLocaleDateString()} at {new Date(generatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              </div>
+            )}
+        </div>
+      </header>
+
+      {/* Main Grid */}
+      <main className="max-w-4xl mx-auto px-4 py-16">
         
         {loading && <LoadingSkeleton />}
 
         {error && (
-          <div className="text-center py-20">
-            <div className="inline-flex items-center justify-center w-12 h-12 bg-rose-50 dark:bg-rose-900/30 text-rose-600 rounded-full mb-4">!</div>
-            <h3 className="text-lg font-bold">Unable to load briefing</h3>
-            <p className="text-zinc-500 mt-2 mb-6">{error}</p>
+          <div className="text-center py-20 bg-rose-50 dark:bg-rose-900/10 rounded-3xl border border-rose-100 dark:border-rose-900/20">
+            <h3 className="text-lg font-bold text-rose-900 dark:text-rose-400">Failed to sync news</h3>
+            <p className="text-rose-600/60 dark:text-rose-400/60 mt-2 mb-6 text-sm">{error}</p>
             <button
               onClick={() => window.location.reload()}
-              className="px-4 py-2 bg-zinc-900 text-white rounded hover:bg-zinc-800"
+              className="px-6 py-2 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 rounded-full font-bold text-sm hover:opacity-90"
             >
-              Retry
+              Retry Sync
             </button>
           </div>
         )}
 
         {!loading && !error && stories.length === 0 && (
-           <div className="text-center py-24 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl">
-              <h3 className="text-xl font-bold mb-2">No Stories Detected</h3>
-              <p className="text-zinc-500">The news cycle seems quiet, or we haven't found sufficient cross-spectrum coverage yet.</p>
+           <div className="text-center py-24 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl">
+              <div className="text-4xl mb-4">🗞️</div>
+              <h3 className="text-xl font-bold mb-2">Quiet News Cycle</h3>
+              <p className="text-zinc-500 max-w-sm mx-auto">We're monitoring sources for significant cross-spectrum coverage. Check back shortly.</p>
            </div>
         )}
 
         {!loading && !error && stories.length > 0 && (
-          <div className="space-y-12">
+          <div className="space-y-16">
             {stories.map((story) => (
               <StoryCard key={story.id} story={story} />
             ))}
           </div>
         )}
 
-        <div className="mt-32 pt-12 border-t border-zinc-200 dark:border-zinc-800 text-center">
-            <p className="text-xs text-zinc-400 uppercase tracking-widest">
-                Generated by RageCheck AI • Aggregating 50+ Sources
+        <footer className="mt-32 pt-12 border-t border-zinc-200 dark:border-zinc-800 text-center space-y-4">
+            <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-[0.2em]">
+                RageCheck Intelligence Engine • Analyzing 50+ Global Outlets
             </p>
-        </div>
+            <div className="flex justify-center gap-6">
+                <Link href="/methodology" className="text-xs font-medium text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100">Our Methodology</Link>
+                <Link href="/about" className="text-xs font-medium text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100">About RageCheck</Link>
+            </div>
+        </footer>
 
-      </div>
+      </main>
     </div>
   );
 }
