@@ -10,8 +10,9 @@ export async function POST(request: NextRequest) {
 
     await initDB();
 
-    // Get referrer from request body (sent by frontend with document.referrer)
+    // Get referrer and page path from request body
     let referrer: string | null = null;
+    let pagePath: string | null = null;
     try {
       const body = await request.json();
       if (body.referrer && typeof body.referrer === "string") {
@@ -20,6 +21,9 @@ export async function POST(request: NextRequest) {
         if (!refUrl.hostname.includes("ragecheck")) {
           referrer = body.referrer;
         }
+      }
+      if (body.pagePath && typeof body.pagePath === "string") {
+        pagePath = body.pagePath;
       }
     } catch {
       // No body or invalid JSON - that's fine
@@ -37,6 +41,7 @@ export async function POST(request: NextRequest) {
       userAgent: userAgent || undefined,
       country: country || undefined,
       referrer: referrer || undefined,
+      pagePath: pagePath || undefined,
     });
 
     return NextResponse.json({ success: true });

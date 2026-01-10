@@ -67,11 +67,26 @@ interface VisitorStats {
   }[];
 }
 
+interface PageVisitorStats {
+  totalVisitors: number;
+  todayVisitors: number;
+  weekVisitors: number;
+  realtimeSeries: {
+    time: string;
+    visitors: number;
+  }[];
+  timeSeries: {
+    date: string;
+    visitors: number;
+  }[];
+}
+
 interface ApiResponse {
   success?: boolean;
   error?: string;
   stats?: DashboardStats;
   visitorStats?: VisitorStats;
+  clearviewVisitorStats?: PageVisitorStats;
   dbAvailable?: boolean;
 }
 
@@ -344,6 +359,144 @@ function RealtimeChart({ data }: { data: { time: string; visitors: number; analy
   );
 }
 
+function PageTrafficChart({ data, title }: { data: { time: string; visitors: number }[]; title: string }) {
+  if (!data || data.length === 0) return null;
+
+  const maxValue = Math.max(...data.map(d => d.visitors), 1);
+  const width = 800;
+  const height = 180;
+  const padding = { top: 20, right: 20, bottom: 20, left: 20 };
+  const chartWidth = width - padding.left - padding.right;
+  const chartHeight = height - padding.top - padding.bottom;
+
+  const getX = (i: number) => padding.left + (i / (data.length - 1)) * chartWidth;
+  const getY = (value: number) => padding.top + chartHeight - (value / maxValue) * chartHeight;
+
+  const points = data.map((d, i) => ({ x: getX(i), y: getY(d.visitors) }));
+
+  // Create area fill path
+  const createAreaPath = (pts: { x: number; y: number }[]): string => {
+    if (pts.length < 2) return '';
+    let path = `M ${pts[0].x} ${padding.top + chartHeight}`;
+    path += ` L ${pts[0].x} ${pts[0].y}`;
+    for (let i = 1; i < pts.length; i++) {
+      path += ` L ${pts[i].x} ${pts[i].y}`;
+    }
+    path += ` L ${pts[pts.length - 1].x} ${padding.top + chartHeight}`;
+    path += ' Z';
+    return path;
+  };
+
+  const formatTime = (isoString: string) => {
+    const d = new Date(isoString);
+    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+
+  return (
+    <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 mb-6">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+          {title}
+        </h3>
+        <div className="flex items-center gap-1.5 text-xs">
+          <div className="w-3 h-0.5 bg-purple-500 rounded" />
+          <span className="text-zinc-500">Visitors</span>
+        </div>
+      </div>
+      <div className="relative">
+        <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-36" preserveAspectRatio="xMidYMid meet">
+          {[0, 0.25, 0.5, 0.75, 1].map((ratio) => (
+            <line
+              key={ratio}
+              x1={padding.left}
+              y1={padding.top + chartHeight * (1 - ratio)}
+              x2={width - padding.right}
+              y2={padding.top + chartHeight * (1 - ratio)}
+              stroke="currentColor"
+              className="text-zinc-100 dark:text-zinc-800"
+              strokeWidth="1"
+            />
+          ))}
+          <path d={createAreaPath(points)} fill="rgba(168, 85, 247, 0.15)" />
+          <polyline
+            points={points.map(p => `${p.x},${p.y}`).join(' ')}
+            fill="none"
+            stroke="#a855f7"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+        <div className="flex justify-between mt-2 text-xs text-zinc-400">
+          <span>{data[0] ? formatTime(data[0].time) : ''}</span>
+          <span>{data[Math.floor(data.length / 2)] ? formatTime(data[Math.floor(data.length / 2)].time) : ''}</span>
+          <span>{data[data.length - 1] ? formatTime(data[data.length - 1].time) : ''}</span>
+        </div>
+        <div className="absolute top-0 right-0 text-xs text-zinc-400">max: {maxValue}</div>
+      </div>
+    </div>
+  );
+}
+
+function PageDailyChart({ data, title }: { data: { date: string; visitors: number }[]; title: string }) {
+  if (!data || data.length === 0) return null;
+
+  const maxValue = Math.max(...data.map(d => d.visitors), 1);
+  const width = 800;
+  const height = 180;
+  const padding = { top: 20, right: 20, bottom: 20, left: 20 };
+  const chartWidth = width - padding.left - padding.right;
+  const chartHeight = height - padding.top - padding.bottom;
+
+  const getX = (i: number) => padding.left + (i / (data.length - 1)) * chartWidth;
+  const getY = (value: number) => padding.top + chartHeight - (value / maxValue) * chartHeight;
+
+  const points = data.map((d, i) => ({ x: getX(i), y: getY(d.visitors) }));
+
+  return (
+    <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 mb-6">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+          {title}
+        </h3>
+      </div>
+      <div className="relative">
+        <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-36" preserveAspectRatio="xMidYMid meet">
+          {[0, 0.25, 0.5, 0.75, 1].map((ratio) => (
+            <line
+              key={ratio}
+              x1={padding.left}
+              y1={padding.top + chartHeight * (1 - ratio)}
+              x2={width - padding.right}
+              y2={padding.top + chartHeight * (1 - ratio)}
+              stroke="currentColor"
+              className="text-zinc-100 dark:text-zinc-800"
+              strokeWidth="1"
+            />
+          ))}
+          {points.map((p, i) => (
+            <circle key={i} cx={p.x} cy={p.y} r="4" fill="#a855f7" />
+          ))}
+          <polyline
+            points={points.map(p => `${p.x},${p.y}`).join(' ')}
+            fill="none"
+            stroke="#a855f7"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+        <div className="flex justify-between mt-2 text-xs text-zinc-400">
+          <span>{data[0]?.date.slice(5)}</span>
+          <span>{data[Math.floor(data.length / 2)]?.date.slice(5)}</span>
+          <span>{data[data.length - 1]?.date.slice(5)}</span>
+        </div>
+        <div className="absolute top-0 right-0 text-xs text-zinc-400">max: {maxValue}</div>
+      </div>
+    </div>
+  );
+}
+
 type TabType = "overview" | "clearview";
 
 interface ClearviewStats {
@@ -367,6 +520,7 @@ export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState<TabType>("overview");
   const [clearviewStats, setClearviewStats] = useState<ClearviewStats | null>(null);
   const [clearviewLoading, setClearviewLoading] = useState(false);
+  const [clearviewVisitorStats, setClearviewVisitorStats] = useState<PageVisitorStats | null>(null);
 
   const fetchStats = async (adminKey: string) => {
     setLoading(true);
@@ -385,6 +539,7 @@ export default function AdminDashboard() {
       if (data.stats) {
         setStats(data.stats);
         setVisitorStats(data.visitorStats || null);
+        setClearviewVisitorStats(data.clearviewVisitorStats || null);
         setAuthenticated(true);
         // Save key to localStorage
         localStorage.setItem("ragecheck-admin-key", adminKey);
@@ -556,7 +711,30 @@ export default function AdminDashboard() {
                   <div className="text-center py-20 text-zinc-500">Loading Clearview data...</div>
                 ) : clearviewStats ? (
                   <>
-                    {/* Clearview Overview Stats */}
+                    {/* Clearview Traffic Stats */}
+                    {clearviewVisitorStats && (
+                      <>
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
+                          <StatCard title="Total Visitors" value={clearviewVisitorStats.totalVisitors} />
+                          <StatCard title="Today" value={clearviewVisitorStats.todayVisitors} />
+                          <StatCard title="This Week" value={clearviewVisitorStats.weekVisitors} />
+                        </div>
+                        {clearviewVisitorStats.realtimeSeries.length > 0 && (
+                          <PageTrafficChart
+                            data={clearviewVisitorStats.realtimeSeries}
+                            title="Clearview Traffic (Last 24 Hours - 10 min intervals)"
+                          />
+                        )}
+                        {clearviewVisitorStats.timeSeries.length > 0 && (
+                          <PageDailyChart
+                            data={clearviewVisitorStats.timeSeries}
+                            title="Clearview Daily Visitors (Last 14 Days)"
+                          />
+                        )}
+                      </>
+                    )}
+
+                    {/* Clearview Content Stats */}
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
                       <StatCard title="Stories Today" value={clearviewStats.storyCount} />
                       <StatCard title="Total Sources" value={clearviewStats.sourceCount} />

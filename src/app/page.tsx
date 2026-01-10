@@ -542,7 +542,10 @@ export default function Home() {
     fetch("/api/visit", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ referrer: document.referrer || null }),
+      body: JSON.stringify({
+        referrer: document.referrer || null,
+        pagePath: "/"
+      }),
     }).catch(() => {});
 
     fetch("/api/headlines")

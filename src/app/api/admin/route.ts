@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { initDB, getDashboardStats, getVisitorStats, isDBAvailable } from "@/lib/db";
+import { initDB, getDashboardStats, getVisitorStats, getPageVisitorStats, isDBAvailable } from "@/lib/db";
 
 export async function GET(request: NextRequest) {
   // Simple password protection via query param
@@ -29,12 +29,14 @@ export async function GET(request: NextRequest) {
     // Get dashboard stats
     const stats = await getDashboardStats();
     const visitorStats = await getVisitorStats();
+    const clearviewVisitorStats = await getPageVisitorStats("/clearview");
 
     return NextResponse.json({
       success: true,
       dbAvailable: true,
       stats,
       visitorStats,
+      clearviewVisitorStats,
     });
   } catch (error) {
     console.error("Admin API error:", error);

@@ -115,6 +115,7 @@ export async function initDB() {
     await getDb()`ALTER TABLE ragecheck_analyses ADD COLUMN IF NOT EXISTS country TEXT`;
     await getDb()`ALTER TABLE ragecheck_analyses ADD COLUMN IF NOT EXISTS is_bot BOOLEAN DEFAULT FALSE`;
     await getDb()`ALTER TABLE ragecheck_visitors ADD COLUMN IF NOT EXISTS is_bot BOOLEAN DEFAULT FALSE`;
+    await getDb()`ALTER TABLE ragecheck_visitors ADD COLUMN IF NOT EXISTS page_path TEXT`;
   } catch {
     // Columns may already exist
   }
@@ -445,6 +446,7 @@ export interface VisitorLog {
   userAgent?: string;
   country?: string;
   referrer?: string;
+  pagePath?: string;
 }
 
 export async function logVisitor(data: VisitorLog) {
@@ -452,8 +454,8 @@ export async function logVisitor(data: VisitorLog) {
     const isBotUser = isBot(data.userAgent);
     await withRetry(async () => {
       await getDb()`
-        INSERT INTO ragecheck_visitors (ip_address, user_agent, country, referrer, is_bot)
-        VALUES (${data.ipAddress || null}, ${data.userAgent || null}, ${data.country || null}, ${data.referrer || null}, ${isBotUser})
+        INSERT INTO ragecheck_visitors (ip_address, user_agent, country, referrer, is_bot, page_path)
+        VALUES (${data.ipAddress || null}, ${data.userAgent || null}, ${data.country || null}, ${data.referrer || null}, ${isBotUser}, ${data.pagePath || null})
       `;
     });
   } catch (error) {
@@ -723,6 +725,100 @@ export async function getVisitorStats(): Promise<VisitorStats> {
       recentVisitors: [],
       timeSeries: [],
       realtimeSeries: [],
+    };
+  }
+}
+
+export interface PageVisitorStats {
+  totalVisitors: number;
+  todayVisitors: number;
+  weekVisitors: number;
+  realtimeSeries: {
+    time: string;
+    visitors: number;
+  }[];
+  timeSeries: {
+    date: string;
+    visitors: number;
+  }[];
+}
+
+export async function getPageVisitorStats(pagePath: string): Promise<PageVisitorStats> {
+  try {
+    const [totalResult] = await getDb()`SELECT COUNT(*) as count FROM ragecheck_visitors WHERE page_path = ${pagePath}`;
+    const [todayResult] = await getDb()`SELECT COUNT(*) as count FROM ragecheck_visitors WHERE page_path = ${pagePath} AND created_at > NOW() - INTERVAL '1 day'`;
+    const [weekResult] = await getDb()`SELECT COUNT(*) as count FROM ragecheck_visitors WHERE page_path = ${pagePath} AND created_at > NOW() - INTERVAL '7 days'`;
+
+    // Realtime series - 10 minute buckets for last 24 hours
+    const visitorRealtime = await getDb()`
+      SELECT
+        date_trunc('hour', created_at) +
+        (floor(extract(minute FROM created_at) / 10) * interval '10 minutes') as bucket,
+        COUNT(*) as count
+      FROM ragecheck_visitors
+      WHERE page_path = ${pagePath} AND created_at > NOW() - INTERVAL '24 hours'
+      GROUP BY bucket
+      ORDER BY bucket ASC
+    `;
+
+    // Merge realtime data into 10-minute buckets
+    const realtimeMap = new Map<string, number>();
+    const now = new Date();
+    for (let i = 143; i >= 0; i--) {
+      const d = new Date(now.getTime() - i * 10 * 60 * 1000);
+      d.setMinutes(Math.floor(d.getMinutes() / 10) * 10, 0, 0);
+      realtimeMap.set(d.toISOString(), 0);
+    }
+
+    for (const row of visitorRealtime) {
+      const timeStr = new Date(row.bucket).toISOString();
+      realtimeMap.set(timeStr, Number(row.count));
+    }
+
+    const realtimeSeries = Array.from(realtimeMap.entries())
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([time, visitors]) => ({ time, visitors }));
+
+    // Daily time series for last 14 days
+    const dailyData = await getDb()`
+      SELECT DATE(created_at) as date, COUNT(*) as count
+      FROM ragecheck_visitors
+      WHERE page_path = ${pagePath} AND created_at > NOW() - INTERVAL '14 days'
+      GROUP BY DATE(created_at)
+      ORDER BY date ASC
+    `;
+
+    const dateMap = new Map<string, number>();
+    for (let i = 13; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      dateMap.set(d.toISOString().split("T")[0], 0);
+    }
+
+    for (const row of dailyData) {
+      const dateStr = new Date(row.date).toISOString().split("T")[0];
+      dateMap.set(dateStr, Number(row.count));
+    }
+
+    const timeSeries = Array.from(dateMap.entries())
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([date, visitors]) => ({ date, visitors }));
+
+    return {
+      totalVisitors: Number(totalResult.count),
+      todayVisitors: Number(todayResult.count),
+      weekVisitors: Number(weekResult.count),
+      realtimeSeries,
+      timeSeries,
+    };
+  } catch (error) {
+    console.error("Failed to get page visitor stats:", error);
+    return {
+      totalVisitors: 0,
+      todayVisitors: 0,
+      weekVisitors: 0,
+      realtimeSeries: [],
+      timeSeries: [],
     };
   }
 }

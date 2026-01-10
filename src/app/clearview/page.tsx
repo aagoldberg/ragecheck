@@ -412,6 +412,18 @@ export default function ClearviewPage() {
       });
   }, []);
 
+  // Track page visit
+  useEffect(() => {
+    fetch("/api/visit", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        referrer: document.referrer || null,
+        pagePath: "/clearview"
+      }),
+    }).catch(() => {});
+  }, []);
+
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-black text-zinc-900 dark:text-zinc-100 font-sans selection:bg-indigo-100 dark:selection:bg-indigo-900">
       
