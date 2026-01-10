@@ -81,12 +81,26 @@ interface PageVisitorStats {
   }[];
 }
 
+interface ViralMetrics {
+  repeatUsers: number;
+  repeatRate: number;
+  avgVisitsPerUser: number;
+  totalShares: number;
+  todayShares: number;
+  shareRate: number;
+  kFactor: number;
+  trafficVsBaseline: number;
+  isSpike: boolean;
+  referralSources: { source: string; count: number }[];
+}
+
 interface ApiResponse {
   success?: boolean;
   error?: string;
   stats?: DashboardStats;
   visitorStats?: VisitorStats;
   clearviewVisitorStats?: PageVisitorStats;
+  viralMetrics?: ViralMetrics;
   dbAvailable?: boolean;
 }
 
@@ -521,6 +535,7 @@ export default function AdminDashboard() {
   const [clearviewStats, setClearviewStats] = useState<ClearviewStats | null>(null);
   const [clearviewLoading, setClearviewLoading] = useState(false);
   const [clearviewVisitorStats, setClearviewVisitorStats] = useState<PageVisitorStats | null>(null);
+  const [viralMetrics, setViralMetrics] = useState<ViralMetrics | null>(null);
 
   const fetchStats = async (adminKey: string) => {
     setLoading(true);
@@ -540,6 +555,7 @@ export default function AdminDashboard() {
         setStats(data.stats);
         setVisitorStats(data.visitorStats || null);
         setClearviewVisitorStats(data.clearviewVisitorStats || null);
+        setViralMetrics(data.viralMetrics || null);
         setAuthenticated(true);
         // Save key to localStorage
         localStorage.setItem("ragecheck-admin-key", adminKey);
@@ -872,6 +888,71 @@ export default function AdminDashboard() {
             {/* Time Series Chart (daily) */}
             {visitorStats && visitorStats.timeSeries.length > 0 && (
               <TimeSeriesChart data={visitorStats.timeSeries} />
+            )}
+
+            {/* Viral Metrics Section */}
+            {viralMetrics && (
+              <div className="mb-8">
+                <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100 mb-4 flex items-center gap-2">
+                  Viral & Retention Metrics
+                  {viralMetrics.isSpike && (
+                    <span className="px-2 py-0.5 bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300 text-xs font-medium rounded-full animate-pulse">
+                      TRAFFIC SPIKE
+                    </span>
+                  )}
+                </h2>
+                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 mb-6">
+                  <StatCard
+                    title="Repeat Users"
+                    value={viralMetrics.repeatUsers}
+                    subtitle={`${viralMetrics.repeatRate}% of visitors`}
+                  />
+                  <StatCard
+                    title="Avg Days/User"
+                    value={viralMetrics.avgVisitsPerUser}
+                    subtitle="visits per user"
+                  />
+                  <StatCard
+                    title="Total Shares"
+                    value={viralMetrics.totalShares}
+                    subtitle={`${viralMetrics.todayShares} today`}
+                  />
+                  <StatCard
+                    title="Share Rate"
+                    value={`${viralMetrics.shareRate}%`}
+                    subtitle="shares/analyses"
+                  />
+                  <StatCard
+                    title="K-Factor"
+                    value={viralMetrics.kFactor}
+                    subtitle={viralMetrics.kFactor >= 1 ? "🚀 Viral!" : viralMetrics.kFactor >= 0.5 ? "Good" : "Building"}
+                  />
+                  <StatCard
+                    title="Traffic vs Avg"
+                    value={`${viralMetrics.trafficVsBaseline}x`}
+                    subtitle={viralMetrics.isSpike ? "Spike detected!" : "vs 7-day avg"}
+                  />
+                </div>
+
+                {/* Referral Sources */}
+                {viralMetrics.referralSources.length > 0 && (
+                  <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6">
+                    <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-4">
+                      Traffic Sources (Last 7 Days)
+                    </h3>
+                    <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                      {viralMetrics.referralSources.map((source) => (
+                        <div key={source.source} className="text-center">
+                          <div className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">
+                            {source.count}
+                          </div>
+                          <div className="text-xs text-zinc-500">{source.source}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
             )}
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">

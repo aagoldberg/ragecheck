@@ -108,6 +108,18 @@ export async function initDB() {
     )
   `;
 
+  // Share events table for viral tracking
+  await getDb()`
+    CREATE TABLE IF NOT EXISTS ragecheck_shares (
+      id SERIAL PRIMARY KEY,
+      url TEXT,
+      share_type TEXT,
+      ip_address TEXT,
+      referrer_code TEXT,
+      created_at TIMESTAMP DEFAULT NOW()
+    )
+  `;
+
   // Add columns if they don't exist (for existing tables)
   try {
     await getDb()`ALTER TABLE ragecheck_analyses ADD COLUMN IF NOT EXISTS ip_address TEXT`;
@@ -873,6 +885,204 @@ export async function getPageVisitorStats(pagePath: string): Promise<PageVisitor
       weekVisitors: 0,
       realtimeSeries: [],
       timeSeries: [],
+    };
+  }
+}
+
+// ============================================
+// SHARE TRACKING & VIRAL METRICS
+// ============================================
+
+export interface ShareLog {
+  url: string;
+  shareType: "copy_link" | "share_button" | "twitter" | "facebook" | "other";
+  ipAddress?: string;
+  referrerCode?: string;
+}
+
+export async function logShare(data: ShareLog) {
+  try {
+    await withRetry(async () => {
+      await getDb()`
+        INSERT INTO ragecheck_shares (url, share_type, ip_address, referrer_code)
+        VALUES (${data.url}, ${data.shareType}, ${data.ipAddress || null}, ${data.referrerCode || null})
+      `;
+    });
+  } catch (error) {
+    console.error("Failed to log share:", error);
+  }
+}
+
+export interface ViralMetrics {
+  // Repeat users (return visitors)
+  repeatUsers: number;
+  repeatRate: number; // % of users who return
+  avgVisitsPerUser: number;
+
+  // Share metrics
+  totalShares: number;
+  todayShares: number;
+  shareRate: number; // shares / analyses
+
+  // Viral coefficient approximation
+  kFactor: number;
+
+  // Traffic baseline comparison
+  trafficVsBaseline: number; // current vs 7-day avg
+  isSpike: boolean;
+
+  // Referral breakdown
+  referralSources: { source: string; count: number }[];
+}
+
+export async function getViralMetrics(): Promise<ViralMetrics> {
+  try {
+    // Repeat users: visitors who came on 2+ different days
+    const repeatUserResult = await getDb()`
+      SELECT COUNT(*) as count FROM (
+        SELECT ip_address
+        FROM ragecheck_visitors
+        WHERE ip_address IS NOT NULL
+        GROUP BY ip_address
+        HAVING COUNT(DISTINCT DATE(created_at)) >= 2
+      ) as repeat_users
+    `;
+
+    // Total unique users
+    const [uniqueUsersResult] = await getDb()`
+      SELECT COUNT(DISTINCT ip_address) as count
+      FROM ragecheck_visitors
+      WHERE ip_address IS NOT NULL
+    `;
+
+    // Average visits per user
+    const [avgVisitsResult] = await getDb()`
+      SELECT AVG(visit_count) as avg FROM (
+        SELECT ip_address, COUNT(DISTINCT DATE(created_at)) as visit_count
+        FROM ragecheck_visitors
+        WHERE ip_address IS NOT NULL
+        GROUP BY ip_address
+      ) as user_visits
+    `;
+
+    // Share counts
+    const [totalSharesResult] = await getDb()`
+      SELECT COUNT(*) as count FROM ragecheck_shares
+    `;
+
+    const [todaySharesResult] = await getDb()`
+      SELECT COUNT(*) as count FROM ragecheck_shares
+      WHERE created_at > NOW() - INTERVAL '1 day'
+    `;
+
+    // Analyses for share rate calculation
+    const [weekAnalysesResult] = await getDb()`
+      SELECT COUNT(*) as count FROM ragecheck_analyses
+      WHERE created_at > NOW() - INTERVAL '7 days' AND success = true
+    `;
+
+    const [weekSharesResult] = await getDb()`
+      SELECT COUNT(*) as count FROM ragecheck_shares
+      WHERE created_at > NOW() - INTERVAL '7 days'
+    `;
+
+    // Traffic baseline comparison (today vs 7-day average)
+    const [todayVisitorsResult] = await getDb()`
+      SELECT COUNT(*) as count FROM ragecheck_visitors
+      WHERE created_at > NOW() - INTERVAL '1 day'
+    `;
+
+    const [avgDailyVisitorsResult] = await getDb()`
+      SELECT AVG(daily_count) as avg FROM (
+        SELECT DATE(created_at) as day, COUNT(*) as daily_count
+        FROM ragecheck_visitors
+        WHERE created_at > NOW() - INTERVAL '8 days'
+          AND created_at < NOW() - INTERVAL '1 day'
+        GROUP BY DATE(created_at)
+      ) as daily_visits
+    `;
+
+    // Referral sources (external referrers)
+    const referralSources = await getDb()`
+      SELECT
+        CASE
+          WHEN referrer LIKE '%twitter%' OR referrer LIKE '%x.com%' THEN 'Twitter/X'
+          WHEN referrer LIKE '%facebook%' THEN 'Facebook'
+          WHEN referrer LIKE '%reddit%' THEN 'Reddit'
+          WHEN referrer LIKE '%linkedin%' THEN 'LinkedIn'
+          WHEN referrer LIKE '%google%' THEN 'Google'
+          WHEN referrer LIKE '%t.co%' THEN 'Twitter/X'
+          WHEN referrer LIKE '%news.ycombinator%' THEN 'Hacker News'
+          WHEN referrer IS NULL OR referrer = '' THEN 'Direct'
+          ELSE 'Other'
+        END as source,
+        COUNT(*) as count
+      FROM ragecheck_visitors
+      WHERE created_at > NOW() - INTERVAL '7 days'
+      GROUP BY source
+      ORDER BY count DESC
+      LIMIT 10
+    `;
+
+    // K-factor estimation: (shares per user) × (conversion rate from shares)
+    // We estimate conversion by looking at referrer patterns
+    const uniqueUsers = Number(uniqueUsersResult.count) || 1;
+    const totalShares = Number(totalSharesResult.count) || 0;
+    const sharesPerUser = totalShares / uniqueUsers;
+
+    // Estimate conversion from shares (visitors with referrer containing our domain or share params)
+    const [referralVisitsResult] = await getDb()`
+      SELECT COUNT(*) as count FROM ragecheck_visitors
+      WHERE referrer LIKE '%ragecheck%' OR referrer LIKE '%share%'
+    `;
+    const referralConversion = totalShares > 0
+      ? Number(referralVisitsResult.count) / totalShares
+      : 0;
+
+    const kFactor = sharesPerUser * Math.min(referralConversion, 1);
+
+    // Calculate metrics
+    const repeatUsers = Number(repeatUserResult[0]?.count) || 0;
+    const repeatRate = uniqueUsers > 0 ? (repeatUsers / uniqueUsers) * 100 : 0;
+    const avgVisitsPerUser = Number(avgVisitsResult.avg) || 1;
+
+    const weekAnalyses = Number(weekAnalysesResult.count) || 1;
+    const weekShares = Number(weekSharesResult.count) || 0;
+    const shareRate = (weekShares / weekAnalyses) * 100;
+
+    const todayVisitors = Number(todayVisitorsResult.count) || 0;
+    const avgDailyVisitors = Number(avgDailyVisitorsResult.avg) || 1;
+    const trafficVsBaseline = todayVisitors / avgDailyVisitors;
+    const isSpike = trafficVsBaseline > 3; // 3x normal = spike
+
+    return {
+      repeatUsers,
+      repeatRate: Math.round(repeatRate * 10) / 10,
+      avgVisitsPerUser: Math.round(avgVisitsPerUser * 10) / 10,
+      totalShares,
+      todayShares: Number(todaySharesResult.count) || 0,
+      shareRate: Math.round(shareRate * 10) / 10,
+      kFactor: Math.round(kFactor * 1000) / 1000,
+      trafficVsBaseline: Math.round(trafficVsBaseline * 100) / 100,
+      isSpike,
+      referralSources: referralSources.map(r => ({
+        source: r.source,
+        count: Number(r.count),
+      })),
+    };
+  } catch (error) {
+    console.error("Failed to get viral metrics:", error);
+    return {
+      repeatUsers: 0,
+      repeatRate: 0,
+      avgVisitsPerUser: 0,
+      totalShares: 0,
+      todayShares: 0,
+      shareRate: 0,
+      kFactor: 0,
+      trafficVsBaseline: 1,
+      isSpike: false,
+      referralSources: [],
     };
   }
 }

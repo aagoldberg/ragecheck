@@ -678,12 +678,21 @@ export default function Home() {
     return `${window.location.origin}/share?${params.toString()}`;
   };
 
+  const trackShare = (shareType: string) => {
+    fetch("/api/share", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url, shareType }),
+    }).catch(() => {});
+  };
+
   const copyShareCard = () => {
     if (!result?.success || result.score === undefined) return;
     const shareUrl = getShareUrl();
     navigator.clipboard.writeText(shareUrl);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+    trackShare("copy_link");
   };
 
   const handleShare = async () => {
@@ -698,6 +707,7 @@ export default function Home() {
     if (navigator.share && navigator.canShare?.(shareData)) {
       try {
         await navigator.share(shareData);
+        trackShare("share_button");
       } catch {
         copyShareCard();
       }
