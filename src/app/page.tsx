@@ -541,6 +541,7 @@ export default function Home() {
   const [imageError, setImageError] = useState<string | null>(null);
   const [downloadingImage, setDownloadingImage] = useState(false);
   const [imageCopied, setImageCopied] = useState(false);
+  const [canNativeShare, setCanNativeShare] = useState(false);
 
   useEffect(() => {
     fetch("/api/visit", {
@@ -561,6 +562,10 @@ export default function Home() {
       })
       .catch(() => {}) // Ignore errors for headlines
       .finally(() => setHeadlinesLoading(false));
+
+    // Check if Web Share API is available (primarily mobile)
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    setCanNativeShare(isMobile && typeof navigator.share === "function");
   }, []);
 
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -726,6 +731,22 @@ export default function Home() {
     const blueskyUrl = `https://bsky.app/intent/compose?text=${encodeURIComponent(text)}`;
     window.open(blueskyUrl, '_blank', 'width=550,height=420');
     trackShare("bluesky");
+  };
+
+  const shareNative = async () => {
+    if (!result?.success || result.score === undefined) return;
+    if (!navigator.share) return;
+
+    try {
+      await navigator.share({
+        title: `RageCheck: ${result.title || "Analysis"}`,
+        text: getShareText(),
+        url: getShareUrl(),
+      });
+      trackShare("native");
+    } catch {
+      // User cancelled or share failed - ignore
+    }
   };
 
   const getShareImageData = () => {
@@ -1108,26 +1129,41 @@ export default function Home() {
                     </svg>
                     {imageCopied ? "Image Copied!" : "Copy Image"}
                   </button>
-                  <button
-                    onClick={shareOnTwitter}
-                    className="flex items-center gap-1.5 px-3 py-2 bg-black hover:bg-zinc-800 text-white text-xs font-bold rounded-lg transition-colors"
-                    title="Post on X"
-                  >
-                    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
-                    </svg>
-                    Post on X
-                  </button>
-                  <button
-                    onClick={shareOnBluesky}
-                    className="flex items-center gap-1.5 px-3 py-2 bg-[#0085ff] hover:bg-[#0070d6] text-white text-xs font-bold rounded-lg transition-colors"
-                    title="Post on Bluesky"
-                  >
-                    <svg className="w-3.5 h-3.5" viewBox="0 0 600 530" fill="currentColor">
-                      <path d="m135.72 44.03c66.496 49.921 138.02 151.14 164.28 205.46 26.262-54.316 97.782-155.54 164.28-205.46 47.98-36.021 125.72-63.892 125.72 24.795 0 17.712-10.155 148.79-16.111 170.07-20.703 73.984-96.144 92.854-163.25 81.433 117.3 19.964 147.14 86.092 82.697 152.22-122.39 125.59-175.91-31.511-189.63-71.766-2.514-7.38-3.69-10.832-3.69-7.914 0-2.918-1.176 0.534-3.69 7.914-13.72 40.255-67.24 197.36-189.63 71.766-64.444-66.128-34.605-132.26 82.697-152.22-67.108 11.421-142.55-7.449-163.25-81.433-5.9561-21.282-16.111-152.36-16.111-170.07 0-88.687 77.742-60.816 125.72-24.795z"/>
-                    </svg>
-                    Post on Bluesky
-                  </button>
+                  {canNativeShare ? (
+                    <button
+                      onClick={shareNative}
+                      className="flex items-center gap-1.5 px-3 py-2 bg-zinc-800 hover:bg-zinc-700 text-white text-xs font-bold rounded-lg transition-colors"
+                      title="Share"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                      </svg>
+                      Share
+                    </button>
+                  ) : (
+                    <>
+                      <button
+                        onClick={shareOnTwitter}
+                        className="flex items-center gap-1.5 px-3 py-2 bg-black hover:bg-zinc-800 text-white text-xs font-bold rounded-lg transition-colors"
+                        title="Post on X"
+                      >
+                        <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
+                          <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+                        </svg>
+                        Post on X
+                      </button>
+                      <button
+                        onClick={shareOnBluesky}
+                        className="flex items-center gap-1.5 px-3 py-2 bg-[#0085ff] hover:bg-[#0070d6] text-white text-xs font-bold rounded-lg transition-colors"
+                        title="Post on Bluesky"
+                      >
+                        <svg className="w-3.5 h-3.5" viewBox="0 0 600 530" fill="currentColor">
+                          <path d="m135.72 44.03c66.496 49.921 138.02 151.14 164.28 205.46 26.262-54.316 97.782-155.54 164.28-205.46 47.98-36.021 125.72-63.892 125.72 24.795 0 17.712-10.155 148.79-16.111 170.07-20.703 73.984-96.144 92.854-163.25 81.433 117.3 19.964 147.14 86.092 82.697 152.22-122.39 125.59-175.91-31.511-189.63-71.766-2.514-7.38-3.69-10.832-3.69-7.914 0-2.918-1.176 0.534-3.69 7.914-13.72 40.255-67.24 197.36-189.63 71.766-64.444-66.128-34.605-132.26 82.697-152.22-67.108 11.421-142.55-7.449-163.25-81.433-5.9561-21.282-16.111-152.36-16.111-170.07 0-88.687 77.742-60.816 125.72-24.795z"/>
+                        </svg>
+                        Post on Bluesky
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
