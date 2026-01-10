@@ -133,6 +133,7 @@ export async function initDB() {
     await getDb()`ALTER TABLE ragecheck_analyses ADD COLUMN IF NOT EXISTS reasons JSONB`;
     await getDb()`ALTER TABLE ragecheck_analyses ADD COLUMN IF NOT EXISTS highlights JSONB`;
     await getDb()`ALTER TABLE ragecheck_analyses ADD COLUMN IF NOT EXISTS context_notes TEXT`;
+    await getDb()`ALTER TABLE ragecheck_analyses ADD COLUMN IF NOT EXISTS text_preview TEXT`;
   } catch {
     // Columns may already exist
   }
@@ -163,6 +164,7 @@ export interface AnalysisLog {
   reasons?: string[];
   highlights?: { start: number; end: number; category: string; text: string }[];
   contextNotes?: string;
+  textPreview?: string;
 }
 
 function detectPlatform(domain: string): string {
@@ -193,7 +195,7 @@ export async function logAnalysis(data: AnalysisLog) {
           signal_loaded_language, signal_absolutist, signal_threat_panic,
           signal_us_vs_them, signal_engagement_bait, success, error,
           ip_address, user_agent, country, is_bot,
-          title, reasons, highlights, context_notes
+          title, reasons, highlights, context_notes, text_preview
         ) VALUES (
           ${data.url},
           ${data.sourceDomain || null},
@@ -215,7 +217,8 @@ export async function logAnalysis(data: AnalysisLog) {
           ${data.title || null},
           ${data.reasons ? JSON.stringify(data.reasons) : null},
           ${data.highlights ? JSON.stringify(data.highlights) : null},
-          ${data.contextNotes || null}
+          ${data.contextNotes || null},
+          ${data.textPreview || null}
         )
       `;
     });
@@ -423,6 +426,7 @@ export interface CachedAnalysis {
   reasons: string[];
   highlights: { start: number; end: number; category: string; text: string }[];
   contextNotes: string | null;
+  textPreview: string | null;
 }
 
 // Get cached analysis for a URL (within last 24 hours)
@@ -436,7 +440,7 @@ export async function getCachedAnalysis(url: string): Promise<CachedAnalysis | n
           url, source_domain, score, label, llm_enhanced,
           signal_loaded_language, signal_absolutist, signal_threat_panic,
           signal_us_vs_them, signal_engagement_bait, created_at,
-          title, reasons, highlights, context_notes
+          title, reasons, highlights, context_notes, text_preview
         FROM ragecheck_analyses
         WHERE url = ${url}
           AND success = true
@@ -478,6 +482,7 @@ export async function getCachedAnalysis(url: string): Promise<CachedAnalysis | n
         reasons,
         highlights,
         contextNotes: result.context_notes || null,
+        textPreview: result.text_preview || null,
       };
     }
 

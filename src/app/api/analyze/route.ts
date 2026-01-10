@@ -146,7 +146,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<AnalyzeRe
         signalBreakdown: cached.signalBreakdown,
         title: cached.title || "Article Analysis",
         sourceDomain: cached.sourceDomain,
-        textPreview: "",
+        textPreview: cached.textPreview || "",
         llmEnhanced: cached.llmEnhanced,
         contextNotes: cached.contextNotes || undefined,
         cached: true,
@@ -231,6 +231,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<AnalyzeRe
       reasons: finalReasons,
       highlights: ruleAnalysis.highlights,
       contextNotes,
+      textPreview,
     });
 
     return NextResponse.json({
