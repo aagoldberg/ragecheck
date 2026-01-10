@@ -34,6 +34,7 @@ interface AnalysisResult {
   sharingPatterns?: string[];
   techniqueExplanations?: string[];
   image?: string;
+  cached?: boolean;
 }
 
 interface Headline {
@@ -626,7 +627,7 @@ export default function Home() {
     }
   };
 
-  const analyze = async (targetUrl: string) => {
+  const analyze = async (targetUrl: string, force = false) => {
     if (!targetUrl.trim()) return;
 
     setLoading(true);
@@ -639,7 +640,7 @@ export default function Home() {
       const response = await fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: targetUrl.trim() }),
+        body: JSON.stringify({ url: targetUrl.trim(), force }),
       });
 
       const data = await response.json();
@@ -651,6 +652,12 @@ export default function Home() {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const forceReanalyze = () => {
+    if (url.trim()) {
+      analyze(url, true);
     }
   };
 
@@ -1039,7 +1046,7 @@ export default function Home() {
             )}
 
             {!isDemo && (
-              <div className="flex justify-center">
+              <div className="flex justify-center gap-3">
                 <button
                   onClick={() => {
                     setResult(DEMO_RESULT);
@@ -1053,6 +1060,17 @@ export default function Home() {
                   </svg>
                   Analyze Another
                 </button>
+                {result?.cached && (!result.textPreview || result.title === "Article Analysis") && (
+                  <button
+                    onClick={forceReanalyze}
+                    className="group flex items-center gap-2 px-4 py-2 bg-amber-100 dark:bg-amber-900/30 hover:bg-amber-200 dark:hover:bg-amber-900/50 rounded-full text-sm font-medium text-amber-700 dark:text-amber-300 transition-colors"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    Re-analyze (Fresh)
+                  </button>
+                )}
               </div>
             )}
 
