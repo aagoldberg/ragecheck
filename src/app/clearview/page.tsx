@@ -53,11 +53,11 @@ interface StoryCluster {
 // --- Constants & Utils ---
 
 const LEAN_CONFIG: Record<string, { color: string; bg: string; border: string; label: string }> = {
-  "Far Left": { color: "text-blue-700 dark:text-blue-300", bg: "bg-blue-100 dark:bg-blue-900/40", border: "border-blue-200 dark:border-blue-800", label: "Far Left" },
-  "Left": { color: "text-blue-600 dark:text-blue-400", bg: "bg-blue-50 dark:bg-blue-900/20", border: "border-blue-200 dark:border-blue-800", label: "Left" },
-  "Center": { color: "text-zinc-600 dark:text-zinc-400", bg: "bg-zinc-100 dark:bg-zinc-800", border: "border-zinc-200 dark:border-zinc-700", label: "Center" },
-  "Right": { color: "text-rose-600 dark:text-rose-400", bg: "bg-rose-50 dark:bg-rose-900/20", border: "border-rose-200 dark:border-rose-800", label: "Right" },
-  "Far Right": { color: "text-rose-700 dark:text-rose-300", bg: "bg-rose-100 dark:bg-rose-900/40", border: "border-rose-200 dark:border-rose-800", label: "Far Right" },
+  "Far Left": { color: "text-indigo-900 dark:text-indigo-200", bg: "bg-indigo-100 dark:bg-indigo-900/40", border: "border-indigo-200 dark:border-indigo-800", label: "Far Left" },
+  "Left": { color: "text-blue-800 dark:text-blue-200", bg: "bg-blue-50 dark:bg-blue-900/20", border: "border-blue-200 dark:border-blue-800", label: "Left" },
+  "Center": { color: "text-zinc-700 dark:text-zinc-300", bg: "bg-zinc-100 dark:bg-zinc-800", border: "border-zinc-200 dark:border-zinc-700", label: "Center" },
+  "Right": { color: "text-rose-800 dark:text-rose-200", bg: "bg-rose-50 dark:bg-rose-900/20", border: "border-rose-200 dark:border-rose-800", label: "Right" },
+  "Far Right": { color: "text-orange-900 dark:text-orange-200", bg: "bg-orange-100 dark:bg-orange-900/40", border: "border-orange-200 dark:border-orange-800", label: "Far Right" },
 };
 
 function getLeanConfig(lean: string) {
@@ -69,14 +69,13 @@ function getLeanConfig(lean: string) {
 function BiasBadge({ lean }: { lean: string }) {
   const config = getLeanConfig(lean);
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border ${config.bg} ${config.color} ${config.border}`}>
+    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${config.bg} ${config.color} border ${config.border} shadow-sm`}>
       {lean}
     </span>
   );
 }
 
 function BiasSpectrum({ sources }: { sources: SourceAnalysis[] }) {
-  // Simple visualization of source distribution
   const counts = { left: 0, center: 0, right: 0 };
   sources.forEach(s => {
     const lean = s.lean.toLowerCase();
@@ -89,442 +88,242 @@ function BiasSpectrum({ sources }: { sources: SourceAnalysis[] }) {
   if (total === 0) return null;
 
   return (
-    <div className="flex items-center gap-2 text-xs text-zinc-500 font-medium">
-      <div className="flex h-2 w-24 rounded-full overflow-hidden bg-zinc-100 dark:bg-zinc-800">
-        <div style={{ width: `${(counts.left / total) * 100}%` }} className="bg-blue-500 h-full" />
-        <div style={{ width: `${(counts.center / total) * 100}%` }} className="bg-zinc-400 h-full" />
-        <div style={{ width: `${(counts.right / total) * 100}%` }} className="bg-rose-500 h-full" />
+    <div className="flex flex-col gap-1">
+      <div className="flex h-1.5 w-32 rounded-full overflow-hidden bg-zinc-100 dark:bg-zinc-800">
+        <div style={{ width: `${(counts.left / total) * 100}%` }} className="bg-blue-500/80" />
+        <div style={{ width: `${(counts.center / total) * 100}%` }} className="bg-zinc-400/50" />
+        <div style={{ width: `${(counts.right / total) * 100}%` }} className="bg-rose-500/80" />
       </div>
-      <span>{total} Sources Analysis</span>
+      <span className="text-[10px] text-zinc-400 font-medium uppercase tracking-wider">{total} Sources</span>
     </div>
-  );
-}
-
-function DebateTypeBadge({ type }: { type: string }) {
-  const config: Record<string, { bg: string; text: string; label: string; icon: string }> = {
-    factual: { bg: "bg-amber-100 dark:bg-amber-900/30", text: "text-amber-700 dark:text-amber-300", label: "Factual Dispute", icon: "❓" },
-    policy: { bg: "bg-blue-100 dark:bg-blue-900/30", text: "text-blue-700 dark:text-blue-300", label: "Policy Debate", icon: "⚖️" },
-    values: { bg: "bg-purple-100 dark:bg-purple-900/30", text: "text-purple-700 dark:text-purple-300", label: "Values Debate", icon: "💭" },
-    mixed: { bg: "bg-zinc-100 dark:bg-zinc-800", text: "text-zinc-700 dark:text-zinc-300", label: "Mixed", icon: "🔀" },
-  };
-  const c = config[type] || config.mixed;
-  return (
-    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${c.bg} ${c.text}`}>
-      <span>{c.icon}</span>
-      {c.label}
-    </span>
   );
 }
 
 function EvidenceStatusBadge({ status }: { status: string }) {
   const config: Record<string, { bg: string; text: string; label: string }> = {
-    supported: { bg: "bg-emerald-100 dark:bg-emerald-900/30", text: "text-emerald-700 dark:text-emerald-300", label: "✓ Evidence Supported" },
-    mixed: { bg: "bg-amber-100 dark:bg-amber-900/30", text: "text-amber-700 dark:text-amber-300", label: "~ Mixed Evidence" },
-    unsupported: { bg: "bg-rose-100 dark:bg-rose-900/30", text: "text-rose-700 dark:text-rose-300", label: "✗ Not Supported" },
-    misleading: { bg: "bg-orange-100 dark:bg-orange-900/30", text: "text-orange-700 dark:text-orange-300", label: "⚠ Misleading" },
+    supported: { bg: "bg-emerald-50 dark:bg-emerald-900/20", text: "text-emerald-700 dark:text-emerald-400", label: "Supported by Evidence" },
+    mixed: { bg: "bg-amber-50 dark:bg-amber-900/20", text: "text-amber-700 dark:text-amber-400", label: "Mixed Evidence" },
+    unsupported: { bg: "bg-rose-50 dark:bg-rose-900/20", text: "text-rose-700 dark:text-rose-400", label: "Unsupported" },
+    misleading: { bg: "bg-orange-50 dark:bg-orange-900/20", text: "text-orange-700 dark:text-orange-400", label: "Misleading Context" },
   };
   const c = config[status] || config.mixed;
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold ${c.bg} ${c.text}`}>
+    <span className={`inline-flex items-center px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wide border border-transparent ${c.bg} ${c.text}`}>
       {c.label}
     </span>
   );
 }
 
-function ExpertConsensusBox({ consensus, debateType, debateQuestion }: {
-  consensus?: ExpertConsensus;
-  debateType?: string;
-  debateQuestion?: string;
-}) {
-  if (!consensus || consensus.type === "none") return null;
+function ExpertConsensusMinimal({ consensus }: { consensus?: ExpertConsensus }) {
+  if (!consensus || consensus.type === "none" || !consensus.exists) return null;
 
-  const typeConfig: Record<string, { icon: string; label: string; color: string }> = {
-    scientific: { icon: "🔬", label: "Scientific Consensus", color: "emerald" },
-    legal: { icon: "⚖️", label: "Legal Consensus", color: "blue" },
-    historical: { icon: "📜", label: "Historical Consensus", color: "amber" },
-    economic: { icon: "📊", label: "Economic Consensus", color: "violet" },
-    intelligence: { icon: "🔍", label: "Intelligence Assessment", color: "slate" },
-    statistical: { icon: "📈", label: "Statistical Evidence", color: "cyan" },
-    professional: { icon: "👔", label: "Professional Standards", color: "indigo" },
-    international: { icon: "🌐", label: "International Consensus", color: "teal" },
-  };
-
-  const confidenceConfig: Record<string, { color: string; label: string }> = {
-    high: { color: "text-emerald-600 dark:text-emerald-400", label: "High confidence" },
-    moderate: { color: "text-amber-600 dark:text-amber-400", label: "Moderate confidence" },
-    low: { color: "text-orange-600 dark:text-orange-400", label: "Low confidence" },
-    contested: { color: "text-rose-600 dark:text-rose-400", label: "Actively contested" },
-  };
-
-  const typeInfo = typeConfig[consensus.type] || { icon: "📋", label: "Expert Consensus", color: "zinc" };
-  const conf = confidenceConfig[consensus.confidenceLevel] || confidenceConfig.contested;
-
-  const colorClasses = consensus.exists
-    ? `bg-${typeInfo.color}-50/50 dark:bg-${typeInfo.color}-950/20 border-${typeInfo.color}-200 dark:border-${typeInfo.color}-900/50`
-    : "bg-amber-50/50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-900/50";
-
-  // Use explicit color classes to ensure Tailwind includes them
-  const bgColors: Record<string, string> = {
-    emerald: "bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-900/50",
-    blue: "bg-blue-50/50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-900/50",
-    amber: "bg-amber-50/50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-900/50",
-    violet: "bg-violet-50/50 dark:bg-violet-950/20 border-violet-200 dark:border-violet-900/50",
-    slate: "bg-slate-50/50 dark:bg-slate-950/20 border-slate-200 dark:border-slate-900/50",
-    cyan: "bg-cyan-50/50 dark:bg-cyan-950/20 border-cyan-200 dark:border-cyan-900/50",
-    indigo: "bg-indigo-50/50 dark:bg-indigo-950/20 border-indigo-200 dark:border-indigo-900/50",
-    teal: "bg-teal-50/50 dark:bg-teal-950/20 border-teal-200 dark:border-teal-900/50",
-  };
-
-  const iconBgColors: Record<string, string> = {
-    emerald: "bg-emerald-100 dark:bg-emerald-900/50",
-    blue: "bg-blue-100 dark:bg-blue-900/50",
-    amber: "bg-amber-100 dark:bg-amber-900/50",
-    violet: "bg-violet-100 dark:bg-violet-900/50",
-    slate: "bg-slate-100 dark:bg-slate-900/50",
-    cyan: "bg-cyan-100 dark:bg-cyan-900/50",
-    indigo: "bg-indigo-100 dark:bg-indigo-900/50",
-    teal: "bg-teal-100 dark:bg-teal-900/50",
-  };
-
-  const textColors: Record<string, string> = {
-    emerald: "text-emerald-900 dark:text-emerald-100",
-    blue: "text-blue-900 dark:text-blue-100",
-    amber: "text-amber-900 dark:text-amber-100",
-    violet: "text-violet-900 dark:text-violet-100",
-    slate: "text-slate-900 dark:text-slate-100",
-    cyan: "text-cyan-900 dark:text-cyan-100",
-    indigo: "text-indigo-900 dark:text-indigo-100",
-    teal: "text-teal-900 dark:text-teal-100",
-  };
+  const confidenceColor = 
+    consensus.confidenceLevel === "high" ? "text-emerald-600 dark:text-emerald-400" :
+    consensus.confidenceLevel === "moderate" ? "text-amber-600 dark:text-amber-400" :
+    "text-zinc-500";
 
   return (
-    <div className={`p-4 rounded-xl border ${consensus.exists ? bgColors[typeInfo.color] || bgColors.amber : "bg-zinc-50/50 dark:bg-zinc-950/20 border-zinc-200 dark:border-zinc-800"}`}>
-      <div className="flex items-start gap-3">
-        <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-lg ${consensus.exists ? iconBgColors[typeInfo.color] || iconBgColors.amber : "bg-zinc-100 dark:bg-zinc-800"}`}>
-          {consensus.exists ? typeInfo.icon : "❓"}
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1 flex-wrap">
-            <h4 className={`font-bold text-sm ${consensus.exists ? textColors[typeInfo.color] || textColors.amber : "text-zinc-700 dark:text-zinc-300"}`}>
-              {consensus.exists ? typeInfo.label : "No Clear Expert Consensus"}
-            </h4>
-            <span className={`text-xs ${conf.color}`}>({conf.label})</span>
-          </div>
-
-          {consensus.statement && (
-            <p className="text-sm text-zinc-700 dark:text-zinc-300 mb-2">
-              {consensus.statement}
-            </p>
-          )}
-
-          {consensus.sources && consensus.sources.length > 0 && (
-            <div className="flex flex-wrap gap-1 mb-2">
-              {consensus.sources.map((src, i) => (
-                <span key={i} className="px-1.5 py-0.5 bg-white/50 dark:bg-zinc-800/50 text-zinc-600 dark:text-zinc-400 text-[10px] rounded border border-zinc-200 dark:border-zinc-700">
-                  {src}
-                </span>
-              ))}
-            </div>
-          )}
-
-          {consensus.dissent && (
-            <div className="mt-2 p-2 bg-zinc-100/50 dark:bg-zinc-800/50 rounded border border-zinc-200 dark:border-zinc-700">
-              <p className="text-xs text-zinc-600 dark:text-zinc-400">
-                <span className="font-semibold">Notable dissent:</span> {consensus.dissent}
-              </p>
-            </div>
-          )}
-
-          {debateType && debateQuestion && (
-            <div className="mt-3 pt-3 border-t border-zinc-200/50 dark:border-zinc-700/50">
-              <div className="flex items-center gap-2 mb-1">
-                <DebateTypeBadge type={debateType} />
-              </div>
-              <p className="text-xs text-zinc-600 dark:text-zinc-400 italic">
-                The real question: "{debateQuestion}"
-              </p>
-            </div>
-          )}
-        </div>
+    <div className="flex items-start gap-3 p-4 bg-zinc-50 dark:bg-zinc-900/50 rounded-lg border border-zinc-100 dark:border-zinc-800/50">
+      <div className="shrink-0 mt-0.5 text-lg">⚖️</div>
+      <div className="space-y-1">
+        <p className="text-xs font-bold uppercase tracking-wider text-zinc-500">Expert Consensus ({consensus.type})</p>
+        <p className="text-sm font-medium text-zinc-800 dark:text-zinc-200 leading-snug">
+          {consensus.statement}
+        </p>
+        <p className={`text-xs ${confidenceColor}`}>Confidence: {consensus.confidenceLevel}</p>
       </div>
     </div>
   );
 }
 
-function CommonGroundSection({ commonGround }: { commonGround?: string[] }) {
-  if (!commonGround || commonGround.length === 0) return null;
-
-  return (
-    <div className="p-4 bg-zinc-50 dark:bg-zinc-900/50 rounded-xl border border-zinc-200 dark:border-zinc-800">
-      <h4 className="font-semibold text-sm text-zinc-900 dark:text-zinc-100 mb-2 flex items-center gap-2">
-        <svg className="w-4 h-4 text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-        </svg>
-        Common Ground (Both Sides Agree)
-      </h4>
-      <ul className="space-y-1">
-        {commonGround.map((item, i) => (
-          <li key={i} className="text-sm text-zinc-600 dark:text-zinc-400 flex items-start gap-2">
-            <span className="text-emerald-500 mt-0.5">✓</span>
-            {item}
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
-
-function FactualDisputesSection({ disputes }: { disputes?: FactualDispute[] }) {
-  if (!disputes || disputes.length === 0) return null;
-
-  return (
-    <div className="space-y-3">
-      <h4 className="font-semibold text-sm text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
-        <svg className="w-4 h-4 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-        </svg>
-        Disputed Claims
-      </h4>
-      {disputes.map((dispute, i) => (
-        <div key={i} className="p-4 bg-white dark:bg-zinc-900/50 rounded-lg border border-zinc-200 dark:border-zinc-800">
-          <div className="flex items-start justify-between gap-2 mb-3">
-            <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">"{dispute.claim}"</p>
-            <EvidenceStatusBadge status={dispute.evidenceStatus} />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="p-2 rounded bg-blue-50/50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-900/30">
-              <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase">Left Position</span>
-              <p className="text-xs text-zinc-700 dark:text-zinc-300 mt-1">{dispute.leftPosition}</p>
-            </div>
-            <div className="p-2 rounded bg-rose-50/50 dark:bg-rose-900/10 border border-rose-100 dark:border-rose-900/30">
-              <span className="text-[10px] font-bold text-rose-600 dark:text-rose-400 uppercase">Right Position</span>
-              <p className="text-xs text-zinc-700 dark:text-zinc-300 mt-1">{dispute.rightPosition}</p>
-            </div>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function PerspectiveCard({ perspective }: { perspective: Perspective }) {
-  const isLeft = perspective.lean.toLowerCase().includes("left");
-  const theme = isLeft ? LEAN_CONFIG["Left"] : LEAN_CONFIG["Right"];
+function PerspectiveColumn({ perspective, align }: { perspective: Perspective; align: "left" | "right" }) {
+  const isLeft = align === "left";
+  const borderColor = isLeft ? "border-l-blue-500" : "border-l-rose-500";
+  const titleColor = isLeft ? "text-blue-700 dark:text-blue-400" : "text-rose-700 dark:text-rose-400";
   
   return (
-    <div className={`p-5 rounded-xl border ${theme.bg} ${theme.border} h-full`}>
-      <h4 className={`font-bold mb-3 flex items-center gap-2 ${theme.color}`}>
-        {isLeft ? (
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                 <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-            </svg>
-        ) : (
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                 <path strokeLinecap="round" strokeLinejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" />
-            </svg>
-        )}
-        {perspective.lean} Viewpoint
+    <div className={`pl-4 border-l-2 ${borderColor}`}>
+      <h4 className={`text-xs font-bold uppercase tracking-wider mb-2 ${titleColor}`}>
+        {isLeft ? "The Left's Framing" : "The Right's Framing"}
       </h4>
-      <p className="text-sm leading-relaxed text-zinc-800 dark:text-zinc-200">
-        {perspective.viewpoint}
+      <p className="text-sm text-zinc-700 dark:text-zinc-300 leading-relaxed italic">
+        "{perspective.viewpoint}"
       </p>
-    </div>
-  );
-}
-
-function SourceCard({ source }: { source: SourceAnalysis }) {
-  const config = getLeanConfig(source.lean);
-  
-  return (
-    <div className="group relative p-4 bg-white dark:bg-zinc-900/50 rounded-lg border border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all hover:shadow-sm">
-      <div className="flex items-center justify-between mb-2">
-        <span className="font-bold text-sm text-zinc-900 dark:text-zinc-100">{source.name}</span>
-        <BiasBadge lean={source.lean} />
-      </div>
-      
-      <a 
-        href={source.url} 
-        target="_blank" 
-        rel="noopener noreferrer"
-        className="block text-sm font-medium text-zinc-800 dark:text-zinc-200 mb-3 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors line-clamp-2"
-      >
-        {source.title}
-      </a>
-
-      <div className="space-y-3">
-        <div>
-           <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-1">Framing</p>
-           <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed">
-             {source.framing}
-           </p>
-        </div>
-        
-        {source.manipulationTechniques.length > 0 && (
-          <div>
-            <div className="flex flex-wrap gap-1">
-              {source.manipulationTechniques.slice(0, 3).map((tech, i) => (
-                <span key={i} className="px-1.5 py-0.5 bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 text-[10px] rounded border border-rose-100 dark:border-rose-800/50">
-                  {tech}
-                </span>
-              ))}
-              {source.manipulationTechniques.length > 3 && (
-                 <span className="px-1.5 py-0.5 text-zinc-400 text-[10px]">+ {source.manipulationTechniques.length - 3} more</span>
-              )}
-            </div>
-          </div>
-        )}
-      </div>
     </div>
   );
 }
 
 function StoryCard({ story }: { story: StoryCluster }) {
   const [expanded, setExpanded] = useState(false);
+  
+  const leftPerspective = story.perspectives.find(p => p.lean.toLowerCase().includes("left"));
+  const rightPerspective = story.perspectives.find(p => p.lean.toLowerCase().includes("right"));
 
   return (
-    <div className="bg-white dark:bg-zinc-950 rounded-2xl border border-zinc-200 dark:border-zinc-800 overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+    <article className="group bg-white dark:bg-zinc-950 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-sm hover:shadow-md transition-all duration-300">
       
-      {/* Main Content */}
-      <div className="p-6 md:p-8">
-        <div className="flex flex-col md:flex-row md:items-start gap-6 md:gap-8">
-            
-          {/* Left Column: Context */}
-          <div className="flex-1 space-y-6">
-            <div>
-                <h2 className="text-2xl font-bold text-zinc-900 dark:text-zinc-50 mb-3 leading-tight">
-                {story.topic}
-                </h2>
-                <div className="flex items-center gap-4 mb-4">
-                    <BiasSpectrum sources={story.sources} />
-                </div>
-            </div>
-
-            <div className="prose prose-sm dark:prose-invert max-w-none">
-                <div className="bg-indigo-50/50 dark:bg-indigo-950/20 p-5 rounded-xl border border-indigo-100 dark:border-indigo-900/30">
-                     <h3 className="text-indigo-900 dark:text-indigo-100 font-bold text-sm uppercase tracking-wide flex items-center gap-2 mb-2">
-                        <svg className="w-4 h-4 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        The Core Facts
-                    </h3>
-                    <p className="text-zinc-800 dark:text-zinc-200 leading-relaxed text-base">
-                        {story.whatHappened}
-                    </p>
-                </div>
-            </div>
-
-            {/* Expert Consensus */}
-            <ExpertConsensusBox
-              consensus={story.expertConsensus}
-              debateType={story.debateType}
-              debateQuestion={story.debateQuestion}
-            />
-
-            <div>
-                <h3 className="font-semibold text-zinc-900 dark:text-zinc-100 text-sm flex items-center gap-2 mb-2">
-                    <svg className="w-4 h-4 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                    </svg>
-                    Key Takeaway
-                </h3>
-                <p className="text-zinc-600 dark:text-zinc-400 text-sm">
-                    {story.keyTakeaway}
-                </p>
-            </div>
-          </div>
-
-          {/* Right Column: Perspectives Preview (Desktop) */}
-          <div className="hidden md:block w-72 flex-shrink-0 space-y-4">
-               <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Divergent Perspectives</h3>
-               {story.perspectives.slice(0, 2).map((p, i) => (
-                   <div key={i} className={`p-3 rounded-lg border text-sm ${
-                        p.lean.toLowerCase().includes("left") 
-                        ? "bg-blue-50/50 border-blue-100 dark:bg-blue-900/10 dark:border-blue-900/30 text-blue-900 dark:text-blue-200"
-                        : "bg-rose-50/50 border-rose-100 dark:bg-rose-900/10 dark:border-rose-900/30 text-rose-900 dark:text-rose-200"
-                   }`}>
-                       <span className="font-bold block mb-1 text-xs opacity-75">{p.lean} Focus</span>
-                       {p.viewpoint}
-                   </div>
-               ))}
-          </div>
-
+      {/* Header / Meta */}
+      <div className="px-6 pt-6 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+             <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-zinc-100 dark:bg-zinc-900 text-zinc-500 font-serif font-bold text-sm">
+                #
+             </span>
+             <span className="text-xs font-medium text-zinc-400 uppercase tracking-widest">{story.debateType || "News"}</span>
         </div>
+        <BiasSpectrum sources={story.sources} />
       </div>
 
-      {/* Action Bar */}
-      <div className="border-t border-zinc-100 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/50">
-          <button 
+      {/* Main Content */}
+      <div className="p-6 md:p-8 space-y-8">
+        
+        {/* Headline & Core Facts */}
+        <div className="space-y-6">
+            <h2 className="text-3xl md:text-4xl font-serif font-bold text-zinc-900 dark:text-zinc-50 leading-tight">
+                {story.topic}
+            </h2>
+
+            <div className="prose prose-lg dark:prose-invert max-w-none">
+                 <p className="text-zinc-800 dark:text-zinc-300 leading-relaxed font-serif text-lg md:text-xl border-l-4 border-zinc-900 dark:border-zinc-100 pl-6 py-1">
+                    {story.whatHappened}
+                </p>
+            </div>
+        </div>
+
+        {/* Perspectives Split */}
+        {(leftPerspective || rightPerspective) && (
+            <div className="grid md:grid-cols-2 gap-8 pt-4 border-t border-zinc-100 dark:border-zinc-900">
+                {leftPerspective && <PerspectiveColumn perspective={leftPerspective} align="left" />}
+                {rightPerspective && <PerspectiveColumn perspective={rightPerspective} align="right" />}
+            </div>
+        )}
+
+        <ExpertConsensusMinimal consensus={story.expertConsensus} />
+
+      </div>
+
+      {/* Footer / Actions */}
+      <div className="bg-zinc-50/50 dark:bg-zinc-900/30 px-6 py-4 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
+         <div className="flex items-center gap-2">
+            <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Key Takeaway</span>
+            <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">{story.keyTakeaway}</span>
+         </div>
+         
+         <button 
             onClick={() => setExpanded(!expanded)}
-            className="w-full py-4 px-6 flex items-center justify-between group hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+            className="text-sm font-semibold text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors flex items-center gap-2"
           >
-              <span className="text-sm font-medium text-zinc-600 dark:text-zinc-400 group-hover:text-zinc-900 dark:group-hover:text-zinc-200 flex items-center gap-2">
-                 {expanded ? "Hide Analysis" : "Dive Deeper: Compare Sources & Framing"}
-              </span>
-              <svg 
-                className={`w-5 h-5 text-zinc-400 transition-transform ${expanded ? "rotate-180" : ""}`} 
-                fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
-              >
+              {expanded ? "Close Analysis" : "View Sources & Disputes"}
+              <svg className={`w-4 h-4 transition-transform ${expanded ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
               </svg>
           </button>
       </div>
 
-      {/* Expanded Analysis */}
+      {/* Expanded Section */}
       {expanded && (
-        <div className="border-t border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/30 p-6 md:p-8 space-y-8 animate-in slide-in-from-top-4 duration-300">
-
-            {/* Mobile Perspectives (Visible only on mobile) */}
-            <div className="md:hidden space-y-4">
-                 <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100">Divergent Perspectives</h3>
-                 <div className="grid gap-4">
-                    {story.perspectives.map((p, i) => <PerspectiveCard key={i} perspective={p} />)}
-                 </div>
-            </div>
-
-            {/* Common Ground & Factual Disputes - NEW */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <CommonGroundSection commonGround={story.commonGround} />
-              <FactualDisputesSection disputes={story.factualDisputes} />
+        <div className="border-t border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/20 p-6 md:p-8 animate-in slide-in-from-top-2">
+            
+            {/* Common Ground & Disputes */}
+            <div className="grid md:grid-cols-2 gap-8 mb-10">
+                {story.commonGround && story.commonGround.length > 0 && (
+                    <div className="space-y-4">
+                        <h4 className="text-sm font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+                            <span className="text-emerald-500">✓</span> Common Ground
+                        </h4>
+                        <ul className="space-y-2">
+                            {story.commonGround.map((item, i) => (
+                                <li key={i} className="text-sm text-zinc-600 dark:text-zinc-400 pl-4 border-l border-zinc-200 dark:border-zinc-700">
+                                    {item}
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+                )}
+                
+                {story.factualDisputes && story.factualDisputes.length > 0 && (
+                    <div className="space-y-4">
+                        <h4 className="text-sm font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+                            <span className="text-amber-500">⚠</span> Factual Disputes
+                        </h4>
+                        <div className="space-y-3">
+                            {story.factualDisputes.map((dispute, i) => (
+                                <div key={i} className="bg-white dark:bg-zinc-900 p-3 rounded border border-zinc-200 dark:border-zinc-800">
+                                    <div className="flex justify-between items-start mb-2">
+                                        <p className="text-xs font-bold text-zinc-700 dark:text-zinc-300">"{dispute.claim}"</p>
+                                        <EvidenceStatusBadge status={dispute.evidenceStatus} />
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-2 text-xs">
+                                        <div className="text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/10 p-1.5 rounded">
+                                            L: {dispute.leftPosition}
+                                        </div>
+                                        <div className="text-rose-700 dark:text-rose-400 bg-rose-50 dark:bg-rose-900/10 p-1.5 rounded">
+                                            R: {dispute.rightPosition}
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
             </div>
 
             {/* Source Grid */}
-            <div>
-                <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100 mb-4 flex items-center gap-2">
-                    <svg className="w-4 h-4 text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" />
-                    </svg>
-                    Source-by-Source Breakdown
-                </h3>
+            <div className="space-y-4">
+                <h4 className="text-sm font-bold text-zinc-900 dark:text-zinc-100 uppercase tracking-widest border-b border-zinc-200 dark:border-zinc-800 pb-2">
+                    Source Breakdown
+                </h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {story.sources.map((source, i) => (
-                        <SourceCard key={i} source={source} />
+                        <a 
+                            key={i} 
+                            href={source.url} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="block p-4 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg hover:border-zinc-400 dark:hover:border-zinc-600 transition-colors group/card"
+                        >
+                            <div className="flex justify-between items-center mb-2">
+                                <span className="text-xs font-bold text-zinc-900 dark:text-zinc-100">{source.name}</span>
+                                <BiasBadge lean={source.lean} />
+                            </div>
+                            <p className="text-sm font-medium text-zinc-800 dark:text-zinc-200 mb-3 group-hover/card:underline decoration-zinc-400 underline-offset-2">
+                                {source.title}
+                            </p>
+                            <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-2">
+                                <span className="font-semibold text-zinc-400">Framing:</span> {source.framing}
+                            </p>
+                            {source.manipulationTechniques.length > 0 && (
+                                <div className="flex flex-wrap gap-1">
+                                    {source.manipulationTechniques.slice(0, 2).map((tech, t) => (
+                                        <span key={t} className="text-[9px] px-1.5 py-0.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-500 rounded border border-zinc-200 dark:border-zinc-700">
+                                            {tech}
+                                        </span>
+                                    ))}
+                                </div>
+                            )}
+                        </a>
                     ))}
                 </div>
             </div>
-
         </div>
       )}
-    </div>
+
+    </article>
   );
 }
 
 function LoadingSkeleton() {
   return (
-    <div className="space-y-6 max-w-5xl mx-auto px-4">
+    <div className="space-y-12">
       {[1, 2].map((i) => (
-        <div key={i} className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-8 animate-pulse">
-          <div className="space-y-4">
-            <div className="h-8 bg-zinc-100 dark:bg-zinc-800 rounded w-3/4" />
-            <div className="h-4 bg-zinc-100 dark:bg-zinc-800 rounded w-1/4" />
-            <div className="h-32 bg-zinc-100 dark:bg-zinc-800 rounded-xl w-full mt-6" />
-          </div>
+        <div key={i} className="animate-pulse space-y-4">
+            <div className="h-6 w-32 bg-zinc-200 dark:bg-zinc-800 rounded" />
+            <div className="h-10 w-3/4 bg-zinc-200 dark:bg-zinc-800 rounded" />
+            <div className="h-40 w-full bg-zinc-100 dark:bg-zinc-900 rounded-xl" />
         </div>
       ))}
     </div>
   );
 }
-
-// --- Main Page ---
 
 export default function ClearviewPage() {
   const [stories, setStories] = useState<StoryCluster[]>([]);
@@ -552,11 +351,11 @@ export default function ClearviewPage() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-black text-zinc-900 dark:text-zinc-100 font-sans">
+    <div className="min-h-screen bg-zinc-50 dark:bg-black text-zinc-900 dark:text-zinc-100 font-sans selection:bg-indigo-100 dark:selection:bg-indigo-900">
       
       {/* Navigation */}
       <nav className="sticky top-0 z-50 border-b border-zinc-200 dark:border-zinc-800 bg-white/80 dark:bg-zinc-950/80 backdrop-blur-md">
-        <div className="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between">
+        <div className="max-w-4xl mx-auto px-4 h-14 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2 group">
             <div className="w-5 h-5 bg-zinc-900 dark:bg-zinc-100 rounded-sm group-hover:rotate-12 transition-transform" />
             <span className="font-bold text-lg tracking-tight">RageCheck</span>
@@ -565,88 +364,71 @@ export default function ClearviewPage() {
             <Link href="/" className="text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors">
               Analyzer
             </Link>
-            <span className="text-indigo-600 dark:text-indigo-400">Clearview</span>
+            <span className="text-zinc-900 dark:text-white border-b-2 border-zinc-900 dark:border-white">ClearView</span>
           </div>
         </div>
       </nav>
 
       {/* Hero Section */}
-      <div className="relative overflow-hidden bg-white dark:bg-zinc-950 border-b border-zinc-200 dark:border-zinc-800">
-        <div className="absolute inset-0 bg-grid-zinc-100 dark:bg-grid-zinc-900/50 [mask-image:linear-gradient(0deg,white,rgba(255,255,255,0.6))] dark:[mask-image:linear-gradient(0deg,rgba(0,0,0,0.2),rgba(0,0,0,0.6))]" />
-        <div className="max-w-5xl mx-auto px-4 pt-16 pb-12 relative z-10">
-            <div className="inline-flex items-center gap-2 px-3 py-1 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 rounded-full text-xs font-semibold uppercase tracking-wide mb-6 border border-indigo-100 dark:border-indigo-800">
-                <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
+      <div className="relative pt-20 pb-16 px-4 border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950">
+        <div className="max-w-2xl mx-auto text-center space-y-6">
+            <div className="inline-flex items-center gap-2 px-3 py-1 bg-zinc-100 dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400 rounded-full text-xs font-bold uppercase tracking-widest border border-zinc-200 dark:border-zinc-800">
                 Daily Briefing
+                {generatedAt && (
+                   <span className="text-zinc-400">| {new Date(generatedAt).toLocaleDateString()}</span>
+                )}
             </div>
-            <h1 className="text-4xl md:text-5xl font-bold tracking-tight mb-6 max-w-3xl">
-                What’s actually happening. <br/>
-                <span className="text-zinc-400 dark:text-zinc-500">Minus the spin.</span>
+            
+            <h1 className="text-5xl md:text-6xl font-serif font-bold tracking-tight text-zinc-900 dark:text-white leading-[1.1]">
+                What actually happened.
             </h1>
-            <p className="text-lg text-zinc-600 dark:text-zinc-400 max-w-2xl leading-relaxed">
-                We analyze stories from across the political spectrum to extract the core facts and show you exactly how different outlets are framing the narrative.
+            
+            <p className="text-xl text-zinc-500 dark:text-zinc-400 max-w-xl mx-auto leading-relaxed">
+                We read the spin so you don't have to. A cross-spectrum analysis of today's top stories.
             </p>
-             {generatedAt && (
-                <p className="text-sm text-zinc-400 mt-6 flex items-center gap-2">
-                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                   </svg>
-                   Last updated: {new Date(generatedAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}
-                </p>
-            )}
         </div>
       </div>
 
-      <div className="max-w-5xl mx-auto px-4 py-12">
+      {/* Main Content */}
+      <div className="max-w-4xl mx-auto px-4 py-16">
         
         {loading && <LoadingSkeleton />}
 
         {error && (
-          <div className="max-w-2xl mx-auto bg-rose-50 dark:bg-rose-900/10 border border-rose-200 dark:border-rose-800 rounded-xl p-8 text-center">
-            <div className="w-12 h-12 bg-rose-100 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 rounded-full flex items-center justify-center mx-auto mb-4">
-                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
-            </div>
-            <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-100 mb-2">Failed to load briefing</h3>
-            <p className="text-zinc-600 dark:text-zinc-400 mb-6">{error}</p>
+          <div className="text-center py-20">
+            <div className="inline-flex items-center justify-center w-12 h-12 bg-rose-50 dark:bg-rose-900/30 text-rose-600 rounded-full mb-4">!</div>
+            <h3 className="text-lg font-bold">Unable to load briefing</h3>
+            <p className="text-zinc-500 mt-2 mb-6">{error}</p>
             <button
               onClick={() => window.location.reload()}
-              className="px-4 py-2 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity"
+              className="px-4 py-2 bg-zinc-900 text-white rounded hover:bg-zinc-800"
             >
-              Try Again
+              Retry
             </button>
           </div>
         )}
 
         {!loading && !error && stories.length === 0 && (
-          <div className="max-w-2xl mx-auto bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-xl p-12 text-center">
-             <div className="w-16 h-16 bg-zinc-100 dark:bg-zinc-800 text-zinc-400 rounded-full flex items-center justify-center mx-auto mb-4">
-                <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" />
-                </svg>
-            </div>
-            <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-100 mb-2">No Stories Analyzed Yet</h3>
-            <p className="text-zinc-600 dark:text-zinc-400">
-              We haven't detected any major stories with significant cross-spectrum coverage at this moment. Please check back later.
-            </p>
-          </div>
+           <div className="text-center py-24 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl">
+              <h3 className="text-xl font-bold mb-2">No Stories Detected</h3>
+              <p className="text-zinc-500">The news cycle seems quiet, or we haven't found sufficient cross-spectrum coverage yet.</p>
+           </div>
         )}
 
         {!loading && !error && stories.length > 0 && (
-          <div className="space-y-8">
+          <div className="space-y-12">
             {stories.map((story) => (
               <StoryCard key={story.id} story={story} />
             ))}
           </div>
         )}
 
-        {/* Methodology Footer */}
-        <div className="mt-24 border-t border-zinc-200 dark:border-zinc-800 pt-12 text-center">
-            <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 mb-2">Powered by Transparent Analysis</h3>
-            <p className="text-sm text-zinc-500 dark:text-zinc-400 max-w-2xl mx-auto">
-                Clearview aggregates headlines from diverse sources (including Jacobin, NPR, PBS, Fox News, Breitbart), identifies shared topics, and uses AI to synthesize facts while highlighting framing differences.
+        <div className="mt-32 pt-12 border-t border-zinc-200 dark:border-zinc-800 text-center">
+            <p className="text-xs text-zinc-400 uppercase tracking-widest">
+                Generated by RageCheck AI • Aggregating 50+ Sources
             </p>
         </div>
+
       </div>
     </div>
   );
