@@ -537,6 +537,7 @@ export default function AdminDashboard() {
                       <tr className="border-b border-zinc-200 dark:border-zinc-700">
                         <th className="text-left py-3 px-3 text-zinc-500 font-medium">URL</th>
                         <th className="text-left py-3 px-3 text-zinc-500 font-medium">Score</th>
+                        <th className="text-left py-3 px-3 text-zinc-500 font-medium">IP</th>
                         <th className="text-left py-3 px-3 text-zinc-500 font-medium">Country</th>
                         <th className="text-left py-3 px-3 text-zinc-500 font-medium">Bot</th>
                         <th className="text-left py-3 px-3 text-zinc-500 font-medium">Time</th>
@@ -545,7 +546,7 @@ export default function AdminDashboard() {
                     <tbody>
                       {stats.recentAnalyses.length === 0 ? (
                         <tr>
-                          <td colSpan={5} className="py-4 text-zinc-500 text-center">No analyses yet</td>
+                          <td colSpan={6} className="py-4 text-zinc-500 text-center">No analyses yet</td>
                         </tr>
                       ) : (
                         stats.recentAnalyses.map((a, i) => (
@@ -563,6 +564,9 @@ export default function AdminDashboard() {
                               }`}>
                                 {a.score}
                               </span>
+                            </td>
+                            <td className="py-2 px-3 text-zinc-500 text-xs font-mono">
+                              {a.ipAddress || "-"}
                             </td>
                             <td className="py-2 px-3 text-zinc-600 dark:text-zinc-400 text-xs">
                               {a.country || "-"}
