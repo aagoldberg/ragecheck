@@ -117,17 +117,63 @@ function EvidenceStatusBadge({ status }: { status: string }) {
 function ExpertConsensusBox({ consensus }: { consensus?: ExpertConsensus }) {
   if (!consensus || consensus.type === "none" || !consensus.exists) return null;
 
+  const typeConfig: Record<string, { icon: string; label: string }> = {
+    scientific: { icon: "🔬", label: "Scientific Consensus" },
+    legal: { icon: "⚖️", label: "Legal Consensus" },
+    historical: { icon: "📜", label: "Historical Consensus" },
+    economic: { icon: "📊", label: "Economic Consensus" },
+    intelligence: { icon: "🔍", label: "Intelligence Assessment" },
+    statistical: { icon: "📈", label: "Statistical Evidence" },
+    professional: { icon: "👔", label: "Professional Standards" },
+    international: { icon: "🌐", label: "International Consensus" },
+  };
+
+  const typeInfo = typeConfig[consensus.type] || { icon: "📋", label: "Expert Consensus" };
+
   return (
     <div className="p-4 bg-indigo-50/30 dark:bg-indigo-900/10 rounded-xl border border-indigo-100 dark:border-indigo-900/30">
       <div className="flex items-start gap-3">
-        <span className="text-xl">⚖️</span>
-        <div>
-          <h4 className="text-xs font-bold uppercase tracking-wider text-indigo-900 dark:text-indigo-300 mb-1">
-            Expert Consensus ({consensus.type})
-          </h4>
-          <p className="text-sm text-zinc-800 dark:text-zinc-200 leading-relaxed font-medium">
-            {consensus.statement}
-          </p>
+        <span className="text-xl flex-shrink-0 bg-indigo-100 dark:bg-indigo-900/50 w-8 h-8 flex items-center justify-center rounded-full">
+            {typeInfo.icon}
+        </span>
+        <div className="space-y-2 flex-1">
+            <div className="flex items-center justify-between">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-indigo-900 dark:text-indigo-300">
+                    {typeInfo.label}
+                </h4>
+                {consensus.confidenceLevel && (
+                    <span className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded ${
+                        consensus.confidenceLevel === 'high' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' :
+                        consensus.confidenceLevel === 'moderate' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' :
+                        'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400'
+                    }`}>
+                        {consensus.confidenceLevel} Confidence
+                    </span>
+                )}
+            </div>
+          
+            <p className="text-sm text-zinc-800 dark:text-zinc-200 leading-relaxed font-medium">
+                {consensus.statement}
+            </p>
+
+            {consensus.sources && consensus.sources.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 pt-1">
+                    <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wide self-center mr-1">Sources:</span>
+                    {consensus.sources.map((src, i) => (
+                        <span key={i} className="px-1.5 py-0.5 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded text-[10px] font-medium text-zinc-600 dark:text-zinc-400">
+                            {src}
+                        </span>
+                    ))}
+                </div>
+            )}
+
+            {consensus.dissent && (
+                <div className="mt-2 pt-2 border-t border-indigo-100 dark:border-indigo-900/20">
+                    <p className="text-xs text-zinc-600 dark:text-zinc-400">
+                        <span className="font-bold text-zinc-500 uppercase text-[10px] tracking-wide">Notable Dissent:</span> {consensus.dissent}
+                    </p>
+                </div>
+            )}
         </div>
       </div>
     </div>
@@ -286,16 +332,57 @@ function StoryCard({ story }: { story: StoryCluster }) {
   );
 }
 
-function LoadingSkeleton() {
+function LoadingState() {
+  const [step, setStep] = useState(0);
+  const steps = [
+    "Scouring 50+ diverse news sources...",
+    "Clustering today's top stories...",
+    "Extracting core factual consensus...",
+    "Analyzing framing differences (Left vs. Right)...",
+    "Identifying manipulative techniques...",
+    "Finalizing cross-spectrum briefing..."
+  ];
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setStep((s) => (s + 1) % steps.length);
+    }, 2500);
+    return () => clearInterval(interval);
+  }, [steps.length]);
+
   return (
-    <div className="space-y-12">
-      {[1, 2].map((i) => (
-        <div key={i} className="animate-pulse space-y-6">
-            <div className="h-4 w-32 bg-zinc-200 dark:bg-zinc-800 rounded" />
-            <div className="h-10 w-3/4 bg-zinc-200 dark:bg-zinc-800 rounded" />
-            <div className="h-48 w-full bg-zinc-100 dark:bg-zinc-900 rounded-3xl" />
+    <div className="max-w-2xl mx-auto py-12 px-4">
+      <div className="space-y-8 text-center">
+        <div className="space-y-3">
+          <div className="inline-flex items-center gap-2 px-3 py-1 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 rounded-full text-[10px] font-bold uppercase tracking-widest border border-indigo-100 dark:border-indigo-900/30">
+            <svg className="animate-spin h-3 w-3" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+            </svg>
+            Analyzing
+          </div>
+          <h3 className="text-xl font-bold text-zinc-900 dark:text-white transition-all duration-500 ease-in-out h-8">
+            {steps[step]}
+          </h3>
         </div>
-      ))}
+
+        <div className="relative h-2 w-full bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+          <div 
+            className="absolute top-0 left-0 h-full bg-indigo-500 transition-all duration-500 ease-out"
+            style={{ width: `${((step + 1) / steps.length) * 100}%` }}
+          />
+        </div>
+
+        <div className="grid grid-cols-1 gap-6 pt-12">
+          {[1, 2].map((i) => (
+            <div key={i} className="animate-pulse space-y-4 text-left">
+                <div className="h-4 w-32 bg-zinc-200 dark:bg-zinc-800 rounded" />
+                <div className="h-8 w-3/4 bg-zinc-200 dark:bg-zinc-800 rounded" />
+                <div className="h-40 w-full bg-zinc-100 dark:bg-zinc-900 rounded-2xl" />
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
@@ -375,7 +462,7 @@ export default function ClearviewPage() {
       {/* Main Grid */}
       <main className="max-w-4xl mx-auto px-4 py-16">
         
-        {loading && <LoadingSkeleton />}
+        {loading && <LoadingState />}
 
         {error && (
           <div className="text-center py-20 bg-rose-50 dark:bg-rose-900/10 rounded-3xl border border-rose-100 dark:border-rose-900/20">
