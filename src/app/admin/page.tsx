@@ -226,6 +226,19 @@ function TimeSeriesChart({ data }: { data: { date: string; visitors: number; ana
   );
 }
 
+type TabType = "overview" | "clearview";
+
+interface ClearviewStats {
+  lastGenerated: string | null;
+  storyCount: number;
+  sourceCount: number;
+  stories: {
+    topic: string;
+    sourceCount: number;
+    perspectives: number;
+  }[];
+}
+
 export default function AdminDashboard() {
   const [key, setKey] = useState("");
   const [authenticated, setAuthenticated] = useState(false);
@@ -233,6 +246,9 @@ export default function AdminDashboard() {
   const [error, setError] = useState<string | null>(null);
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [visitorStats, setVisitorStats] = useState<VisitorStats | null>(null);
+  const [activeTab, setActiveTab] = useState<TabType>("overview");
+  const [clearviewStats, setClearviewStats] = useState<ClearviewStats | null>(null);
+  const [clearviewLoading, setClearviewLoading] = useState(false);
 
   const fetchStats = async (adminKey: string) => {
     setLoading(true);
@@ -262,6 +278,35 @@ export default function AdminDashboard() {
     }
   };
 
+  const fetchClearviewStats = async () => {
+    setClearviewLoading(true);
+    try {
+      const response = await fetch("/api/clearview");
+      const data = await response.json();
+
+      if (data.stories) {
+        const stories = data.stories.map((s: { topic: string; sources: unknown[]; perspectives: unknown[] }) => ({
+          topic: s.topic,
+          sourceCount: s.sources?.length || 0,
+          perspectives: s.perspectives?.length || 0,
+        }));
+
+        const totalSources = stories.reduce((sum: number, s: { sourceCount: number }) => sum + s.sourceCount, 0);
+
+        setClearviewStats({
+          lastGenerated: data.generatedAt || null,
+          storyCount: stories.length,
+          sourceCount: totalSources,
+          stories,
+        });
+      }
+    } catch (err) {
+      console.error("Failed to fetch clearview stats:", err);
+    } finally {
+      setClearviewLoading(false);
+    }
+  };
+
   // Try to auto-login with saved key
   useEffect(() => {
     const savedKey = localStorage.getItem("ragecheck-admin-key");
@@ -270,6 +315,13 @@ export default function AdminDashboard() {
       fetchStats(savedKey);
     }
   }, []);
+
+  // Fetch clearview stats when tab changes
+  useEffect(() => {
+    if (authenticated && activeTab === "clearview" && !clearviewStats) {
+      fetchClearviewStats();
+    }
+  }, [authenticated, activeTab, clearviewStats]);
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -347,6 +399,31 @@ export default function AdminDashboard() {
             </button>
           </div>
         </div>
+        {/* Tabs */}
+        <div className="max-w-7xl mx-auto px-4">
+          <div className="flex gap-6 -mb-px">
+            <button
+              onClick={() => setActiveTab("overview")}
+              className={`py-3 text-sm font-medium border-b-2 transition-colors ${
+                activeTab === "overview"
+                  ? "border-indigo-500 text-indigo-600 dark:text-indigo-400"
+                  : "border-transparent text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
+              }`}
+            >
+              Overview
+            </button>
+            <button
+              onClick={() => setActiveTab("clearview")}
+              className={`py-3 text-sm font-medium border-b-2 transition-colors ${
+                activeTab === "clearview"
+                  ? "border-indigo-500 text-indigo-600 dark:text-indigo-400"
+                  : "border-transparent text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
+              }`}
+            >
+              Clearview
+            </button>
+          </div>
+        </div>
       </nav>
 
       <div className="max-w-7xl mx-auto px-4 py-8">
@@ -354,6 +431,125 @@ export default function AdminDashboard() {
           <div className="text-center py-20 text-zinc-500">Loading...</div>
         ) : stats ? (
           <>
+            {/* Clearview Tab */}
+            {activeTab === "clearview" && (
+              <div>
+                {clearviewLoading ? (
+                  <div className="text-center py-20 text-zinc-500">Loading Clearview data...</div>
+                ) : clearviewStats ? (
+                  <>
+                    {/* Clearview Overview Stats */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+                      <StatCard title="Stories Today" value={clearviewStats.storyCount} />
+                      <StatCard title="Total Sources" value={clearviewStats.sourceCount} />
+                      <StatCard
+                        title="Last Generated"
+                        value={clearviewStats.lastGenerated
+                          ? new Date(clearviewStats.lastGenerated).toLocaleTimeString()
+                          : "Never"}
+                        subtitle={clearviewStats.lastGenerated
+                          ? new Date(clearviewStats.lastGenerated).toLocaleDateString()
+                          : undefined}
+                      />
+                      <StatCard
+                        title="Avg Sources/Story"
+                        value={clearviewStats.storyCount > 0
+                          ? Math.round(clearviewStats.sourceCount / clearviewStats.storyCount)
+                          : 0}
+                      />
+                    </div>
+
+                    {/* Stories Table */}
+                    <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 mb-8">
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+                          Current Stories
+                        </h3>
+                        <button
+                          onClick={fetchClearviewStats}
+                          className="text-xs text-indigo-600 hover:text-indigo-700 font-medium"
+                        >
+                          Refresh
+                        </button>
+                      </div>
+                      <div className="overflow-x-auto border border-zinc-100 dark:border-zinc-800 rounded-lg">
+                        <table className="w-full text-sm">
+                          <thead className="bg-zinc-50 dark:bg-zinc-800">
+                            <tr className="border-b border-zinc-200 dark:border-zinc-700">
+                              <th className="text-left py-3 px-4 text-zinc-500 font-medium">Topic</th>
+                              <th className="text-left py-3 px-4 text-zinc-500 font-medium">Sources</th>
+                              <th className="text-left py-3 px-4 text-zinc-500 font-medium">Perspectives</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {clearviewStats.stories.length === 0 ? (
+                              <tr>
+                                <td colSpan={3} className="py-8 text-zinc-500 text-center">No stories generated yet</td>
+                              </tr>
+                            ) : (
+                              clearviewStats.stories.map((story, i) => (
+                                <tr key={i} className="border-b border-zinc-100 dark:border-zinc-800 last:border-0 hover:bg-zinc-50 dark:hover:bg-zinc-800/50">
+                                  <td className="py-3 px-4 text-zinc-900 dark:text-zinc-100 font-medium">
+                                    {story.topic}
+                                  </td>
+                                  <td className="py-3 px-4">
+                                    <span className="text-xs font-medium px-2 py-1 rounded bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300">
+                                      {story.sourceCount} sources
+                                    </span>
+                                  </td>
+                                  <td className="py-3 px-4">
+                                    <span className="text-xs font-medium px-2 py-1 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
+                                      {story.perspectives} perspectives
+                                    </span>
+                                  </td>
+                                </tr>
+                              ))
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                    {/* Actions */}
+                    <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6">
+                      <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-4">
+                        Actions
+                      </h3>
+                      <div className="flex gap-4">
+                        <a
+                          href="/clearview"
+                          target="_blank"
+                          className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors"
+                        >
+                          View Clearview Page
+                        </a>
+                        <a
+                          href="/api/clearview/refresh"
+                          target="_blank"
+                          className="px-4 py-2 bg-zinc-200 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-200 rounded-lg text-sm font-medium hover:bg-zinc-300 dark:hover:bg-zinc-600 transition-colors"
+                        >
+                          Trigger Refresh
+                        </a>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <div className="text-center py-20 text-zinc-500">
+                    <p className="mb-4">No Clearview data available</p>
+                    <button
+                      onClick={fetchClearviewStats}
+                      className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors"
+                    >
+                      Load Data
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Overview Tab */}
+            {activeTab === "overview" && (
+            <>
             {/* Overview Stats */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
               <StatCard title="Total Analyses" value={stats.totalAnalyses} />
@@ -645,6 +841,8 @@ export default function AdminDashboard() {
                 </div>
               )}
             </div>
+            </>
+            )}
           </>
         ) : null}
       </div>
