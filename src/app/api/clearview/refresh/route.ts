@@ -125,11 +125,13 @@ Respond with this exact JSON structure:
         }
       ],
       "keyTakeaway": "One sentence helping the reader understand the story without the spin",
-      "factualContext": {
-        "hasScientificConsensus": true/false,
-        "consensusStatement": "What scientific/expert consensus says (if applicable)",
+      "expertConsensus": {
+        "type": "scientific|legal|historical|economic|intelligence|statistical|professional|international|none",
+        "exists": true/false,
+        "statement": "What expert consensus says (if applicable)",
         "confidenceLevel": "high|moderate|low|contested",
-        "expertSources": ["CDC", "peer-reviewed research", etc.]
+        "sources": ["CDC", "Supreme Court", "Bureau of Labor Statistics", "FBI/CIA", "historians", etc.],
+        "dissent": "Notable minority expert view if relevant"
       },
       "debateType": "factual|policy|values|mixed",
       "debateQuestion": "The actual question being debated (e.g., 'Should vaccines be mandated?' not 'Are vaccines safe?')",
@@ -153,8 +155,19 @@ CRITICAL GUIDELINES:
 - Include the actual URLs from the headlines data
 - If a story only has one source, skip it
 
-FACTUAL CONTEXT RULES:
-- If there's established scientific consensus (vaccines work, climate change is real, etc.), set hasScientificConsensus to true and state it clearly
+EXPERT CONSENSUS RULES:
+- Identify the most relevant type of expert consensus for each story:
+  - "scientific": Medical, climate, physics, biology (sources: CDC, WHO, peer-reviewed journals)
+  - "legal": Constitutional law, court rulings (sources: Supreme Court, legal scholars, bar associations)
+  - "historical": What historians document happened (sources: historians, archives, documentation)
+  - "economic": Economic effects, trade, fiscal policy (sources: CBO, economists, Federal Reserve)
+  - "intelligence": National security, foreign interference (sources: FBI, CIA, DNI assessments)
+  - "statistical": Crime rates, demographics, measurable data (sources: BLS, Census, FBI UCR)
+  - "professional": Industry standards, best practices (sources: professional associations)
+  - "international": International law, treaties (sources: UN, ICC, international courts)
+  - "none": No clear expert domain applies or genuinely contested among experts
+- If experts broadly agree, set exists to true and state the consensus clearly
+- Include "dissent" only if there's a notable minority expert view worth mentioning
 - debateType should be:
   - "factual" if the debate is about what happened/is true
   - "policy" if the facts are agreed but the debate is about what to do
@@ -162,7 +175,7 @@ FACTUAL CONTEXT RULES:
   - "mixed" if it involves multiple types
 - For factualDisputes, honestly assess whether claims are supported by evidence
 - evidenceStatus "misleading" means the claim contains some truth but is framed deceptively
-- Don't create false balance: if one side's claims contradict scientific consensus, say so`;
+- Don't create false balance: if one side's claims contradict expert consensus, say so`;
 
   const response = await client.messages.create({
     model: "claude-sonnet-4-20250514",

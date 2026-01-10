@@ -19,11 +19,13 @@ interface Perspective {
   viewpoint: string;
 }
 
-interface FactualContext {
-  hasScientificConsensus: boolean;
-  consensusStatement?: string;
+interface ExpertConsensus {
+  type: "scientific" | "legal" | "historical" | "economic" | "intelligence" | "statistical" | "professional" | "international" | "none";
+  exists: boolean;
+  statement?: string;
   confidenceLevel: "high" | "moderate" | "low" | "contested";
-  expertSources?: string[];
+  sources?: string[];
+  dissent?: string;
 }
 
 interface FactualDispute {
@@ -41,7 +43,7 @@ interface StoryCluster {
   sources: SourceAnalysis[];
   perspectives: Perspective[];
   keyTakeaway: string;
-  factualContext?: FactualContext;
+  expertConsensus?: ExpertConsensus;
   debateType?: "factual" | "policy" | "values" | "mixed";
   debateQuestion?: string;
   commonGround?: string[];
@@ -129,12 +131,23 @@ function EvidenceStatusBadge({ status }: { status: string }) {
   );
 }
 
-function FactualContextBox({ context, debateType, debateQuestion }: {
-  context?: FactualContext;
+function ExpertConsensusBox({ consensus, debateType, debateQuestion }: {
+  consensus?: ExpertConsensus;
   debateType?: string;
   debateQuestion?: string;
 }) {
-  if (!context) return null;
+  if (!consensus || consensus.type === "none") return null;
+
+  const typeConfig: Record<string, { icon: string; label: string; color: string }> = {
+    scientific: { icon: "🔬", label: "Scientific Consensus", color: "emerald" },
+    legal: { icon: "⚖️", label: "Legal Consensus", color: "blue" },
+    historical: { icon: "📜", label: "Historical Consensus", color: "amber" },
+    economic: { icon: "📊", label: "Economic Consensus", color: "violet" },
+    intelligence: { icon: "🔍", label: "Intelligence Assessment", color: "slate" },
+    statistical: { icon: "📈", label: "Statistical Evidence", color: "cyan" },
+    professional: { icon: "👔", label: "Professional Standards", color: "indigo" },
+    international: { icon: "🌐", label: "International Consensus", color: "teal" },
+  };
 
   const confidenceConfig: Record<string, { color: string; label: string }> = {
     high: { color: "text-emerald-600 dark:text-emerald-400", label: "High confidence" },
@@ -143,55 +156,82 @@ function FactualContextBox({ context, debateType, debateQuestion }: {
     contested: { color: "text-rose-600 dark:text-rose-400", label: "Actively contested" },
   };
 
-  const conf = confidenceConfig[context.confidenceLevel] || confidenceConfig.contested;
+  const typeInfo = typeConfig[consensus.type] || { icon: "📋", label: "Expert Consensus", color: "zinc" };
+  const conf = confidenceConfig[consensus.confidenceLevel] || confidenceConfig.contested;
+
+  const colorClasses = consensus.exists
+    ? `bg-${typeInfo.color}-50/50 dark:bg-${typeInfo.color}-950/20 border-${typeInfo.color}-200 dark:border-${typeInfo.color}-900/50`
+    : "bg-amber-50/50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-900/50";
+
+  // Use explicit color classes to ensure Tailwind includes them
+  const bgColors: Record<string, string> = {
+    emerald: "bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-900/50",
+    blue: "bg-blue-50/50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-900/50",
+    amber: "bg-amber-50/50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-900/50",
+    violet: "bg-violet-50/50 dark:bg-violet-950/20 border-violet-200 dark:border-violet-900/50",
+    slate: "bg-slate-50/50 dark:bg-slate-950/20 border-slate-200 dark:border-slate-900/50",
+    cyan: "bg-cyan-50/50 dark:bg-cyan-950/20 border-cyan-200 dark:border-cyan-900/50",
+    indigo: "bg-indigo-50/50 dark:bg-indigo-950/20 border-indigo-200 dark:border-indigo-900/50",
+    teal: "bg-teal-50/50 dark:bg-teal-950/20 border-teal-200 dark:border-teal-900/50",
+  };
+
+  const iconBgColors: Record<string, string> = {
+    emerald: "bg-emerald-100 dark:bg-emerald-900/50",
+    blue: "bg-blue-100 dark:bg-blue-900/50",
+    amber: "bg-amber-100 dark:bg-amber-900/50",
+    violet: "bg-violet-100 dark:bg-violet-900/50",
+    slate: "bg-slate-100 dark:bg-slate-900/50",
+    cyan: "bg-cyan-100 dark:bg-cyan-900/50",
+    indigo: "bg-indigo-100 dark:bg-indigo-900/50",
+    teal: "bg-teal-100 dark:bg-teal-900/50",
+  };
+
+  const textColors: Record<string, string> = {
+    emerald: "text-emerald-900 dark:text-emerald-100",
+    blue: "text-blue-900 dark:text-blue-100",
+    amber: "text-amber-900 dark:text-amber-100",
+    violet: "text-violet-900 dark:text-violet-100",
+    slate: "text-slate-900 dark:text-slate-100",
+    cyan: "text-cyan-900 dark:text-cyan-100",
+    indigo: "text-indigo-900 dark:text-indigo-100",
+    teal: "text-teal-900 dark:text-teal-100",
+  };
 
   return (
-    <div className={`p-4 rounded-xl border ${
-      context.hasScientificConsensus
-        ? "bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-900/50"
-        : "bg-amber-50/50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-900/50"
-    }`}>
+    <div className={`p-4 rounded-xl border ${consensus.exists ? bgColors[typeInfo.color] || bgColors.amber : "bg-zinc-50/50 dark:bg-zinc-950/20 border-zinc-200 dark:border-zinc-800"}`}>
       <div className="flex items-start gap-3">
-        <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
-          context.hasScientificConsensus
-            ? "bg-emerald-100 dark:bg-emerald-900/50"
-            : "bg-amber-100 dark:bg-amber-900/50"
-        }`}>
-          {context.hasScientificConsensus ? (
-            <svg className="w-4 h-4 text-emerald-600 dark:text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-          ) : (
-            <svg className="w-4 h-4 text-amber-600 dark:text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-          )}
+        <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-lg ${consensus.exists ? iconBgColors[typeInfo.color] || iconBgColors.amber : "bg-zinc-100 dark:bg-zinc-800"}`}>
+          {consensus.exists ? typeInfo.icon : "❓"}
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1 flex-wrap">
-            <h4 className={`font-bold text-sm ${
-              context.hasScientificConsensus
-                ? "text-emerald-900 dark:text-emerald-100"
-                : "text-amber-900 dark:text-amber-100"
-            }`}>
-              {context.hasScientificConsensus ? "Scientific Consensus Exists" : "No Clear Scientific Consensus"}
+            <h4 className={`font-bold text-sm ${consensus.exists ? textColors[typeInfo.color] || textColors.amber : "text-zinc-700 dark:text-zinc-300"}`}>
+              {consensus.exists ? typeInfo.label : "No Clear Expert Consensus"}
             </h4>
             <span className={`text-xs ${conf.color}`}>({conf.label})</span>
           </div>
 
-          {context.consensusStatement && (
+          {consensus.statement && (
             <p className="text-sm text-zinc-700 dark:text-zinc-300 mb-2">
-              {context.consensusStatement}
+              {consensus.statement}
             </p>
           )}
 
-          {context.expertSources && context.expertSources.length > 0 && (
+          {consensus.sources && consensus.sources.length > 0 && (
             <div className="flex flex-wrap gap-1 mb-2">
-              {context.expertSources.map((src, i) => (
+              {consensus.sources.map((src, i) => (
                 <span key={i} className="px-1.5 py-0.5 bg-white/50 dark:bg-zinc-800/50 text-zinc-600 dark:text-zinc-400 text-[10px] rounded border border-zinc-200 dark:border-zinc-700">
                   {src}
                 </span>
               ))}
+            </div>
+          )}
+
+          {consensus.dissent && (
+            <div className="mt-2 p-2 bg-zinc-100/50 dark:bg-zinc-800/50 rounded border border-zinc-200 dark:border-zinc-700">
+              <p className="text-xs text-zinc-600 dark:text-zinc-400">
+                <span className="font-semibold">Notable dissent:</span> {consensus.dissent}
+              </p>
             </div>
           )}
 
@@ -373,9 +413,9 @@ function StoryCard({ story }: { story: StoryCluster }) {
                 </div>
             </div>
 
-            {/* Factual Context - NEW */}
-            <FactualContextBox
-              context={story.factualContext}
+            {/* Expert Consensus */}
+            <ExpertConsensusBox
+              consensus={story.expertConsensus}
               debateType={story.debateType}
               debateQuestion={story.debateQuestion}
             />
