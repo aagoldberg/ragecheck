@@ -664,11 +664,10 @@ export default function Home() {
         {/* Hero Section */}
         <div className="text-center max-w-2xl mx-auto mb-16">
           <h1 className="text-3xl md:text-5xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100 mb-6">
-            Analyze content for <br/>
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-rose-500 to-indigo-600">manipulative patterns</span>
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-rose-500 to-indigo-600">Ragecheck</span> this post
           </h1>
           <p className="text-lg text-zinc-600 dark:text-zinc-400 mb-8 leading-relaxed">
-            Detect loaded language, fear-mongering, and outrage bait in news articles, tweets, social posts, or uploaded screenshots.
+            See what kind of reaction it's built to trigger.
           </p>
 
           {/* Search Input */}
