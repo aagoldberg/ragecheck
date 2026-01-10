@@ -585,10 +585,28 @@ export async function getVisitorStats(): Promise<VisitorStats> {
     const [todayResult] = await getDb()`SELECT COUNT(*) as count FROM ragecheck_visitors WHERE created_at > NOW() - INTERVAL '1 day'`;
     const [weekResult] = await getDb()`SELECT COUNT(*) as count FROM ragecheck_visitors WHERE created_at > NOW() - INTERVAL '7 days'`;
 
-    const [analysesToday] = await getDb()`SELECT COUNT(*) as count FROM ragecheck_analyses WHERE created_at > NOW() - INTERVAL '1 day'`;
+    // True conversion rate: unique visitors who performed at least one analysis
+    const [uniqueVisitorsToday] = await getDb()`
+      SELECT COUNT(DISTINCT ip_address) as count
+      FROM ragecheck_visitors
+      WHERE created_at > NOW() - INTERVAL '1 day'
+        AND ip_address IS NOT NULL
+    `;
 
-    const conversionRate = Number(todayResult.count) > 0
-      ? (Number(analysesToday.count) / Number(todayResult.count)) * 100
+    const [convertedVisitors] = await getDb()`
+      SELECT COUNT(DISTINCT v.ip_address) as count
+      FROM ragecheck_visitors v
+      WHERE v.created_at > NOW() - INTERVAL '1 day'
+        AND v.ip_address IS NOT NULL
+        AND EXISTS (
+          SELECT 1 FROM ragecheck_analyses a
+          WHERE a.ip_address = v.ip_address
+            AND a.created_at > NOW() - INTERVAL '1 day'
+        )
+    `;
+
+    const conversionRate = Number(uniqueVisitorsToday.count) > 0
+      ? (Number(convertedVisitors.count) / Number(uniqueVisitorsToday.count)) * 100
       : 0;
 
     const recentRows = await getDb()`
