@@ -678,12 +678,12 @@ export async function getVisitorStats(): Promise<VisitorStats> {
     // Merge realtime data into 30-minute buckets
     const realtimeMap = new Map<string, { visitors: number; analyses: number }>();
 
-    // Initialize last 24 hours in 30-minute intervals (48 buckets)
+    // Initialize last 24 hours in 30-minute intervals (48 buckets, excluding current incomplete bucket)
     const now = new Date();
-    for (let i = 47; i >= 0; i--) {
+    // Round down to current 30-min bucket start
+    now.setMinutes(Math.floor(now.getMinutes() / 30) * 30, 0, 0);
+    for (let i = 48; i >= 1; i--) {
       const d = new Date(now.getTime() - i * 30 * 60 * 1000);
-      // Round down to 30-minute bucket
-      d.setMinutes(Math.floor(d.getMinutes() / 30) * 30, 0, 0);
       const timeStr = d.toISOString();
       realtimeMap.set(timeStr, { visitors: 0, analyses: 0 });
     }
@@ -761,12 +761,13 @@ export async function getPageVisitorStats(pagePath: string): Promise<PageVisitor
       ORDER BY bucket ASC
     `;
 
-    // Merge realtime data into 30-minute buckets
+    // Merge realtime data into 30-minute buckets (excluding current incomplete bucket)
     const realtimeMap = new Map<string, number>();
     const now = new Date();
-    for (let i = 47; i >= 0; i--) {
+    // Round down to current 30-min bucket start
+    now.setMinutes(Math.floor(now.getMinutes() / 30) * 30, 0, 0);
+    for (let i = 48; i >= 1; i--) {
       const d = new Date(now.getTime() - i * 30 * 60 * 1000);
-      d.setMinutes(Math.floor(d.getMinutes() / 30) * 30, 0, 0);
       realtimeMap.set(d.toISOString(), 0);
     }
 
