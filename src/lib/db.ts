@@ -376,6 +376,70 @@ export async function isDBAvailable(): Promise<boolean> {
   }
 }
 
+// Cached analysis result
+export interface CachedAnalysis {
+  url: string;
+  sourceDomain: string;
+  score: number;
+  label: string;
+  llmEnhanced: boolean;
+  signalBreakdown: {
+    arousal: number;
+    enemy_construction: number;
+    moral_condemnation: number;
+    simplification: number;
+    call_to_conflict: number;
+  };
+  createdAt: Date;
+}
+
+// Get cached analysis for a URL (within last 24 hours)
+export async function getCachedAnalysis(url: string): Promise<CachedAnalysis | null> {
+  if (!process.env.DATABASE_URL) return null;
+
+  try {
+    const result = await withRetry(async () => {
+      const [row] = await getDb()`
+        SELECT
+          url, source_domain, score, label, llm_enhanced,
+          signal_loaded_language, signal_absolutist, signal_threat_panic,
+          signal_us_vs_them, signal_engagement_bait, created_at
+        FROM ragecheck_analyses
+        WHERE url = ${url}
+          AND success = true
+          AND score IS NOT NULL
+          AND created_at > NOW() - INTERVAL '24 hours'
+        ORDER BY created_at DESC
+        LIMIT 1
+      `;
+      return row;
+    });
+
+    if (result) {
+      return {
+        url: result.url,
+        sourceDomain: result.source_domain || "unknown",
+        score: Number(result.score),
+        label: result.label || "Medium",
+        llmEnhanced: result.llm_enhanced || false,
+        signalBreakdown: {
+          arousal: Number(result.signal_loaded_language) || 0,
+          enemy_construction: Number(result.signal_us_vs_them) || 0,
+          moral_condemnation: Number(result.signal_threat_panic) || 0,
+          simplification: Number(result.signal_absolutist) || 0,
+          call_to_conflict: Number(result.signal_engagement_bait) || 0,
+        },
+        createdAt: result.created_at,
+      };
+    }
+
+    return null;
+  } catch (error) {
+    console.error("Failed to get cached analysis:", error);
+    return null;
+  }
+}
+
 export interface VisitorLog {
   ipAddress?: string;
   userAgent?: string;

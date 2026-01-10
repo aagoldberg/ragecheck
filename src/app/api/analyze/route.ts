@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { extractContent } from "@/lib/extract";
 import { analyzeText, SignalBreakdown, Highlight } from "@/lib/score";
 import { enhanceWithLLM, isLLMAvailable, analyzeImageWithVision } from "@/lib/llm";
-import { logAnalysis } from "@/lib/db";
+import { logAnalysis, getCachedAnalysis } from "@/lib/db";
+
+// Extend function timeout for slow sites
+export const maxDuration = 60; // 60 seconds
 
 export interface AnalyzeResponse {
   success: boolean;
@@ -20,6 +23,7 @@ export interface AnalyzeResponse {
   image?: string;
   sharingPatterns?: string[];
   techniqueExplanations?: string[];
+  cached?: boolean;
 }
 
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5MB
@@ -127,6 +131,25 @@ export async function POST(request: NextRequest): Promise<NextResponse<AnalyzeRe
         { success: false, error: "Invalid URL format" },
         { status: 400 }
       );
+    }
+
+    // Check cache first (results from last 24 hours)
+    const cached = await getCachedAnalysis(url);
+    if (cached) {
+      console.log(`Cache hit for ${url}`);
+      return NextResponse.json({
+        success: true,
+        score: cached.score,
+        label: cached.label as "Low" | "Medium" | "High",
+        reasons: ["Cached result from recent analysis"],
+        highlights: [],
+        signalBreakdown: cached.signalBreakdown,
+        title: "Cached Analysis",
+        sourceDomain: cached.sourceDomain,
+        textPreview: "",
+        llmEnhanced: cached.llmEnhanced,
+        cached: true,
+      });
     }
 
     // Extract content from URL
