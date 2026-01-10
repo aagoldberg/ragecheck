@@ -667,7 +667,7 @@ export default function Home() {
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-rose-500 to-indigo-600">Ragecheck</span> this post
           </h1>
           <p className="text-lg text-zinc-600 dark:text-zinc-400 mb-8 leading-relaxed">
-            See what kind of reaction it's built to trigger.
+            See what reactions it's built to trigger.
           </p>
 
           {/* Search Input */}
