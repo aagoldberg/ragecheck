@@ -221,6 +221,7 @@ CRITICAL GUIDELINES:
 - Identify manipulation techniques like: loaded language, fear-mongering, omission of context, false equivalence, appeal to emotion, etc.
 - Include the actual URLs from the headlines data
 - If a story only has one source, skip it
+- REQUIRED: Every story MUST include the expertConsensus object - never omit it
 
 EXPERT CONSENSUS RULES:
 - Identify the most relevant type of expert consensus for each story:
