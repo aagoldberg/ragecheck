@@ -720,8 +720,8 @@ export async function getVisitorStats(): Promise<VisitorStats> {
     // Merge into single time series
     const dateMap = new Map<string, { visitors: number; analyses: number }>();
 
-    // Initialize last 14 days
-    for (let i = 13; i >= 0; i--) {
+    // Initialize last 14 complete days (excluding today which is incomplete)
+    for (let i = 14; i >= 1; i--) {
       const d = new Date();
       d.setDate(d.getDate() - i);
       const dateStr = d.toISOString().split("T")[0];
@@ -884,7 +884,8 @@ export async function getPageVisitorStats(pagePath: string): Promise<PageVisitor
     `;
 
     const dateMap = new Map<string, number>();
-    for (let i = 13; i >= 0; i--) {
+    // Exclude today (incomplete)
+    for (let i = 14; i >= 1; i--) {
       const d = new Date();
       d.setDate(d.getDate() - i);
       dateMap.set(d.toISOString().split("T")[0], 0);
