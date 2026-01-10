@@ -55,18 +55,26 @@ export function countPunctuation(text: string): {
   return { exclamations, questions, intensity };
 }
 
+// Max text length for analysis (prevents crashes on very long articles)
+const MAX_TEXT_LENGTH = 50000; // ~7,000-10,000 words
+
 /**
  * Full preprocessing pipeline
  */
 export function preprocess(text: string): PreprocessedText {
-  const sentences = splitSentences(text);
-  const tokens = tokenize(text);
-  const capsRatio = calculateCapsRatio(text);
-  const punct = countPunctuation(text);
+  // Truncate very long text to prevent performance issues
+  const truncatedText = text.length > MAX_TEXT_LENGTH
+    ? text.substring(0, MAX_TEXT_LENGTH)
+    : text;
+
+  const sentences = splitSentences(truncatedText);
+  const tokens = tokenize(truncatedText);
+  const capsRatio = calculateCapsRatio(truncatedText);
+  const punct = countPunctuation(truncatedText);
 
   return {
-    original: text,
-    lowercase: text.toLowerCase(),
+    original: truncatedText,
+    lowercase: truncatedText.toLowerCase(),
     sentences,
     tokens,
     wordCount: tokens.length,
@@ -91,7 +99,10 @@ export function findPatternMatches(
     if (typeof pattern === "string") {
       const lowerPattern = pattern.toLowerCase();
       let idx = 0;
-      while ((idx = lowerText.indexOf(lowerPattern, idx)) !== -1) {
+      let matchCount = 0;
+      const maxMatches = 20; // Limit matches per pattern to prevent slowdown
+
+      while ((idx = lowerText.indexOf(lowerPattern, idx)) !== -1 && matchCount < maxMatches) {
         // Check word boundaries
         const before = idx === 0 ? " " : lowerText[idx - 1];
         const after = idx + lowerPattern.length >= lowerText.length
@@ -101,13 +112,20 @@ export function findPatternMatches(
         if (/[\s\.,;:!?"'()\[\]{}<>\/\-]/.test(before) &&
             /[\s\.,;:!?"'()\[\]{}<>\/\-]/.test(after)) {
           matches.push(text.substring(idx, idx + lowerPattern.length));
+          matchCount++;
         }
-        idx++;
+        idx += lowerPattern.length; // Skip past current match for efficiency
       }
     } else {
-      const regexMatches = text.match(pattern);
-      if (regexMatches) {
-        matches.push(...regexMatches);
+      // Use exec with limit for regex patterns
+      const globalRegex = new RegExp(pattern.source, pattern.flags.includes('g') ? pattern.flags : pattern.flags + 'g');
+      let match;
+      let matchCount = 0;
+      const maxMatches = 20;
+
+      while ((match = globalRegex.exec(text)) !== null && matchCount < maxMatches) {
+        matches.push(match[0]);
+        matchCount++;
       }
     }
   }
