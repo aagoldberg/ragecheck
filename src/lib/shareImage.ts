@@ -1,5 +1,5 @@
 // Canvas-based share image generator matching the server-rendered design
-// Features: speedometer, all 5 signal bars with percentages
+// Features: compact gauge, signal bars, analysis insights
 
 import { getScoreColor } from "@/lib/shareCard";
 import type { SignalBreakdown } from "@/lib/score";
@@ -21,10 +21,10 @@ const SIZE_CONFIGS: Record<ImageSize, { width: number; height: number }> = {
 // Signal bar labels
 const SIGNAL_LABELS: Record<string, string> = {
   arousal: "Emotional Arousal",
-  enemy_construction: "Enemy Construction",
-  moral_condemnation: "Moral Condemnation",
+  enemy_construction: "Enemy Framing",
+  moral_condemnation: "Moral Outrage",
   simplification: "Oversimplification",
-  call_to_conflict: "Call-to-Conflict",
+  call_to_conflict: "Call to Conflict",
 };
 
 // Get bar color based on value
@@ -32,6 +32,37 @@ function getBarColor(value: number): string {
   if (value >= 60) return "#ef4444"; // red
   if (value >= 30) return "#f59e0b"; // amber
   return "#22c55e"; // green
+}
+
+// Generate analysis insights based on the data
+function getAnalysisInsights(baitScore: number, bars: { key: string; value: number }[]): string[] {
+  const insights: string[] = [];
+  const sorted = [...bars].sort((a, b) => b.value - a.value);
+  const top = sorted[0];
+  const second = sorted[1];
+
+  if (baitScore >= 70) {
+    if (top.key === "arousal" && top.value >= 50) {
+      insights.push("Uses emotionally charged language to provoke reaction");
+    } else if (top.key === "enemy_construction" && top.value >= 50) {
+      insights.push("Frames groups as threats or enemies");
+    } else if (top.key === "moral_condemnation" && top.value >= 50) {
+      insights.push("Appeals to moral outrage over factual analysis");
+    } else {
+      insights.push("Multiple manipulation patterns detected");
+    }
+  } else if (baitScore >= 40) {
+    insights.push("Some emotional framing present");
+  } else {
+    insights.push("Relatively balanced presentation");
+  }
+
+  if (second && second.value >= 30 && insights.length < 2) {
+    const secondLabel = SIGNAL_LABELS[second.key] || second.key;
+    insights.push(`Notable ${secondLabel.toLowerCase()} detected`);
+  }
+
+  return insights.slice(0, 2);
 }
 
 function wrapText(
@@ -90,7 +121,7 @@ export function generateShareImage(
     const scoreColor = getScoreColor(data.score);
 
     // Truncate title
-    const maxTitleLength = 80;
+    const maxTitleLength = 90;
     const displayTitle = data.title.length > maxTitleLength
       ? data.title.slice(0, maxTitleLength - 3) + "..."
       : data.title;
@@ -104,152 +135,205 @@ export function generateShareImage(
       { key: "call_to_conflict", label: SIGNAL_LABELS.call_to_conflict, value: data.signalBreakdown.call_to_conflict },
     ];
 
+    // Get analysis insights
+    const insights = getAnalysisInsights(data.score, barsArray);
+
+    // Get top drivers
+    const topDrivers = [...barsArray].sort((a, b) => b.value - a.value).slice(0, 2);
+
     // === BACKGROUND ===
-    ctx.fillStyle = "#fafafa";
+    ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, width, height);
 
     // === HEADER ===
     // Logo box
     ctx.fillStyle = "#18181b";
-    ctx.fillRect(padding, padding, 32, 32);
+    ctx.beginPath();
+    ctx.roundRect(padding, 40, 28, 28, 4);
+    ctx.fill();
 
     // RageCheck text
     ctx.fillStyle = "#18181b";
-    ctx.font = "700 24px system-ui, -apple-system, sans-serif";
+    ctx.font = "700 20px system-ui, -apple-system, sans-serif";
     ctx.textAlign = "left";
     ctx.textBaseline = "middle";
-    ctx.fillText("RageCheck", padding + 44, padding + 16);
+    ctx.fillText("RageCheck", padding + 38, 54);
 
     // Domain
     ctx.fillStyle = "#71717a";
-    ctx.font = "500 18px system-ui, -apple-system, sans-serif";
+    ctx.font = "500 16px system-ui, -apple-system, sans-serif";
     ctx.textAlign = "right";
-    ctx.fillText(data.domain, width - padding, padding + 16);
+    ctx.fillText(data.domain, width - padding, 54);
 
     // === TITLE ===
     ctx.fillStyle = "#18181b";
-    ctx.font = "700 32px system-ui, -apple-system, sans-serif";
+    ctx.font = "700 26px system-ui, -apple-system, sans-serif";
     ctx.textAlign = "left";
     ctx.textBaseline = "top";
 
-    const titleY = padding + 64;
+    const titleY = 88;
     const titleLines = wrapText(ctx, displayTitle, width - padding * 2, 2);
-    const titleLineHeight = 38;
+    const titleLineHeight = 34;
     titleLines.forEach((line, i) => {
       ctx.fillText(line, padding, titleY + i * titleLineHeight);
     });
 
-    // === MAIN CONTENT AREA ===
-    const contentY = titleY + titleLines.length * titleLineHeight + 32;
-    const speedometerWidth = 280;
-    const barsX = padding + speedometerWidth + 48;
-    const barsWidth = width - barsX - padding;
+    // === LAYOUT CONSTANTS ===
+    const contentY = titleY + titleLines.length * titleLineHeight + 24;
+    const leftColWidth = 320;
+    const rightColX = padding + leftColWidth + 40;
+    const rightColWidth = width - rightColX - padding;
 
-    // === SPEEDOMETER ===
-    const speedoCenterX = padding + speedometerWidth / 2;
-    const speedoCenterY = contentY + 130;
-    const speedoRadius = 90;
+    // === LEFT COLUMN: Score + Analysis ===
 
-    // Draw background arc
+    // Score box background
+    ctx.fillStyle = "#f4f4f5";
     ctx.beginPath();
-    ctx.arc(speedoCenterX, speedoCenterY, speedoRadius, Math.PI * 1.25, Math.PI * -0.25, false);
+    ctx.roundRect(padding, contentY, leftColWidth, 82, 12);
+    ctx.fill();
+
+    // Mini gauge
+    const gaugeX = padding + 60;
+    const gaugeY = contentY + 56;
+    const gaugeRadius = 32;
+
+    // Background arc
+    ctx.beginPath();
+    ctx.arc(gaugeX, gaugeY, gaugeRadius, Math.PI * 1.25, Math.PI * -0.25, false);
     ctx.strokeStyle = "#e4e4e7";
-    ctx.lineWidth = 16;
+    ctx.lineWidth = 8;
     ctx.lineCap = "round";
     ctx.stroke();
 
-    // Draw colored progress arc
+    // Colored arc
     const progressAngle = Math.PI * 1.25 + (data.score / 100) * Math.PI * 1.5;
     ctx.beginPath();
-    ctx.arc(speedoCenterX, speedoCenterY, speedoRadius, Math.PI * 1.25, progressAngle, false);
+    ctx.arc(gaugeX, gaugeY, gaugeRadius, Math.PI * 1.25, progressAngle, false);
     ctx.strokeStyle = scoreColor;
-    ctx.lineWidth = 16;
+    ctx.lineWidth = 8;
     ctx.lineCap = "round";
     ctx.stroke();
-
-    // Draw needle
-    const needleAngle = Math.PI * 1.25 + (data.score / 100) * Math.PI * 1.5 - Math.PI / 2;
-    const needleLength = 70;
-    ctx.save();
-    ctx.translate(speedoCenterX, speedoCenterY);
-    ctx.rotate(needleAngle);
-    ctx.fillStyle = "#18181b";
-    ctx.fillRect(-2, -needleLength, 4, needleLength);
-    ctx.restore();
-
-    // Draw center dot
-    ctx.beginPath();
-    ctx.arc(speedoCenterX, speedoCenterY, 8, 0, Math.PI * 2);
-    ctx.fillStyle = "#18181b";
-    ctx.fill();
 
     // Score number
     ctx.fillStyle = scoreColor;
-    ctx.font = "900 64px system-ui, -apple-system, sans-serif";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "top";
-    ctx.fillText(String(data.score), speedoCenterX, speedoCenterY + 20);
+    ctx.font = "900 42px system-ui, -apple-system, sans-serif";
+    ctx.textAlign = "left";
+    ctx.textBaseline = "middle";
+    ctx.fillText(String(data.score), padding + 120, contentY + 35);
 
     // "Bait Score" label
     ctx.fillStyle = "#71717a";
-    ctx.font = "700 14px system-ui, -apple-system, sans-serif";
-    ctx.letterSpacing = "0.1em";
-    ctx.fillText("BAIT SCORE", speedoCenterX, speedoCenterY + 90);
+    ctx.font = "700 11px system-ui, -apple-system, sans-serif";
+    ctx.fillText("BAIT SCORE", padding + 120, contentY + 62);
 
-    // === SIGNAL BARS ===
-    const barHeight = 12;
-    const barGap = 16;
-    const labelHeight = 24;
-    const totalBarHeight = labelHeight + 6 + barHeight;
-    const barsStartY = contentY + 20;
+    // Analysis section
+    const analysisY = contentY + 102;
+    ctx.fillStyle = "#71717a";
+    ctx.font = "700 11px system-ui, -apple-system, sans-serif";
+    ctx.textAlign = "left";
+    ctx.textBaseline = "top";
+    ctx.fillText("ANALYSIS", padding, analysisY);
+
+    // Analysis insights
+    ctx.font = "400 14px system-ui, -apple-system, sans-serif";
+    insights.forEach((insight, i) => {
+      const insightY = analysisY + 22 + i * 24;
+
+      // Bullet
+      ctx.fillStyle = scoreColor;
+      ctx.fillText("•", padding, insightY);
+
+      // Text
+      ctx.fillStyle = "#3f3f46";
+      ctx.fillText(insight, padding + 16, insightY);
+    });
+
+    // Top driver tags
+    const tagsY = analysisY + 22 + insights.length * 24 + 16;
+    let tagX = padding;
+    topDrivers.forEach((driver) => {
+      const label = driver.label.replace("Emotional ", "");
+      ctx.font = "600 12px system-ui, -apple-system, sans-serif";
+      const tagWidth = ctx.measureText(label).width + 24;
+
+      // Tag background
+      ctx.fillStyle = scoreColor + "15";
+      ctx.beginPath();
+      ctx.roundRect(tagX, tagsY, tagWidth, 28, 6);
+      ctx.fill();
+
+      // Tag border
+      ctx.strokeStyle = scoreColor + "40";
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      // Tag text
+      ctx.fillStyle = scoreColor;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(label, tagX + tagWidth / 2, tagsY + 14);
+
+      tagX += tagWidth + 8;
+    });
+
+    // === RIGHT COLUMN: Signal Bars ===
+    ctx.fillStyle = "#71717a";
+    ctx.font = "700 11px system-ui, -apple-system, sans-serif";
+    ctx.textAlign = "left";
+    ctx.textBaseline = "top";
+    ctx.fillText("SIGNAL BREAKDOWN", rightColX, contentY);
+
+    const barsStartY = contentY + 24;
+    const barRowHeight = 36;
 
     barsArray.forEach((bar, i) => {
-      const barY = barsStartY + i * (totalBarHeight + barGap);
+      const rowY = barsStartY + i * barRowHeight;
 
       // Label
-      ctx.fillStyle = "#3f3f46";
-      ctx.font = "600 16px system-ui, -apple-system, sans-serif";
+      ctx.fillStyle = "#52525b";
+      ctx.font = "500 13px system-ui, -apple-system, sans-serif";
       ctx.textAlign = "left";
-      ctx.textBaseline = "top";
-      ctx.fillText(bar.label, barsX, barY);
-
-      // Percentage
-      ctx.fillStyle = "#18181b";
-      ctx.font = "700 16px system-ui, -apple-system, sans-serif";
-      ctx.textAlign = "right";
-      ctx.fillText(`${bar.value}%`, barsX + barsWidth, barY);
+      ctx.textBaseline = "middle";
+      ctx.fillText(bar.label, rightColX, rowY + 12);
 
       // Bar background
-      const barBgY = barY + labelHeight + 6;
+      const barX = rightColX + 140;
+      const barWidth = rightColWidth - 180;
       ctx.fillStyle = "#e4e4e7";
       ctx.beginPath();
-      ctx.roundRect(barsX, barBgY, barsWidth, barHeight, 6);
+      ctx.roundRect(barX, rowY + 7, barWidth, 10, 5);
       ctx.fill();
 
       // Bar fill
-      const fillWidth = (bar.value / 100) * barsWidth;
+      const fillWidth = (bar.value / 100) * barWidth;
       if (fillWidth > 0) {
         ctx.fillStyle = getBarColor(bar.value);
         ctx.beginPath();
-        ctx.roundRect(barsX, barBgY, fillWidth, barHeight, 6);
+        ctx.roundRect(barX, rowY + 7, fillWidth, 10, 5);
         ctx.fill();
       }
+
+      // Percentage
+      ctx.fillStyle = "#18181b";
+      ctx.font = "700 13px system-ui, -apple-system, sans-serif";
+      ctx.textAlign = "right";
+      ctx.fillText(`${bar.value}%`, rightColX + rightColWidth, rowY + 12);
     });
 
     // === FOOTER ===
-    const footerY = height - padding - 20;
+    const footerY = height - 40;
 
     // Divider line
     ctx.strokeStyle = "#e4e4e7";
     ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.moveTo(padding, footerY - 24);
-    ctx.lineTo(width - padding, footerY - 24);
+    ctx.moveTo(padding, footerY - 16);
+    ctx.lineTo(width - padding, footerY - 16);
     ctx.stroke();
 
     // Footer text
     ctx.fillStyle = "#a1a1aa";
-    ctx.font = "400 14px system-ui, -apple-system, sans-serif";
+    ctx.font = "400 12px system-ui, -apple-system, sans-serif";
     ctx.textAlign = "left";
     ctx.textBaseline = "middle";
     ctx.fillText("ragecheck.app", padding, footerY);

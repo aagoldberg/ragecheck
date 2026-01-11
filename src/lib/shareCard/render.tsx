@@ -26,13 +26,13 @@ const SIZE_CONFIG: Record<CardSize, { width: number; height: number }> = {
   bsky: { width: 1200, height: 630 },
 };
 
-// Signal bar labels
+// Signal bar labels (short versions)
 const SIGNAL_LABELS: Record<string, string> = {
   arousal: "Emotional Arousal",
-  enemy_construction: "Enemy Construction",
-  moral_condemnation: "Moral Condemnation",
+  enemy_construction: "Enemy Framing",
+  moral_condemnation: "Moral Outrage",
   simplification: "Oversimplification",
-  call_to_conflict: "Call-to-Conflict",
+  call_to_conflict: "Call to Conflict",
 };
 
 // Get bar color based on value
@@ -40,6 +40,37 @@ function getBarColor(value: number): string {
   if (value >= 60) return "#ef4444"; // red
   if (value >= 30) return "#f59e0b"; // amber
   return "#22c55e"; // green
+}
+
+// Generate analysis insights based on the data
+function getAnalysisInsights(baitScore: number, bars: { key: string; value: number }[]): string[] {
+  const insights: string[] = [];
+  const sorted = [...bars].sort((a, b) => b.value - a.value);
+  const top = sorted[0];
+  const second = sorted[1];
+
+  if (baitScore >= 70) {
+    if (top.key === "arousal" && top.value >= 50) {
+      insights.push("Uses emotionally charged language to provoke reaction");
+    } else if (top.key === "enemy_construction" && top.value >= 50) {
+      insights.push("Frames groups as threats or enemies");
+    } else if (top.key === "moral_condemnation" && top.value >= 50) {
+      insights.push("Appeals to moral outrage over factual analysis");
+    } else {
+      insights.push("Multiple manipulation patterns detected");
+    }
+  } else if (baitScore >= 40) {
+    insights.push("Some emotional framing present");
+  } else {
+    insights.push("Relatively balanced presentation");
+  }
+
+  if (second && second.value >= 30 && insights.length < 2) {
+    const secondLabel = SIGNAL_LABELS[second.key] || second.key;
+    insights.push(`Notable ${secondLabel.toLowerCase()} detected`);
+  }
+
+  return insights.slice(0, 2);
 }
 
 /**
@@ -51,9 +82,10 @@ export function renderShareCard(
 ): ImageResponse {
   const { width, height } = SIZE_CONFIG[size];
   const scoreColor = getScoreColor(analysis.baitScore);
+  const topDrivers = getTopDrivers(analysis.bars);
 
   // Truncate title if too long
-  const maxTitleLength = 80;
+  const maxTitleLength = 90;
   const displayTitle = analysis.title.length > maxTitleLength
     ? analysis.title.slice(0, maxTitleLength - 3) + "..."
     : analysis.title;
@@ -67,8 +99,8 @@ export function renderShareCard(
         value: value as number,
       }));
 
-  // Calculate speedometer angle (0 = -135deg, 100 = 135deg, so 270deg range)
-  const speedometerAngle = -135 + (analysis.baitScore / 100) * 270;
+  // Get analysis insights
+  const insights = getAnalysisInsights(analysis.baitScore, barsArray);
 
   return new ImageResponse(
     (
@@ -78,10 +110,9 @@ export function renderShareCard(
           height: "100%",
           display: "flex",
           flexDirection: "column",
-          padding: "48px",
-          backgroundColor: "#fafafa",
+          padding: "40px 48px",
+          backgroundColor: "#ffffff",
           fontFamily: '"Helvetica Neue", Helvetica, sans-serif',
-          position: "relative",
         }}
       >
         {/* Header */}
@@ -90,24 +121,23 @@ export function renderShareCard(
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
-            marginBottom: "32px",
+            marginBottom: "20px",
           }}
         >
-          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
             <div
               style={{
-                width: "32px",
-                height: "32px",
+                width: "28px",
+                height: "28px",
                 backgroundColor: "#18181b",
                 borderRadius: "4px",
               }}
             />
             <span
               style={{
-                fontSize: "24px",
+                fontSize: "20px",
                 fontWeight: 700,
                 color: "#18181b",
-                letterSpacing: "-0.02em",
               }}
             >
               RageCheck
@@ -115,7 +145,7 @@ export function renderShareCard(
           </div>
           <span
             style={{
-              fontSize: "18px",
+              fontSize: "16px",
               color: "#71717a",
               fontWeight: 500,
             }}
@@ -127,188 +157,230 @@ export function renderShareCard(
         {/* Title */}
         <div
           style={{
-            fontSize: "32px",
+            fontSize: "26px",
             fontWeight: 700,
             color: "#18181b",
-            lineHeight: 1.2,
-            marginBottom: "32px",
-            maxWidth: "100%",
+            lineHeight: 1.3,
+            marginBottom: "24px",
           }}
         >
           {displayTitle}
         </div>
 
-        {/* Main Content: Speedometer + Bars */}
+        {/* Main Content Row */}
         <div
           style={{
             display: "flex",
             flex: 1,
-            gap: "48px",
+            gap: "40px",
           }}
         >
-          {/* Left: Speedometer */}
+          {/* Left Column: Score + Analysis */}
           <div
             style={{
               display: "flex",
               flexDirection: "column",
-              alignItems: "center",
-              justifyContent: "center",
-              width: "280px",
+              width: "320px",
+              gap: "20px",
             }}
           >
-            {/* Speedometer Arc */}
+            {/* Score Section */}
             <div
               style={{
-                position: "relative",
-                width: "220px",
-                height: "140px",
                 display: "flex",
-                alignItems: "flex-end",
-                justifyContent: "center",
+                alignItems: "center",
+                gap: "20px",
+                padding: "16px 20px",
+                backgroundColor: "#f4f4f5",
+                borderRadius: "12px",
               }}
             >
-              {/* Background arc */}
-              <svg
-                width="220"
-                height="140"
-                viewBox="0 0 220 140"
-                style={{ position: "absolute", top: 0, left: 0 }}
+              {/* Mini Gauge */}
+              <div
+                style={{
+                  position: "relative",
+                  width: "80px",
+                  height: "50px",
+                  display: "flex",
+                  alignItems: "flex-end",
+                  justifyContent: "center",
+                }}
               >
-                {/* Gray background arc */}
-                <path
-                  d="M 20 130 A 90 90 0 0 1 200 130"
-                  fill="none"
-                  stroke="#e4e4e7"
-                  strokeWidth="16"
-                  strokeLinecap="round"
-                />
-                {/* Colored progress arc */}
-                <path
-                  d="M 20 130 A 90 90 0 0 1 200 130"
-                  fill="none"
-                  stroke={scoreColor}
-                  strokeWidth="16"
-                  strokeLinecap="round"
-                  strokeDasharray={`${(analysis.baitScore / 100) * 283} 283`}
-                />
-              </svg>
+                <svg
+                  width="80"
+                  height="50"
+                  viewBox="0 0 80 50"
+                  style={{ position: "absolute", top: 0, left: 0 }}
+                >
+                  <path
+                    d="M 8 46 A 32 32 0 0 1 72 46"
+                    fill="none"
+                    stroke="#e4e4e7"
+                    strokeWidth="8"
+                    strokeLinecap="round"
+                  />
+                  <path
+                    d="M 8 46 A 32 32 0 0 1 72 46"
+                    fill="none"
+                    stroke={scoreColor}
+                    strokeWidth="8"
+                    strokeLinecap="round"
+                    strokeDasharray={`${(analysis.baitScore / 100) * 100} 100`}
+                  />
+                </svg>
+              </div>
 
-              {/* Needle */}
-              <div
-                style={{
-                  position: "absolute",
-                  bottom: "10px",
-                  left: "50%",
-                  width: "4px",
-                  height: "70px",
-                  backgroundColor: "#18181b",
-                  borderRadius: "2px",
-                  transformOrigin: "bottom center",
-                  transform: `translateX(-50%) rotate(${speedometerAngle}deg)`,
-                }}
-              />
-
-              {/* Center dot */}
-              <div
-                style={{
-                  position: "absolute",
-                  bottom: "2px",
-                  left: "50%",
-                  transform: "translateX(-50%)",
-                  width: "16px",
-                  height: "16px",
-                  backgroundColor: "#18181b",
-                  borderRadius: "50%",
-                }}
-              />
+              {/* Score Number */}
+              <div style={{ display: "flex", flexDirection: "column" }}>
+                <span
+                  style={{
+                    fontSize: "42px",
+                    fontWeight: 900,
+                    color: scoreColor,
+                    lineHeight: 1,
+                  }}
+                >
+                  {analysis.baitScore}
+                </span>
+                <span
+                  style={{
+                    fontSize: "11px",
+                    fontWeight: 700,
+                    color: "#71717a",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.05em",
+                  }}
+                >
+                  Bait Score
+                </span>
+              </div>
             </div>
 
-            {/* Score Number */}
+            {/* Analysis Insights */}
             <div
               style={{
                 display: "flex",
                 flexDirection: "column",
-                alignItems: "center",
-                marginTop: "8px",
+                gap: "10px",
               }}
             >
               <span
                 style={{
-                  fontSize: "64px",
-                  fontWeight: 900,
-                  color: scoreColor,
-                  lineHeight: 1,
-                }}
-              >
-                {analysis.baitScore}
-              </span>
-              <span
-                style={{
-                  fontSize: "14px",
+                  fontSize: "11px",
                   fontWeight: 700,
                   color: "#71717a",
                   textTransform: "uppercase",
-                  letterSpacing: "0.1em",
-                  marginTop: "4px",
+                  letterSpacing: "0.05em",
                 }}
               >
-                Bait Score
+                Analysis
               </span>
+              {insights.map((insight, i) => (
+                <div
+                  key={i}
+                  style={{
+                    display: "flex",
+                    alignItems: "flex-start",
+                    gap: "8px",
+                  }}
+                >
+                  <span style={{ color: scoreColor, fontSize: "14px" }}>•</span>
+                  <span
+                    style={{
+                      fontSize: "14px",
+                      color: "#3f3f46",
+                      lineHeight: 1.4,
+                    }}
+                  >
+                    {insight}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            {/* Top Drivers */}
+            <div
+              style={{
+                display: "flex",
+                gap: "8px",
+                flexWrap: "wrap",
+              }}
+            >
+              {topDrivers.slice(0, 2).map((driver) => (
+                <div
+                  key={driver.key}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    padding: "6px 12px",
+                    backgroundColor: `${scoreColor}15`,
+                    border: `1px solid ${scoreColor}40`,
+                    borderRadius: "6px",
+                  }}
+                >
+                  <span
+                    style={{
+                      color: scoreColor,
+                      fontSize: "12px",
+                      fontWeight: 600,
+                    }}
+                  >
+                    {driver.label.replace("Emotional ", "")}
+                  </span>
+                </div>
+              ))}
             </div>
           </div>
 
-          {/* Right: Signal Bars */}
+          {/* Right Column: Signal Bars */}
           <div
             style={{
               display: "flex",
               flexDirection: "column",
               flex: 1,
               justifyContent: "center",
-              gap: "16px",
+              gap: "12px",
             }}
           >
+            <span
+              style={{
+                fontSize: "11px",
+                fontWeight: 700,
+                color: "#71717a",
+                textTransform: "uppercase",
+                letterSpacing: "0.05em",
+                marginBottom: "4px",
+              }}
+            >
+              Signal Breakdown
+            </span>
             {barsArray.map((bar) => (
               <div
                 key={bar.key}
                 style={{
                   display: "flex",
-                  flexDirection: "column",
-                  gap: "6px",
+                  alignItems: "center",
+                  gap: "12px",
                 }}
               >
-                <div
+                <span
                   style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
+                    fontSize: "13px",
+                    fontWeight: 500,
+                    color: "#52525b",
+                    width: "130px",
+                    flexShrink: 0,
                   }}
                 >
-                  <span
-                    style={{
-                      fontSize: "16px",
-                      fontWeight: 600,
-                      color: "#3f3f46",
-                    }}
-                  >
-                    {bar.label}
-                  </span>
-                  <span
-                    style={{
-                      fontSize: "16px",
-                      fontWeight: 700,
-                      color: "#18181b",
-                    }}
-                  >
-                    {bar.value}%
-                  </span>
-                </div>
+                  {bar.label}
+                </span>
                 <div
                   style={{
                     display: "flex",
-                    width: "100%",
-                    height: "12px",
+                    flex: 1,
+                    height: "10px",
                     backgroundColor: "#e4e4e7",
-                    borderRadius: "6px",
+                    borderRadius: "5px",
                     overflow: "hidden",
                   }}
                 >
@@ -317,10 +389,21 @@ export function renderShareCard(
                       width: `${bar.value}%`,
                       height: "100%",
                       backgroundColor: getBarColor(bar.value),
-                      borderRadius: "6px",
+                      borderRadius: "5px",
                     }}
                   />
                 </div>
+                <span
+                  style={{
+                    fontSize: "13px",
+                    fontWeight: 700,
+                    color: "#18181b",
+                    width: "36px",
+                    textAlign: "right",
+                  }}
+                >
+                  {bar.value}%
+                </span>
               </div>
             ))}
           </div>
@@ -332,25 +415,15 @@ export function renderShareCard(
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
-            marginTop: "24px",
-            paddingTop: "24px",
+            marginTop: "16px",
+            paddingTop: "16px",
             borderTop: "1px solid #e4e4e7",
           }}
         >
-          <span
-            style={{
-              fontSize: "14px",
-              color: "#a1a1aa",
-            }}
-          >
+          <span style={{ fontSize: "12px", color: "#a1a1aa" }}>
             ragecheck.app
           </span>
-          <span
-            style={{
-              fontSize: "14px",
-              color: "#a1a1aa",
-            }}
-          >
+          <span style={{ fontSize: "12px", color: "#a1a1aa" }}>
             AI-powered emotional manipulation analysis
           </span>
         </div>
