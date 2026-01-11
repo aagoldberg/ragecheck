@@ -1,5 +1,5 @@
-// Canvas-based share image generator matching the "Scientific Report" design
-// Features: Monospace header, high-contrast title, forensic analysis, outlined precision data footer
+// Canvas-based share image generator matching the Landing Page "Bento" Design
+// Features: Clean modern UI, soft borders, rounded aesthetic
 
 import { getScoreColor } from "@/lib/shareCard";
 import type { SignalBreakdown } from "@/lib/score";
@@ -19,14 +19,6 @@ export type ImageSize = "x" | "bluesky";
 const SIZE_CONFIGS: Record<ImageSize, { width: number; height: number }> = {
   x: { width: 1200, height: 675 },
   bluesky: { width: 1200, height: 630 },
-};
-
-const SIGNAL_LABELS: Record<string, string> = {
-  arousal: "EMOTIONAL_AROUSAL",
-  enemy_construction: "ENEMY_CONSTRUCTION",
-  moral_condemnation: "MORAL_CONDEMNATION",
-  simplification: "OVERSIMPLIFICATION",
-  call_to_conflict: "CALL_TO_CONFLICT",
 };
 
 function wrapText(
@@ -81,207 +73,192 @@ export function generateShareImage(
     canvas.width = width;
     canvas.height = height;
     
-    // Scientific Palette - Muted/Professional
+    // Landing Page Palette
     const getColors = (s: number) => {
-      if (s <= 33) return { main: "#10b981", text: "#047857" }; // Emerald
-      if (s <= 66) return { main: "#f59e0b", text: "#b45309" }; // Amber
-      return { main: "#ef4444", text: "#b91c1c" }; // Red
-    };
-
-    const getRiskLabel = (s: number) => {
-      if (s <= 33) return "LOW RISK";
-      if (s <= 66) return "MEDIUM RISK";
-      return "HIGH RISK";
+      if (s <= 33) return { main: "#10b981", bg: "#ecfdf5", text: "#065f46" }; // Emerald
+      if (s <= 66) return { main: "#f59e0b", bg: "#fffbeb", text: "#92400e" }; // Amber
+      return { main: "#f43f5e", bg: "#fff1f2", text: "#9f1239" }; // Rose
     };
 
     const colors = getColors(data.score);
-    const riskLabel = getRiskLabel(data.score);
-    const date = new Date().toISOString().split("T")[0];
-    const reportId = Math.random().toString(36).substring(7).toUpperCase();
+    const riskLabel = data.score > 66 ? "High Risk" : data.score > 33 ? "Medium Risk" : "Low Risk";
 
-    // === BACKGROUND & FRAME ===
-    ctx.fillStyle = "#ffffff";
+    // === BACKGROUND (Zinc-50) ===
+    ctx.fillStyle = "#fafafa";
     ctx.fillRect(0, 0, width, height);
     
-    // Thick Frame
-    const frameWidth = 24;
-    ctx.strokeStyle = "#18181b";
-    ctx.lineWidth = frameWidth;
-    ctx.strokeRect(frameWidth/2, frameWidth/2, width - frameWidth, height - frameWidth);
-
-    const contentPadding = 60;
-    const innerWidth = width - (contentPadding * 2 + frameWidth * 2);
+    // === BENTO CARD ===
+    const cardPadding = 60;
+    const cardX = 40;
+    const cardY = 40;
+    const cardW = width - 80;
+    const cardH = height - 80;
     
-    // === HEADER (Monospace) ===
-    ctx.font = "500 24px monospace, 'Courier New', Courier";
-    ctx.fillStyle = "#71717a";
-    ctx.textAlign = "left";
-    ctx.textBaseline = "top";
+    // Card Shadow
+    ctx.shadowColor = "rgba(0,0,0,0.05)";
+    ctx.shadowBlur = 40;
+    ctx.shadowOffsetY = 20;
     
-    const headerY = contentPadding + frameWidth;
-    ctx.fillText("RAGECHECK_ANALYSIS_V1", contentPadding + frameWidth, headerY);
-    
-    ctx.textAlign = "center";
-    ctx.fillText(`ID: ${reportId}`, width / 2, headerY);
-    
-    ctx.textAlign = "right";
-    ctx.fillText(`DATE: ${date}`, width - (contentPadding + frameWidth), headerY);
-
-    // Header Divider Line
-    const dividerY = headerY + 40;
-    ctx.beginPath();
-    ctx.moveTo(contentPadding + frameWidth, dividerY);
-    ctx.lineTo(width - (contentPadding + frameWidth), dividerY);
-    ctx.strokeStyle = "#e4e4e7";
+    // Card Body
+    ctx.fillStyle = "#ffffff";
+    ctx.strokeStyle = "#e4e4e7"; // zinc-200
     ctx.lineWidth = 2;
+    
+    ctx.beginPath();
+    ctx.roundRect(cardX, cardY, cardW, cardH, 32);
+    ctx.fill();
+    ctx.shadowColor = "transparent"; // Reset shadow for strokes/text
     ctx.stroke();
 
-    // === MAIN CONTENT ===
-    // Source Tag
-    const sourceY = dividerY + 40;
-    const sourceText = `SOURCE: ${data.domain.toUpperCase()}`;
-    ctx.font = "700 24px system-ui, -apple-system, sans-serif";
-    const sourceWidth = ctx.measureText(sourceText).width + 32;
-    
-    ctx.fillStyle = "#f4f4f5";
+    const innerX = cardX + cardPadding;
+    const innerY = cardY + cardPadding;
+    const innerW = cardW - (cardPadding * 2);
+
+    // === HEADER ===
+    // Brand
+    ctx.fillStyle = "#18181b";
     ctx.beginPath();
-    ctx.roundRect(contentPadding + frameWidth, sourceY, sourceWidth, 44, 4);
+    ctx.roundRect(innerX, innerY, 32, 32, 8);
     ctx.fill();
     
-    ctx.fillStyle = "#52525b";
+    ctx.font = "700 28px system-ui, -apple-system, sans-serif";
+    ctx.fillStyle = "#18181b";
     ctx.textAlign = "left";
     ctx.textBaseline = "middle";
-    ctx.fillText(sourceText, contentPadding + frameWidth + 16, sourceY + 22);
+    ctx.fillText("RageCheck", innerX + 44, innerY + 18);
 
-    // Title
-    const titleY = sourceY + 70;
+    // Domain Pill
+    ctx.font = "600 20px system-ui, -apple-system, sans-serif";
+    const domainText = data.domain;
+    const domainWidth = ctx.measureText(domainText).width + 40;
+    
+    ctx.fillStyle = "#f4f4f5"; // zinc-100
+    ctx.beginPath();
+    ctx.roundRect(innerX + innerW - domainWidth, innerY, domainWidth, 40, 20);
+    ctx.fill();
+    
+    ctx.fillStyle = "#52525b"; // zinc-600
+    ctx.textAlign = "center";
+    ctx.fillText(domainText, innerX + innerW - (domainWidth/2), innerY + 22);
+
+    // === TITLE ===
+    const titleY = innerY + 100;
     ctx.fillStyle = "#18181b";
-    ctx.font = "900 52px system-ui, -apple-system, sans-serif";
+    ctx.font = "800 56px system-ui, -apple-system, sans-serif";
+    ctx.textAlign = "left";
     ctx.textBaseline = "top";
     
-    const titleLines = wrapText(ctx, data.title, innerWidth, 2);
-    const lineHeight = 60;
+    const titleLines = wrapText(ctx, data.title, innerW, 2); // Max 2 lines to keep it airy
+    const lineHeight = 68;
     
     titleLines.forEach((line, i) => {
-      ctx.fillText(line, contentPadding + frameWidth, titleY + (i * lineHeight));
+      ctx.fillText(line, innerX, titleY + (i * lineHeight));
     });
 
-    // === SIGNALS DETECTED ===
-    const signalsY = titleY + (titleLines.length * lineHeight) + 40;
+    // === FORENSIC INSIGHTS (The "Why") ===
+    const insightsY = titleY + (titleLines.length * lineHeight) + 40;
     
-    ctx.font = "500 20px monospace, 'Courier New', Courier";
-    ctx.fillStyle = "#71717a";
-    ctx.fillText("LINGUISTIC_SIGNALS_DETECTED", contentPadding + frameWidth, signalsY);
+    // Only show if we have data
+    const points = [
+        ...(data.techniqueExplanations || []).slice(0, 1),
+        ...(data.sharingPatterns || []).slice(0, 1)
+    ];
 
-    const sortedSignals = Object.entries(data.signalBreakdown)
-      .sort(([, a], [, b]) => b - a)
-      .filter(([, v]) => v > 10)
-      .slice(0, 3);
-
-    const signalGridY = signalsY + 40;
-    const colWidth = innerWidth / 3;
-
-    sortedSignals.forEach(([key, value], i) => {
-      const x = contentPadding + frameWidth + (i * colWidth);
-      
-      // Signal Label
-      ctx.font = "700 14px monospace, 'Courier New', Courier";
-      ctx.fillStyle = "#18181b";
-      ctx.fillText(SIGNAL_LABELS[key] || key.toUpperCase(), x, signalGridY);
-      
-      // Value
-      ctx.font = "900 32px system-ui, -apple-system, sans-serif";
-      ctx.fillStyle = value > 60 ? "#ef4444" : value > 30 ? "#f59e0b" : "#10b981";
-      ctx.fillText(`${Math.round(value)}%`, x, signalGridY + 25);
-
-      // Small Bar
-      const barWidth = colWidth - 40;
-      ctx.fillStyle = "#f4f4f5";
-      ctx.beginPath();
-      ctx.roundRect(x, signalGridY + 65, barWidth, 6, 3);
-      ctx.fill();
-
-      ctx.fillStyle = value > 60 ? "#ef4444" : value > 30 ? "#f59e0b" : "#10b981";
-      ctx.beginPath();
-      ctx.roundRect(x, signalGridY + 65, (value / 100) * barWidth, 6, 3);
-      ctx.fill();
-    });
-
-    // === FORENSIC ANALYSIS ===
-    if (data.techniqueExplanations?.length || data.sharingPatterns?.length) {
-        const analysisY = signalGridY + 100;
-        
-        ctx.font = "500 20px monospace, 'Courier New', Courier";
-        ctx.fillStyle = "#71717a";
-        ctx.fillText("FORENSIC_ANALYSIS", contentPadding + frameWidth, analysisY);
-
-        ctx.font = "500 22px system-ui, -apple-system, sans-serif";
-        ctx.fillStyle = "#18181b";
-        
-        const points = [
-            ...(data.techniqueExplanations || []).slice(0, 1),
-            ...(data.sharingPatterns || []).slice(0, 1)
-        ].map(p => p.length > 85 ? p.substring(0, 82) + "..." : p);
-
+    if (points.length > 0) {
         points.forEach((point, i) => {
-            ctx.fillText(`• ${point}`, contentPadding + frameWidth, analysisY + 40 + (i * 36));
+            const pointY = insightsY + (i * 40);
+            
+            // Bullet styling
+            ctx.fillStyle = colors.main;
+            ctx.beginPath();
+            ctx.arc(innerX + 6, pointY + 12, 4, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Text
+            ctx.font = "500 24px system-ui, -apple-system, sans-serif";
+            ctx.fillStyle = "#3f3f46"; // zinc-700
+            
+            // Truncate
+            let text = point;
+            if (ctx.measureText(text).width > innerW - 30) {
+                 while (ctx.measureText(text + "...").width > innerW - 30 && text.length > 0) {
+                    text = text.slice(0, -1);
+                 }
+                 text += "...";
+            }
+            ctx.fillText(text, innerX + 24, pointY);
         });
     }
 
-    // === FOOTER (Data Dashboard) ===
-    const footerY = height - (contentPadding + frameWidth) - 100;
+    // === FOOTER ===
+    const footerY = cardY + cardH - cardPadding;
     
-    // Footer Divider
-    ctx.beginPath();
-    ctx.moveTo(contentPadding + frameWidth, footerY - 32);
-    ctx.lineTo(width - (contentPadding + frameWidth), footerY - 32);
-    ctx.strokeStyle = "#e4e4e7";
+    // Divider
+    ctx.strokeStyle = "#f4f4f5";
     ctx.lineWidth = 2;
-    ctx.stroke();
-
-    // Left: Manipulation Index (Score)
-    ctx.textAlign = "left";
-    ctx.textBaseline = "top";
-    
-    // Label
-    ctx.font = "500 20px monospace, 'Courier New', Courier";
-    ctx.fillStyle = "#71717a";
-    ctx.fillText("MANIPULATION_INDEX", contentPadding + frameWidth, footerY);
-    
-    // Number
-    const scoreY = footerY + 30;
-    ctx.font = "900 96px system-ui, -apple-system, sans-serif";
-    ctx.fillStyle = colors.text;
-    const scoreTextWidth = ctx.measureText(String(data.score)).width;
-    ctx.fillText(String(data.score), contentPadding + frameWidth, scoreY);
-    
-    // "/ 100"
-    ctx.font = "600 32px system-ui, -apple-system, sans-serif";
-    ctx.fillStyle = "#a1a1aa";
-    ctx.fillText("/ 100", contentPadding + frameWidth + scoreTextWidth + 16, scoreY + 54);
-
-    // Right: Classification Badge - CLEANER STYLE
-    ctx.textAlign = "right";
-    
-    // Label
-    ctx.font = "500 20px monospace, 'Courier New', Courier";
-    ctx.fillStyle = "#71717a";
-    ctx.fillText("CLASSIFICATION", width - (contentPadding + frameWidth), footerY);
-    
-    // Badge (Outlined instead of filled)
-    const badgeY = scoreY + 10;
-    ctx.font = "700 32px monospace, 'Courier New', Courier";
-    const badgeTextWidth = ctx.measureText(riskLabel).width + 64;
-    
-    ctx.strokeStyle = colors.main;
-    ctx.lineWidth = 4;
     ctx.beginPath();
-    ctx.roundRect(width - (contentPadding + frameWidth) - badgeTextWidth, badgeY, badgeTextWidth, 70, 4);
+    ctx.moveTo(innerX, footerY - 80);
+    ctx.lineTo(innerX + innerW, footerY - 80);
+    ctx.stroke();
+
+    // Score Group
+    const scoreGroupY = footerY - 40;
+    
+    // Mini Gauge Ring
+    const gaugeSize = 80;
+    const gaugeX = innerX + 40;
+    const gaugeY = scoreGroupY;
+    
+    ctx.lineWidth = 8;
+    ctx.lineCap = "round";
+    
+    // Background Arc
+    ctx.strokeStyle = colors.bg;
+    ctx.beginPath();
+    ctx.arc(gaugeX, gaugeY, 32, 0, Math.PI * 2);
     ctx.stroke();
     
-    ctx.fillStyle = colors.text;
+    // Active Arc
+    ctx.strokeStyle = colors.main;
+    ctx.beginPath();
+    const endAngle = (Math.PI * 2) * (data.score / 100) - (Math.PI / 2);
+    ctx.arc(gaugeX, gaugeY, 32, -Math.PI / 2, endAngle);
+    ctx.stroke();
+    
+    // Score Text inside gauge
+    ctx.font = "800 24px system-ui, -apple-system, sans-serif";
+    ctx.fillStyle = colors.main;
+    ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText(riskLabel, width - (contentPadding + frameWidth) - 32, badgeY + 35);
+    ctx.fillText(String(data.score), gaugeX, gaugeY + 2);
+
+    // Text Label next to gauge
+    ctx.textAlign = "left";
+    ctx.fillStyle = "#a1a1aa"; // zinc-400
+    ctx.font = "600 16px system-ui, -apple-system, sans-serif";
+    ctx.fillText("BAIT SCORE", innerX + 100, scoreGroupY - 12);
+    
+    ctx.fillStyle = "#18181b"; // zinc-900
+    ctx.font = "700 32px system-ui, -apple-system, sans-serif";
+    ctx.fillText(`${data.score} / 100`, innerX + 100, scoreGroupY + 16);
+
+    // Verdict Badge (Right Aligned)
+    ctx.font = "700 24px system-ui, -apple-system, sans-serif";
+    const badgeTextWidth = ctx.measureText(riskLabel).width;
+    const badgePaddingX = 32;
+    const badgeW = badgeTextWidth + (badgePaddingX * 2);
+    const badgeH = 56;
+    const badgeX = innerX + innerW - badgeW;
+    const badgeYStart = scoreGroupY - (badgeH / 2);
+
+    ctx.fillStyle = colors.bg;
+    ctx.beginPath();
+    ctx.roundRect(badgeX, badgeYStart, badgeW, badgeH, 16);
+    ctx.fill();
+
+    ctx.fillStyle = colors.text;
+    ctx.textAlign = "center";
+    ctx.fillText(riskLabel, badgeX + (badgeW/2), scoreGroupY + 2);
 
     // Convert to blob
     canvas.toBlob(
