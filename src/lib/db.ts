@@ -1201,15 +1201,15 @@ export async function getViralMetrics(): Promise<ViralMetrics> {
       WHERE created_at > NOW() - INTERVAL '1 day' AND ip_address IS NOT NULL
     `;
 
-    // Analyses for share rate calculation
-    const [weekAnalysesResult] = await getDb()`
-      SELECT COUNT(*) as count FROM ragecheck_analyses
-      WHERE created_at > NOW() - INTERVAL '7 days' AND success = true
+    // Unique users for share rate calculation (unique sharers / unique analyzers)
+    const [weekUniqueAnalyzersResult] = await getDb()`
+      SELECT COUNT(DISTINCT ip_address) as count FROM ragecheck_analyses
+      WHERE created_at > NOW() - INTERVAL '7 days' AND success = true AND ip_address IS NOT NULL
     `;
 
-    const [weekSharesResult] = await getDb()`
-      SELECT COUNT(*) as count FROM ragecheck_shares
-      WHERE created_at > NOW() - INTERVAL '7 days'
+    const [weekUniqueSharersResult] = await getDb()`
+      SELECT COUNT(DISTINCT ip_address) as count FROM ragecheck_shares
+      WHERE created_at > NOW() - INTERVAL '7 days' AND ip_address IS NOT NULL
     `;
 
     // Traffic baseline comparison (today vs 7-day average)
@@ -1250,31 +1250,32 @@ export async function getViralMetrics(): Promise<ViralMetrics> {
       LIMIT 10
     `;
 
-    // K-factor estimation: (shares per user) × (conversion rate from shares)
-    // We estimate conversion by looking at referrer patterns
+    // K-factor estimation: (unique sharers / unique users) × (conversion rate from shares)
     const uniqueUsers = Number(uniqueUsersResult.count) || 1;
-    const totalShares = Number(totalSharesResult.count) || 0;
-    const sharesPerUser = totalShares / uniqueUsers;
+    const uniqueSharers = Number(uniqueSharersResult.count) || 0;
+    const shareRateDecimal = uniqueSharers / uniqueUsers; // What % of users share
 
     // Estimate conversion from shares (visitors with referrer containing our domain or share params)
     const [referralVisitsResult] = await getDb()`
       SELECT COUNT(*) as count FROM ragecheck_visitors
       WHERE referrer LIKE '%ragecheck%' OR referrer LIKE '%share%'
     `;
-    const referralConversion = totalShares > 0
-      ? Number(referralVisitsResult.count) / totalShares
+    const referralConversion = uniqueSharers > 0
+      ? Number(referralVisitsResult.count) / uniqueSharers
       : 0;
 
-    const kFactor = sharesPerUser * Math.min(referralConversion, 1);
+    // K-factor = share rate × referral conversion (how many new users each share brings)
+    const kFactor = shareRateDecimal * Math.min(referralConversion, 1);
 
     // Calculate metrics
     const repeatUsers = Number(repeatUserResult[0]?.count) || 0;
     const repeatRate = uniqueUsers > 0 ? (repeatUsers / uniqueUsers) * 100 : 0;
     const avgVisitsPerUser = Number(avgVisitsResult.avg) || 1;
 
-    const weekAnalyses = Number(weekAnalysesResult.count) || 1;
-    const weekShares = Number(weekSharesResult.count) || 0;
-    const shareRate = (weekShares / weekAnalyses) * 100;
+    // Share rate: what % of users who analyzed also shared (based on unique IPs)
+    const weekUniqueAnalyzers = Number(weekUniqueAnalyzersResult.count) || 1;
+    const weekUniqueSharers = Number(weekUniqueSharersResult.count) || 0;
+    const shareRate = (weekUniqueSharers / weekUniqueAnalyzers) * 100;
 
     const todayVisitors = Number(todayVisitorsResult.count) || 0;
     const avgDailyVisitors = Number(avgDailyVisitorsResult.avg) || 1;
@@ -1285,8 +1286,8 @@ export async function getViralMetrics(): Promise<ViralMetrics> {
       repeatUsers,
       repeatRate: Math.round(repeatRate * 10) / 10,
       avgVisitsPerUser: Math.round(avgVisitsPerUser * 10) / 10,
-      totalShares,
-      uniqueSharers: Number(uniqueSharersResult.count) || 0,
+      totalShares: Number(totalSharesResult.count) || 0,
+      uniqueSharers,
       todayShares: Number(todaySharesResult.count) || 0,
       todayUniqueSharers: Number(todayUniqueSharersResult.count) || 0,
       shareRate: Math.round(shareRate * 10) / 10,
