@@ -11,6 +11,7 @@ export interface ShareImageData {
   signalBreakdown: SignalBreakdown;
   techniqueExplanations?: string[];
   sharingPatterns?: string[];
+  shareCardSummary?: string;
 }
 
 export type ImageSize = "x" | "bluesky";
@@ -206,40 +207,23 @@ export function generateShareImage(
       ctx.fill();
     });
 
-    // === FORENSIC NOTES (New Section) ===
-    // If we have techniques or triggers, show them
-    if (data.techniqueExplanations?.length || data.sharingPatterns?.length) {
-        const notesY = signalGridY + 100;
-        
+    // === VERDICT SUMMARY ===
+    // Show Claude's punchy one-line summary of the manipulation verdict
+    if (data.shareCardSummary) {
+        const summaryY = signalGridY + 100;
+
         ctx.font = "500 20px monospace, 'Courier New', Courier";
         ctx.fillStyle = "#71717a";
-        ctx.fillText("FORENSIC_NOTES", contentPadding + frameWidth, notesY);
+        ctx.fillText("VERDICT", contentPadding + frameWidth, summaryY);
 
-        let noteIndex = 0;
-        const noteLineHeight = 36;
-        const noteStartTextY = notesY + 40;
+        ctx.font = "600 26px system-ui, -apple-system, sans-serif";
+        ctx.fillStyle = "#18181b";
 
-        ctx.font = "500 22px system-ui, -apple-system, sans-serif";
-        ctx.fillStyle = "#3f3f46";
+        let summaryText = data.shareCardSummary;
+        // Truncate if too long
+        if (summaryText.length > 70) summaryText = summaryText.substring(0, 67) + "...";
 
-        // Show top technique
-        if (data.techniqueExplanations && data.techniqueExplanations.length > 0) {
-            let textToDraw = `• ${data.techniqueExplanations[0]}`;
-
-            // Truncate if too long
-            if (textToDraw.length > 85) textToDraw = textToDraw.substring(0, 82) + "...";
-
-            ctx.fillText(textToDraw, contentPadding + frameWidth, noteStartTextY + (noteIndex * noteLineHeight));
-            noteIndex++;
-        }
-
-        // Show top viral trigger
-        if (data.sharingPatterns && data.sharingPatterns.length > 0 && noteIndex < 2) {
-             let pattern = data.sharingPatterns[0];
-             let textToDraw = `• ${pattern}`;
-             if (textToDraw.length > 85) textToDraw = textToDraw.substring(0, 82) + "...";
-             ctx.fillText(textToDraw, contentPadding + frameWidth, noteStartTextY + (noteIndex * noteLineHeight));
-        }
+        ctx.fillText(summaryText, contentPadding + frameWidth, summaryY + 36);
     }
 
     // === FOOTER (Data Dashboard) ===

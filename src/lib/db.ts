@@ -136,6 +136,7 @@ export async function initDB() {
     await getDb()`ALTER TABLE ragecheck_analyses ADD COLUMN IF NOT EXISTS text_preview TEXT`;
     await getDb()`ALTER TABLE ragecheck_analyses ADD COLUMN IF NOT EXISTS sharing_patterns JSONB`;
     await getDb()`ALTER TABLE ragecheck_analyses ADD COLUMN IF NOT EXISTS technique_explanations JSONB`;
+    await getDb()`ALTER TABLE ragecheck_analyses ADD COLUMN IF NOT EXISTS share_card_summary TEXT`;
   } catch {
     // Columns may already exist
   }
@@ -169,6 +170,7 @@ export interface AnalysisLog {
   textPreview?: string;
   sharingPatterns?: string[];
   techniqueExplanations?: string[];
+  shareCardSummary?: string;
 }
 
 function detectPlatform(domain: string): string {
@@ -200,7 +202,7 @@ export async function logAnalysis(data: AnalysisLog) {
           signal_us_vs_them, signal_engagement_bait, success, error,
           ip_address, user_agent, country, is_bot,
           title, reasons, highlights, context_notes, text_preview,
-          sharing_patterns, technique_explanations
+          sharing_patterns, technique_explanations, share_card_summary
         ) VALUES (
           ${data.url},
           ${data.sourceDomain || null},
@@ -225,7 +227,8 @@ export async function logAnalysis(data: AnalysisLog) {
           ${data.contextNotes || null},
           ${data.textPreview || null},
           ${data.sharingPatterns ? JSON.stringify(data.sharingPatterns) : null},
-          ${data.techniqueExplanations ? JSON.stringify(data.techniqueExplanations) : null}
+          ${data.techniqueExplanations ? JSON.stringify(data.techniqueExplanations) : null},
+          ${data.shareCardSummary || null}
         )
       `;
     });
@@ -436,6 +439,7 @@ export interface CachedAnalysis {
   textPreview: string | null;
   sharingPatterns: string[];
   techniqueExplanations: string[];
+  shareCardSummary: string | null;
 }
 
 // Invalidate incomplete cache entries (those without textPreview)
@@ -474,7 +478,7 @@ export async function getCachedAnalysis(url: string): Promise<CachedAnalysis | n
           signal_loaded_language, signal_absolutist, signal_threat_panic,
           signal_us_vs_them, signal_engagement_bait, created_at,
           title, reasons, highlights, context_notes, text_preview,
-          sharing_patterns, technique_explanations
+          sharing_patterns, technique_explanations, share_card_summary
         FROM ragecheck_analyses
         WHERE url = ${url}
           AND success = true
@@ -527,6 +531,7 @@ export async function getCachedAnalysis(url: string): Promise<CachedAnalysis | n
         textPreview: result.text_preview || null,
         sharingPatterns,
         techniqueExplanations,
+        shareCardSummary: result.share_card_summary || null,
       };
     }
 

@@ -23,6 +23,7 @@ export interface AnalyzeResponse {
   image?: string;
   sharingPatterns?: string[];
   techniqueExplanations?: string[];
+  shareCardSummary?: string;
   cached?: boolean;
 }
 
@@ -112,6 +113,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<AnalyzeRe
         llmEnhanced: true,
         sharingPatterns: result.sharingPatterns,
         techniqueExplanations: result.techniqueExplanations,
+        shareCardSummary: result.shareCardSummary,
       });
     }
 
@@ -153,6 +155,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<AnalyzeRe
         contextNotes: cached.contextNotes || undefined,
         sharingPatterns: cached.sharingPatterns,
         techniqueExplanations: cached.techniqueExplanations,
+        shareCardSummary: cached.shareCardSummary || undefined,
         cached: true,
       });
     }
@@ -197,6 +200,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<AnalyzeRe
     let contextNotes: string | undefined;
     let sharingPatterns: string[] | undefined;
     let techniqueExplanations: string[] | undefined;
+    let shareCardSummary: string | undefined;
 
     if (isLLMAvailable()) {
       const llmResult = await enhanceWithLLM({
@@ -213,6 +217,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<AnalyzeRe
         contextNotes = llmResult.contextNotes;
         sharingPatterns = llmResult.sharingPatterns;
         techniqueExplanations = llmResult.techniqueExplanations;
+        shareCardSummary = llmResult.shareCardSummary;
         llmEnhanced = true;
       }
     }
@@ -238,6 +243,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<AnalyzeRe
       textPreview,
       sharingPatterns,
       techniqueExplanations,
+      shareCardSummary,
     });
 
     return NextResponse.json({
@@ -255,6 +261,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<AnalyzeRe
       image: extracted.image,
       sharingPatterns,
       techniqueExplanations,
+      shareCardSummary,
     });
   } catch (error) {
     console.error("Analyze error:", error);

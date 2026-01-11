@@ -45,6 +45,7 @@ interface AnalysisResult {
   contextNotes?: string;
   sharingPatterns?: string[];
   techniqueExplanations?: string[];
+  shareCardSummary?: string;
   image?: string;
 }
 
@@ -892,6 +893,7 @@ export default function Home() {
         signalBreakdown: result.signalBreakdown,
         techniqueExplanations: result.techniqueExplanations,
         sharingPatterns: result.sharingPatterns,
+        shareCardSummary: result.shareCardSummary,
       });
 
       if (success && !silent) {

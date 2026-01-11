@@ -11,6 +11,7 @@ export interface LLMAnalysis {
   contextNotes?: string;
   sharingPatterns?: string[];
   techniqueExplanations?: string[];
+  shareCardSummary?: string;
 }
 
 const SYSTEM_PROMPT = `You are an expert at detecting outrage bait and manipulative framing in media. Your job is to analyze text and identify patterns designed to provoke emotional reactions rather than inform.
@@ -86,7 +87,8 @@ Respond with this exact JSON structure:
   "reasons": [<3-5 concise bullet points explaining the score>],
   "contextNotes": "<optional: note if rule-based score was misleading due to context>",
   "sharingPatterns": [<2-3 reasons why content like this tends to spread, e.g. "Validates pre-existing fears about X", "Creates strong in-group identification", "Outrage drives more engagement than nuance">],
-  "techniqueExplanations": [<2-3 specific manipulation techniques used, with brief explanations, e.g. "Fear appeal: Uses threat of harm to bypass rational evaluation", "Loaded framing: Describes neutral facts using emotionally charged language">]
+  "techniqueExplanations": [<2-3 specific manipulation techniques used, with brief explanations, e.g. "Fear appeal: Uses threat of harm to bypass rational evaluation", "Loaded framing: Describes neutral facts using emotionally charged language">],
+  "shareCardSummary": "<ONE punchy 8-12 word sentence summarizing the manipulation verdict for social sharing, e.g. 'Uses fear framing to bypass critical thinking' or 'Straightforward reporting with minimal emotional spin'>"
 }`;
 
   try {
@@ -122,6 +124,7 @@ Respond with this exact JSON structure:
       contextNotes: parsed.contextNotes,
       sharingPatterns: parsed.sharingPatterns || [],
       techniqueExplanations: parsed.techniqueExplanations || [],
+      shareCardSummary: parsed.shareCardSummary,
     };
   } catch (error) {
     console.error("LLM analysis failed:", error);
@@ -145,6 +148,7 @@ export interface ImageAnalysisResult {
   highlights?: Highlight[];
   sharingPatterns?: string[];
   techniqueExplanations?: string[];
+  shareCardSummary?: string;
 }
 
 const IMAGE_ANALYSIS_PROMPT = `You are analyzing a screenshot of a social media post or article. Your task is to:
@@ -177,7 +181,8 @@ Respond with this exact JSON structure:
   "reasons": [<3-5 concise bullet points explaining the score>],
   "highlights": [{"text": "<problematic phrase>", "category": "<signal category>"}],
   "sharingPatterns": [<2-3 reasons why this content spreads>],
-  "techniqueExplanations": [<2-3 specific manipulation techniques used>]
+  "techniqueExplanations": [<2-3 specific manipulation techniques used>],
+  "shareCardSummary": "<ONE punchy 8-12 word sentence summarizing the verdict for social sharing>"
 }`;
 
 export async function analyzeImageWithVision(
@@ -264,6 +269,7 @@ export async function analyzeImageWithVision(
       })),
       sharingPatterns: parsed.sharingPatterns || [],
       techniqueExplanations: parsed.techniqueExplanations || [],
+      shareCardSummary: parsed.shareCardSummary,
     };
   } catch (error) {
     console.error("Image analysis failed:", error);
