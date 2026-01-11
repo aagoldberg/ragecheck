@@ -1,4 +1,4 @@
-export { getHookLine, getTriggersLine, SIGNAL_SHORT_LABELS } from "./getHookLine";
+export { getHookLine, SIGNAL_SHORT_LABELS } from "./getHookLine";
 export type { HookLineResult } from "./getHookLine";
 
 export {

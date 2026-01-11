@@ -9,7 +9,7 @@ export async function GET(request: NextRequest) {
   const domain = searchParams.get("domain") || "Unknown source";
   const title = searchParams.get("title") || "Content Analysis";
 
-  // Scientific Palette
+  // Scientific Palette - Muted/Professional
   const getColors = (s: number) => {
     if (s <= 33) return { main: "#10b981", text: "#047857" }; // Emerald
     if (s <= 66) return { main: "#f59e0b", text: "#b45309" }; // Amber
@@ -19,16 +19,16 @@ export async function GET(request: NextRequest) {
   const colors = getColors(score);
   
   const getRiskLabel = (s: number) => {
-    if (s <= 33) return "LOW_RISK_DETECTED";
-    if (s <= 66) return "MEDIUM_RISK_DETECTED";
-    return "HIGH_RISK_DETECTED";
+    if (s <= 33) return "LOW RISK";
+    if (s <= 66) return "MEDIUM RISK";
+    return "HIGH RISK";
   };
 
   const riskLabel = getRiskLabel(score);
   const date = new Date().toISOString().split("T")[0];
   const reportId = Math.random().toString(36).substring(7).toUpperCase();
 
-  // Truncate title for clean display (Canvas-like truncation)
+  // Truncate title for clean display
   const displayTitle = title.length > 100 ? title.substring(0, 97) + "..." : title;
 
   return new ImageResponse(
@@ -59,7 +59,7 @@ export async function GET(request: NextRequest) {
             borderBottom: "2px solid #e4e4e7",
             color: "#71717a",
             fontSize: "24px",
-            paddingBottom: "24px", // Visual padding for the border
+            paddingBottom: "24px",
           }}
         >
           <span>RAGECHECK_ANALYSIS_V1</span>
@@ -72,8 +72,8 @@ export async function GET(request: NextRequest) {
           style={{
             display: "flex",
             flexDirection: "column",
-            flex: 1, // Fill available space
-            justifyContent: "center", // Center vertically
+            flex: 1,
+            justifyContent: "center",
             gap: "32px",
           }}
         >
@@ -142,16 +142,17 @@ export async function GET(request: NextRequest) {
             </div>
           </div>
 
-          {/* Right: Classification */}
+          {/* Right: Classification - CLEANER STYLE */}
           <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
             <span style={{ fontSize: "20px", color: "#71717a", marginBottom: "12px" }}>
               CLASSIFICATION
             </span>
             <div
               style={{
-                backgroundColor: colors.main,
-                color: "white",
-                padding: "16px 32px",
+                backgroundColor: "#ffffff", // White bg
+                border: `4px solid ${colors.main}`, // Colored border instead of fill
+                color: colors.text,
+                padding: "14px 32px",
                 borderRadius: "4px",
                 display: "flex",
                 alignItems: "center",

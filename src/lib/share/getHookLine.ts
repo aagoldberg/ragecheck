@@ -85,14 +85,4 @@ export function getHookLine(
   };
 }
 
-/**
- * Get a "triggers" line listing the top signals
- */
-export function getTriggersLine(topSignals: string[]): string {
-  if (topSignals.length === 0) {
-    return "";
-  }
-  return `Triggers: ${topSignals.join(", ")}`;
-}
-
 export { SIGNAL_SHORT_LABELS };
