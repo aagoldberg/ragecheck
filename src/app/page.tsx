@@ -219,6 +219,14 @@ const SIGNAL_LABELS: Record<keyof SignalBreakdown, string> = {
   call_to_conflict: "Call-to-Conflict",
 };
 
+const SIGNAL_DESCRIPTIONS: Record<keyof SignalBreakdown, string> = {
+  arousal: "Language designed to trigger immediate physical reactions like fear, anger, or disgust using intensity and urgency.",
+  enemy_construction: "Rhetoric that frames an opponent not just as wrong, but as an existential threat or evil force.",
+  moral_condemnation: "Framing an issue as a black-and-white battle between good and evil to bypass rational debate.",
+  simplification: "Stripping away nuance to present complex issues as simple binary choices or obvious truths.",
+  call_to_conflict: "Direct or indirect encouragement to attack, harass, or view the 'other side' as an enemy to be defeated.",
+};
+
 // Professional Palette for 5-bar model
 const CATEGORY_COLORS: Record<string, string> = {
   arousal: "bg-rose-100 text-rose-800 dark:bg-rose-900/30 dark:text-rose-200",
@@ -300,7 +308,7 @@ function ScoreGauge({ score }: { score: number; label?: string }) {
   );
 }
 
-function SignalBar({ label, value }: { label: string; value: number }) {
+function SignalBar({ label, value, description }: { label: string; value: number; description?: string }) {
   const getBarColor = (val: number) => {
     if (val < 33) return "bg-emerald-500";
     if (val < 66) return "bg-amber-500";
@@ -309,10 +317,23 @@ function SignalBar({ label, value }: { label: string; value: number }) {
 
   return (
     <div className="group">
-      <div className="flex justify-between mb-2">
-        <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400 group-hover:text-zinc-900 dark:group-hover:text-zinc-200 transition-colors">
-          {label}
-        </span>
+      <div className="flex justify-between mb-2 items-center">
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400 group-hover:text-zinc-900 dark:group-hover:text-zinc-200 transition-colors">
+            {label}
+          </span>
+          {description && (
+            <div className="relative group/info cursor-help">
+              <svg className="w-3.5 h-3.5 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 w-48 p-2 bg-zinc-900 text-white text-[10px] leading-tight rounded shadow-lg opacity-0 invisible group-hover/info:opacity-100 group-hover/info:visible transition-all z-10 pointer-events-none">
+                {description}
+                <div className="absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-zinc-900"></div>
+              </div>
+            </div>
+          )}
+        </div>
         <span className="text-xs font-mono font-medium text-zinc-500">{Math.round(value)}%</span>
       </div>
       <div className="h-2.5 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
@@ -1063,10 +1084,48 @@ export default function Home() {
               </div>
             )}
           </form>
-
-          {/* Loading State - under input bar */}
-          {loading && <AnalyzingProgress />}
         </div>
+
+        {/* How it Works Section */}
+        {(!result || isDemo) && (
+          <div className="max-w-4xl mx-auto mb-20 animate-in fade-in slide-in-from-bottom-6 duration-700 delay-100">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              <div className="text-center p-6 bg-white dark:bg-zinc-900/50 rounded-2xl border border-zinc-100 dark:border-zinc-800">
+                <div className="w-12 h-12 mx-auto bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 rounded-full flex items-center justify-center mb-4">
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                  </svg>
+                </div>
+                <h3 className="font-bold text-zinc-900 dark:text-zinc-100 mb-2">1. Paste a Link</h3>
+                <p className="text-sm text-zinc-500 leading-relaxed">
+                  Drop in a URL from any major news site or social platform (X, Bluesky, Threads).
+                </p>
+              </div>
+              <div className="text-center p-6 bg-white dark:bg-zinc-900/50 rounded-2xl border border-zinc-100 dark:border-zinc-800">
+                <div className="w-12 h-12 mx-auto bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 rounded-full flex items-center justify-center mb-4">
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.384-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+                  </svg>
+                </div>
+                <h3 className="font-bold text-zinc-900 dark:text-zinc-100 mb-2">2. Analyze Patterns</h3>
+                <p className="text-sm text-zinc-500 leading-relaxed">
+                  Our system scans for 5 key markers of manipulation: Arousal, Moral Condemnation, and more.
+                </p>
+              </div>
+              <div className="text-center p-6 bg-white dark:bg-zinc-900/50 rounded-2xl border border-zinc-100 dark:border-zinc-800">
+                <div className="w-12 h-12 mx-auto bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 rounded-full flex items-center justify-center mb-4">
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <h3 className="font-bold text-zinc-900 dark:text-zinc-100 mb-2">3. See Reality</h3>
+                <p className="text-sm text-zinc-500 leading-relaxed">
+                  Get a clear "Bait Score" and highlighted examples of how the text tries to manipulate you.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Live Headlines Section */}
         {(!result || isDemo) && (
@@ -1512,7 +1571,11 @@ export default function Home() {
                           className={`cursor-pointer hover:opacity-80 transition-opacity ${activeFilter && activeFilter !== key ? 'opacity-30' : ''}`}
                           onClick={() => setActiveFilter(activeFilter === key ? null : key)}
                          >
-                           <SignalBar label={SIGNAL_LABELS[key as keyof SignalBreakdown]} value={value} />
+                           <SignalBar 
+                             label={SIGNAL_LABELS[key as keyof SignalBreakdown]} 
+                             value={value} 
+                             description={SIGNAL_DESCRIPTIONS[key as keyof SignalBreakdown]}
+                           />
                          </div>
                       ))}
                     </div>

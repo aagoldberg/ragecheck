@@ -82,49 +82,49 @@ export function getTopDrivers(
 
 /**
  * Hook line library organized by category and register
- * Tone: Observational, Analytic, invitational (Media Literacy focus)
+ * Tone: Accessible, observational, non-judgmental
  */
 const HOOK_LINES = {
   // High bait (75+)
   high: [
-    "High intensity framing.",
-    "Significant emotional patterning.",
-    "Analysis: High friction.",
-    "Strong persuasive elements.",
+    "Heavy on emotion.",
+    "Designed to get a reaction.",
+    "Strong emotional pull.",
+    "Pushing buttons.",
   ],
   // Arousal-focused
   arousal: [
-    "Heavy reliance on emotion.",
-    "High emotional signal.",
-    "Charged language detected.",
-    "Intense emotional framing.",
+    "Lots of charged language.",
+    "Leans on emotion.",
+    "Emotionally charged.",
+    "High on intensity.",
   ],
   // Enemy framing focused
   enemy: [
-    "Us-vs-them framing.",
-    "Group identity focus.",
-    "Conflict-centered narrative.",
-    "Sharp group boundaries.",
+    "Draws clear sides.",
+    "Us vs. them setup.",
+    "Picks a villain.",
+    "Takes sides.",
   ],
   // Moral outrage focused
   moral: [
-    "Moralized framing.",
-    "Focus on moral conflict.",
-    "Values-based appeal.",
+    "Appeals to outrage.",
+    "Heavy on moral framing.",
+    "Plays to values.",
   ],
   // Medium bait (50-74)
   medium: [
-    "Complex framing patterns.",
-    "Worth a closer look.",
-    "Mixed signal analysis.",
-    "Notice the rhetoric.",
+    "Some emotional framing.",
+    "Worth a second look.",
+    "Mixed signals.",
+    "A few hooks in here.",
   ],
   // Low bait (0-49)
   low: [
-    "Information-first reporting.",
-    "Neutral framing style.",
-    "Substance-focused.",
-    "Low friction analysis.",
+    "Pretty straightforward.",
+    "Sticks to the facts.",
+    "Mostly substance.",
+    "Light on emotion.",
   ],
 };
 
@@ -190,33 +190,33 @@ export function getDeterministicHookLine(
   // High bait score (75+)
   if (baitScore >= 75) {
     if (primaryKey.includes("arousal") && primaryValue >= 60) {
-      return "High emotional intensity.";
+      return "Lots of charged language.";
     }
     if (primaryKey.includes("enemy") && primaryValue >= 60) {
-      return "Strong us-vs-them framing.";
+      return "Draws clear sides.";
     }
-    return "Significant framing patterns.";
+    return "Heavy on emotion.";
   }
 
   // Medium-high (60-74)
   if (baitScore >= 60) {
-    if (primaryKey.includes("arousal")) return "Charged language detected.";
-    if (primaryKey.includes("enemy")) return "Group conflict focus.";
-    if (primaryKey.includes("moral")) return "Moralized narrative.";
-    return "Complex framing patterns.";
+    if (primaryKey.includes("arousal")) return "Leans on emotion.";
+    if (primaryKey.includes("enemy")) return "Us vs. them setup.";
+    if (primaryKey.includes("moral")) return "Appeals to outrage.";
+    return "Strong emotional pull.";
   }
 
   // Medium (40-59)
   if (baitScore >= 40) {
-    return "Worth a closer look.";
+    return "Worth a second look.";
   }
 
   // Low (0-39)
   if (baitScore >= 20) {
-    return "Substance-focused.";
+    return "Mostly substance.";
   }
 
-  return "Neutral framing style.";
+  return "Sticks to the facts.";
 }
 
 /**
