@@ -264,15 +264,29 @@ export function renderShareCard(
                 borderRadius: "6px",
               }}
             />
-            <span
-              style={{
-                color: "#fafafa",
-                fontSize: "22px",
-                fontWeight: 700,
-              }}
-            >
-              RageCheck
-            </span>
+            <div style={{ display: "flex", flexDirection: "column" }}>
+              <span
+                style={{
+                  color: "#fafafa",
+                  fontSize: "20px",
+                  fontWeight: 700,
+                  lineHeight: 1.1,
+                }}
+              >
+                RageCheck
+              </span>
+              <span
+                style={{
+                  color: "#71717a",
+                  fontSize: "12px",
+                  fontWeight: 500,
+                  textTransform: "lowercase",
+                  letterSpacing: "0.2px",
+                }}
+              >
+                emotional analysis
+              </span>
+            </div>
           </div>
 
           {/* URL */}
@@ -333,14 +347,6 @@ function DriverRow({
           {isPrimary ? "Primary: " : "Secondary: "}
           {driver.label}
         </span>
-        <span
-          style={{
-            color: "#71717a",
-            fontSize: "16px",
-          }}
-        >
-          {driver.value}%
-        </span>
       </div>
 
       {/* Progress bar */}
@@ -348,9 +354,9 @@ function DriverRow({
         style={{
           display: "flex",
           width: "100%",
-          height: "8px",
+          height: "6px",
           background: "#3f3f46",
-          borderRadius: "4px",
+          borderRadius: "3px",
           overflow: "hidden",
         }}
       >
@@ -359,7 +365,7 @@ function DriverRow({
             width: `${driver.value}%`,
             height: "100%",
             background: barColor,
-            borderRadius: "4px",
+            borderRadius: "3px",
           }}
         />
       </div>

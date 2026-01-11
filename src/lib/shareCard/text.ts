@@ -35,7 +35,7 @@ const SIGNAL_LABELS: Record<string, string> = {
 export function getVerdict(baitScore: number): Verdict {
   if (baitScore <= 29) return { label: "Low bait", sub: "Mostly substance" };
   if (baitScore <= 49) return { label: "Mild", sub: "Some emotional framing" };
-  if (baitScore <= 69) return { label: "Borderline", sub: "Leaning emotional" };
+  if (baitScore <= 69) return { label: "Borderline", sub: "Leaning emotional framing" };
   if (baitScore <= 84) return { label: "High bait", sub: "Optimized for reaction" };
   return { label: "Very high", sub: "Designed to provoke" };
 }
@@ -81,22 +81,22 @@ export function getTopDrivers(
 }
 
 /**
- * Hook line library organized by category
+ * Hook line library organized by category and register
  */
 const HOOK_LINES = {
   // High bait (75+)
   high: [
-    "This one's trying to start something.",
-    "Engineered for reaction.",
     "This is doing a lot.",
+    "Engineered for reaction.",
+    "This one's trying to start something.",
     "Built to go viral.",
   ],
   // Arousal-focused
   arousal: [
-    "This one's pushing buttons.",
     "High heat, low nuance.",
+    "This one's pushing buttons.",
     "Notice the emotional framing.",
-    "Feelings over facts here.",
+    "Built for reaction.",
   ],
   // Enemy framing focused
   enemy: [
@@ -139,40 +139,40 @@ export function getHookLine(baitScore: number, topDrivers: Driver[]): string {
   if (baitScore >= 75) {
     // Check for specific high drivers
     if (primaryKey.includes("arousal") && primaryValue >= 60) {
-      return pickRandom(HOOK_LINES.arousal);
+      return pickDeterministic(HOOK_LINES.arousal, baitScore);
     }
     if (primaryKey.includes("enemy") && primaryValue >= 60) {
-      return pickRandom(HOOK_LINES.enemy);
+      return pickDeterministic(HOOK_LINES.enemy, baitScore);
     }
-    return pickRandom(HOOK_LINES.high);
+    return pickDeterministic(HOOK_LINES.high, baitScore);
   }
 
   // Medium-high (50-74)
   if (baitScore >= 50) {
     // Check dominant driver
     if (primaryKey.includes("arousal") && primaryValue >= 50) {
-      return pickRandom(HOOK_LINES.arousal);
+      return pickDeterministic(HOOK_LINES.arousal, baitScore);
     }
     if (primaryKey.includes("enemy") && primaryValue >= 50) {
-      return pickRandom(HOOK_LINES.enemy);
+      return pickDeterministic(HOOK_LINES.enemy, baitScore);
     }
     if (primaryKey.includes("moral") && primaryValue >= 50) {
-      return pickRandom(HOOK_LINES.moral);
+      return pickDeterministic(HOOK_LINES.moral, baitScore);
     }
-    return pickRandom(HOOK_LINES.medium);
+    return pickDeterministic(HOOK_LINES.medium, baitScore);
   }
 
   // Low bait (0-49)
-  return pickRandom(HOOK_LINES.low);
+  return pickDeterministic(HOOK_LINES.low, baitScore);
 }
 
 /**
- * Pick a random item from an array (deterministic based on score for consistency)
+ * Pick an item from an array deterministically based on score
  */
-function pickRandom(arr: string[]): string {
-  // Use first item for consistency in image generation
-  // (same input = same output for caching)
-  return arr[0];
+function pickDeterministic(arr: string[], seed: number): string {
+  if (arr.length === 0) return "";
+  const index = Math.abs(seed) % arr.length;
+  return arr[index];
 }
 
 /**
@@ -189,7 +189,7 @@ export function getDeterministicHookLine(
   // High bait score (75+)
   if (baitScore >= 75) {
     if (primaryKey.includes("arousal") && primaryValue >= 60) {
-      return "This one's pushing buttons.";
+      return "This is doing a lot.";
     }
     if (primaryKey.includes("enemy") && primaryValue >= 60) {
       return "Watch the us-vs-them.";
@@ -201,13 +201,13 @@ export function getDeterministicHookLine(
   if (baitScore >= 60) {
     if (primaryKey.includes("arousal")) return "High heat, low nuance.";
     if (primaryKey.includes("enemy")) return "Classic enemy framing.";
-    if (primaryKey.includes("moral")) return "Heavy on moral framing.";
-    return "Worth a second look.";
+    if (primaryKey.includes("moral")) return "Notice the emotional framing.";
+    return "Built for reaction.";
   }
 
   // Medium (40-59)
   if (baitScore >= 40) {
-    return "Some emotional hooks here.";
+    return "Worth a second look.";
   }
 
   // Low (0-39)
@@ -215,7 +215,7 @@ export function getDeterministicHookLine(
     return "Mostly substance here.";
   }
 
-  return "Low on emotional hooks.";
+  return "Light on emotional hooks.";
 }
 
 /**
