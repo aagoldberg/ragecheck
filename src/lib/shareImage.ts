@@ -1,5 +1,5 @@
-// Canvas-based share image generator matching the server-rendered design
-// Features: compact gauge, signal bars, analysis insights
+// Canvas-based share image generator matching the "Scientific Report" design
+// Features: Monospace header, high-contrast title, precision data footer
 
 import { getScoreColor } from "@/lib/shareCard";
 import type { SignalBreakdown } from "@/lib/score";
@@ -17,114 +17,6 @@ const SIZE_CONFIGS: Record<ImageSize, { width: number; height: number }> = {
   x: { width: 1200, height: 675 },
   bluesky: { width: 1200, height: 630 },
 };
-
-// Signal bar labels
-const SIGNAL_LABELS: Record<string, string> = {
-  arousal: "Emotional Arousal",
-  enemy_construction: "Enemy Framing",
-  moral_condemnation: "Moral Outrage",
-  simplification: "Oversimplification",
-  call_to_conflict: "Call to Conflict",
-};
-
-// Get bar color based on value
-function getBarColor(value: number): string {
-  if (value >= 60) return "#ef4444"; // red
-  if (value >= 30) return "#f59e0b"; // amber
-  return "#22c55e"; // green
-}
-
-// Generate analysis insights based on the data
-function getAnalysisInsights(baitScore: number, bars: { key: string; value: number }[]): string[] {
-  const insights: string[] = [];
-  const sorted = [...bars].sort((a, b) => b.value - a.value);
-
-  // HIGH SCORE (70+): Focus on what's wrong
-  if (baitScore >= 70) {
-    insights.push("High manipulation potential - approach with skepticism");
-
-    for (const bar of sorted) {
-      if (bar.value >= 40 && insights.length < 5) {
-        switch (bar.key) {
-          case "arousal":
-            insights.push("Heavy use of emotionally charged language");
-            break;
-          case "enemy_construction":
-            insights.push("Strong us-vs-them framing detected");
-            break;
-          case "moral_condemnation":
-            insights.push("Appeals to moral outrage over facts");
-            break;
-          case "simplification":
-            insights.push("Complex issues reduced to simple narratives");
-            break;
-          case "call_to_conflict":
-            insights.push("Encourages confrontation or action");
-            break;
-        }
-      }
-    }
-  }
-  // MEDIUM SCORE (40-69): Mixed
-  else if (baitScore >= 40) {
-    insights.push("Some emotional framing detected");
-
-    for (const bar of sorted) {
-      if (bar.value >= 30 && insights.length < 5) {
-        switch (bar.key) {
-          case "arousal":
-            insights.push("Contains emotionally charged language");
-            break;
-          case "enemy_construction":
-            insights.push("Some group-based framing present");
-            break;
-          case "moral_condemnation":
-            insights.push("Moral framing used in places");
-            break;
-          case "simplification":
-            insights.push("Some nuance may be missing");
-            break;
-          case "call_to_conflict":
-            insights.push("Subtle push toward taking sides");
-            break;
-        }
-      }
-    }
-  }
-  // LOW SCORE (<40): Focus on what's good/absent
-  else {
-    if (baitScore < 20) {
-      insights.push("Low manipulation - relatively balanced");
-    } else {
-      insights.push("Minimal emotional manipulation detected");
-    }
-
-    // Add positive observations based on what's LOW
-    const arousal = bars.find(b => b.key === "arousal")?.value || 0;
-    const enemy = bars.find(b => b.key === "enemy_construction")?.value || 0;
-    const moral = bars.find(b => b.key === "moral_condemnation")?.value || 0;
-    const simple = bars.find(b => b.key === "simplification")?.value || 0;
-    const conflict = bars.find(b => b.key === "call_to_conflict")?.value || 0;
-
-    if (arousal < 20) {
-      insights.push("Uses measured, factual language");
-    }
-    if (enemy < 20) {
-      insights.push("Avoids villainizing groups or individuals");
-    }
-    if (moral < 20 && insights.length < 5) {
-      insights.push("Presents information without moral judgment");
-    }
-    if (simple < 20 && insights.length < 5) {
-      insights.push("Acknowledges complexity of the issue");
-    }
-    if (conflict < 20 && insights.length < 5) {
-      insights.push("Doesn't push reader toward confrontation");
-    }
-  }
-
-  return insights.slice(0, 5);
-}
 
 function wrapText(
   ctx: CanvasRenderingContext2D,
@@ -177,205 +69,145 @@ export function generateShareImage(
     const { width, height } = SIZE_CONFIGS[size];
     canvas.width = width;
     canvas.height = height;
-    const padding = 48;
+    
+    // Scientific Palette
+    const getColors = (s: number) => {
+      if (s <= 33) return { main: "#10b981", text: "#047857" }; // Emerald
+      if (s <= 66) return { main: "#f59e0b", text: "#b45309" }; // Amber
+      return { main: "#ef4444", text: "#b91c1c" }; // Red
+    };
 
-    const scoreColor = getScoreColor(data.score);
+    const getRiskLabel = (s: number) => {
+      if (s <= 33) return "LOW_RISK_DETECTED";
+      if (s <= 66) return "MEDIUM_RISK_DETECTED";
+      return "HIGH_RISK_DETECTED";
+    };
 
-    // Truncate title
-    const maxTitleLength = 90;
-    const displayTitle = data.title.length > maxTitleLength
-      ? data.title.slice(0, maxTitleLength - 3) + "..."
-      : data.title;
+    const colors = getColors(data.score);
+    const riskLabel = getRiskLabel(data.score);
+    const date = new Date().toISOString().split("T")[0];
+    const reportId = Math.random().toString(36).substring(7).toUpperCase();
 
-    // Convert signal breakdown to array
-    const barsArray = [
-      { key: "arousal", label: SIGNAL_LABELS.arousal, value: data.signalBreakdown.arousal },
-      { key: "enemy_construction", label: SIGNAL_LABELS.enemy_construction, value: data.signalBreakdown.enemy_construction },
-      { key: "moral_condemnation", label: SIGNAL_LABELS.moral_condemnation, value: data.signalBreakdown.moral_condemnation },
-      { key: "simplification", label: SIGNAL_LABELS.simplification, value: data.signalBreakdown.simplification },
-      { key: "call_to_conflict", label: SIGNAL_LABELS.call_to_conflict, value: data.signalBreakdown.call_to_conflict },
-    ];
-
-    // Get analysis insights
-    const insights = getAnalysisInsights(data.score, barsArray);
-
-    // === BACKGROUND ===
+    // === BACKGROUND & FRAME ===
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, width, height);
+    
+    // Thick Frame
+    const frameWidth = 24;
+    ctx.strokeStyle = "#18181b";
+    ctx.lineWidth = frameWidth;
+    ctx.strokeRect(frameWidth/2, frameWidth/2, width - frameWidth, height - frameWidth);
 
-    // === HEADER ===
-    // Logo box
-    ctx.fillStyle = "#18181b";
-    ctx.beginPath();
-    ctx.roundRect(padding, 40, 28, 28, 4);
-    ctx.fill();
-
-    // RageCheck text
-    ctx.fillStyle = "#18181b";
-    ctx.font = "700 20px system-ui, -apple-system, sans-serif";
-    ctx.textAlign = "left";
-    ctx.textBaseline = "middle";
-    ctx.fillText("RageCheck", padding + 38, 54);
-
-    // Domain
+    const contentPadding = 60;
+    
+    // === HEADER (Monospace) ===
+    ctx.font = "500 24px monospace, 'Courier New', Courier";
     ctx.fillStyle = "#71717a";
-    ctx.font = "500 16px system-ui, -apple-system, sans-serif";
-    ctx.textAlign = "right";
-    ctx.fillText(data.domain, width - padding, 54);
-
-    // === TITLE ===
-    ctx.fillStyle = "#18181b";
-    ctx.font = "700 26px system-ui, -apple-system, sans-serif";
     ctx.textAlign = "left";
     ctx.textBaseline = "top";
+    
+    const headerY = contentPadding + frameWidth;
+    ctx.fillText("RAGECHECK_ANALYSIS_V1", contentPadding + frameWidth, headerY);
+    
+    ctx.textAlign = "center";
+    ctx.fillText(`ID: ${reportId}`, width / 2, headerY);
+    
+    ctx.textAlign = "right";
+    ctx.fillText(`DATE: ${date}`, width - (contentPadding + frameWidth), headerY);
 
-    const titleY = 88;
-    const titleLines = wrapText(ctx, displayTitle, width - padding * 2, 2);
-    const titleLineHeight = 34;
-    titleLines.forEach((line, i) => {
-      ctx.fillText(line, padding, titleY + i * titleLineHeight);
-    });
+    // Header Divider Line
+    const dividerY = headerY + 40;
+    ctx.beginPath();
+    ctx.moveTo(contentPadding + frameWidth, dividerY);
+    ctx.lineTo(width - (contentPadding + frameWidth), dividerY);
+    ctx.strokeStyle = "#e4e4e7";
+    ctx.lineWidth = 2;
+    ctx.stroke();
 
-    // === LAYOUT CONSTANTS ===
-    const contentY = titleY + titleLines.length * titleLineHeight + 24;
-    const leftColWidth = 320;
-    const rightColX = padding + leftColWidth + 40;
-    const rightColWidth = width - rightColX - padding;
-
-    // === LEFT COLUMN: Score + Analysis ===
-
-    // Score box background
+    // === MAIN CONTENT ===
+    // Source Tag
+    const sourceY = dividerY + 40;
+    const sourceText = `SOURCE: ${data.domain.toUpperCase()}`;
+    ctx.font = "700 24px system-ui, -apple-system, sans-serif";
+    const sourceWidth = ctx.measureText(sourceText).width + 32;
+    
     ctx.fillStyle = "#f4f4f5";
     ctx.beginPath();
-    ctx.roundRect(padding, contentY, leftColWidth, 82, 12);
+    ctx.roundRect(contentPadding + frameWidth, sourceY, sourceWidth, 44, 4);
     ctx.fill();
-
-    // Mini gauge
-    const gaugeX = padding + 60;
-    const gaugeY = contentY + 56;
-    const gaugeRadius = 32;
-
-    // Background arc
-    ctx.beginPath();
-    ctx.arc(gaugeX, gaugeY, gaugeRadius, Math.PI * 1.25, Math.PI * -0.25, false);
-    ctx.strokeStyle = "#e4e4e7";
-    ctx.lineWidth = 8;
-    ctx.lineCap = "round";
-    ctx.stroke();
-
-    // Colored arc
-    const progressAngle = Math.PI * 1.25 + (data.score / 100) * Math.PI * 1.5;
-    ctx.beginPath();
-    ctx.arc(gaugeX, gaugeY, gaugeRadius, Math.PI * 1.25, progressAngle, false);
-    ctx.strokeStyle = scoreColor;
-    ctx.lineWidth = 8;
-    ctx.lineCap = "round";
-    ctx.stroke();
-
-    // Score number
-    ctx.fillStyle = scoreColor;
-    ctx.font = "900 42px system-ui, -apple-system, sans-serif";
+    
+    ctx.fillStyle = "#52525b";
     ctx.textAlign = "left";
     ctx.textBaseline = "middle";
-    ctx.fillText(String(data.score), padding + 120, contentY + 35);
+    ctx.fillText(sourceText, contentPadding + frameWidth + 16, sourceY + 22);
 
-    // "Bait Score" label
-    ctx.fillStyle = "#71717a";
-    ctx.font = "700 11px system-ui, -apple-system, sans-serif";
-    ctx.fillText("BAIT SCORE", padding + 120, contentY + 62);
-
-    // Analysis section
-    const analysisY = contentY + 102;
-    ctx.fillStyle = "#71717a";
-    ctx.font = "700 11px system-ui, -apple-system, sans-serif";
-    ctx.textAlign = "left";
+    // Title
+    const titleY = sourceY + 70;
+    ctx.fillStyle = "#18181b";
+    ctx.font = "900 56px system-ui, -apple-system, sans-serif";
     ctx.textBaseline = "top";
-    ctx.fillText("ANALYSIS", padding, analysisY);
-
-    // Analysis insights
-    ctx.font = "400 13px system-ui, -apple-system, sans-serif";
-    insights.forEach((insight, i) => {
-      const insightY = analysisY + 20 + i * 20;
-
-      // Bullet
-      ctx.fillStyle = scoreColor;
-      ctx.fillText("•", padding, insightY);
-
-      // Text (truncate if too long)
-      ctx.fillStyle = "#3f3f46";
-      const maxInsightWidth = leftColWidth - 20;
-      let displayInsight = insight;
-      while (ctx.measureText(displayInsight).width > maxInsightWidth && displayInsight.length > 0) {
-        displayInsight = displayInsight.slice(0, -1);
-      }
-      if (displayInsight !== insight) displayInsight += "...";
-      ctx.fillText(displayInsight, padding + 14, insightY);
+    
+    const maxTitleWidth = width - (contentPadding * 2 + frameWidth * 2);
+    const titleLines = wrapText(ctx, data.title, maxTitleWidth, 3);
+    const lineHeight = 64;
+    
+    titleLines.forEach((line, i) => {
+      ctx.fillText(line, contentPadding + frameWidth, titleY + (i * lineHeight));
     });
 
-    // === RIGHT COLUMN: Signal Bars ===
-    ctx.fillStyle = "#71717a";
-    ctx.font = "700 11px system-ui, -apple-system, sans-serif";
-    ctx.textAlign = "left";
-    ctx.textBaseline = "top";
-    ctx.fillText("SIGNAL BREAKDOWN", rightColX, contentY);
-
-    const barsStartY = contentY + 24;
-    const barRowHeight = 36;
-
-    barsArray.forEach((bar, i) => {
-      const rowY = barsStartY + i * barRowHeight;
-
-      // Label
-      ctx.fillStyle = "#52525b";
-      ctx.font = "500 13px system-ui, -apple-system, sans-serif";
-      ctx.textAlign = "left";
-      ctx.textBaseline = "middle";
-      ctx.fillText(bar.label, rightColX, rowY + 12);
-
-      // Bar background
-      const barX = rightColX + 140;
-      const barWidth = rightColWidth - 180;
-      ctx.fillStyle = "#e4e4e7";
-      ctx.beginPath();
-      ctx.roundRect(barX, rowY + 7, barWidth, 10, 5);
-      ctx.fill();
-
-      // Bar fill
-      const fillWidth = (bar.value / 100) * barWidth;
-      if (fillWidth > 0) {
-        ctx.fillStyle = getBarColor(bar.value);
-        ctx.beginPath();
-        ctx.roundRect(barX, rowY + 7, fillWidth, 10, 5);
-        ctx.fill();
-      }
-
-      // Percentage
-      ctx.fillStyle = "#18181b";
-      ctx.font = "700 13px system-ui, -apple-system, sans-serif";
-      ctx.textAlign = "right";
-      ctx.fillText(`${bar.value}%`, rightColX + rightColWidth, rowY + 12);
-    });
-
-    // === FOOTER ===
-    const footerY = height - 40;
-
-    // Divider line
-    ctx.strokeStyle = "#e4e4e7";
-    ctx.lineWidth = 1;
+    // === FOOTER (Data Dashboard) ===
+    const footerY = height - (contentPadding + frameWidth) - 100;
+    
+    // Footer Divider
     ctx.beginPath();
-    ctx.moveTo(padding, footerY - 16);
-    ctx.lineTo(width - padding, footerY - 16);
+    ctx.moveTo(contentPadding + frameWidth, footerY - 32);
+    ctx.lineTo(width - (contentPadding + frameWidth), footerY - 32);
+    ctx.strokeStyle = "#e4e4e7";
+    ctx.lineWidth = 2;
     ctx.stroke();
 
-    // Footer text
+    // Left: Manipulation Index (Score)
+    ctx.textAlign = "left";
+    ctx.textBaseline = "top";
+    
+    // Label
+    ctx.font = "500 20px monospace, 'Courier New', Courier";
+    ctx.fillStyle = "#71717a";
+    ctx.fillText("MANIPULATION_INDEX", contentPadding + frameWidth, footerY);
+    
+    // Number
+    const scoreY = footerY + 30;
+    ctx.font = "900 96px system-ui, -apple-system, sans-serif";
+    ctx.fillStyle = colors.text;
+    const scoreTextWidth = ctx.measureText(String(data.score)).width;
+    ctx.fillText(String(data.score), contentPadding + frameWidth, scoreY);
+    
+    // "/ 100"
+    ctx.font = "600 32px system-ui, -apple-system, sans-serif";
     ctx.fillStyle = "#a1a1aa";
-    ctx.font = "400 12px system-ui, -apple-system, sans-serif";
-    ctx.textAlign = "left";
-    ctx.textBaseline = "middle";
-    ctx.fillText("ragecheck.app", padding, footerY);
+    ctx.fillText("/ 100", contentPadding + frameWidth + scoreTextWidth + 16, scoreY + 54);
 
+    // Right: Classification Badge
     ctx.textAlign = "right";
-    ctx.fillText("AI-powered emotional manipulation analysis", width - padding, footerY);
+    
+    // Label
+    ctx.font = "500 20px monospace, 'Courier New', Courier";
+    ctx.fillStyle = "#71717a";
+    ctx.fillText("CLASSIFICATION", width - (contentPadding + frameWidth), footerY);
+    
+    // Badge
+    const badgeY = scoreY + 10;
+    ctx.font = "700 32px monospace, 'Courier New', Courier";
+    const badgeTextWidth = ctx.measureText(riskLabel).width + 64;
+    
+    ctx.fillStyle = colors.main;
+    ctx.beginPath();
+    ctx.roundRect(width - (contentPadding + frameWidth) - badgeTextWidth, badgeY, badgeTextWidth, 70, 4);
+    ctx.fill();
+    
+    ctx.fillStyle = "#ffffff";
+    ctx.textBaseline = "middle";
+    ctx.fillText(riskLabel, width - (contentPadding + frameWidth) - 32, badgeY + 35);
 
     // Convert to blob
     canvas.toBlob(

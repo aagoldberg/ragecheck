@@ -887,25 +887,6 @@ export default function Home() {
     );
   }, [result]);
 
-  // Build share card API URL
-  const getShareCardUrl = (size: "x" | "bsky" = "x") => {
-    if (!result?.success || result.score === undefined || !result.signalBreakdown) return null;
-
-    const params = new URLSearchParams({
-      score: String(result.score),
-      title: result.title || "Content Analysis",
-      domain: result.sourceDomain || "unknown",
-      size,
-      arousal: String(result.signalBreakdown.arousal),
-      enemy: String(result.signalBreakdown.enemy_construction),
-      moral: String(result.signalBreakdown.moral_condemnation),
-      simplification: String(result.signalBreakdown.simplification),
-      conflict: String(result.signalBreakdown.call_to_conflict),
-    });
-
-    return `/api/share-card?${params.toString()}`;
-  };
-
   // Primary share action - uses client-side canvas for clipboard copy
   const handleShareImage = async (silent = false) => {
     if (!result?.success || result.score === undefined || !result.signalBreakdown) return;

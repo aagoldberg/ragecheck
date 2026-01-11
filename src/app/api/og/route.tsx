@@ -9,7 +9,7 @@ export async function GET(request: NextRequest) {
   const domain = searchParams.get("domain") || "Unknown source";
   const title = searchParams.get("title") || "Content Analysis";
 
-  // Scientific Color Palette
+  // Scientific Palette
   const getColors = (s: number) => {
     if (s <= 33) return { main: "#10b981", text: "#047857" }; // Emerald
     if (s <= 66) return { main: "#f59e0b", text: "#b45309" }; // Amber
@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
   const date = new Date().toISOString().split("T")[0];
   const reportId = Math.random().toString(36).substring(7).toUpperCase();
 
-  // Truncate title for clean display
+  // Truncate title for clean display (Canvas-like truncation)
   const displayTitle = title.length > 100 ? title.substring(0, 97) + "..." : title;
 
   return new ImageResponse(
@@ -40,23 +40,26 @@ export async function GET(request: NextRequest) {
           display: "flex",
           flexDirection: "column",
           backgroundColor: "#ffffff",
-          fontFamily: "monospace", // Default fallback
-          padding: "60px",
-          justifyContent: "space-between",
-          border: "24px solid #18181b", // Thick dark frame
+          fontFamily: "monospace",
+          padding: "48px",
+          border: "24px solid #18181b",
+          boxSizing: "border-box",
+          position: "relative",
         }}
       >
-        {/* Scientific Header */}
+        {/* === HEADER === */}
         <div
           style={{
             display: "flex",
             flexDirection: "row",
             justifyContent: "space-between",
+            alignItems: "center",
+            width: "100%",
+            height: "40px",
             borderBottom: "2px solid #e4e4e7",
-            paddingBottom: "24px",
-            fontSize: "24px",
             color: "#71717a",
-            fontFamily: "monospace",
+            fontSize: "24px",
+            paddingBottom: "24px", // Visual padding for the border
           }}
         >
           <span>RAGECHECK_ANALYSIS_V1</span>
@@ -64,14 +67,14 @@ export async function GET(request: NextRequest) {
           <span>DATE: {date}</span>
         </div>
 
-        {/* Main Content Area */}
+        {/* === CONTENT === */}
         <div
           style={{
             display: "flex",
             flexDirection: "column",
-            gap: "24px",
-            marginTop: "20px",
-            marginBottom: "20px",
+            flex: 1, // Fill available space
+            justifyContent: "center", // Center vertically
+            gap: "32px",
           }}
         >
           {/* Source Tag */}
@@ -79,65 +82,69 @@ export async function GET(request: NextRequest) {
             style={{
               display: "flex",
               backgroundColor: "#f4f4f5",
-              padding: "8px 16px",
+              padding: "12px 24px",
               borderRadius: "4px",
               alignSelf: "flex-start",
             }}
           >
-            <span style={{ fontSize: "24px", fontWeight: "bold", color: "#52525b" }}>
-              SOURCE: {domain.toUpperCase()}
+            <span
+              style={{
+                fontFamily: "sans-serif",
+                fontSize: "24px",
+                fontWeight: 700,
+                color: "#52525b",
+                textTransform: "uppercase",
+              }}
+            >
+              SOURCE: {domain}
             </span>
           </div>
 
           {/* Title */}
           <span
             style={{
-              fontSize: "56px",
-              fontWeight: "900",
+              fontFamily: "sans-serif",
+              fontSize: "64px",
+              fontWeight: 900,
               color: "#18181b",
               lineHeight: 1.1,
-              fontFamily: "sans-serif", // Keep title readable/standard
+              letterSpacing: "-0.02em",
             }}
           >
             {displayTitle}
           </span>
         </div>
 
-        {/* Data Footer */}
+        {/* === FOOTER DASHBOARD === */}
         <div
           style={{
             display: "flex",
             flexDirection: "row",
-            alignItems: "center",
             justifyContent: "space-between",
+            alignItems: "flex-end",
+            width: "100%",
             borderTop: "2px solid #e4e4e7",
             paddingTop: "32px",
           }}
         >
-          {/* Score Block */}
+          {/* Left: Score */}
           <div style={{ display: "flex", flexDirection: "column" }}>
             <span style={{ fontSize: "20px", color: "#71717a", marginBottom: "8px" }}>
               MANIPULATION_INDEX
             </span>
-            <div style={{ display: "flex", alignItems: "baseline", gap: "12px" }}>
-              <span style={{ fontSize: "96px", fontWeight: "900", color: colors.text, lineHeight: 0.8 }}>
+            <div style={{ display: "flex", alignItems: "baseline" }}>
+              <span style={{ fontSize: "96px", fontWeight: 900, color: colors.text, lineHeight: 0.8 }}>
                 {score}
               </span>
-              <span style={{ fontSize: "32px", fontWeight: "600", color: "#a1a1aa" }}>
+              <span style={{ fontSize: "32px", fontWeight: 600, color: "#a1a1aa", marginLeft: "16px" }}>
                 / 100
               </span>
             </div>
           </div>
 
-          {/* Risk Classification */}
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "flex-end",
-            }}
-          >
-             <span style={{ fontSize: "20px", color: "#71717a", marginBottom: "12px" }}>
+          {/* Right: Classification */}
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
+            <span style={{ fontSize: "20px", color: "#71717a", marginBottom: "12px" }}>
               CLASSIFICATION
             </span>
             <div
@@ -151,7 +158,7 @@ export async function GET(request: NextRequest) {
                 justifyContent: "center",
               }}
             >
-              <span style={{ fontSize: "32px", fontWeight: "bold", letterSpacing: "2px", fontFamily: "monospace" }}>
+              <span style={{ fontSize: "32px", fontWeight: 700, letterSpacing: "2px" }}>
                 {riskLabel}
               </span>
             </div>
