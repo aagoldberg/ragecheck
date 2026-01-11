@@ -1,15 +1,17 @@
 "use client";
 
 import { useState, useMemo, useEffect, useRef } from "react";
-import { copyShareImageToClipboard } from "@/lib/shareImage";
 import {
-  getHookLine,
   getShareText,
   buildXIntentUrl,
   buildBlueskyIntentUrl,
   isWorthSharing,
   getScoreBucket,
 } from "@/lib/share";
+import {
+  getDeterministicHookLine,
+  getTopDrivers,
+} from "@/lib/shareCard";
 
 interface Highlight {
   start: number;
@@ -730,9 +732,10 @@ export default function Home() {
   // Get hook line for share text
   const getHookLineForShare = () => {
     if (!result?.success || result.score === undefined || !result.signalBreakdown) {
-      return { hookLine: "", topSignals: [] };
+      return "";
     }
-    return getHookLine(result.score, result.signalBreakdown);
+    const topDrivers = getTopDrivers(result.signalBreakdown);
+    return getDeterministicHookLine(result.score, topDrivers);
   };
 
   const copyShareCard = () => {
@@ -748,7 +751,7 @@ export default function Home() {
   const shareOnTwitter = () => {
     if (!result?.success || result.score === undefined || !result.signalBreakdown) return;
     const shareUrl = getShareUrl();
-    const { hookLine } = getHookLineForShare();
+    const hookLine = getHookLineForShare();
     const text = getShareText("x", hookLine, shareUrl);
     const twitterUrl = buildXIntentUrl(text, shareUrl);
     window.open(twitterUrl, "_blank", "width=550,height=420");
@@ -760,7 +763,7 @@ export default function Home() {
   const shareOnBluesky = () => {
     if (!result?.success || result.score === undefined || !result.signalBreakdown) return;
     const shareUrl = getShareUrl();
-    const { hookLine } = getHookLineForShare();
+    const hookLine = getHookLineForShare();
     const text = getShareText("bluesky", hookLine, shareUrl);
     const blueskyUrl = buildBlueskyIntentUrl(text);
     window.open(blueskyUrl, "_blank", "width=550,height=420");
@@ -774,7 +777,7 @@ export default function Home() {
     if (!navigator.share) return;
 
     const shareUrl = getShareUrl();
-    const { hookLine } = getHookLineForShare();
+    const hookLine = getHookLineForShare();
     const text = getShareText("native", hookLine, shareUrl);
 
     try {
@@ -801,30 +804,61 @@ export default function Home() {
     );
   }, [result]);
 
-  const getShareImageData = () => {
+  // Build share card API URL
+  const getShareCardUrl = (size: "x" | "bsky" = "x") => {
     if (!result?.success || result.score === undefined || !result.signalBreakdown) return null;
-    return {
-      score: result.score,
-      title: result.title || "Content Analysis",
+
+    const params = new URLSearchParams({
+      score: String(result.score),
+      title: encodeURIComponent(result.title || "Content Analysis"),
       domain: result.sourceDomain || "unknown",
-      signalBreakdown: result.signalBreakdown,
-    };
+      size,
+      arousal: String(result.signalBreakdown.arousal),
+      enemy: String(result.signalBreakdown.enemy_construction),
+      moral: String(result.signalBreakdown.moral_condemnation),
+      simplification: String(result.signalBreakdown.simplification),
+      conflict: String(result.signalBreakdown.call_to_conflict),
+    });
+
+    return `/api/share-card?${params.toString()}`;
   };
 
-  // Primary share action - copies image to clipboard
+  // Primary share action - fetches server-rendered image and copies to clipboard
   const handleShareImage = async (silent = false) => {
-    const imageData = getShareImageData();
-    if (!imageData) return;
+    const cardUrl = getShareCardUrl();
+    if (!cardUrl) return;
 
     try {
-      const success = await copyShareImageToClipboard(imageData);
-      if (success && !silent) {
+      // Fetch the server-rendered PNG
+      const response = await fetch(cardUrl);
+      if (!response.ok) throw new Error("Failed to fetch share card");
+
+      const blob = await response.blob();
+
+      // Copy to clipboard
+      await navigator.clipboard.write([
+        new ClipboardItem({
+          "image/png": blob,
+        }),
+      ]);
+
+      if (!silent) {
         setImageCopied(true);
         setTimeout(() => setImageCopied(false), 3000);
         trackShareEvent("share_image_success");
       }
     } catch (error) {
       console.error("Failed to copy image:", error);
+      // Fallback: try to download the image
+      if (!silent) {
+        const cardUrl = getShareCardUrl();
+        if (cardUrl) {
+          const link = document.createElement("a");
+          link.href = cardUrl;
+          link.download = `ragecheck-${result?.score || 0}.png`;
+          link.click();
+        }
+      }
     }
   };
 
