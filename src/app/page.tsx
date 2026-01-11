@@ -1,18 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect, useRef } from "react";
-import {
-  getShareText,
-  buildXIntentUrl,
-  buildBlueskyIntentUrl,
-  isWorthSharing,
-  getScoreBucket,
-} from "@/lib/share";
-import {
-  getDeterministicHookLine,
-  getTopDrivers,
-} from "@/lib/shareCard";
-import { copyShareImageToClipboard } from "@/lib/shareImage";
+import { useState, useMemo, useEffect } from "react";
 
 interface Highlight {
   start: number;
@@ -45,7 +33,6 @@ interface AnalysisResult {
   sharingPatterns?: string[];
   techniqueExplanations?: string[];
   image?: string;
-  cached?: boolean;
 }
 
 interface Headline {
@@ -486,75 +473,29 @@ function SocialPostCard({
   );
 }
 
-const ANALYSIS_STEPS = [
-  { label: "Fetching content", duration: 1500 },
-  { label: "Extracting text", duration: 800 },
-  { label: "Scanning emotional arousal", duration: 600 },
-  { label: "Detecting enemy construction", duration: 600 },
-  { label: "Analyzing moral framing", duration: 600 },
-  { label: "Checking oversimplification", duration: 600 },
-  { label: "Identifying engagement bait", duration: 600 },
-  { label: "Calculating final score", duration: 400 },
-];
-
-function AnalyzingProgress() {
-  const [currentStep, setCurrentStep] = useState(0);
-  const [progress, setProgress] = useState(0);
-
-  useEffect(() => {
-    const totalDuration = ANALYSIS_STEPS.reduce((sum, s) => sum + s.duration, 0);
-    let elapsed = 0;
-
-    const interval = setInterval(() => {
-      elapsed += 50;
-
-      // Calculate which step we're on based on elapsed time
-      let accumulatedTime = 0;
-      let stepIndex = 0;
-      for (let i = 0; i < ANALYSIS_STEPS.length; i++) {
-        if (elapsed >= accumulatedTime && elapsed < accumulatedTime + ANALYSIS_STEPS[i].duration) {
-          stepIndex = i;
-          break;
-        }
-        accumulatedTime += ANALYSIS_STEPS[i].duration;
-        if (i === ANALYSIS_STEPS.length - 1) stepIndex = i;
-      }
-
-      setCurrentStep(stepIndex);
-      setProgress(Math.min(95, (elapsed / totalDuration) * 100)); // Cap at 95% until done
-    }, 50);
-
-    return () => clearInterval(interval);
-  }, []);
-
-  const currentLabel = ANALYSIS_STEPS[currentStep]?.label || "Finalizing...";
+function MiniScoreGauge({ score }: { score: number }) {
+  const rotation = (score / 100) * 180 - 90;
+  const getColor = (val: number) => {
+    if (val < 33) return "stroke-emerald-500";
+    if (val < 66) return "stroke-amber-500";
+    return "stroke-rose-500";
+  };
+  const getTextColor = (val: number) => {
+    if (val < 33) return "text-emerald-600 dark:text-emerald-400";
+    if (val < 66) return "text-amber-600 dark:text-amber-400";
+    return "text-rose-600 dark:text-rose-400";
+  };
 
   return (
-    <div className="max-w-md mx-auto mt-12 animate-in fade-in duration-500">
-      <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-8 shadow-2xl">
-        <div className="flex items-center justify-between mb-3">
-          <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
-            {currentLabel}
-          </span>
-          <span className="text-sm font-bold text-indigo-600 dark:text-indigo-400">
-            {Math.round(progress)}%
-          </span>
-        </div>
-
-        <div className="h-3 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden mb-4">
-          <div
-            className="h-full bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-600 rounded-full transition-all duration-100 ease-out"
-            style={{ width: `${progress}%` }}
-          />
-        </div>
-
-        <div className="flex items-center justify-center gap-2 text-xs text-zinc-400">
-          <svg className="animate-spin h-3 w-3" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-          </svg>
-          <span>Step {currentStep + 1} of {ANALYSIS_STEPS.length}</span>
-        </div>
+    <div className="flex flex-col items-center justify-center scale-75 origin-top">
+      <svg className="w-24 h-14" viewBox="0 0 100 55">
+        <path d="M 10 50 A 40 40 0 0 1 90 50" fill="none" stroke="currentColor" strokeWidth="8" className="text-zinc-100 dark:text-zinc-800" strokeLinecap="round" />
+        <path d="M 10 50 A 40 40 0 0 1 90 50" fill="none" strokeWidth="8" strokeDasharray="125.6" strokeDashoffset={125.6 - (score / 100) * 125.6} className={getColor(score)} strokeLinecap="round" />
+        <line x1="50" y1="50" x2="50" y2="15" stroke="currentColor" strokeWidth="3" className="text-zinc-800 dark:text-zinc-200" style={{ transformOrigin: '50px 50px', transform: `rotate(${rotation}deg)` }} />
+      </svg>
+      <div className="-mt-3 flex flex-col items-center">
+        <span className={`text-xl font-black ${getTextColor(score)}`}>{score}</span>
+        <span className="text-[8px] font-bold text-zinc-400 uppercase tracking-widest -mt-1">Bait Score</span>
       </div>
     </div>
   );
@@ -562,24 +503,43 @@ function AnalyzingProgress() {
 
 function MicroDemoCard() {
   return (
-    <div className="hidden lg:block absolute -right-20 top-0 w-72 animate-in fade-in slide-in-from-right-8 duration-1000 delay-300">
-      <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-4 shadow-2xl rotate-3 hover:rotate-0 transition-transform duration-500">
-        <div className="flex items-center gap-2 mb-3">
-          <div className="w-6 h-6 rounded-full bg-blue-500 flex items-center justify-center text-[10px] text-white font-bold">A</div>
-          <div className="h-2 w-16 bg-zinc-100 dark:bg-zinc-800 rounded"></div>
+    <div className="relative w-80 animate-in fade-in slide-in-from-right-8 duration-1000 delay-300">
+      <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 shadow-2xl transition-transform duration-500 hover:scale-[1.02]">
+        <div className="flex items-center justify-between mb-4">
+          <h4 className="text-[10px] font-bold text-zinc-400 uppercase tracking-[0.2em]">Sample Decoding</h4>
+          <MiniScoreGauge score={84} />
         </div>
-        <div className="space-y-2 mb-4">
-          <div className="h-3 w-full bg-zinc-50 dark:bg-zinc-800/50 rounded"></div>
-          <p className="text-[11px] leading-relaxed text-zinc-800 dark:text-zinc-200">
-            This is an <mark className="bg-rose-100 text-rose-800 px-0.5 rounded">existential threat</mark> to our way of life!
+        
+        <div className="flex items-center gap-2.5 mb-3">
+          <div className="w-8 h-8 rounded-full bg-rose-500 flex items-center justify-center text-xs text-white font-bold shadow-sm">P</div>
+          <div className="flex flex-col">
+            <div className="h-2 w-16 bg-zinc-100 dark:bg-zinc-800 rounded mb-1"></div>
+            <div className="h-1.5 w-10 bg-zinc-50 dark:bg-zinc-800/50 rounded"></div>
+          </div>
+        </div>
+
+        <div className="space-y-2 mb-5">
+          <p className="text-[13px] leading-relaxed text-zinc-800 dark:text-zinc-200 font-medium">
+            The <mark className="bg-rose-100 text-rose-800 px-0.5 rounded">corrupt elites</mark> are working to <mark className="bg-amber-100 text-amber-800 px-0.5 rounded text-amber-900">destroy</mark> your family&apos;s future. Act now!
           </p>
         </div>
-        <div className="relative pl-3 border-l-2 border-rose-500 py-1">
-          <span className="absolute -left-1.5 top-1/2 -translate-y-1/2 w-3 h-3 bg-rose-500 rounded-full border-2 border-white dark:border-zinc-900"></span>
-          <p className="text-[10px] font-bold text-rose-600 uppercase tracking-tight">Enemy Construction</p>
-          <p className="text-[9px] text-zinc-500 leading-tight mt-0.5">Frames opponents as a fatal threat to bypass reason.</p>
+
+        <div className="space-y-3">
+          <div className="relative pl-3 border-l-2 border-rose-500 py-0.5">
+            <span className="absolute -left-1.5 top-1/2 -translate-y-1/2 w-3 h-3 bg-rose-500 rounded-full border-2 border-white dark:border-zinc-900"></span>
+            <p className="text-[10px] font-bold text-rose-600 uppercase tracking-tight">Enemy Construction</p>
+            <p className="text-[9px] text-zinc-500 leading-tight mt-0.5">Dehumanizes a group as a malicious force.</p>
+          </div>
+          <div className="relative pl-3 border-l-2 border-amber-500 py-0.5">
+            <span className="absolute -left-1.5 top-1/2 -translate-y-1/2 w-3 h-3 bg-amber-500 rounded-full border-2 border-white dark:border-zinc-900"></span>
+            <p className="text-[10px] font-bold text-amber-600 uppercase tracking-tight">Emotional Arousal</p>
+            <p className="text-[9px] text-zinc-500 leading-tight mt-0.5">Triggers fear and urgency to bypass reason.</p>
+          </div>
         </div>
       </div>
+      
+      {/* Decorative elements */}
+      <div className="absolute -z-10 -bottom-4 -right-4 w-full h-full bg-indigo-500/5 rounded-2xl blur-2xl"></div>
     </div>
   );
 }
@@ -595,25 +555,12 @@ export default function Home() {
   const [headlinesLoading, setHeadlinesLoading] = useState(true);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageError, setImageError] = useState<string | null>(null);
-  const [downloadingImage, setDownloadingImage] = useState(false);
-  const [imageCopied, setImageCopied] = useState(false);
-  const [canNativeShare, setCanNativeShare] = useState(false);
-  const [showMoreMenu, setShowMoreMenu] = useState(false);
-  const [feedbackGiven, setFeedbackGiven] = useState<"up" | "down" | null>(null);
-  const [feedbackComment, setFeedbackComment] = useState("");
-  const [showFeedbackForm, setShowFeedbackForm] = useState(false);
-  const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
-  const [errorReported, setErrorReported] = useState(false);
-  const moreMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     fetch("/api/visit", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        referrer: document.referrer || null,
-        pagePath: "/"
-      }),
+      body: JSON.stringify({ referrer: document.referrer || null }),
     }).catch(() => {});
 
     fetch("/api/headlines")
@@ -623,12 +570,8 @@ export default function Home() {
           setHeadlines(data.headlines);
         }
       })
-      .catch(() => {}) // Ignore errors for headlines
+      .catch(() => {})
       .finally(() => setHeadlinesLoading(false));
-
-    // Check if Web Share API is available (primarily mobile)
-    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-    setCanNativeShare(isMobile && typeof navigator.share === "function");
   }, []);
 
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -695,25 +638,20 @@ export default function Home() {
     }
   };
 
-  const analyze = async (targetUrl: string, force = false) => {
+  const analyze = async (targetUrl: string) => {
     if (!targetUrl.trim()) return;
 
     setLoading(true);
     setResult(null);
     setIsDemo(false);
     setActiveFilter(null);
-    setFeedbackGiven(null);
-    setFeedbackComment("");
-    setShowFeedbackForm(false);
-    setFeedbackSubmitted(false);
-    setErrorReported(false);
     clearImage();
 
     try {
       const response = await fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: targetUrl.trim(), force }),
+        body: JSON.stringify({ url: targetUrl.trim() }),
       });
 
       const data = await response.json();
@@ -725,12 +663,6 @@ export default function Home() {
       });
     } finally {
       setLoading(false);
-    }
-  };
-
-  const forceReanalyze = () => {
-    if (url.trim()) {
-      analyze(url, true);
     }
   };
 
@@ -761,213 +693,33 @@ export default function Home() {
     return `${window.location.origin}/share?${params.toString()}`;
   };
 
-  const trackShareEvent = (
-    eventType: string,
-    metadata?: Record<string, string | number>
-  ) => {
-    if (!result?.success || result.score === undefined || !result.signalBreakdown) return;
-
-    const topBars = Object.entries(result.signalBreakdown)
-      .sort(([, a], [, b]) => b - a)
-      .slice(0, 3)
-      .map(([key]) => key);
-
-    fetch("/api/share", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        url,
-        shareType: eventType,
-        baitScoreBucket: getScoreBucket(result.score),
-        topBars,
-        ...metadata,
-      }),
-    }).catch(() => {});
-  };
-
-  // Submit feedback
-  const submitFeedback = async (rating: "up" | "down", comment?: string) => {
-    if (!result?.success || result.score === undefined) return;
-
-    setFeedbackGiven(rating);
-    if (rating === "down") {
-      setShowFeedbackForm(true);
-    } else {
-      setFeedbackSubmitted(true);
-    }
-
-    fetch("/api/feedback", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        url,
-        rating,
-        comment: comment || null,
-        score: result.score,
-        title: result.title,
-        sourceDomain: result.sourceDomain,
-        signalBreakdown: result.signalBreakdown,
-      }),
-    }).catch(() => {});
-  };
-
-  const submitFeedbackComment = () => {
-    if (!feedbackComment.trim()) {
-      setFeedbackSubmitted(true);
-      setShowFeedbackForm(false);
-      return;
-    }
-
-    fetch("/api/feedback", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        url,
-        rating: "down",
-        comment: feedbackComment,
-        score: result?.score,
-        title: result?.title,
-        sourceDomain: result?.sourceDomain,
-        signalBreakdown: result?.signalBreakdown,
-      }),
-    }).catch(() => {});
-
-    setFeedbackSubmitted(true);
-    setShowFeedbackForm(false);
-  };
-
-  // Get hook line for share text
-  const getHookLineForShare = () => {
-    if (!result?.success || result.score === undefined || !result.signalBreakdown) {
-      return "";
-    }
-    const topDrivers = getTopDrivers(result.signalBreakdown);
-    return getDeterministicHookLine(result.score, topDrivers);
-  };
-
   const copyShareCard = () => {
     if (!result?.success || result.score === undefined) return;
     const shareUrl = getShareUrl();
     navigator.clipboard.writeText(shareUrl);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
-    trackShareEvent("copy_link_clicked");
-    setShowMoreMenu(false);
   };
 
-  const shareOnTwitter = () => {
-    if (!result?.success || result.score === undefined || !result.signalBreakdown) return;
+  const handleShare = async () => {
+    if (!result?.success || result.score === undefined) return;
     const shareUrl = getShareUrl();
-    const hookLine = getHookLineForShare();
-    const text = getShareText("x", hookLine, shareUrl);
-    const twitterUrl = buildXIntentUrl(text, shareUrl);
-    window.open(twitterUrl, "_blank", "width=550,height=420");
-    trackShareEvent("share_x_clicked");
-    // Also copy image to clipboard for easy pasting
-    handleShareImage(true);
-  };
-
-  const shareOnBluesky = () => {
-    if (!result?.success || result.score === undefined || !result.signalBreakdown) return;
-    const shareUrl = getShareUrl();
-    const hookLine = getHookLineForShare();
-    const text = getShareText("bluesky", hookLine, shareUrl);
-    const blueskyUrl = buildBlueskyIntentUrl(text);
-    window.open(blueskyUrl, "_blank", "width=550,height=420");
-    trackShareEvent("share_bluesky_clicked");
-    // Also copy image to clipboard for easy pasting
-    handleShareImage(true);
-  };
-
-  const shareNative = async () => {
-    if (!result?.success || result.score === undefined || !result.signalBreakdown) return;
-    if (!navigator.share) return;
-
-    const shareUrl = getShareUrl();
-    const hookLine = getHookLineForShare();
-    const text = getShareText("native", hookLine, shareUrl);
-
-    try {
-      await navigator.share({
-        title: "RageCheck Analysis",
-        text,
-        url: shareUrl,
-      });
-      trackShareEvent("web_share_clicked");
-    } catch {
-      // User cancelled or share failed - ignore
-    }
-  };
-
-  // Check if this result is "worth sharing"
-  const showSharePrompt = useMemo(() => {
-    if (!result?.success || result.score === undefined || !result.signalBreakdown) {
-      return false;
-    }
-    return isWorthSharing(
-      result.score,
-      result.signalBreakdown.arousal,
-      result.signalBreakdown.call_to_conflict
-    );
-  }, [result]);
-
-  // Build share card API URL
-  const getShareCardUrl = (size: "x" | "bsky" = "x") => {
-    if (!result?.success || result.score === undefined || !result.signalBreakdown) return null;
-
-    const params = new URLSearchParams({
-      score: String(result.score),
-      title: result.title || "Content Analysis",
-      domain: result.sourceDomain || "unknown",
-      size,
-      arousal: String(result.signalBreakdown.arousal),
-      enemy: String(result.signalBreakdown.enemy_construction),
-      moral: String(result.signalBreakdown.moral_condemnation),
-      simplification: String(result.signalBreakdown.simplification),
-      conflict: String(result.signalBreakdown.call_to_conflict),
-    });
-
-    return `/api/share-card?${params.toString()}`;
-  };
-
-  // Primary share action - uses client-side canvas for clipboard copy
-  const handleShareImage = async (silent = false) => {
-    if (!result?.success || result.score === undefined || !result.signalBreakdown) return;
-
-    try {
-      const success = await copyShareImageToClipboard({
-        score: result.score,
-        title: result.title || "Content Analysis",
-        domain: result.sourceDomain || "unknown",
-        signalBreakdown: result.signalBreakdown,
-      });
-
-      if (success && !silent) {
-        setImageCopied(true);
-        setTimeout(() => setImageCopied(false), 3000);
-        trackShareEvent("share_image_success");
-      }
-    } catch (error) {
-      console.error("Failed to copy image:", error);
-    }
-  };
-
-  // Click handler for share image button
-  const onShareImageClick = async () => {
-    trackShareEvent("share_image_clicked");
-    await handleShareImage();
-  };
-
-  // Close more menu when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (moreMenuRef.current && !moreMenuRef.current.contains(event.target as Node)) {
-        setShowMoreMenu(false);
-      }
+    const shareData = {
+      title: `RageCheck: ${result.score}/100`,
+      text: `${result.title || "Content"} scored ${result.score}/100 for manipulative patterns`,
+      url: shareUrl,
     };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+
+    if (navigator.share && navigator.canShare?.(shareData)) {
+      try {
+        await navigator.share(shareData);
+      } catch {
+        copyShareCard();
+      }
+    } else {
+      copyShareCard();
+    }
+  };
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-black text-zinc-900 dark:text-zinc-100 font-sans selection:bg-indigo-100 dark:selection:bg-indigo-900/50">
@@ -987,134 +739,107 @@ export default function Home() {
         </div>
       </nav>
 
-      <div className="max-w-6xl mx-auto px-4 py-16 md:py-24">
+      <div className="max-w-6xl mx-auto px-4 py-12 lg:py-24">
         
         {/* Hero Section */}
-        <div className="relative text-center max-w-3xl mx-auto mb-20 animate-in fade-in slide-in-from-bottom-4 duration-700">
-          <MicroDemoCard />
-          <h1 className="text-4xl md:text-6xl font-black tracking-tight text-zinc-900 dark:text-zinc-100 mb-6 leading-[1.1]">
-            Is that post <span className="text-transparent bg-clip-text bg-gradient-to-r from-rose-500 to-indigo-600">designed</span> to make you angry?
-          </h1>
-          <p className="text-xl text-zinc-600 dark:text-zinc-400 mb-10 leading-relaxed max-w-2xl mx-auto">
-            Identify engagement bait, fear-mongering, and manipulation patterns in news and social media instantly.
-          </p>
+        <div className="grid lg:grid-cols-5 gap-12 items-center mb-20">
+          <div className="lg:col-span-3 text-center lg:text-left animate-in fade-in slide-in-from-left-4 duration-700">
+            <h1 className="text-4xl md:text-6xl font-black tracking-tight text-zinc-900 dark:text-zinc-100 mb-6 leading-[1.1]">
+              Is that post <span className="text-transparent bg-clip-text bg-gradient-to-r from-rose-500 to-indigo-600">designed</span> to make you angry?
+            </h1>
+            <p className="text-xl text-zinc-600 dark:text-zinc-400 mb-10 leading-relaxed max-w-2xl mx-auto lg:mx-0">
+              Identify engagement bait, fear-mongering, and manipulation patterns in news and social media instantly.
+            </p>
 
-          {/* Search Input */}
-          <form onSubmit={handleSubmit} className="relative max-w-2xl mx-auto">
-            {imagePreview && (
-              <div className="mb-6 relative animate-in fade-in zoom-in duration-300">
-                <div className="relative rounded-2xl overflow-hidden border border-zinc-200 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-800 shadow-lg">
-                  <img
-                    src={imagePreview}
-                    alt="Screenshot preview"
-                    className="w-full max-h-64 object-contain"
-                  />
-                  <button
-                    type="button"
-                    onClick={clearImage}
-                    className="absolute top-3 right-3 p-1.5 bg-zinc-900/80 hover:bg-zinc-900 text-white rounded-full transition-colors backdrop-blur-sm"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                </div>
-                <button
-                  type="button"
-                  onClick={analyzeImage}
-                  disabled={loading}
-                  className="mt-4 w-full px-6 py-4 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 rounded-xl font-bold text-lg hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-all shadow-lg hover:shadow-xl disabled:opacity-70"
-                >
-                  {loading ? "Scanning Image..." : "Analyze Screenshot (~5s)"}
-                </button>
-              </div>
-            )}
-
-            {!imagePreview && (
-              <div className="relative group">
-                <div className="absolute -inset-1 bg-gradient-to-r from-rose-500 to-indigo-600 rounded-2xl blur opacity-20 group-focus-within:opacity-40 transition duration-1000"></div>
-                <div className="relative flex items-center bg-white dark:bg-zinc-900 rounded-2xl shadow-xl transition-shadow ring-1 ring-zinc-200 dark:ring-zinc-800 group-focus-within:ring-zinc-300 dark:group-focus-within:ring-zinc-700">
-                  <input
-                    type="url"
-                    value={url}
-                    onChange={(e) => setUrl(e.target.value)}
-                    placeholder="Paste URL (article, tweet, bsky)..."
-                    className="flex-1 w-full pl-6 pr-4 py-5 bg-transparent border-0 focus:ring-0 text-lg text-zinc-900 dark:text-zinc-100 placeholder-zinc-400"
-                    required
-                  />
-                  <div className="pr-3 flex items-center gap-3">
-                    <label
-                      htmlFor="image-upload"
-                      className="p-2.5 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 cursor-pointer transition-colors bg-zinc-50 dark:bg-zinc-800 rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-700"
-                      title="Upload screenshot"
-                    >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                      </svg>
-                      <input
-                        id="image-upload"
-                        type="file"
-                        accept="image/jpeg,image/png,image/gif,image/webp"
-                        onChange={handleImageSelect}
-                        className="hidden"
-                      />
-                    </label>
-                    <button
-                      type="submit"
-                      disabled={loading || !url.trim()}
-                      className="px-6 py-3 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 rounded-xl text-base font-bold hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-all shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none min-w-[120px]"
-                    >
-                      {loading ? (
-                        <span className="flex items-center gap-2">
-                          <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                          </svg>
-                        </span>
-                      ) : (
-                        <div className="flex flex-col leading-none">
-                          <span>Analyze</span>
-                          <span className="text-[10px] opacity-60 font-medium mt-0.5">~5s</span>
-                        </div>
-                      )}
+            {/* Search Input */}
+            <form onSubmit={handleSubmit} className="relative max-w-2xl lg:mx-0">
+              {imagePreview && (
+                <div className="mb-6 relative animate-in fade-in zoom-in duration-300">
+                  <div className="relative rounded-2xl overflow-hidden border border-zinc-200 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-800 shadow-lg">
+                    <img src={imagePreview} alt="Screenshot preview" className="w-full max-h-64 object-contain" />
+                    <button type="button" onClick={clearImage} className="absolute top-3 right-3 p-1.5 bg-zinc-900/80 hover:bg-zinc-900 text-white rounded-full transition-colors backdrop-blur-sm">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                     </button>
                   </div>
+                  <button type="button" onClick={analyzeImage} disabled={loading} className="mt-4 w-full px-6 py-4 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 rounded-xl font-bold text-lg hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-all shadow-lg hover:shadow-xl disabled:opacity-70">
+                    {loading ? "Scanning Image..." : "Analyze Screenshot (~5s)"}
+                  </button>
                 </div>
-              </div>
-            )}
-            
-            {imageError && (
-              <p className="mt-3 text-sm text-rose-600 dark:text-rose-400 font-medium animate-pulse">{imageError}</p>
-            )}
+              )}
 
-            {!imagePreview && (
-              <div className="mt-6 flex flex-wrap items-center justify-center gap-2 text-sm text-zinc-500">
-                <span>Try an example:</span>
-                <button
-                  type="button"
-                  onClick={() => tryExample("news")}
-                  className="px-3 py-1 rounded-full bg-zinc-100 dark:bg-zinc-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors font-medium text-xs"
-                >
-                  News Article
-                </button>
-                <button
-                  type="button"
-                  onClick={() => tryExample("tweet")}
-                  className="px-3 py-1 rounded-full bg-zinc-100 dark:bg-zinc-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors font-medium text-xs"
-                >
-                  Viral Tweet
-                </button>
-                <button
-                  type="button"
-                  onClick={() => tryExample("bluesky")}
-                  className="px-3 py-1 rounded-full bg-zinc-100 dark:bg-zinc-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors font-medium text-xs"
-                >
-                  Bluesky Post
-                </button>
-              </div>
-            )}
-          </form>
+              {!imagePreview && (
+                <div className="relative group">
+                  <div className="absolute -inset-1 bg-gradient-to-r from-rose-500 to-indigo-600 rounded-2xl blur opacity-20 group-focus-within:opacity-40 transition duration-1000"></div>
+                  <div className="relative flex items-center bg-white dark:bg-zinc-900 rounded-2xl shadow-xl transition-shadow ring-1 ring-zinc-200 dark:ring-zinc-800 group-focus-within:ring-zinc-300 dark:group-focus-within:ring-zinc-700">
+                    <input type="url" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="Paste URL (article, tweet, bsky)..." className="flex-1 w-full pl-6 pr-4 py-5 bg-transparent border-0 focus:ring-0 text-lg text-zinc-900 dark:text-zinc-100 placeholder-zinc-400" required />
+                    <div className="pr-3 flex items-center gap-3">
+                      <label htmlFor="image-upload" className="p-2.5 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 cursor-pointer transition-colors bg-zinc-50 dark:bg-zinc-800 rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-700" title="Upload screenshot">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                        <input id="image-upload" type="file" accept="image/jpeg,image/png,image/gif,image/webp" onChange={handleImageSelect} className="hidden" />
+                      </label>
+                      <button type="submit" disabled={loading || !url.trim()} className="px-6 py-3 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 rounded-xl text-base font-bold hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-all shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed min-w-[120px]">
+                        {loading ? <svg className="animate-spin h-4 w-4 mx-auto" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" /></svg> : <div className="flex flex-col leading-none"><span>Analyze</span><span className="text-[10px] opacity-60 font-medium mt-0.5">~5s</span></div>}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              {!imagePreview && (
+                <div className="mt-6 flex flex-wrap items-center justify-center lg:justify-start gap-2 text-sm text-zinc-500">
+                  <span>Try:</span>
+                  <button type="button" onClick={() => tryExample("news")} className="px-3 py-1 rounded-full bg-zinc-100 dark:bg-zinc-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors font-medium text-xs">News Article</button>
+                  <button type="button" onClick={() => tryExample("tweet")} className="px-3 py-1 rounded-full bg-zinc-100 dark:bg-zinc-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors font-medium text-xs">Viral Tweet</button>
+                </div>
+              )}
+            </form>
+          </div>
+
+          <div className="hidden lg:flex lg:col-span-2 justify-center">
+            <MicroDemoCard />
+          </div>
         </div>
+
+        {/* How it Works Section */}
+        {(!result || isDemo) && (
+          <div className="max-w-4xl mx-auto mb-20 animate-in fade-in slide-in-from-bottom-6 duration-700 delay-100">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              <div className="text-center p-6 bg-white dark:bg-zinc-900/50 rounded-2xl border border-zinc-100 dark:border-zinc-800">
+                <div className="w-12 h-12 mx-auto bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 rounded-full flex items-center justify-center mb-4">
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                  </svg>
+                </div>
+                <h3 className="font-bold text-zinc-900 dark:text-zinc-100 mb-2">1. Paste a Link</h3>
+                <p className="text-sm text-zinc-500 leading-relaxed">
+                  Drop in a URL from any major news site or social platform (X, Bluesky, Threads).
+                </p>
+              </div>
+              <div className="text-center p-6 bg-white dark:bg-zinc-900/50 rounded-2xl border border-zinc-100 dark:border-zinc-800">
+                <div className="w-12 h-12 mx-auto bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 rounded-full flex items-center justify-center mb-4">
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.384-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+                  </svg>
+                </div>
+                <h3 className="font-bold text-zinc-900 dark:text-zinc-100 mb-2">2. Analyze Patterns</h3>
+                <p className="text-sm text-zinc-500 leading-relaxed">
+                  Our system scans for 5 key markers of manipulation: Arousal, Moral Condemnation, and more.
+                </p>
+              </div>
+              <div className="text-center p-6 bg-white dark:bg-zinc-900/50 rounded-2xl border border-zinc-100 dark:border-zinc-800">
+                <div className="w-12 h-12 mx-auto bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 rounded-full flex items-center justify-center mb-4">
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <h3 className="font-bold text-zinc-900 dark:text-zinc-100 mb-2">3. See Reality</h3>
+                <p className="text-sm text-zinc-500 leading-relaxed">
+                  Get a clear "Bait Score" and highlighted examples of how the text tries to manipulate you.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Live Headlines Section */}
         {(!result || isDemo) && (
@@ -1219,6 +944,42 @@ export default function Home() {
           </div>
         )}
 
+        {/* Loading State */}
+        {loading && (
+          <div className="max-w-xl mx-auto mt-12 animate-in fade-in duration-500">
+            <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-10 shadow-2xl text-center">
+              <div className="inline-block relative mb-8">
+                 <div className="absolute inset-0 bg-indigo-500 blur-xl opacity-20 animate-pulse"></div>
+                 <svg className="relative animate-spin h-10 w-10 text-indigo-600 mx-auto" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+              </div>
+              
+              <h3 className="text-xl font-bold text-zinc-900 dark:text-zinc-100 mb-2">Analyzing Patterns</h3>
+              <p className="text-zinc-500 mb-8">Our models are scanning for manipulative framing...</p>
+
+              <div className="space-y-4 max-w-sm mx-auto">
+                {Object.entries(SIGNAL_LABELS).map(([key, label], index) => (
+                  <div key={key} className="flex items-center gap-4">
+                    <span className="text-xs font-medium text-zinc-400 w-32 text-right">{label}</span>
+                    <div className="flex-1 h-1.5 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-indigo-500 rounded-full animate-shimmer"
+                        style={{
+                          width: '100%',
+                          animationDelay: `${index * 150}ms`,
+                          opacity: 0.6
+                        }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Results Section */}
         {result && !loading && (
           <div className="animate-in fade-in slide-in-from-bottom-8 duration-700 space-y-8 mt-12">
@@ -1251,7 +1012,7 @@ export default function Home() {
             )}
 
             {!isDemo && (
-              <div className="flex justify-center gap-3">
+              <div className="flex justify-center">
                 <button
                   onClick={() => {
                     setResult(DEMO_RESULT);
@@ -1265,193 +1026,18 @@ export default function Home() {
                   </svg>
                   Analyze Another
                 </button>
-                {result?.cached && (!result.textPreview || result.title === "Article Analysis") && (
-                  <button
-                    onClick={forceReanalyze}
-                    className="group flex items-center gap-2 px-4 py-2 bg-amber-100 dark:bg-amber-900/30 hover:bg-amber-200 dark:hover:bg-amber-900/50 rounded-full text-sm font-medium text-amber-700 dark:text-amber-300 transition-colors"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                    </svg>
-                    Re-analyze (Fresh)
-                  </button>
-                )}
               </div>
             )}
 
             {!result.success ? (
-              <div className="max-w-xl mx-auto p-8 bg-gradient-to-b from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/30 border border-amber-200 dark:border-amber-800 rounded-2xl text-center">
-                {errorReported ? (
-                  <div className="animate-in fade-in zoom-in duration-300">
-                    <div className="w-16 h-16 mx-auto mb-4 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center">
-                      <svg className="w-8 h-8 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                    </div>
-                    <h3 className="text-xl font-bold text-zinc-900 dark:text-zinc-100 mb-2">
-                      Thanks for reporting!
-                    </h3>
-                    <p className="text-zinc-600 dark:text-zinc-400">
-                      We&apos;ve logged this site and will work on adding support.
-                    </p>
-                  </div>
-                ) : (
-                  <>
-                    <div className="w-16 h-16 mx-auto mb-4 bg-amber-100 dark:bg-amber-900/30 rounded-full flex items-center justify-center">
-                      <svg className="w-8 h-8 text-amber-600 dark:text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                      </svg>
-                    </div>
-                    <h3 className="text-xl font-bold text-zinc-900 dark:text-zinc-100 mb-2">
-                      We couldn&apos;t analyze this page
-                    </h3>
-                    <p className="text-zinc-600 dark:text-zinc-400 mb-2">
-                      {result.error?.includes("403") || result.error?.includes("blocked")
-                        ? "This site blocks automated access."
-                        : result.error?.includes("400") || result.error?.includes("404")
-                        ? "This page couldn't be loaded."
-                        : result.error?.includes("login") || result.error?.includes("sign in")
-                        ? "This content requires login to view."
-                        : "Some sites have restrictions we haven't worked around yet."}
-                    </p>
-                    <p className="text-sm text-zinc-500 dark:text-zinc-500 mb-6">
-                      <span className="font-mono text-xs bg-zinc-100 dark:bg-zinc-800 px-2 py-1 rounded">
-                        {result.error}
-                      </span>
-                    </p>
-                    <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                      <button
-                        onClick={() => {
-                          fetch("/api/feedback", {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({
-                              url,
-                              rating: "down",
-                              comment: `[SITE ERROR] ${result.error}`,
-                              score: -1,
-                              title: "Error Report",
-                              sourceDomain: result.sourceDomain || new URL(url).hostname,
-                              signalBreakdown: {},
-                            }),
-                          }).catch(() => {});
-                          setErrorReported(true);
-                        }}
-                        className="px-6 py-3 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl transition-colors flex items-center justify-center gap-2"
-                      >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-                        </svg>
-                        Let us know
-                      </button>
-                      <button
-                        onClick={() => {
-                          setResult(null);
-                          setUrl("");
-                        }}
-                        className="px-6 py-3 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 font-medium transition-colors"
-                      >
-                        Try another URL
-                      </button>
-                    </div>
-                    <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-200 dark:border-blue-800">
-                      <p className="text-sm text-blue-700 dark:text-blue-300 font-medium flex items-center justify-center gap-2">
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                        </svg>
-                        Take a screenshot and upload it instead
-                      </p>
-                      <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
-                        Use the camera button above to upload a screenshot of the article
-                      </p>
-                    </div>
-                  </>
-                )}
+              <div className="max-w-xl mx-auto p-6 bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 rounded-2xl text-center text-rose-700 dark:text-rose-300">
+                <svg className="w-12 h-12 mx-auto mb-4 text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                <p className="font-bold text-lg mb-1">Analysis Failed</p>
+                <p>{result.error}</p>
               </div>
             ) : (
-              <>
-              {/* Share Buttons - Above Analysis */}
-              <div className="max-w-4xl mx-auto mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 px-4">
-                <div className="flex items-center gap-3">
-                  <span className="text-xs font-medium text-zinc-400">
-                    {activeFilter ? `Filtering: ${SIGNAL_LABELS[activeFilter as keyof SignalBreakdown]}` : "Showing all detected patterns"}
-                  </span>
-                  {showSharePrompt && !isDemo && (
-                    <span className="text-xs font-medium text-amber-600 dark:text-amber-400 animate-pulse">
-                      This one&apos;s worth sharing.
-                    </span>
-                  )}
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  {/* Primary CTA: Share Image */}
-                  <button
-                    onClick={onShareImageClick}
-                    className="flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white text-xs font-bold rounded-lg transition-all shadow-md hover:shadow-lg"
-                    title="Copy image to clipboard — paste anywhere"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
-                    {imageCopied ? "Copied — paste anywhere!" : "Share Image"}
-                  </button>
-                  {/* Post on X */}
-                  <button
-                    onClick={shareOnTwitter}
-                    className="flex items-center gap-1.5 px-3 py-2 bg-black hover:bg-zinc-800 text-white text-xs font-bold rounded-lg transition-colors"
-                    title="Post on X"
-                  >
-                    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
-                    </svg>
-                    Post on X
-                  </button>
-                  {/* Post on Bluesky */}
-                  <button
-                    onClick={shareOnBluesky}
-                    className="flex items-center gap-1.5 px-3 py-2 bg-[#0085ff] hover:bg-[#0070d6] text-white text-xs font-bold rounded-lg transition-colors"
-                    title="Post on Bluesky"
-                  >
-                    <svg className="w-3.5 h-3.5" viewBox="0 0 600 530" fill="currentColor">
-                      <path d="m135.72 44.03c66.496 49.921 138.02 151.14 164.28 205.46 26.262-54.316 97.782-155.54 164.28-205.46 47.98-36.021 125.72-63.892 125.72 24.795 0 17.712-10.155 148.79-16.111 170.07-20.703 73.984-96.144 92.854-163.25 81.433 117.3 19.964 147.14 86.092 82.697 152.22-122.39 125.59-175.91-31.511-189.63-71.766-2.514-7.38-3.69-10.832-3.69-7.914 0-2.918-1.176 0.534-3.69 7.914-13.72 40.255-67.24 197.36-189.63 71.766-64.444-66.128-34.605-132.26 82.697-152.22-67.108 11.421-142.55-7.449-163.25-81.433-5.9561-21.282-16.111-152.36-16.111-170.07 0-88.687 77.742-60.816 125.72-24.795z"/>
-                    </svg>
-                    Post on Bluesky
-                  </button>
-                  {/* More dropdown */}
-                  <div className="relative" ref={moreMenuRef}>
-                    <button
-                      onClick={() => setShowMoreMenu(!showMoreMenu)}
-                      className="flex items-center gap-1 px-2 py-2 text-xs font-medium text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 transition-colors"
-                      title="More options"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h.01M12 12h.01M19 12h.01M6 12a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0z" />
-                      </svg>
-                    </button>
-                    {showMoreMenu && (
-                      <div className="absolute right-0 top-full mt-1 w-40 bg-white dark:bg-zinc-800 rounded-lg shadow-lg border border-zinc-200 dark:border-zinc-700 py-1 z-50">
-                        <button
-                          onClick={copyShareCard}
-                          className="w-full text-left px-4 py-2 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 transition-colors"
-                        >
-                          {copied ? "Link Copied!" : "Copy Link"}
-                        </button>
-                        {canNativeShare && (
-                          <button
-                            onClick={() => {
-                              shareNative();
-                              setShowMoreMenu(false);
-                            }}
-                            className="w-full text-left px-4 py-2 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 transition-colors"
-                          >
-                            Share via...
-                          </button>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
                 
                 {/* Score & Context Card */}
@@ -1557,7 +1143,7 @@ export default function Home() {
 
                       <div className="pl-5 border-l-2 border-zinc-200 dark:border-zinc-800">
                         <p className="text-lg text-zinc-500 italic font-serif">
-                          &ldquo;{result.contextNotes || "This content exhibits multiple patterns associated with manipulative framing."}"&rdquo;
+                          &ldquo;{result.contextNotes || "This content exhibits multiple patterns associated with manipulative framing."}&rdquo;
                         </p>
                       </div>
                     </div>
@@ -1580,10 +1166,10 @@ export default function Home() {
                   </BentoCard>
 
                   {/* Highlighted Text */}
-                  <BentoCard title={result.sourceDomain?.match(/twitter|x.com|bsky|threads|truthsocial/) ? "Social Context" : "Key Excerpts"} className="flex-1">
+                  <BentoCard title={result.sourceDomain?.match(/twitter|x\.com|bsky|threads|truthsocial/) ? "Social Context" : "Key Excerpts"} className="flex-1">
                     <div className="relative">
                       <div className="max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
-                        {result.sourceDomain?.match(/twitter|x.com|bsky|threads|truthsocial/) ? (
+                        {result.sourceDomain?.match(/twitter|x\.com|bsky|threads|truthsocial/) ? (
                           <SocialPostCard 
                              title={result.title || ""}
                              text={result.textPreview || ""}
@@ -1601,104 +1187,31 @@ export default function Home() {
                         )}
                       </div>
                     </div>
-                    </BentoCard>
+                    <div className="mt-6 pt-4 border-t border-zinc-100 dark:border-zinc-800 flex justify-between items-center">
+                       <span className="text-xs font-medium text-zinc-400">
+                         {activeFilter ? `Filtering: ${SIGNAL_LABELS[activeFilter as keyof SignalBreakdown]}` : "Showing all detected patterns"}
+                       </span>
+                       <div className="flex items-center gap-3">
+                         <button
+                           onClick={copyShareCard}
+                           className="text-xs font-bold text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 transition-colors"
+                         >
+                           {copied ? "Copied!" : "Copy Link"}
+                         </button>
+                         <button
+                           onClick={handleShare}
+                           className="flex items-center gap-2 px-4 py-2 bg-zinc-900 dark:bg-zinc-100 hover:bg-zinc-800 dark:hover:bg-zinc-200 text-white dark:text-zinc-900 text-xs font-bold rounded-lg transition-colors shadow-sm"
+                         >
+                           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                           </svg>
+                           Share Analysis
+                         </button>
+                       </div>
+                    </div>
+                  </BentoCard>
                 </div>
               </div>
-
-              {/* Prominent Feedback Section */}
-              {!isDemo && (
-                <div className="mt-10 max-w-2xl mx-auto">
-                  <div className="bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-950/30 dark:to-purple-950/30 border border-indigo-200 dark:border-indigo-800 rounded-2xl p-6 md:p-8 text-center">
-                    {feedbackSubmitted ? (
-                      <div className="animate-in fade-in zoom-in duration-300">
-                        <div className="w-16 h-16 mx-auto mb-4 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center">
-                          <svg className="w-8 h-8 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                          </svg>
-                        </div>
-                        <h3 className="text-xl font-bold text-zinc-900 dark:text-zinc-100 mb-2">
-                          Thanks for your feedback!
-                        </h3>
-                        <p className="text-zinc-600 dark:text-zinc-400">
-                          Your input helps us improve RageCheck for everyone.
-                        </p>
-                      </div>
-                    ) : showFeedbackForm ? (
-                      <div className="animate-in fade-in duration-300">
-                        <h3 className="text-xl font-bold text-zinc-900 dark:text-zinc-100 mb-2">
-                          What could be better?
-                        </h3>
-                        <p className="text-zinc-600 dark:text-zinc-400 mb-4">
-                          Was the score too high, too low, or something else?
-                        </p>
-                        <textarea
-                          value={feedbackComment}
-                          onChange={(e) => setFeedbackComment(e.target.value)}
-                          placeholder="The score seems too high because... / I expected... / The analysis missed..."
-                          className="w-full p-4 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
-                          rows={3}
-                          autoFocus
-                        />
-                        <div className="flex gap-3 mt-4 justify-center">
-                          <button
-                            onClick={submitFeedbackComment}
-                            className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl transition-colors"
-                          >
-                            Submit Feedback
-                          </button>
-                          <button
-                            onClick={() => {
-                              setFeedbackSubmitted(true);
-                              setShowFeedbackForm(false);
-                            }}
-                            className="px-6 py-2.5 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 font-medium transition-colors"
-                          >
-                            Skip
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <>
-                        <h3 className="text-xl md:text-2xl font-bold text-zinc-900 dark:text-zinc-100 mb-2">
-                          Was this analysis accurate?
-                        </h3>
-                        <p className="text-zinc-600 dark:text-zinc-400 mb-6">
-                          Your feedback helps us improve
-                        </p>
-                        <div className="flex justify-center gap-4">
-                          <button
-                            onClick={() => submitFeedback("up")}
-                            className={`group flex items-center gap-3 px-8 py-4 rounded-xl font-bold text-lg transition-all ${
-                              feedbackGiven === "up"
-                                ? "bg-green-500 text-white scale-105"
-                                : "bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-green-50 dark:hover:bg-green-900/20 hover:text-green-600 dark:hover:text-green-400 border border-zinc-200 dark:border-zinc-700 hover:border-green-300 dark:hover:border-green-700"
-                            }`}
-                          >
-                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 20m7-10V5a2 2 0 00-2-2h-.095c-.5 0-.905.405-.905.905 0 .714-.211 1.412-.608 2.006L7 11v9m7-10h-2M7 20H5a2 2 0 01-2-2v-6a2 2 0 012-2h2.5" />
-                            </svg>
-                            Yes, accurate
-                          </button>
-                          <button
-                            onClick={() => submitFeedback("down")}
-                            className={`group flex items-center gap-3 px-8 py-4 rounded-xl font-bold text-lg transition-all ${
-                              feedbackGiven === "down"
-                                ? "bg-rose-500 text-white scale-105"
-                                : "bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-rose-50 dark:hover:bg-rose-900/20 hover:text-rose-600 dark:hover:text-rose-400 border border-zinc-200 dark:border-zinc-700 hover:border-rose-300 dark:hover:border-rose-700"
-                            }`}
-                          >
-                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14H5.236a2 2 0 01-1.789-2.894l3.5-7A2 2 0 018.736 3h4.018a2 2 0 01.485.06l3.76.94m-7 10v5a2 2 0 002 2h.096c.5 0 .905-.405.905-.904 0-.715.211-1.413.608-2.008L17 13V4m-7 10h2m5-10h2a2 2 0 012 2v6a2 2 0 01-2 2h-2.5" />
-                            </svg>
-                            Not quite
-                          </button>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                </div>
-              )}
-              </>
             )}
           </div>
         )}
@@ -1721,6 +1234,13 @@ export default function Home() {
         }
         .dark .custom-scrollbar::-webkit-scrollbar-thumb {
           background: #3f3f46;
+        }
+        @keyframes shimmer {
+          0% { transform: translateX(-100%); }
+          100% { transform: translateX(100%); }
+        }
+        .animate-shimmer {
+          animation: shimmer 2s infinite;
         }
       `}</style>
     </div>
