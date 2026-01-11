@@ -1,7 +1,7 @@
-// Canvas-based share image generator matching the new server-rendered design
-// Features: sentence case hook line, quoted title, upright score box, subtle driver tags
+// Canvas-based share image generator matching the server-rendered design
+// Features: speedometer, all 5 signal bars with percentages
 
-import { getDeterministicHookLine, getTopDrivers, getScoreColor, getAccentColor } from "@/lib/shareCard";
+import { getScoreColor } from "@/lib/shareCard";
 import type { SignalBreakdown } from "@/lib/score";
 
 export interface ShareImageData {
@@ -18,25 +18,20 @@ const SIZE_CONFIGS: Record<ImageSize, { width: number; height: number }> = {
   bluesky: { width: 1200, height: 630 },
 };
 
-function drawRoundedRect(
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  width: number,
-  height: number,
-  radius: number
-) {
-  ctx.beginPath();
-  ctx.moveTo(x + radius, y);
-  ctx.lineTo(x + width - radius, y);
-  ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
-  ctx.lineTo(x + width, y + height - radius);
-  ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
-  ctx.lineTo(x + radius, y + height);
-  ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
-  ctx.lineTo(x, y + radius);
-  ctx.quadraticCurveTo(x, y, x + radius, y);
-  ctx.closePath();
+// Signal bar labels
+const SIGNAL_LABELS: Record<string, string> = {
+  arousal: "Emotional Arousal",
+  enemy_construction: "Enemy Construction",
+  moral_condemnation: "Moral Condemnation",
+  simplification: "Oversimplification",
+  call_to_conflict: "Call-to-Conflict",
+};
+
+// Get bar color based on value
+function getBarColor(value: number): string {
+  if (value >= 60) return "#ef4444"; // red
+  if (value >= 30) return "#f59e0b"; // amber
+  return "#22c55e"; // green
 }
 
 function wrapText(
@@ -55,7 +50,6 @@ function wrapText(
       lines.push(currentLine);
       currentLine = word;
       if (lines.length >= maxLines) {
-        // Truncate last line
         let lastLine = lines[lines.length - 1];
         while (ctx.measureText(lastLine + "...").width > maxWidth && lastLine.length > 0) {
           lastLine = lastLine.slice(0, -1);
@@ -91,146 +85,177 @@ export function generateShareImage(
     const { width, height } = SIZE_CONFIGS[size];
     canvas.width = width;
     canvas.height = height;
-    const padding = 64;
+    const padding = 48;
 
-    // Get design data
-    const topDrivers = getTopDrivers(data.signalBreakdown);
-    const hookLine = getDeterministicHookLine(data.score, topDrivers);
     const scoreColor = getScoreColor(data.score);
-    const accentColor = getAccentColor(data.score);
 
     // Truncate title
-    const maxTitleLength = 100;
+    const maxTitleLength = 80;
     const displayTitle = data.title.length > maxTitleLength
       ? data.title.slice(0, maxTitleLength - 3) + "..."
       : data.title;
 
+    // Convert signal breakdown to array
+    const barsArray = [
+      { key: "arousal", label: SIGNAL_LABELS.arousal, value: data.signalBreakdown.arousal },
+      { key: "enemy_construction", label: SIGNAL_LABELS.enemy_construction, value: data.signalBreakdown.enemy_construction },
+      { key: "moral_condemnation", label: SIGNAL_LABELS.moral_condemnation, value: data.signalBreakdown.moral_condemnation },
+      { key: "simplification", label: SIGNAL_LABELS.simplification, value: data.signalBreakdown.simplification },
+      { key: "call_to_conflict", label: SIGNAL_LABELS.call_to_conflict, value: data.signalBreakdown.call_to_conflict },
+    ];
+
     // === BACKGROUND ===
-    ctx.fillStyle = "#09090b"; // Matte black
+    ctx.fillStyle = "#fafafa";
     ctx.fillRect(0, 0, width, height);
 
-    // === HEADER: RAGECHECK / EMOTIONAL ANALYSIS | DOMAIN ===
-    ctx.font = "500 20px monospace";
+    // === HEADER ===
+    // Logo box
+    ctx.fillStyle = "#18181b";
+    ctx.fillRect(padding, padding, 32, 32);
+
+    // RageCheck text
+    ctx.fillStyle = "#18181b";
+    ctx.font = "700 24px system-ui, -apple-system, sans-serif";
+    ctx.textAlign = "left";
     ctx.textBaseline = "middle";
+    ctx.fillText("RageCheck", padding + 44, padding + 16);
 
-    // Left side: RAGECHECK / EMOTIONAL ANALYSIS
-    ctx.textAlign = "left";
-    ctx.fillStyle = "#e4e4e7";
-    ctx.font = "700 20px monospace";
-    ctx.fillText("RAGECHECK", padding, padding + 10);
-
-    const rageCheckWidth = ctx.measureText("RAGECHECK").width;
+    // Domain
     ctx.fillStyle = "#71717a";
-    ctx.font = "500 20px monospace";
-    ctx.fillText(" / EMOTIONAL ANALYSIS", padding + rageCheckWidth, padding + 10);
-
-    // Right side: DOMAIN
+    ctx.font = "500 18px system-ui, -apple-system, sans-serif";
     ctx.textAlign = "right";
-    ctx.fillStyle = "#71717a";
-    ctx.fillText(data.domain.toUpperCase(), width - padding, padding + 10);
+    ctx.fillText(data.domain, width - padding, padding + 16);
 
-    // === MAIN: HOOK LINE (Sentence Case) ===
-    const hookY = padding + 80;
-    ctx.fillStyle = "#fafafa";
-    ctx.font = "800 88px system-ui, -apple-system, sans-serif"; // 800 weight (slightly lighter)
+    // === TITLE ===
+    ctx.fillStyle = "#18181b";
+    ctx.font = "700 32px system-ui, -apple-system, sans-serif";
     ctx.textAlign = "left";
     ctx.textBaseline = "top";
 
-    // Wrap hook line if needed (max 2 lines) - NO UPPERCASE
-    const hookLines = wrapText(ctx, hookLine, width - padding * 2, 2);
-    const hookLineHeight = 88; // Adjusted for lineHeight 1.0
-
-    hookLines.forEach((line, i) => {
-      ctx.fillText(line, padding, hookY + i * hookLineHeight);
-    });
-
-    // === ARTICLE TITLE (quoted, below hook) ===
-    const titleY = hookY + hookLines.length * hookLineHeight + 36;
-    ctx.fillStyle = "#a1a1aa";
-    ctx.font = "500 32px system-ui, -apple-system, sans-serif";
-    ctx.textAlign = "left";
-    ctx.textBaseline = "top";
-
-    // Wrap title (max 2 lines)
-    const quotedTitle = `"${displayTitle}"`;
-    const titleLines = wrapText(ctx, quotedTitle, (width - padding * 2) * 0.9, 2);
-    const titleLineHeight = 42;
-
+    const titleY = padding + 64;
+    const titleLines = wrapText(ctx, displayTitle, width - padding * 2, 2);
+    const titleLineHeight = 38;
     titleLines.forEach((line, i) => {
       ctx.fillText(line, padding, titleY + i * titleLineHeight);
     });
 
-    // === FOOTER: SCORE BOX (left) + DRIVER TAGS (right) ===
-    const footerY = height - padding - 100;
+    // === MAIN CONTENT AREA ===
+    const contentY = titleY + titleLines.length * titleLineHeight + 32;
+    const speedometerWidth = 280;
+    const barsX = padding + speedometerWidth + 48;
+    const barsWidth = width - barsX - padding;
 
-    // --- Score Box (Upright, no rotation) ---
-    const boxX = padding;
-    const boxY = footerY;
-    const boxWidth = 130;
-    const boxHeight = 110;
+    // === SPEEDOMETER ===
+    const speedoCenterX = padding + speedometerWidth / 2;
+    const speedoCenterY = contentY + 130;
+    const speedoRadius = 90;
 
-    // Soft shadow (draw shadow rect first, offset)
-    ctx.fillStyle = "rgba(0,0,0,0.5)";
-    drawRoundedRect(ctx, boxX + 4, boxY + 4, boxWidth, boxHeight, 4);
-    ctx.fill();
-
-    // Score box background
-    ctx.fillStyle = scoreColor;
-    drawRoundedRect(ctx, boxX, boxY, boxWidth, boxHeight, 4);
-    ctx.fill();
-
-    // White border
-    ctx.strokeStyle = "#ffffff";
-    ctx.lineWidth = 4;
-    drawRoundedRect(ctx, boxX, boxY, boxWidth, boxHeight, 4);
+    // Draw background arc
+    ctx.beginPath();
+    ctx.arc(speedoCenterX, speedoCenterY, speedoRadius, Math.PI * 1.25, Math.PI * -0.25, false);
+    ctx.strokeStyle = "#e4e4e7";
+    ctx.lineWidth = 16;
+    ctx.lineCap = "round";
     ctx.stroke();
 
-    // "BAIT SCORE" label
-    ctx.fillStyle = "#000000";
-    ctx.font = "700 14px system-ui, -apple-system, sans-serif";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText("BAIT SCORE", boxX + boxWidth / 2, boxY + 28);
+    // Draw colored progress arc
+    const progressAngle = Math.PI * 1.25 + (data.score / 100) * Math.PI * 1.5;
+    ctx.beginPath();
+    ctx.arc(speedoCenterX, speedoCenterY, speedoRadius, Math.PI * 1.25, progressAngle, false);
+    ctx.strokeStyle = scoreColor;
+    ctx.lineWidth = 16;
+    ctx.lineCap = "round";
+    ctx.stroke();
+
+    // Draw needle
+    const needleAngle = Math.PI * 1.25 + (data.score / 100) * Math.PI * 1.5 - Math.PI / 2;
+    const needleLength = 70;
+    ctx.save();
+    ctx.translate(speedoCenterX, speedoCenterY);
+    ctx.rotate(needleAngle);
+    ctx.fillStyle = "#18181b";
+    ctx.fillRect(-2, -needleLength, 4, needleLength);
+    ctx.restore();
+
+    // Draw center dot
+    ctx.beginPath();
+    ctx.arc(speedoCenterX, speedoCenterY, 8, 0, Math.PI * 2);
+    ctx.fillStyle = "#18181b";
+    ctx.fill();
 
     // Score number
-    ctx.font = "900 56px system-ui, -apple-system, sans-serif";
-    ctx.fillText(String(data.score), boxX + boxWidth / 2, boxY + 70);
+    ctx.fillStyle = scoreColor;
+    ctx.font = "900 64px system-ui, -apple-system, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "top";
+    ctx.fillText(String(data.score), speedoCenterX, speedoCenterY + 20);
 
-    // --- Driver Tags (right side, subtle outlined pills) ---
-    ctx.textAlign = "right";
-    let tagX = width - padding;
-    const tagY = footerY + boxHeight / 2;
-    const tagPadding = { x: 24, y: 12 };
-    const tagGap = 16;
+    // "Bait Score" label
+    ctx.fillStyle = "#71717a";
+    ctx.font = "700 14px system-ui, -apple-system, sans-serif";
+    ctx.letterSpacing = "0.1em";
+    ctx.fillText("BAIT SCORE", speedoCenterX, speedoCenterY + 90);
 
-    // Draw tags from right to left
-    topDrivers.slice(0, 2).reverse().forEach((driver) => {
-      const label = driver.label.replace("Emotional ", "").toUpperCase();
-      ctx.font = "600 22px system-ui, -apple-system, sans-serif"; // 600 weight
-      const textWidth = ctx.measureText(label).width;
-      const tagWidth = textWidth + tagPadding.x * 2;
-      const tagHeight = 44;
+    // === SIGNAL BARS ===
+    const barHeight = 12;
+    const barGap = 16;
+    const labelHeight = 24;
+    const totalBarHeight = labelHeight + 6 + barHeight;
+    const barsStartY = contentY + 20;
 
-      // Tag background (subtle transparent)
-      const tagLeft = tagX - tagWidth;
-      ctx.fillStyle = "rgba(255,255,255,0.05)";
-      drawRoundedRect(ctx, tagLeft, tagY - tagHeight/2, tagWidth, tagHeight, tagHeight/2);
+    barsArray.forEach((bar, i) => {
+      const barY = barsStartY + i * (totalBarHeight + barGap);
+
+      // Label
+      ctx.fillStyle = "#3f3f46";
+      ctx.font = "600 16px system-ui, -apple-system, sans-serif";
+      ctx.textAlign = "left";
+      ctx.textBaseline = "top";
+      ctx.fillText(bar.label, barsX, barY);
+
+      // Percentage
+      ctx.fillStyle = "#18181b";
+      ctx.font = "700 16px system-ui, -apple-system, sans-serif";
+      ctx.textAlign = "right";
+      ctx.fillText(`${bar.value}%`, barsX + barsWidth, barY);
+
+      // Bar background
+      const barBgY = barY + labelHeight + 6;
+      ctx.fillStyle = "#e4e4e7";
+      ctx.beginPath();
+      ctx.roundRect(barsX, barBgY, barsWidth, barHeight, 6);
       ctx.fill();
 
-      // Tag border (colored)
-      ctx.strokeStyle = accentColor;
-      ctx.lineWidth = 2;
-      drawRoundedRect(ctx, tagLeft, tagY - tagHeight/2, tagWidth, tagHeight, tagHeight/2);
-      ctx.stroke();
-
-      // Tag text (no emoji)
-      ctx.fillStyle = accentColor;
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText(label, tagLeft + tagWidth / 2, tagY);
-
-      tagX = tagLeft - tagGap;
+      // Bar fill
+      const fillWidth = (bar.value / 100) * barsWidth;
+      if (fillWidth > 0) {
+        ctx.fillStyle = getBarColor(bar.value);
+        ctx.beginPath();
+        ctx.roundRect(barsX, barBgY, fillWidth, barHeight, 6);
+        ctx.fill();
+      }
     });
+
+    // === FOOTER ===
+    const footerY = height - padding - 20;
+
+    // Divider line
+    ctx.strokeStyle = "#e4e4e7";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(padding, footerY - 24);
+    ctx.lineTo(width - padding, footerY - 24);
+    ctx.stroke();
+
+    // Footer text
+    ctx.fillStyle = "#a1a1aa";
+    ctx.font = "400 14px system-ui, -apple-system, sans-serif";
+    ctx.textAlign = "left";
+    ctx.textBaseline = "middle";
+    ctx.fillText("ragecheck.app", padding, footerY);
+
+    ctx.textAlign = "right";
+    ctx.fillText("AI-powered emotional manipulation analysis", width - padding, footerY);
 
     // Convert to blob
     canvas.toBlob(
