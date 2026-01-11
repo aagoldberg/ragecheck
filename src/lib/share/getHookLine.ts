@@ -34,8 +34,8 @@ export function getHookLine(
     .map(key => ({ key, value: signalBreakdown[key] }))
     .sort((a, b) => b.value - a.value);
 
+  // Always include top 3 signals for the triggers line
   const topSignals = sortedSignals
-    .filter(s => s.value >= 30)
     .slice(0, 3)
     .map(s => SIGNAL_SHORT_LABELS[s.key]);
 

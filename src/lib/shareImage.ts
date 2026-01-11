@@ -155,12 +155,11 @@ export function generateShareImage(
     ctx.textBaseline = "middle";
     ctx.fillText(label, centerX, centerY + 75);
 
-    // === TOP BARS (only top 2-3) ===
+    // === TOP BARS (always show top 3) ===
     const sortedSignals = (Object.keys(data.signalBreakdown) as (keyof SignalBreakdown)[])
       .map(key => ({ key, value: data.signalBreakdown[key] }))
       .sort((a, b) => b.value - a.value)
-      .filter(s => s.value >= 20) // Only show significant signals
-      .slice(0, 3); // Max 3 bars
+      .slice(0, 3); // Always show top 3 bars
 
     if (sortedSignals.length > 0) {
       const barsStartY = 400;
