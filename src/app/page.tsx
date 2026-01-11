@@ -560,6 +560,30 @@ function AnalyzingProgress() {
   );
 }
 
+function MicroDemoCard() {
+  return (
+    <div className="hidden lg:block absolute -right-20 top-0 w-72 animate-in fade-in slide-in-from-right-8 duration-1000 delay-300">
+      <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-4 shadow-2xl rotate-3 hover:rotate-0 transition-transform duration-500">
+        <div className="flex items-center gap-2 mb-3">
+          <div className="w-6 h-6 rounded-full bg-blue-500 flex items-center justify-center text-[10px] text-white font-bold">A</div>
+          <div className="h-2 w-16 bg-zinc-100 dark:bg-zinc-800 rounded"></div>
+        </div>
+        <div className="space-y-2 mb-4">
+          <div className="h-3 w-full bg-zinc-50 dark:bg-zinc-800/50 rounded"></div>
+          <p className="text-[11px] leading-relaxed text-zinc-800 dark:text-zinc-200">
+            This is an <mark className="bg-rose-100 text-rose-800 px-0.5 rounded">existential threat</mark> to our way of life!
+          </p>
+        </div>
+        <div className="relative pl-3 border-l-2 border-rose-500 py-1">
+          <span className="absolute -left-1.5 top-1/2 -translate-y-1/2 w-3 h-3 bg-rose-500 rounded-full border-2 border-white dark:border-zinc-900"></span>
+          <p className="text-[10px] font-bold text-rose-600 uppercase tracking-tight">Enemy Construction</p>
+          <p className="text-[9px] text-zinc-500 leading-tight mt-0.5">Frames opponents as a fatal threat to bypass reason.</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function Home() {
   const [url, setUrl] = useState("");
   const [loading, setLoading] = useState(false);
@@ -966,7 +990,8 @@ export default function Home() {
       <div className="max-w-6xl mx-auto px-4 py-16 md:py-24">
         
         {/* Hero Section */}
-        <div className="text-center max-w-3xl mx-auto mb-20 animate-in fade-in slide-in-from-bottom-4 duration-700">
+        <div className="relative text-center max-w-3xl mx-auto mb-20 animate-in fade-in slide-in-from-bottom-4 duration-700">
+          <MicroDemoCard />
           <h1 className="text-4xl md:text-6xl font-black tracking-tight text-zinc-900 dark:text-zinc-100 mb-6 leading-[1.1]">
             Is that post <span className="text-transparent bg-clip-text bg-gradient-to-r from-rose-500 to-indigo-600">designed</span> to make you angry?
           </h1>
@@ -1000,7 +1025,7 @@ export default function Home() {
                   disabled={loading}
                   className="mt-4 w-full px-6 py-4 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 rounded-xl font-bold text-lg hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-all shadow-lg hover:shadow-xl disabled:opacity-70"
                 >
-                  {loading ? "Scanning Image..." : "Analyze Screenshot"}
+                  {loading ? "Scanning Image..." : "Analyze Screenshot (~5s)"}
                 </button>
               </div>
             )}
@@ -1037,7 +1062,7 @@ export default function Home() {
                     <button
                       type="submit"
                       disabled={loading || !url.trim()}
-                      className="px-6 py-3 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 rounded-xl text-base font-bold hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-all shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
+                      className="px-6 py-3 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 rounded-xl text-base font-bold hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-all shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none min-w-[120px]"
                     >
                       {loading ? (
                         <span className="flex items-center gap-2">
@@ -1046,7 +1071,12 @@ export default function Home() {
                             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                           </svg>
                         </span>
-                      ) : "Analyze"}
+                      ) : (
+                        <div className="flex flex-col leading-none">
+                          <span>Analyze</span>
+                          <span className="text-[10px] opacity-60 font-medium mt-0.5">~5s</span>
+                        </div>
+                      )}
                     </button>
                   </div>
                 </div>
