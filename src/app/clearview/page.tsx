@@ -515,11 +515,6 @@ export default function ClearviewPage() {
         {/* Archived Briefings */}
         {!loading && !error && archived.length > 0 && (
           <div className="mt-24 pt-16 border-t border-zinc-200 dark:border-zinc-800">
-            <div className="text-center mb-12">
-              <h2 className="text-2xl font-bold text-zinc-900 dark:text-white mb-2">Previous Briefings</h2>
-              <p className="text-zinc-500 text-sm">Older stories from the past few days</p>
-            </div>
-
             <div className="space-y-20">
               {archived.map((briefing, briefingIndex) => (
                 <div key={briefingIndex} className="space-y-8">
