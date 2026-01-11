@@ -11,107 +11,69 @@ export async function GET() {
           width: "100%",
           display: "flex",
           flexDirection: "column",
-          backgroundColor: "#fafafa",
-          position: "relative",
+          backgroundColor: "#fafafa", // zinc-50
+          padding: "60px",
+          fontFamily: "Inter, sans-serif",
         }}
       >
-        {/* Gradient accent bar at top */}
-        <div
-          style={{
-            position: "absolute",
-            top: 0,
-            left: 0,
-            right: 0,
-            height: "8px",
-            background: "linear-gradient(90deg, #ec4899, #f59e0b, #10b981)",
-          }}
-        />
-
-        {/* Main content */}
+        {/* Main Bento Card */}
         <div
           style={{
             display: "flex",
             flexDirection: "column",
-            alignItems: "center",
-            justifyContent: "center",
             height: "100%",
-            padding: "60px",
-            gap: "32px",
+            width: "100%",
+            backgroundColor: "#ffffff",
+            borderRadius: "32px",
+            border: "2px solid #e4e4e7", // zinc-200
+            boxShadow: "0 20px 40px -10px rgba(0,0,0,0.05)",
+            padding: "48px",
+            justifyContent: "space-between",
           }}
         >
-          {/* Logo and title */}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "24px",
-            }}
-          >
-            <div
-              style={{
-                width: "80px",
-                height: "80px",
-                backgroundColor: "#18181b",
-                borderRadius: "16px",
-              }}
-            />
-            <span
-              style={{
-                fontSize: "72px",
-                fontWeight: "800",
-                color: "#18181b",
-                letterSpacing: "-2px",
-              }}
-            >
+          {/* Header: Brand */}
+          <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+            <div style={{ width: "48px", height: "48px", backgroundColor: "#18181b", borderRadius: "12px" }} />
+            <span style={{ fontSize: "36px", fontWeight: "700", color: "#18181b", letterSpacing: "-0.02em" }}>
               RageCheck
             </span>
           </div>
 
-          {/* Tagline */}
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              gap: "16px",
-            }}
-          >
-            <span
-              style={{
-                fontSize: "36px",
-                fontWeight: "600",
-                color: "#52525b",
-                textAlign: "center",
-              }}
-            >
-              Detect Outrage Bait Patterns
+          {/* Body: Headline */}
+          <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+            <span style={{
+              fontSize: "72px",
+              fontWeight: "800",
+              color: "#18181b",
+              lineHeight: "1.05",
+              letterSpacing: "-0.03em"
+            }}>
+              Is that post designed to make you angry?
             </span>
-            <span
-              style={{
-                fontSize: "24px",
-                color: "#71717a",
-                textAlign: "center",
-                maxWidth: "800px",
-              }}
-            >
-              Analyze articles and social posts for manipulative language,
-              fear-mongering, and engagement bait
+            <span style={{
+              fontSize: "28px",
+              fontWeight: "500",
+              color: "#71717a",
+              lineHeight: "1.4"
+            }}>
+              Detect outrage bait, fear-mongering, and manipulation patterns in news and social media.
             </span>
           </div>
 
-          {/* Signal indicators */}
-          <div
-            style={{
-              display: "flex",
-              gap: "16px",
-              marginTop: "24px",
-            }}
-          >
+          {/* Footer: Signal Pills */}
+          <div style={{
+            display: "flex",
+            gap: "12px",
+            flexWrap: "wrap",
+            paddingTop: "32px",
+            borderTop: "2px solid #f4f4f5"
+          }}>
             {[
-              { label: "Loaded Language", color: "#ef4444" },
-              { label: "Us-vs-Them", color: "#3b82f6" },
-              { label: "Fear Tactics", color: "#f97316" },
-              { label: "Engagement Bait", color: "#f59e0b" },
+              { label: "Emotional Arousal", color: "#f43f5e" },
+              { label: "Enemy Framing", color: "#8b5cf6" },
+              { label: "Moral Outrage", color: "#f59e0b" },
+              { label: "Oversimplification", color: "#3b82f6" },
+              { label: "Call to Conflict", color: "#10b981" },
             ].map((signal) => (
               <div
                 key={signal.label}
@@ -119,45 +81,18 @@ export async function GET() {
                   display: "flex",
                   alignItems: "center",
                   gap: "8px",
-                  padding: "12px 20px",
+                  padding: "10px 20px",
                   backgroundColor: "#f4f4f5",
-                  borderRadius: "50px",
-                  borderLeft: `4px solid ${signal.color}`,
+                  borderRadius: "100px",
                 }}
               >
-                <span
-                  style={{
-                    fontSize: "18px",
-                    color: "#52525b",
-                    fontWeight: "500",
-                  }}
-                >
+                <div style={{ width: "10px", height: "10px", backgroundColor: signal.color, borderRadius: "50%" }} />
+                <span style={{ fontSize: "18px", color: "#52525b", fontWeight: "600" }}>
                   {signal.label}
                 </span>
               </div>
             ))}
           </div>
-        </div>
-
-        {/* Footer */}
-        <div
-          style={{
-            position: "absolute",
-            bottom: "24px",
-            left: "60px",
-            right: "60px",
-            display: "flex",
-            justifyContent: "center",
-          }}
-        >
-          <span
-            style={{
-              fontSize: "20px",
-              color: "#a1a1aa",
-            }}
-          >
-            ragecheck.com
-          </span>
         </div>
       </div>
     ),
