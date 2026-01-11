@@ -104,6 +104,7 @@ interface FeedbackStats {
     rating: string;
     comment: string | null;
     score: number;
+    sourceDomain: string | null;
     createdAt: Date;
   }[];
 }
@@ -1051,15 +1052,15 @@ export default function AdminDashboard() {
                   <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-4">
                     Recent User Feedback
                   </h3>
-                  <div className="overflow-x-auto max-h-[300px] overflow-y-auto border border-zinc-100 dark:border-zinc-800 rounded-lg">
+                  <div className="overflow-x-auto max-h-[400px] overflow-y-auto border border-zinc-100 dark:border-zinc-800 rounded-lg">
                     <table className="w-full text-sm">
                       <thead className="sticky top-0 bg-zinc-50 dark:bg-zinc-800">
                         <tr className="border-b border-zinc-200 dark:border-zinc-700">
-                          <th className="text-left py-3 px-3 text-zinc-500 font-medium">Rating</th>
-                          <th className="text-left py-3 px-3 text-zinc-500 font-medium">URL</th>
-                          <th className="text-left py-3 px-3 text-zinc-500 font-medium">Score</th>
-                          <th className="text-left py-3 px-3 text-zinc-500 font-medium">Comment</th>
-                          <th className="text-left py-3 px-3 text-zinc-500 font-medium">Time</th>
+                          <th className="text-left py-3 px-3 text-zinc-500 font-medium w-16">Rating</th>
+                          <th className="text-left py-3 px-3 text-zinc-500 font-medium">Site</th>
+                          <th className="text-left py-3 px-3 text-zinc-500 font-medium w-16">Score</th>
+                          <th className="text-left py-3 px-3 text-zinc-500 font-medium">What they said</th>
+                          <th className="text-left py-3 px-3 text-zinc-500 font-medium w-32">Time</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -1072,19 +1073,19 @@ export default function AdminDashboard() {
                             .filter(f => !f.comment?.includes("[SITE ERROR]"))
                             .map((f, i) => (
                               <tr key={i} className="border-b border-zinc-100 dark:border-zinc-800 last:border-0 hover:bg-zinc-50 dark:hover:bg-zinc-800/50">
-                                <td className="py-2 px-3">
-                                  <span className={`text-lg ${f.rating === "up" ? "text-green-500" : "text-rose-500"}`}>
+                                <td className="py-3 px-3">
+                                  <span className={`text-xl ${f.rating === "up" ? "text-green-500" : "text-rose-500"}`}>
                                     {f.rating === "up" ? "👍" : "👎"}
                                   </span>
                                 </td>
-                                <td className="py-2 px-3 max-w-[200px]">
-                                  <a href={f.url} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline truncate block text-xs">
-                                    {f.url}
+                                <td className="py-3 px-3">
+                                  <a href={f.url} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline text-sm font-medium">
+                                    {f.sourceDomain || (() => { try { return new URL(f.url).hostname; } catch { return f.url; } })()}
                                   </a>
                                 </td>
-                                <td className="py-2 px-3">
+                                <td className="py-3 px-3">
                                   {f.score >= 0 && (
-                                    <span className={`text-xs font-medium px-2 py-0.5 rounded ${
+                                    <span className={`text-xs font-bold px-2 py-1 rounded ${
                                       f.score > 66 ? "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300" :
                                       f.score > 33 ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300" :
                                       "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300"
@@ -1093,10 +1094,14 @@ export default function AdminDashboard() {
                                     </span>
                                   )}
                                 </td>
-                                <td className="py-2 px-3 text-zinc-600 dark:text-zinc-400 text-xs max-w-[200px] truncate" title={f.comment || undefined}>
-                                  {f.comment || "-"}
+                                <td className="py-3 px-3 text-zinc-700 dark:text-zinc-300 text-sm">
+                                  {f.comment ? (
+                                    <span className="block max-w-md">{f.comment}</span>
+                                  ) : (
+                                    <span className="text-zinc-400 italic">No comment provided</span>
+                                  )}
                                 </td>
-                                <td className="py-2 px-3 text-zinc-500 text-xs whitespace-nowrap">
+                                <td className="py-3 px-3 text-zinc-500 text-xs whitespace-nowrap">
                                   {new Date(f.createdAt).toLocaleString()}
                                 </td>
                               </tr>

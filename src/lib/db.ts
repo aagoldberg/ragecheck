@@ -1058,6 +1058,7 @@ export interface FeedbackStats {
     rating: string;
     comment: string | null;
     score: number;
+    sourceDomain: string | null;
     createdAt: Date;
   }[];
 }
@@ -1069,7 +1070,7 @@ export async function getFeedbackStats(): Promise<FeedbackStats> {
     const [negativeResult] = await getDb()`SELECT COUNT(*) as count FROM ragecheck_feedback WHERE rating = 'down'`;
 
     const recentRows = await getDb()`
-      SELECT url, rating, comment, score, created_at
+      SELECT url, rating, comment, score, source_domain, created_at
       FROM ragecheck_feedback
       ORDER BY created_at DESC
       LIMIT 50
@@ -1088,6 +1089,7 @@ export async function getFeedbackStats(): Promise<FeedbackStats> {
         rating: row.rating,
         comment: row.comment,
         score: Number(row.score),
+        sourceDomain: row.source_domain || null,
         createdAt: row.created_at,
       })),
     };
