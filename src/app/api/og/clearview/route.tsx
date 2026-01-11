@@ -3,7 +3,7 @@ import { ImageResponse } from "@vercel/og";
 export const runtime = "edge";
 
 export async function GET() {
-  return new ImageResponse(
+  const response = new ImageResponse(
     (
       <div
         style={{
@@ -193,4 +193,8 @@ export async function GET() {
       height: 630,
     }
   );
+
+  // Short cache to allow updates to propagate faster
+  response.headers.set("Cache-Control", "public, max-age=3600, s-maxage=3600, stale-while-revalidate=86400");
+  return response;
 }

@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
   // Truncate title
   const displayTitle = title.length > 85 ? title.substring(0, 82) + "..." : title;
 
-  return new ImageResponse(
+  const response = new ImageResponse(
     (
       <div
         style={{
@@ -142,4 +142,8 @@ export async function GET(request: NextRequest) {
       height: 630,
     }
   );
+
+  // Short cache to allow updates to propagate faster
+  response.headers.set("Cache-Control", "public, max-age=3600, s-maxage=3600, stale-while-revalidate=86400");
+  return response;
 }
