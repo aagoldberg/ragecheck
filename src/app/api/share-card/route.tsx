@@ -59,7 +59,7 @@ export async function GET(request: NextRequest) {
     const response = renderShareCard(
       {
         sourceDomain: domain,
-        title: decodeURIComponent(title),
+        title, // Already decoded by searchParams.get()
         baitScore,
         bars,
       },

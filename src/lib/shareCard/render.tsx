@@ -43,7 +43,7 @@ export function renderShareCard(
   const accentColor = getAccentColor(analysis.baitScore);
 
   // Truncate title if too long
-  const maxTitleLength = 120;
+  const maxTitleLength = 100;
   const displayTitle = analysis.title.length > maxTitleLength
     ? analysis.title.slice(0, maxTitleLength - 3) + "..."
     : analysis.title;
@@ -56,248 +56,150 @@ export function renderShareCard(
           height: "100%",
           display: "flex",
           flexDirection: "column",
-          padding: "56px",
-          background: "linear-gradient(135deg, #18181b 0%, #09090b 100%)",
-          fontFamily: "system-ui, -apple-system, sans-serif",
+          padding: "64px",
+          backgroundColor: "#09090b", // Matte black
+          fontFamily: '"Helvetica Neue", Helvetica, sans-serif',
+          position: "relative",
         }}
       >
-        {/* Top row: Source + Hook line */}
+        {/* Header: Mono details */}
         <div
           style={{
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
-            marginBottom: "32px",
+            marginBottom: "48px",
+            fontFamily: "monospace", // Tech/Analytic feel
+            color: "#71717a",
+            fontSize: "20px",
+            letterSpacing: "0.05em",
           }}
         >
-          {/* Source pill */}
+          <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
+             <span style={{ color: "#e4e4e7", fontWeight: 700 }}>RAGECHECK</span>
+             <span>/</span>
+             <span>EMOTIONAL ANALYSIS</span>
+          </div>
+          <span>{analysis.sourceDomain.toUpperCase()}</span>
+        </div>
+
+        {/* Main: Massive Hook */}
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: "24px",
+            marginBottom: "auto", // Push footer down
+          }}
+        >
+          <h1
+            style={{
+              fontSize: "92px",
+              fontWeight: 900,
+              color: "#fafafa",
+              lineHeight: 0.9,
+              letterSpacing: "-0.04em",
+              margin: 0,
+              textTransform: "uppercase",
+            }}
+          >
+            {hookLine}
+          </h1>
+          
+          {/* Article Title - Subordinate but clear */}
+          <div
+            style={{
+              fontSize: "32px",
+              color: "#a1a1aa",
+              lineHeight: 1.3,
+              maxWidth: "90%",
+              fontWeight: 500,
+              marginTop: "12px",
+            }}
+          >
+            "{displayTitle}"
+          </div>
+        </div>
+
+        {/* Footer: Sticker & Tags */}
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "flex-end",
+          }}
+        >
+          {/* Left: The "Sticker" Score */}
           <div
             style={{
               display: "flex",
+              flexDirection: "column",
               alignItems: "center",
-              padding: "8px 16px",
-              background: "rgba(39, 39, 42, 0.9)",
-              borderRadius: "8px",
-              border: "1px solid rgba(63, 63, 70, 0.5)",
+              justifyContent: "center",
+              backgroundColor: scoreColor,
+              padding: "16px 24px",
+              transform: "rotate(-4deg)",
+              border: "4px solid white",
+              boxShadow: "8px 8px 0px rgba(255,255,255,0.1)",
             }}
           >
             <span
               style={{
-                color: "#a1a1aa",
                 fontSize: "16px",
-                fontWeight: 600,
+                fontWeight: 800,
+                color: "#000",
                 textTransform: "uppercase",
-                letterSpacing: "0.5px",
+                letterSpacing: "0.1em",
+                marginBottom: "4px",
               }}
             >
-              {analysis.sourceDomain.toUpperCase().slice(0, 25)}
+              BAIT SCORE
+            </span>
+            <span
+              style={{
+                fontSize: "64px",
+                fontWeight: 900,
+                color: "#000",
+                lineHeight: 0.9,
+              }}
+            >
+              {analysis.baitScore}
             </span>
           </div>
 
-          {/* Hook line */}
-          <span
-            style={{
-              color: accentColor,
-              fontSize: "32px",
-              fontWeight: 700,
-            }}
-          >
-            {hookLine}
-          </span>
-        </div>
-
-        {/* Main content: Two columns */}
-        <div
-          style={{
-            display: "flex",
-            flex: 1,
-            gap: "48px",
-          }}
-        >
-          {/* Left column: Score gauge */}
+          {/* Right: Driver Tags */}
           <div
             style={{
               display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              justifyContent: "center",
-              width: "280px",
+              gap: "16px",
             }}
           >
-            {/* Score circle */}
-            <div
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                justifyContent: "center",
-                width: "200px",
-                height: "200px",
-                borderRadius: "100px",
-                border: `8px solid ${scoreColor}`,
-                background: `radial-gradient(circle, ${scoreColor}15 0%, transparent 70%)`,
-                position: "relative",
-              }}
-            >
-              <span
+            {topDrivers.map((driver) => (
+              <div
+                key={driver.key}
                 style={{
-                  color: "#fafafa",
-                  fontSize: "96px",
-                  fontWeight: 700,
-                  lineHeight: 1,
+                  display: "flex",
+                  alignItems: "center",
+                  padding: "12px 24px",
+                  border: `3px solid ${accentColor}`,
+                  borderRadius: "100px", // Full pill
+                  backgroundColor: "rgba(0,0,0,0.5)",
                 }}
               >
-                {analysis.baitScore}
-              </span>
-              <span
-                style={{
-                  color: "#a1a1aa",
-                  fontSize: "16px",
-                  fontWeight: 600,
-                  marginTop: "4px",
-                  letterSpacing: "1px",
-                }}
-              >
-                BAIT SCORE
-              </span>
-            </div>
-
-            {/* Verdict */}
-            <div
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                marginTop: "24px",
-              }}
-            >
-              <span
-                style={{
-                  color: scoreColor,
-                  fontSize: "24px",
-                  fontWeight: 700,
-                }}
-              >
-                {verdict.label}
-              </span>
-              <span
-                style={{
-                  color: "#71717a",
-                  fontSize: "16px",
-                  marginTop: "4px",
-                }}
-              >
-                {verdict.sub}
-              </span>
-            </div>
+                <span
+                  style={{
+                    color: accentColor,
+                    fontSize: "24px",
+                    fontWeight: 700,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.05em",
+                  }}
+                >
+                  ⚠️ {driver.label.replace("Emotional ", "")}
+                </span>
+              </div>
+            ))}
           </div>
-
-          {/* Right column: Title + Drivers */}
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              flex: 1,
-              justifyContent: "center",
-            }}
-          >
-            {/* Title */}
-            <div
-              style={{
-                color: "#fafafa",
-                fontSize: "40px",
-                fontWeight: 700,
-                lineHeight: 1.2,
-                marginBottom: "40px",
-                display: "-webkit-box",
-                WebkitLineClamp: 3,
-                WebkitBoxOrient: "vertical",
-                overflow: "hidden",
-              }}
-            >
-              {displayTitle}
-            </div>
-
-            {/* Drivers */}
-            <div
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: "20px",
-              }}
-            >
-              {topDrivers.map((driver, i) => (
-                <DriverRow
-                  key={driver.key}
-                  driver={driver}
-                  isPrimary={i === 0}
-                  accentColor={accentColor}
-                />
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Footer */}
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            marginTop: "auto",
-            paddingTop: "24px",
-          }}
-        >
-          {/* Logo */}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "12px",
-            }}
-          >
-            <div
-              style={{
-                width: "28px",
-                height: "28px",
-                background: "#fafafa",
-                borderRadius: "6px",
-              }}
-            />
-            <div style={{ display: "flex", flexDirection: "column" }}>
-              <span
-                style={{
-                  color: "#fafafa",
-                  fontSize: "20px",
-                  fontWeight: 700,
-                  lineHeight: 1.1,
-                }}
-              >
-                RageCheck
-              </span>
-              <span
-                style={{
-                  color: "#71717a",
-                  fontSize: "12px",
-                  fontWeight: 500,
-                  textTransform: "lowercase",
-                  letterSpacing: "0.2px",
-                }}
-              >
-                emotional analysis
-              </span>
-            </div>
-          </div>
-
-          {/* URL */}
-          <span
-            style={{
-              color: "#71717a",
-              fontSize: "18px",
-            }}
-          >
-            ragecheck.app
-          </span>
         </div>
       </div>
     ),
@@ -305,71 +207,6 @@ export function renderShareCard(
       width,
       height,
     }
-  );
-}
-
-/**
- * Driver row component
- */
-function DriverRow({
-  driver,
-  isPrimary,
-  accentColor,
-}: {
-  driver: Driver;
-  isPrimary: boolean;
-  accentColor: string;
-}) {
-  const barColor = isPrimary ? accentColor : "#71717a";
-
-  return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        gap: "8px",
-      }}
-    >
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-        }}
-      >
-        <span
-          style={{
-            color: isPrimary ? "#e4e4e7" : "#a1a1aa",
-            fontSize: "18px",
-            fontWeight: isPrimary ? 600 : 500,
-          }}
-        >
-          {isPrimary ? "Primary: " : "Secondary: "}
-          {driver.label}
-        </span>
-      </div>
-
-      {/* Progress bar */}
-      <div
-        style={{
-          display: "flex",
-          width: "100%",
-          height: "6px",
-          background: "#3f3f46",
-          borderRadius: "3px",
-          overflow: "hidden",
-        }}
-      >
-        <div
-          style={{
-            width: `${driver.value}%`,
-            height: "100%",
-            background: barColor,
-            borderRadius: "3px",
-          }}
-        />
-      </div>
-    </div>
   );
 }
 

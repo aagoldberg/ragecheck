@@ -810,7 +810,7 @@ export default function Home() {
 
     const params = new URLSearchParams({
       score: String(result.score),
-      title: encodeURIComponent(result.title || "Content Analysis"),
+      title: result.title || "Content Analysis",
       domain: result.sourceDomain || "unknown",
       size,
       arousal: String(result.signalBreakdown.arousal),
