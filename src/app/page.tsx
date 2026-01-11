@@ -829,24 +829,22 @@ export default function Home() {
     if (!cardUrl) return;
 
     try {
-      // Fetch the server-rendered PNG
-      const response = await fetch(cardUrl);
-      if (!response.ok) throw new Error("Failed to fetch share card");
-
-      const originalBlob = await response.blob();
-
-      // Ensure blob has correct PNG type (some browsers are strict)
-      const pngBlob = new Blob([originalBlob], { type: "image/png" });
-
       // Check if clipboard API is available and supports images
       if (!navigator.clipboard?.write) {
         throw new Error("Clipboard API not supported");
       }
 
+      // Fetch the image as arrayBuffer (more reliable than blob)
+      const response = await fetch(cardUrl);
+      if (!response.ok) throw new Error("Failed to fetch share card");
+
+      const arrayBuffer = await response.arrayBuffer();
+      const blob = new Blob([arrayBuffer], { type: "image/png" });
+
       // Copy to clipboard
       await navigator.clipboard.write([
         new ClipboardItem({
-          "image/png": pngBlob,
+          "image/png": blob,
         }),
       ]);
 

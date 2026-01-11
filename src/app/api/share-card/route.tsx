@@ -56,7 +56,9 @@ export async function GET(request: NextRequest) {
   };
 
   try {
-    const response = renderShareCard(
+    // Return the ImageResponse directly - it already has correct headers
+    // Don't wrap in new Response as it can cause body streaming issues
+    return renderShareCard(
       {
         sourceDomain: domain,
         title, // Already decoded by searchParams.get()
@@ -65,18 +67,6 @@ export async function GET(request: NextRequest) {
       },
       size
     );
-
-    // Add caching headers
-    const headers = new Headers(response.headers);
-    headers.set(
-      "Cache-Control",
-      "public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800"
-    );
-
-    return new Response(response.body, {
-      status: 200,
-      headers,
-    });
   } catch (error) {
     console.error("Share card generation error:", error);
     return new Response(
