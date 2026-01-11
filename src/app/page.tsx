@@ -566,8 +566,8 @@ function MicroDemoCard() {
 export default function Home() {
   const [url, setUrl] = useState("");
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<AnalysisResult | null>(DEMO_RESULT);
-  const [isDemo, setIsDemo] = useState(true);
+  const [result, setResult] = useState<AnalysisResult | null>(null);
+  const [isDemo, setIsDemo] = useState(false);
   const [copied, setCopied] = useState(false);
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
   const [headlines, setHeadlines] = useState<Headline[]>([]);
@@ -873,6 +873,51 @@ export default function Home() {
                   <p className="text-zinc-500">Could not load live headlines.</p>
                 </div>
               )}
+            </div>
+
+            {/* Social Grid */}
+            <div>
+              <div className="flex items-center gap-3 mb-6">
+                 <h3 className="text-sm font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+                   Viral on Social Media
+                 </h3>
+                 <div className="h-px flex-1 bg-zinc-100 dark:bg-zinc-800"></div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+                {CURATED_EXAMPLES.filter(e => e.type === "tweet").map((example, i) => (
+                  <button
+                    key={i}
+                    onClick={() => {
+                      setUrl(example.url);
+                      analyze(example.url);
+                    }}
+                    className="group text-left bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-4 hover:border-indigo-300 dark:hover:border-indigo-700 hover:shadow-md transition-all"
+                  >
+                    <div className="flex items-center gap-3 mb-3">
+                      <img
+                        src={example.image}
+                        alt={example.source}
+                        className="w-8 h-8 rounded-full object-cover ring-2 ring-zinc-100 dark:ring-zinc-800"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${example.source.slice(1)}&background=random`;
+                        }}
+                      />
+                      <div className="flex flex-col">
+                        <span className="text-xs font-bold text-zinc-900 dark:text-zinc-100">
+                          {example.source}
+                        </span>
+                        <span className={`text-[9px] w-fit font-medium px-1.5 py-px rounded ${LEAN_COLORS[example.lean]}`}>
+                          {example.lean}
+                        </span>
+                      </div>
+                    </div>
+                    <p className="text-sm text-zinc-600 dark:text-zinc-300 line-clamp-2 leading-relaxed group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+                      {example.title}
+                    </p>
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         )}
