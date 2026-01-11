@@ -86,7 +86,9 @@ interface ViralMetrics {
   repeatRate: number;
   avgVisitsPerUser: number;
   totalShares: number;
+  uniqueSharers: number;
   todayShares: number;
+  todayUniqueSharers: number;
   shareRate: number;
   kFactor: number;
   trafficVsBaseline: number;
@@ -932,9 +934,9 @@ export default function AdminDashboard() {
                     subtitle="visits per user"
                   />
                   <StatCard
-                    title="Total Shares"
-                    value={viralMetrics.totalShares}
-                    subtitle={`${viralMetrics.todayShares} today`}
+                    title="Unique Sharers"
+                    value={viralMetrics.uniqueSharers}
+                    subtitle={`${viralMetrics.todayUniqueSharers} today`}
                   />
                   <StatCard
                     title="Share Rate"

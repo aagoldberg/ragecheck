@@ -1015,7 +1015,9 @@ export interface ViralMetrics {
 
   // Share metrics
   totalShares: number;
+  uniqueSharers: number;
   todayShares: number;
+  todayUniqueSharers: number;
   shareRate: number; // shares / analyses
 
   // Viral coefficient approximation
@@ -1179,14 +1181,24 @@ export async function getViralMetrics(): Promise<ViralMetrics> {
       ) as user_visits
     `;
 
-    // Share counts
+    // Share counts (total and unique by IP)
     const [totalSharesResult] = await getDb()`
       SELECT COUNT(*) as count FROM ragecheck_shares
+    `;
+
+    const [uniqueSharersResult] = await getDb()`
+      SELECT COUNT(DISTINCT ip_address) as count FROM ragecheck_shares
+      WHERE ip_address IS NOT NULL
     `;
 
     const [todaySharesResult] = await getDb()`
       SELECT COUNT(*) as count FROM ragecheck_shares
       WHERE created_at > NOW() - INTERVAL '1 day'
+    `;
+
+    const [todayUniqueSharersResult] = await getDb()`
+      SELECT COUNT(DISTINCT ip_address) as count FROM ragecheck_shares
+      WHERE created_at > NOW() - INTERVAL '1 day' AND ip_address IS NOT NULL
     `;
 
     // Analyses for share rate calculation
@@ -1274,7 +1286,9 @@ export async function getViralMetrics(): Promise<ViralMetrics> {
       repeatRate: Math.round(repeatRate * 10) / 10,
       avgVisitsPerUser: Math.round(avgVisitsPerUser * 10) / 10,
       totalShares,
+      uniqueSharers: Number(uniqueSharersResult.count) || 0,
       todayShares: Number(todaySharesResult.count) || 0,
+      todayUniqueSharers: Number(todayUniqueSharersResult.count) || 0,
       shareRate: Math.round(shareRate * 10) / 10,
       kFactor: Math.round(kFactor * 1000) / 1000,
       trafficVsBaseline: Math.round(trafficVsBaseline * 100) / 100,
@@ -1291,7 +1305,9 @@ export async function getViralMetrics(): Promise<ViralMetrics> {
       repeatRate: 0,
       avgVisitsPerUser: 0,
       totalShares: 0,
+      uniqueSharers: 0,
       todayShares: 0,
+      todayUniqueSharers: 0,
       shareRate: 0,
       kFactor: 0,
       trafficVsBaseline: 1,
