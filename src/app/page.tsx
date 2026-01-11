@@ -12,6 +12,7 @@ import {
   getDeterministicHookLine,
   getTopDrivers,
 } from "@/lib/shareCard";
+import { copyShareImageToClipboard } from "@/lib/shareImage";
 
 interface Highlight {
   start: number;
@@ -823,58 +824,25 @@ export default function Home() {
     return `/api/share-card?${params.toString()}`;
   };
 
-  // Primary share action - fetches server-rendered image and copies to clipboard
+  // Primary share action - uses client-side canvas for clipboard copy
   const handleShareImage = async (silent = false) => {
-    const cardUrl = getShareCardUrl();
-    if (!cardUrl) return;
+    if (!result?.success || result.score === undefined || !result.signalBreakdown) return;
 
     try {
-      // Check if clipboard API is available and supports images
-      if (!navigator.clipboard?.write) {
-        throw new Error("Clipboard API not supported");
-      }
+      const success = await copyShareImageToClipboard({
+        score: result.score,
+        title: result.title || "Content Analysis",
+        domain: result.sourceDomain || "unknown",
+        signalBreakdown: result.signalBreakdown,
+      });
 
-      // Fetch the image as arrayBuffer (more reliable than blob)
-      const response = await fetch(cardUrl);
-      if (!response.ok) throw new Error("Failed to fetch share card");
-
-      const arrayBuffer = await response.arrayBuffer();
-      const blob = new Blob([arrayBuffer], { type: "image/png" });
-
-      // Copy to clipboard
-      await navigator.clipboard.write([
-        new ClipboardItem({
-          "image/png": blob,
-        }),
-      ]);
-
-      if (!silent) {
+      if (success && !silent) {
         setImageCopied(true);
         setTimeout(() => setImageCopied(false), 3000);
         trackShareEvent("share_image_success");
       }
     } catch (error) {
       console.error("Failed to copy image:", error);
-      // Fallback: download the image instead
-      if (!silent) {
-        try {
-          const response = await fetch(cardUrl);
-          const blob = await response.blob();
-          const url = URL.createObjectURL(blob);
-          const link = document.createElement("a");
-          link.href = url;
-          link.download = `ragecheck-${result?.score || 0}.png`;
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-          URL.revokeObjectURL(url);
-          // Still show success since they got the image
-          setImageCopied(true);
-          setTimeout(() => setImageCopied(false), 3000);
-        } catch {
-          console.error("Failed to download image");
-        }
-      }
     }
   };
 
