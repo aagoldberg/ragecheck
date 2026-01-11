@@ -503,43 +503,62 @@ function MiniScoreGauge({ score }: { score: number }) {
 
 function MicroDemoCard() {
   return (
-    <div className="relative w-80 animate-in fade-in slide-in-from-right-8 duration-1000 delay-300">
-      <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 shadow-2xl transition-transform duration-500 hover:scale-[1.02]">
-        <div className="flex items-center justify-between mb-4">
-          <h4 className="text-[10px] font-bold text-zinc-400 uppercase tracking-[0.2em]">Sample Decoding</h4>
-          <MiniScoreGauge score={84} />
-        </div>
+    <div className="relative w-full max-w-sm mx-auto lg:mx-0 animate-in fade-in slide-in-from-right-8 duration-1000 delay-300">
+      <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl overflow-hidden shadow-2xl transition-transform duration-500 hover:scale-[1.02]">
         
-        <div className="flex items-center gap-2.5 mb-3">
-          <div className="w-8 h-8 rounded-full bg-rose-500 flex items-center justify-center text-xs text-white font-bold shadow-sm">P</div>
-          <div className="flex flex-col">
-            <div className="h-2 w-16 bg-zinc-100 dark:bg-zinc-800 rounded mb-1"></div>
-            <div className="h-1.5 w-10 bg-zinc-50 dark:bg-zinc-800/50 rounded"></div>
-          </div>
+        {/* Social Header */}
+        <div className="p-5 pb-3 flex items-center gap-3">
+           <div className="w-10 h-10 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-zinc-400">
+             <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M24 4.557c-.883.392-1.832.656-2.828.775 1.017-.609 1.798-1.574 2.165-2.724-.951.564-2.005.974-3.127 1.195-.897-.957-2.178-1.555-3.594-1.555-3.179 0-5.515 2.966-4.797 6.045-4.091-.205-7.719-2.165-10.148-5.144-1.29 2.213-.669 5.108 1.523 6.574-.806-.026-1.566-.247-2.229-.616-.054 2.281 1.581 4.415 3.949 4.89-.693.188-1.452.232-2.224.084.626 1.956 2.444 3.379 4.6 3.419-2.07 1.623-4.678 2.348-7.29 2.04 2.179 1.397 4.768 2.212 7.548 2.212 9.142 0 14.307-7.721 13.995-14.646.962-.695 1.797-1.562 2.457-2.549z"/></svg>
+           </div>
+           <div className="leading-tight">
+             <div className="font-bold text-zinc-900 dark:text-zinc-100 text-sm">Political Pundit</div>
+             <div className="text-xs text-zinc-500">@pundit_real</div>
+           </div>
         </div>
 
-        <div className="space-y-2 mb-5">
-          <p className="text-[13px] leading-relaxed text-zinc-800 dark:text-zinc-200 font-medium">
-            The <mark className="bg-rose-100 text-rose-800 px-0.5 rounded">corrupt elites</mark> are working to <mark className="bg-amber-100 text-amber-800 px-0.5 rounded text-amber-900">destroy</mark> your family&apos;s future. Act now!
+        {/* Content */}
+        <div className="px-5 pb-5">
+          <p className="text-[15px] leading-relaxed text-zinc-800 dark:text-zinc-200">
+            The <mark className="bg-indigo-100 text-indigo-800 px-0.5 rounded font-medium">corrupt elites</mark> are working to <mark className="bg-rose-100 text-rose-800 px-0.5 rounded font-medium">destroy</mark> your family&apos;s future.
           </p>
         </div>
 
-        <div className="space-y-3">
-          <div className="relative pl-3 border-l-2 border-rose-500 py-0.5">
-            <span className="absolute -left-1.5 top-1/2 -translate-y-1/2 w-3 h-3 bg-rose-500 rounded-full border-2 border-white dark:border-zinc-900"></span>
-            <p className="text-[10px] font-bold text-rose-600 uppercase tracking-tight">Enemy Construction</p>
-            <p className="text-[9px] text-zinc-500 leading-tight mt-0.5">Dehumanizes a group as a malicious force.</p>
-          </div>
-          <div className="relative pl-3 border-l-2 border-amber-500 py-0.5">
-            <span className="absolute -left-1.5 top-1/2 -translate-y-1/2 w-3 h-3 bg-amber-500 rounded-full border-2 border-white dark:border-zinc-900"></span>
-            <p className="text-[10px] font-bold text-amber-600 uppercase tracking-tight">Emotional Arousal</p>
-            <p className="text-[9px] text-zinc-500 leading-tight mt-0.5">Triggers fear and urgency to bypass reason.</p>
-          </div>
+        {/* Analysis Footer */}
+        <div className="bg-zinc-50 dark:bg-zinc-800/50 border-t border-zinc-100 dark:border-zinc-800 p-4">
+           <div className="flex items-center gap-4">
+              <div className="flex-shrink-0 scale-90 origin-left">
+                 <MiniScoreGauge score={84} /> 
+              </div>
+              
+              <div className="w-px h-10 bg-zinc-200 dark:bg-zinc-700"></div>
+
+              <div className="flex-1 space-y-2.5">
+                 <div className="space-y-1">
+                    <div className="flex justify-between text-[9px] uppercase font-bold text-zinc-500 tracking-wider">
+                       <span>Enemy Construction</span>
+                       <span>85%</span>
+                    </div>
+                    <div className="h-1.5 bg-zinc-200 dark:bg-zinc-700 rounded-full overflow-hidden">
+                       <div className="h-full bg-indigo-500 w-[85%] rounded-full"></div>
+                    </div>
+                 </div>
+                 <div className="space-y-1">
+                    <div className="flex justify-between text-[9px] uppercase font-bold text-zinc-500 tracking-wider">
+                       <span>Emotional Arousal</span>
+                       <span>72%</span>
+                    </div>
+                    <div className="h-1.5 bg-zinc-200 dark:bg-zinc-700 rounded-full overflow-hidden">
+                       <div className="h-full bg-rose-500 w-[72%] rounded-full"></div>
+                    </div>
+                 </div>
+              </div>
+           </div>
         </div>
+
       </div>
       
-      {/* Decorative elements */}
-      <div className="absolute -z-10 -bottom-4 -right-4 w-full h-full bg-indigo-500/5 rounded-2xl blur-2xl"></div>
+      <div className="absolute -z-10 -bottom-5 -right-5 w-full h-full bg-indigo-500/10 rounded-3xl blur-3xl"></div>
     </div>
   );
 }
