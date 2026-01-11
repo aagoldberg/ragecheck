@@ -566,8 +566,8 @@ function MicroDemoCard() {
 export default function Home() {
   const [url, setUrl] = useState("");
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<AnalysisResult | null>(null);
-  const [isDemo, setIsDemo] = useState(false);
+  const [result, setResult] = useState<AnalysisResult | null>(DEMO_RESULT);
+  const [isDemo, setIsDemo] = useState(true);
   const [copied, setCopied] = useState(false);
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
   const [headlines, setHeadlines] = useState<Headline[]>([]);
@@ -761,62 +761,57 @@ export default function Home() {
       <div className="max-w-6xl mx-auto px-4 py-12 lg:py-24">
         
         {/* Hero Section */}
-        <div className="grid lg:grid-cols-5 gap-12 items-center mb-20">
-          <div className="lg:col-span-3 text-center lg:text-left animate-in fade-in slide-in-from-left-4 duration-700">
-            <h1 className="text-4xl md:text-6xl font-black tracking-tight text-zinc-900 dark:text-zinc-100 mb-6 leading-[1.1]">
-              Is that post <span className="text-transparent bg-clip-text bg-gradient-to-r from-rose-500 to-indigo-600">designed</span> to make you angry?
-            </h1>
-            <p className="text-xl text-zinc-600 dark:text-zinc-400 mb-10 leading-relaxed max-w-2xl mx-auto lg:mx-0">
-              Identify engagement bait, fear-mongering, and manipulation patterns in news and social media instantly.
-            </p>
+        <div className="text-center max-w-3xl mx-auto mb-20 animate-in fade-in slide-in-from-bottom-4 duration-700">
+          <h1 className="text-4xl md:text-6xl font-black tracking-tight text-zinc-900 dark:text-zinc-100 mb-6 leading-[1.1]">
+            Is that post <span className="text-transparent bg-clip-text bg-gradient-to-r from-rose-500 to-indigo-600">designed</span> to make you angry?
+          </h1>
+          <p className="text-xl text-zinc-600 dark:text-zinc-400 mb-10 leading-relaxed max-w-2xl mx-auto">
+            Identify engagement bait, fear-mongering, and manipulation patterns in news and social media instantly.
+          </p>
 
-            {/* Search Input */}
-            <form onSubmit={handleSubmit} className="relative max-w-2xl lg:mx-0">
-              {imagePreview && (
-                <div className="mb-6 relative animate-in fade-in zoom-in duration-300">
-                  <div className="relative rounded-2xl overflow-hidden border border-zinc-200 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-800 shadow-lg">
-                    <img src={imagePreview} alt="Screenshot preview" className="w-full max-h-64 object-contain" />
-                    <button type="button" onClick={clearImage} className="absolute top-3 right-3 p-1.5 bg-zinc-900/80 hover:bg-zinc-900 text-white rounded-full transition-colors backdrop-blur-sm">
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                    </button>
-                  </div>
-                  <button type="button" onClick={analyzeImage} disabled={loading} className="mt-4 w-full px-6 py-4 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 rounded-xl font-bold text-lg hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-all shadow-lg hover:shadow-xl disabled:opacity-70">
-                    {loading ? "Scanning Image..." : "Analyze Screenshot (~5s)"}
+          {/* Search Input */}
+          <form onSubmit={handleSubmit} className="relative max-w-2xl mx-auto">
+            {imagePreview && (
+              <div className="mb-6 relative animate-in fade-in zoom-in duration-300">
+                <div className="relative rounded-2xl overflow-hidden border border-zinc-200 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-800 shadow-lg">
+                  <img src={imagePreview} alt="Screenshot preview" className="w-full max-h-64 object-contain" />
+                  <button type="button" onClick={clearImage} className="absolute top-3 right-3 p-1.5 bg-zinc-900/80 hover:bg-zinc-900 text-white rounded-full transition-colors backdrop-blur-sm">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                   </button>
                 </div>
-              )}
+                <button type="button" onClick={analyzeImage} disabled={loading} className="mt-4 w-full px-6 py-4 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 rounded-xl font-bold text-lg hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-all shadow-lg hover:shadow-xl disabled:opacity-70">
+                  {loading ? "Scanning Image..." : "Analyze Screenshot (~5s)"}
+                </button>
+              </div>
+            )}
 
-              {!imagePreview && (
-                <div className="relative group">
-                  <div className="absolute -inset-1 bg-gradient-to-r from-rose-500 to-indigo-600 rounded-2xl blur opacity-20 group-focus-within:opacity-40 transition duration-1000"></div>
-                  <div className="relative flex items-center bg-white dark:bg-zinc-900 rounded-2xl shadow-xl transition-shadow ring-1 ring-zinc-200 dark:ring-zinc-800 group-focus-within:ring-zinc-300 dark:group-focus-within:ring-zinc-700">
-                    <input type="url" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="Paste URL (article, tweet, bsky)..." className="flex-1 w-full pl-6 pr-4 py-5 bg-transparent border-0 focus:ring-0 text-lg text-zinc-900 dark:text-zinc-100 placeholder-zinc-400" required />
-                    <div className="pr-3 flex items-center gap-3">
-                      <label htmlFor="image-upload" className="p-2.5 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 cursor-pointer transition-colors bg-zinc-50 dark:bg-zinc-800 rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-700" title="Upload screenshot">
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-                        <input id="image-upload" type="file" accept="image/jpeg,image/png,image/gif,image/webp" onChange={handleImageSelect} className="hidden" />
-                      </label>
-                      <button type="submit" disabled={loading || !url.trim()} className="px-6 py-3 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 rounded-xl text-base font-bold hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-all shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed min-w-[120px]">
-                        {loading ? <svg className="animate-spin h-4 w-4 mx-auto" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" /></svg> : <div className="flex flex-col leading-none"><span>Analyze</span><span className="text-[10px] opacity-60 font-medium mt-0.5">~5s</span></div>}
-                      </button>
-                    </div>
+            {!imagePreview && (
+              <div className="relative group">
+                <div className="absolute -inset-1 bg-gradient-to-r from-rose-500 to-indigo-600 rounded-2xl blur opacity-20 group-focus-within:opacity-40 transition duration-1000"></div>
+                <div className="relative flex items-center bg-white dark:bg-zinc-900 rounded-2xl shadow-xl transition-shadow ring-1 ring-zinc-200 dark:ring-zinc-800 group-focus-within:ring-zinc-300 dark:group-focus-within:ring-zinc-700">
+                  <input type="url" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="Paste URL (article, tweet, bsky)..." className="flex-1 w-full pl-6 pr-4 py-5 bg-transparent border-0 focus:ring-0 text-lg text-zinc-900 dark:text-zinc-100 placeholder-zinc-400" required />
+                  <div className="pr-3 flex items-center gap-3">
+                    <label htmlFor="image-upload" className="p-2.5 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 cursor-pointer transition-colors bg-zinc-50 dark:bg-zinc-800 rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-700" title="Upload screenshot">
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                      <input id="image-upload" type="file" accept="image/jpeg,image/png,image/gif,image/webp" onChange={handleImageSelect} className="hidden" />
+                    </label>
+                    <button type="submit" disabled={loading || !url.trim()} className="px-6 py-3 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 rounded-xl text-base font-bold hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-all shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed min-w-[120px]">
+                      {loading ? <svg className="animate-spin h-4 w-4 mx-auto" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" /></svg> : <div className="flex flex-col leading-none"><span>Analyze</span><span className="text-[10px] opacity-60 font-medium mt-0.5">~5s</span></div>}
+                    </button>
                   </div>
                 </div>
-              )}
-              
-              {!imagePreview && (
-                <div className="mt-6 flex flex-wrap items-center justify-center lg:justify-start gap-2 text-sm text-zinc-500">
-                  <span>Try:</span>
-                  <button type="button" onClick={() => tryExample("news")} className="px-3 py-1 rounded-full bg-zinc-100 dark:bg-zinc-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors font-medium text-xs">News Article</button>
-                  <button type="button" onClick={() => tryExample("tweet")} className="px-3 py-1 rounded-full bg-zinc-100 dark:bg-zinc-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors font-medium text-xs">Viral Tweet</button>
-                </div>
-              )}
-            </form>
-          </div>
+              </div>
+            )}
 
-          <div className="hidden lg:flex lg:col-span-2 justify-center">
-            <MicroDemoCard />
-          </div>
+            {!imagePreview && (
+              <div className="mt-6 flex flex-wrap items-center justify-center gap-2 text-sm text-zinc-500">
+                <span>Try an example:</span>
+                <button type="button" onClick={() => tryExample("news")} className="px-3 py-1 rounded-full bg-zinc-100 dark:bg-zinc-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors font-medium text-xs">News Article</button>
+                <button type="button" onClick={() => tryExample("tweet")} className="px-3 py-1 rounded-full bg-zinc-100 dark:bg-zinc-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors font-medium text-xs">Viral Tweet</button>
+                <button type="button" onClick={() => tryExample("bluesky")} className="px-3 py-1 rounded-full bg-zinc-100 dark:bg-zinc-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors font-medium text-xs">Bluesky Post</button>
+              </div>
+            )}
+          </form>
         </div>
 
         {/* Live Headlines Section */}
