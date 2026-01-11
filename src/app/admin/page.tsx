@@ -261,11 +261,12 @@ function TimeSeriesChart({ data }: { data: { date: string; visitors: number; ana
             />
           ))}
         </svg>
-        {/* X-axis labels */}
+        {/* X-axis labels - show 5 points */}
         <div className="flex justify-between mt-2 text-xs text-zinc-400">
-          <span>{data[0]?.date.slice(5)}</span>
-          <span>{data[Math.floor(data.length / 2)]?.date.slice(5)}</span>
-          <span>{data[data.length - 1]?.date.slice(5)}</span>
+          {[0, 0.25, 0.5, 0.75, 1].map((ratio, i) => {
+            const idx = Math.floor(ratio * (data.length - 1));
+            return <span key={i}>{data[idx]?.date.slice(5)}</span>;
+          })}
         </div>
         {/* Y-axis label */}
         <div className="absolute top-0 right-0 text-xs text-zinc-400">

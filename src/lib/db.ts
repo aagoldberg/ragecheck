@@ -787,14 +787,18 @@ export async function getVisitorStats(): Promise<VisitorStats> {
     }
 
     for (const row of visitorTimeSeries) {
-      const dateStr = new Date(row.date).toISOString().split("T")[0];
+      // Handle date without timezone conversion issues
+      const d = new Date(row.date);
+      const dateStr = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
       const existing = dateMap.get(dateStr) || { visitors: 0, analyses: 0 };
       existing.visitors = Number(row.count);
       dateMap.set(dateStr, existing);
     }
 
     for (const row of analysisTimeSeries) {
-      const dateStr = new Date(row.date).toISOString().split("T")[0];
+      // Handle date without timezone conversion issues
+      const d = new Date(row.date);
+      const dateStr = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
       const existing = dateMap.get(dateStr) || { visitors: 0, analyses: 0 };
       existing.analyses = Number(row.count);
       dateMap.set(dateStr, existing);
@@ -950,7 +954,9 @@ export async function getPageVisitorStats(pagePath: string): Promise<PageVisitor
     }
 
     for (const row of dailyData) {
-      const dateStr = new Date(row.date).toISOString().split("T")[0];
+      // Handle date without timezone conversion issues
+      const d = new Date(row.date);
+      const dateStr = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
       dateMap.set(dateStr, Number(row.count));
     }
 
