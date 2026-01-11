@@ -1,7 +1,7 @@
-// Canvas-based share image generator for social media
-// Optimized for virality: source + title + hook line + score + top bars
+// Canvas-based share image generator matching the new server-rendered design
+// Features: massive hook line, quoted title, score sticker, driver tags
 
-import { getHookLine, getTriggersLine, SIGNAL_SHORT_LABELS } from "@/lib/share";
+import { getDeterministicHookLine, getTopDrivers, getScoreColor, getAccentColor } from "@/lib/shareCard";
 import type { SignalBreakdown } from "@/lib/score";
 
 export interface ShareImageData {
@@ -14,21 +14,17 @@ export interface ShareImageData {
 export type ImageSize = "x" | "bluesky";
 
 const SIZE_CONFIGS: Record<ImageSize, { width: number; height: number }> = {
-  x: { width: 1200, height: 675 },      // 16:9 for X
-  bluesky: { width: 1200, height: 630 }, // Slightly shorter for Bluesky
+  x: { width: 1200, height: 675 },
+  bluesky: { width: 1200, height: 630 },
 };
 
-function getScoreColor(score: number): string {
-  if (score <= 33) return "#10b981"; // green
-  if (score <= 66) return "#f59e0b"; // amber
-  return "#ef4444"; // red
-}
-
-function getScoreLabel(score: number): string {
-  if (score <= 33) return "Low Risk";
-  if (score <= 66) return "Borderline";
-  return "High Bait";
-}
+const SIGNAL_LABELS: Record<string, string> = {
+  arousal: "Arousal",
+  enemy_construction: "Enemy Framing",
+  moral_condemnation: "Moral Outrage",
+  simplification: "Oversimplification",
+  call_to_conflict: "Call-to-Conflict",
+};
 
 function drawRoundedRect(
   ctx: CanvasRenderingContext2D,
@@ -51,22 +47,45 @@ function drawRoundedRect(
   ctx.closePath();
 }
 
-function truncateText(
+function wrapText(
   ctx: CanvasRenderingContext2D,
   text: string,
-  maxWidth: number
-): string {
-  if (ctx.measureText(text).width <= maxWidth) return text;
-  let truncated = text;
-  while (ctx.measureText(truncated + "...").width > maxWidth && truncated.length > 0) {
-    truncated = truncated.slice(0, -1);
+  maxWidth: number,
+  maxLines: number
+): string[] {
+  const words = text.split(" ");
+  const lines: string[] = [];
+  let currentLine = "";
+
+  for (const word of words) {
+    const testLine = currentLine ? `${currentLine} ${word}` : word;
+    if (ctx.measureText(testLine).width > maxWidth && currentLine) {
+      lines.push(currentLine);
+      currentLine = word;
+      if (lines.length >= maxLines) {
+        // Truncate last line
+        let lastLine = lines[lines.length - 1];
+        while (ctx.measureText(lastLine + "...").width > maxWidth && lastLine.length > 0) {
+          lastLine = lastLine.slice(0, -1);
+        }
+        lines[lines.length - 1] = lastLine + "...";
+        return lines;
+      }
+    } else {
+      currentLine = testLine;
+    }
   }
-  return truncated + "...";
+
+  if (currentLine && lines.length < maxLines) {
+    lines.push(currentLine);
+  }
+
+  return lines;
 }
 
 export function generateShareImage(
   data: ShareImageData,
-  format: "jpeg" | "png" = "jpeg",
+  format: "jpeg" | "png" = "png",
   size: ImageSize = "x"
 ): Promise<Blob> {
   return new Promise((resolve, reject) => {
@@ -80,214 +99,150 @@ export function generateShareImage(
     const { width, height } = SIZE_CONFIGS[size];
     canvas.width = width;
     canvas.height = height;
+    const padding = 64;
 
-    // Background gradient
-    const gradient = ctx.createLinearGradient(0, 0, width, height);
-    gradient.addColorStop(0, "#18181b"); // zinc-900
-    gradient.addColorStop(1, "#09090b"); // zinc-950
-    ctx.fillStyle = gradient;
+    // Get design data
+    const topDrivers = getTopDrivers(data.signalBreakdown);
+    const hookLine = getDeterministicHookLine(data.score, topDrivers);
+    const scoreColor = getScoreColor(data.score);
+    const accentColor = getAccentColor(data.score);
+
+    // Truncate title
+    const maxTitleLength = 100;
+    const displayTitle = data.title.length > maxTitleLength
+      ? data.title.slice(0, maxTitleLength - 3) + "..."
+      : data.title;
+
+    // === BACKGROUND ===
+    ctx.fillStyle = "#09090b"; // Matte black
     ctx.fillRect(0, 0, width, height);
 
-    // Subtle pattern overlay
-    ctx.fillStyle = "rgba(255,255,255,0.015)";
-    for (let i = 0; i < width; i += 50) {
-      for (let j = 0; j < height; j += 50) {
-        if ((i + j) % 100 === 0) {
-          ctx.fillRect(i, j, 25, 25);
-        }
-      }
-    }
+    // === HEADER: RAGECHECK / EMOTIONAL ANALYSIS | DOMAIN ===
+    ctx.font = "500 20px monospace";
+    ctx.textBaseline = "middle";
 
-    const scoreColor = getScoreColor(data.score);
-    const padding = 60;
-
-    // === ROW 1: Source badge + Hook line ===
-    const { hookLine, topSignals } = getHookLine(data.score, data.signalBreakdown);
-
-    // Source badge (top left)
-    ctx.fillStyle = "#27272a";
-    ctx.font = "600 14px system-ui, -apple-system, sans-serif";
-    const domainText = data.domain.toUpperCase().slice(0, 20);
-    const domainWidth = Math.min(ctx.measureText(domainText).width + 20, 200);
-    drawRoundedRect(ctx, padding, 45, domainWidth, 28, 6);
-    ctx.fill();
-    ctx.fillStyle = "#a1a1aa";
+    // Left side: RAGECHECK / EMOTIONAL ANALYSIS
     ctx.textAlign = "left";
-    ctx.textBaseline = "middle";
-    ctx.fillText(domainText, padding + 10, 59);
+    ctx.fillStyle = "#e4e4e7";
+    ctx.font = "700 20px monospace";
+    ctx.fillText("RAGECHECK", padding, padding + 10);
 
-    // Hook line (top right area)
-    ctx.fillStyle = scoreColor;
-    ctx.font = "bold 28px system-ui, -apple-system, sans-serif";
+    const rageCheckWidth = ctx.measureText("RAGECHECK").width;
+    ctx.fillStyle = "#71717a";
+    ctx.font = "500 20px monospace";
+    ctx.fillText(" / EMOTIONAL ANALYSIS", padding + rageCheckWidth, padding + 10);
+
+    // Right side: DOMAIN
     ctx.textAlign = "right";
-    ctx.textBaseline = "middle";
-    ctx.fillText(hookLine, width - padding, 59);
+    ctx.fillStyle = "#71717a";
+    ctx.fillText(data.domain.toUpperCase(), width - padding, padding + 10);
 
-    // === ROW 2: Article title (2 lines max) ===
+    // === MAIN: MASSIVE HOOK LINE ===
+    const hookY = padding + 80;
     ctx.fillStyle = "#fafafa";
-    ctx.font = "bold 32px system-ui, -apple-system, sans-serif";
+    ctx.font = "900 88px system-ui, -apple-system, sans-serif";
     ctx.textAlign = "left";
     ctx.textBaseline = "top";
 
-    const titleMaxWidth = width - padding * 2;
-    const words = data.title.split(" ");
-    let line = "";
-    let titleY = 100;
-    const lineHeight = 42;
-    let lineCount = 0;
-    const maxLines = 2;
+    // Wrap hook line if needed (max 2 lines)
+    const hookLines = wrapText(ctx, hookLine.toUpperCase(), width - padding * 2, 2);
+    const hookLineHeight = 80;
 
-    for (const word of words) {
-      const testLine = line + word + " ";
-      const metrics = ctx.measureText(testLine);
-      if (metrics.width > titleMaxWidth && line !== "") {
-        ctx.fillText(line.trim(), padding, titleY);
-        line = word + " ";
-        titleY += lineHeight;
-        lineCount++;
-        if (lineCount >= maxLines) {
-          // Truncate last line
-          line = truncateText(ctx, line.trim(), titleMaxWidth);
-          break;
-        }
-      } else {
-        line = testLine;
-      }
-    }
-    if (lineCount < maxLines && line.trim()) {
-      ctx.fillText(line.trim(), padding, titleY);
-    }
-
-    // === LEFT SIDE: Score gauge ===
-    const gaugeX = 180;
-    const gaugeY = 340;
-    const radius = 90;
-
-    // Glow effect
-    const glowGradient = ctx.createRadialGradient(
-      gaugeX, gaugeY, radius * 0.5,
-      gaugeX, gaugeY, radius * 1.3
-    );
-    glowGradient.addColorStop(0, scoreColor + "25");
-    glowGradient.addColorStop(1, "transparent");
-    ctx.fillStyle = glowGradient;
-    ctx.beginPath();
-    ctx.arc(gaugeX, gaugeY, radius * 1.3, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Score arc background
-    ctx.strokeStyle = "#3f3f46";
-    ctx.lineWidth = 12;
-    ctx.lineCap = "round";
-    ctx.beginPath();
-    ctx.arc(gaugeX, gaugeY, radius, 0.75 * Math.PI, 2.25 * Math.PI);
-    ctx.stroke();
-
-    // Score arc progress
-    const progress = data.score / 100;
-    const startAngle = 0.75 * Math.PI;
-    const endAngle = startAngle + progress * 1.5 * Math.PI;
-    ctx.strokeStyle = scoreColor;
-    ctx.lineWidth = 12;
-    ctx.beginPath();
-    ctx.arc(gaugeX, gaugeY, radius, startAngle, endAngle);
-    ctx.stroke();
-
-    // Score number
-    ctx.fillStyle = "#fafafa";
-    ctx.font = "bold 56px system-ui, -apple-system, sans-serif";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText(String(data.score), gaugeX, gaugeY - 5);
-
-    // Score label
-    ctx.fillStyle = "#a1a1aa";
-    ctx.font = "600 14px system-ui, -apple-system, sans-serif";
-    ctx.fillText("BAIT SCORE", gaugeX, gaugeY + 35);
-
-    // Risk level badge
-    const label = getScoreLabel(data.score);
-    ctx.font = "bold 12px system-ui, -apple-system, sans-serif";
-    const badgeWidth = ctx.measureText(label).width + 20;
-    drawRoundedRect(ctx, gaugeX - badgeWidth / 2, gaugeY + 52, badgeWidth, 24, 12);
-    ctx.fillStyle = scoreColor + "25";
-    ctx.fill();
-    ctx.fillStyle = scoreColor;
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText(label, gaugeX, gaugeY + 64);
-
-    // === RIGHT SIDE: Top 3 bars ===
-    const barsX = 340;
-    const barsWidth = width - barsX - padding;
-    const barsStartY = 250;
-    const barHeight = 10;
-    const barSpacing = 55;
-
-    const sortedSignals = (Object.keys(data.signalBreakdown) as (keyof SignalBreakdown)[])
-      .map(key => ({ key, value: data.signalBreakdown[key] }))
-      .sort((a, b) => b.value - a.value)
-      .slice(0, 3);
-
-    sortedSignals.forEach((signal, i) => {
-      const barY = barsStartY + i * barSpacing;
-
-      // Label
-      ctx.fillStyle = "#e4e4e7";
-      ctx.font = "600 16px system-ui, -apple-system, sans-serif";
-      ctx.textAlign = "left";
-      ctx.textBaseline = "bottom";
-      ctx.fillText(SIGNAL_SHORT_LABELS[signal.key], barsX, barY - 10);
-
-      // Percentage
-      ctx.fillStyle = "#a1a1aa";
-      ctx.textAlign = "right";
-      ctx.fillText(`${signal.value}%`, barsX + barsWidth, barY - 10);
-
-      // Bar background
-      drawRoundedRect(ctx, barsX, barY, barsWidth, barHeight, 5);
-      ctx.fillStyle = "#3f3f46";
-      ctx.fill();
-
-      // Bar fill
-      const fillWidth = (signal.value / 100) * barsWidth;
-      if (fillWidth > 0) {
-        drawRoundedRect(ctx, barsX, barY, Math.max(fillWidth, 10), barHeight, 5);
-        const barColor = signal.value > 66 ? "#ef4444" : signal.value > 33 ? "#f59e0b" : "#10b981";
-        ctx.fillStyle = barColor;
-        ctx.fill();
-      }
+    hookLines.forEach((line, i) => {
+      ctx.fillText(line, padding, hookY + i * hookLineHeight);
     });
 
-    // === TRIGGERS LINE ===
-    const triggersLine = getTriggersLine(topSignals);
-    if (triggersLine) {
-      ctx.fillStyle = "#71717a";
-      ctx.font = "500 14px system-ui, -apple-system, sans-serif";
-      ctx.textAlign = "left";
-      ctx.textBaseline = "top";
-      ctx.fillText(triggersLine, barsX, barsStartY + 3 * barSpacing + 10);
-    }
-
-    // === FOOTER ===
-    const footerY = height - 40;
-
-    // RageCheck logo
-    ctx.fillStyle = "#fafafa";
-    drawRoundedRect(ctx, padding, footerY - 10, 20, 20, 5);
-    ctx.fill();
-
-    ctx.fillStyle = "#fafafa";
-    ctx.font = "bold 18px system-ui, -apple-system, sans-serif";
-    ctx.textAlign = "left";
-    ctx.textBaseline = "middle";
-    ctx.fillText("RageCheck", padding + 28, footerY);
-
-    // URL (right side)
-    ctx.textAlign = "right";
+    // === ARTICLE TITLE (quoted, below hook) ===
+    const titleY = hookY + hookLines.length * hookLineHeight + 36;
     ctx.fillStyle = "#a1a1aa";
-    ctx.font = "500 14px system-ui, -apple-system, sans-serif";
-    ctx.fillText("ragecheck.app", width - padding, footerY);
+    ctx.font = "500 32px system-ui, -apple-system, sans-serif";
+    ctx.textAlign = "left";
+    ctx.textBaseline = "top";
+
+    // Wrap title (max 2 lines)
+    const quotedTitle = `"${displayTitle}"`;
+    const titleLines = wrapText(ctx, quotedTitle, (width - padding * 2) * 0.9, 2);
+    const titleLineHeight = 42;
+
+    titleLines.forEach((line, i) => {
+      ctx.fillText(line, padding, titleY + i * titleLineHeight);
+    });
+
+    // === FOOTER: SCORE STICKER (left) + DRIVER TAGS (right) ===
+    const footerY = height - padding - 100;
+
+    // --- Score Sticker (rotated) ---
+    ctx.save();
+    const stickerX = padding + 60;
+    const stickerY = footerY + 50;
+
+    // Rotate around sticker center
+    ctx.translate(stickerX, stickerY);
+    ctx.rotate(-4 * Math.PI / 180); // -4 degrees
+
+    // Sticker background
+    const stickerWidth = 130;
+    const stickerHeight = 110;
+    ctx.fillStyle = scoreColor;
+    ctx.fillRect(-stickerWidth/2, -stickerHeight/2, stickerWidth, stickerHeight);
+
+    // White border
+    ctx.strokeStyle = "#ffffff";
+    ctx.lineWidth = 4;
+    ctx.strokeRect(-stickerWidth/2, -stickerHeight/2, stickerWidth, stickerHeight);
+
+    // Shadow effect
+    ctx.fillStyle = "rgba(255,255,255,0.1)";
+    ctx.fillRect(-stickerWidth/2 + 8, -stickerHeight/2 + 8, stickerWidth, stickerHeight);
+
+    // "BAIT SCORE" label
+    ctx.fillStyle = "#000000";
+    ctx.font = "800 14px system-ui, -apple-system, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("BAIT SCORE", 0, -25);
+
+    // Score number
+    ctx.font = "900 56px system-ui, -apple-system, sans-serif";
+    ctx.fillText(String(data.score), 0, 20);
+
+    ctx.restore();
+
+    // --- Driver Tags (right side) ---
+    ctx.textAlign = "right";
+    let tagX = width - padding;
+    const tagY = footerY + 50;
+    const tagPadding = { x: 24, y: 12 };
+    const tagGap = 16;
+
+    // Draw tags from right to left
+    topDrivers.slice(0, 2).reverse().forEach((driver) => {
+      const label = driver.label.replace("Emotional ", "");
+      ctx.font = "700 22px system-ui, -apple-system, sans-serif";
+      const textWidth = ctx.measureText(label).width;
+      const tagWidth = textWidth + tagPadding.x * 2 + 30; // +30 for warning icon space
+      const tagHeight = 44;
+
+      // Tag background (pill shape)
+      const tagLeft = tagX - tagWidth;
+      ctx.fillStyle = "rgba(0,0,0,0.5)";
+      drawRoundedRect(ctx, tagLeft, tagY - tagHeight/2, tagWidth, tagHeight, tagHeight/2);
+      ctx.fill();
+
+      // Tag border
+      ctx.strokeStyle = accentColor;
+      ctx.lineWidth = 3;
+      drawRoundedRect(ctx, tagLeft, tagY - tagHeight/2, tagWidth, tagHeight, tagHeight/2);
+      ctx.stroke();
+
+      // Tag text with warning icon
+      ctx.fillStyle = accentColor;
+      ctx.textAlign = "left";
+      ctx.textBaseline = "middle";
+      ctx.fillText("⚠ " + label.toUpperCase(), tagLeft + tagPadding.x, tagY);
+
+      tagX = tagLeft - tagGap;
+    });
 
     // Convert to blob
     canvas.toBlob(
@@ -309,11 +264,11 @@ export async function downloadShareImage(
   filename?: string,
   size: ImageSize = "x"
 ): Promise<void> {
-  const blob = await generateShareImage(data, "jpeg", size);
+  const blob = await generateShareImage(data, "png", size);
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = filename || `ragecheck-${data.score}.jpg`;
+  a.download = filename || `ragecheck-${data.score}.png`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
