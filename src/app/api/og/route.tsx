@@ -9,24 +9,27 @@ export async function GET(request: NextRequest) {
   const domain = searchParams.get("domain") || "Unknown source";
   const title = searchParams.get("title") || "Content Analysis";
 
-  // Color based on score
+  // Scientific Color Palette
   const getColors = (s: number) => {
-    if (s <= 33) return { main: "#10b981", bg: "#ecfdf5", text: "#065f46" }; // emerald
-    if (s <= 66) return { main: "#f59e0b", bg: "#fffbeb", text: "#92400e" }; // amber
-    return { main: "#ef4444", bg: "#fef2f2", text: "#991b1b" }; // red
-  };
-
-  const getLabel = (s: number) => {
-    if (s <= 33) return "LOW RISK";
-    if (s <= 66) return "MEDIUM RISK";
-    return "HIGH RISK";
+    if (s <= 33) return { main: "#10b981", text: "#047857" }; // Emerald
+    if (s <= 66) return { main: "#f59e0b", text: "#b45309" }; // Amber
+    return { main: "#ef4444", text: "#b91c1c" }; // Red
   };
 
   const colors = getColors(score);
-  const label = getLabel(score);
+  
+  const getRiskLabel = (s: number) => {
+    if (s <= 33) return "LOW_RISK_DETECTED";
+    if (s <= 66) return "MEDIUM_RISK_DETECTED";
+    return "HIGH_RISK_DETECTED";
+  };
 
-  // Truncate title
-  const displayTitle = title.length > 80 ? title.substring(0, 77) + "..." : title;
+  const riskLabel = getRiskLabel(score);
+  const date = new Date().toISOString().split("T")[0];
+  const reportId = Math.random().toString(36).substring(7).toUpperCase();
+
+  // Truncate title for clean display
+  const displayTitle = title.length > 100 ? title.substring(0, 97) + "..." : title;
 
   return new ImageResponse(
     (
@@ -36,232 +39,123 @@ export async function GET(request: NextRequest) {
           width: "100%",
           display: "flex",
           flexDirection: "column",
-          backgroundColor: "#fafafa",
-          position: "relative",
+          backgroundColor: "#ffffff",
+          fontFamily: "monospace", // Default fallback
+          padding: "60px",
+          justifyContent: "space-between",
+          border: "24px solid #18181b", // Thick dark frame
         }}
       >
-        {/* Gradient accent bar at top */}
-        <div
-          style={{
-            position: "absolute",
-            top: 0,
-            left: 0,
-            right: 0,
-            height: "8px",
-            background: `linear-gradient(90deg, ${colors.main}, ${colors.main}88)`,
-          }}
-        />
-
-        {/* Main content */}
+        {/* Scientific Header */}
         <div
           style={{
             display: "flex",
             flexDirection: "row",
-            height: "100%",
-            padding: "60px",
-            gap: "60px",
+            justifyContent: "space-between",
+            borderBottom: "2px solid #e4e4e7",
+            paddingBottom: "24px",
+            fontSize: "24px",
+            color: "#71717a",
+            fontFamily: "monospace",
           }}
         >
-          {/* Left side - Score */}
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              justifyContent: "center",
-              width: "380px",
-              flexShrink: 0,
-            }}
-          >
-            {/* Score circle */}
-            <div
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                justifyContent: "center",
-                width: "280px",
-                height: "280px",
-                borderRadius: "140px",
-                backgroundColor: colors.bg,
-                border: `6px solid ${colors.main}`,
-                boxShadow: `0 0 0 20px ${colors.main}15`,
-              }}
-            >
-              <span
-                style={{
-                  fontSize: "120px",
-                  fontWeight: "800",
-                  color: colors.main,
-                  lineHeight: 1,
-                  letterSpacing: "-4px",
-                }}
-              >
-                {score}
-              </span>
-              <span
-                style={{
-                  fontSize: "24px",
-                  color: colors.text,
-                  fontWeight: "600",
-                  marginTop: "8px",
-                }}
-              >
-                out of 100
-              </span>
-            </div>
-
-            {/* Label badge */}
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                marginTop: "24px",
-                padding: "12px 32px",
-                backgroundColor: colors.main,
-                borderRadius: "50px",
-              }}
-            >
-              <span
-                style={{
-                  fontSize: "22px",
-                  fontWeight: "700",
-                  color: "white",
-                  letterSpacing: "2px",
-                }}
-              >
-                {label}
-              </span>
-            </div>
-          </div>
-
-          {/* Right side - Content */}
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              justifyContent: "center",
-              flex: 1,
-              gap: "24px",
-            }}
-          >
-            {/* Branding */}
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "16px",
-              }}
-            >
-              <div
-                style={{
-                  width: "48px",
-                  height: "48px",
-                  backgroundColor: "#18181b",
-                  borderRadius: "10px",
-                }}
-              />
-              <span
-                style={{
-                  fontSize: "36px",
-                  fontWeight: "700",
-                  color: "#18181b",
-                  letterSpacing: "-1px",
-                }}
-              >
-                RageCheck
-              </span>
-            </div>
-
-            {/* Title */}
-            <div
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: "16px",
-              }}
-            >
-              <span
-                style={{
-                  fontSize: "42px",
-                  fontWeight: "700",
-                  color: "#18181b",
-                  lineHeight: 1.2,
-                  letterSpacing: "-1px",
-                }}
-              >
-                {displayTitle}
-              </span>
-              <span
-                style={{
-                  fontSize: "24px",
-                  color: "#71717a",
-                  fontWeight: "500",
-                }}
-              >
-                {domain}
-              </span>
-            </div>
-
-            {/* Description */}
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "12px",
-                marginTop: "16px",
-                padding: "16px 24px",
-                backgroundColor: "#f4f4f5",
-                borderRadius: "12px",
-                borderLeft: `4px solid ${colors.main}`,
-              }}
-            >
-              <span
-                style={{
-                  fontSize: "20px",
-                  color: "#52525b",
-                  lineHeight: 1.4,
-                }}
-              >
-                {score > 66
-                  ? "High density of manipulative language patterns detected"
-                  : score > 33
-                  ? "Some concerning manipulation patterns found"
-                  : "Minimal manipulative framing detected"}
-              </span>
-            </div>
-          </div>
+          <span>RAGECHECK_ANALYSIS_V1</span>
+          <span>ID: {reportId}</span>
+          <span>DATE: {date}</span>
         </div>
 
-        {/* Footer */}
+        {/* Main Content Area */}
         <div
           style={{
-            position: "absolute",
-            bottom: "24px",
-            left: "60px",
-            right: "60px",
             display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
+            flexDirection: "column",
+            gap: "24px",
+            marginTop: "20px",
+            marginBottom: "20px",
           }}
         >
-          <span
+          {/* Source Tag */}
+          <div
             style={{
-              fontSize: "18px",
-              color: "#a1a1aa",
+              display: "flex",
+              backgroundColor: "#f4f4f5",
+              padding: "8px 16px",
+              borderRadius: "4px",
+              alignSelf: "flex-start",
             }}
           >
-            Analyze content at ragecheck.com
-          </span>
+            <span style={{ fontSize: "24px", fontWeight: "bold", color: "#52525b" }}>
+              SOURCE: {domain.toUpperCase()}
+            </span>
+          </div>
+
+          {/* Title */}
           <span
             style={{
-              fontSize: "18px",
-              color: "#a1a1aa",
+              fontSize: "56px",
+              fontWeight: "900",
+              color: "#18181b",
+              lineHeight: 1.1,
+              fontFamily: "sans-serif", // Keep title readable/standard
             }}
           >
-            Outrage Bait Detection Tool
+            {displayTitle}
           </span>
+        </div>
+
+        {/* Data Footer */}
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
+            borderTop: "2px solid #e4e4e7",
+            paddingTop: "32px",
+          }}
+        >
+          {/* Score Block */}
+          <div style={{ display: "flex", flexDirection: "column" }}>
+            <span style={{ fontSize: "20px", color: "#71717a", marginBottom: "8px" }}>
+              MANIPULATION_INDEX
+            </span>
+            <div style={{ display: "flex", alignItems: "baseline", gap: "12px" }}>
+              <span style={{ fontSize: "96px", fontWeight: "900", color: colors.text, lineHeight: 0.8 }}>
+                {score}
+              </span>
+              <span style={{ fontSize: "32px", fontWeight: "600", color: "#a1a1aa" }}>
+                / 100
+              </span>
+            </div>
+          </div>
+
+          {/* Risk Classification */}
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "flex-end",
+            }}
+          >
+             <span style={{ fontSize: "20px", color: "#71717a", marginBottom: "12px" }}>
+              CLASSIFICATION
+            </span>
+            <div
+              style={{
+                backgroundColor: colors.main,
+                color: "white",
+                padding: "16px 32px",
+                borderRadius: "4px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <span style={{ fontSize: "32px", fontWeight: "bold", letterSpacing: "2px", fontFamily: "monospace" }}>
+                {riskLabel}
+              </span>
+            </div>
+          </div>
         </div>
       </div>
     ),
