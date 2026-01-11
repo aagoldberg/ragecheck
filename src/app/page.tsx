@@ -1086,47 +1086,6 @@ export default function Home() {
           </form>
         </div>
 
-        {/* How it Works Section */}
-        {(!result || isDemo) && (
-          <div className="max-w-4xl mx-auto mb-20 animate-in fade-in slide-in-from-bottom-6 duration-700 delay-100">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-              <div className="text-center p-6 bg-white dark:bg-zinc-900/50 rounded-2xl border border-zinc-100 dark:border-zinc-800">
-                <div className="w-12 h-12 mx-auto bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 rounded-full flex items-center justify-center mb-4">
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-                  </svg>
-                </div>
-                <h3 className="font-bold text-zinc-900 dark:text-zinc-100 mb-2">1. Paste a Link</h3>
-                <p className="text-sm text-zinc-500 leading-relaxed">
-                  Drop in a URL from any major news site or social platform (X, Bluesky, Threads).
-                </p>
-              </div>
-              <div className="text-center p-6 bg-white dark:bg-zinc-900/50 rounded-2xl border border-zinc-100 dark:border-zinc-800">
-                <div className="w-12 h-12 mx-auto bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 rounded-full flex items-center justify-center mb-4">
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.384-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
-                  </svg>
-                </div>
-                <h3 className="font-bold text-zinc-900 dark:text-zinc-100 mb-2">2. Analyze Patterns</h3>
-                <p className="text-sm text-zinc-500 leading-relaxed">
-                  Our system scans for 5 key markers of manipulation: Arousal, Moral Condemnation, and more.
-                </p>
-              </div>
-              <div className="text-center p-6 bg-white dark:bg-zinc-900/50 rounded-2xl border border-zinc-100 dark:border-zinc-800">
-                <div className="w-12 h-12 mx-auto bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 rounded-full flex items-center justify-center mb-4">
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                </div>
-                <h3 className="font-bold text-zinc-900 dark:text-zinc-100 mb-2">3. See Reality</h3>
-                <p className="text-sm text-zinc-500 leading-relaxed">
-                  Get a clear "Bait Score" and highlighted examples of how the text tries to manipulate you.
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* Live Headlines Section */}
         {(!result || isDemo) && (
           <div className="mt-24 max-w-6xl mx-auto animate-in fade-in slide-in-from-bottom-8 duration-700">
