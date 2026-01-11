@@ -10,7 +10,6 @@ import {
   getDeterministicHookLine,
   getScoreColor,
   getAccentColor,
-  type Driver,
 } from "./text";
 
 export interface Analysis {
@@ -37,7 +36,6 @@ export function renderShareCard(
 ): ImageResponse {
   const { width, height } = SIZE_CONFIG[size];
   const topDrivers = getTopDrivers(analysis.bars);
-  const verdict = getVerdict(analysis.baitScore);
   const hookLine = getDeterministicHookLine(analysis.baitScore, topDrivers);
   const scoreColor = getScoreColor(analysis.baitScore);
   const accentColor = getAccentColor(analysis.baitScore);
@@ -114,10 +112,10 @@ export function renderShareCard(
               lineHeight: 1.3,
               maxWidth: "90%",
               fontWeight: 500,
-              marginTop: "12px",
+              marginTop: "8px",
             }}
           >
-            "{displayTitle}"
+            &quot;{displayTitle}&quot;
           </div>
         </div>
 
@@ -150,14 +148,14 @@ export function renderShareCard(
                 color: "#000",
                 textTransform: "uppercase",
                 letterSpacing: "0.1em",
-                marginBottom: "4px",
+                marginBottom: "0px",
               }}
             >
               BAIT SCORE
             </span>
             <span
               style={{
-                fontSize: "64px",
+                fontSize: "80px",
                 fontWeight: 900,
                 color: "#000",
                 lineHeight: 0.9,
@@ -181,18 +179,17 @@ export function renderShareCard(
                   display: "flex",
                   alignItems: "center",
                   padding: "12px 24px",
-                  border: `3px solid ${accentColor}`,
-                  borderRadius: "100px", // Full pill
-                  backgroundColor: "rgba(0,0,0,0.5)",
+                  backgroundColor: accentColor, // Solid fill
+                  borderRadius: "100px",
                 }}
               >
                 <span
                   style={{
-                    color: accentColor,
+                    color: "#000", // Black text on solid color
                     fontSize: "24px",
-                    fontWeight: 700,
+                    fontWeight: 800,
                     textTransform: "uppercase",
-                    letterSpacing: "0.05em",
+                    letterSpacing: "0.02em",
                   }}
                 >
                   ⚠️ {driver.label.replace("Emotional ", "")}
