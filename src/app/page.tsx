@@ -1,6 +1,18 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
+import {
+  getShareText,
+  buildXIntentUrl,
+  buildBlueskyIntentUrl,
+  isWorthSharing,
+  getScoreBucket,
+} from "@/lib/share";
+import {
+  getDeterministicHookLine,
+  getTopDrivers,
+} from "@/lib/shareCard";
+import { copyShareImageToClipboard } from "@/lib/shareImage";
 
 interface Highlight {
   start: number;
@@ -574,6 +586,15 @@ export default function Home() {
   const [headlinesLoading, setHeadlinesLoading] = useState(true);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageError, setImageError] = useState<string | null>(null);
+  const [imageCopied, setImageCopied] = useState(false);
+  const [canNativeShare, setCanNativeShare] = useState(false);
+  const [showMoreMenu, setShowMoreMenu] = useState(false);
+  const [feedbackGiven, setFeedbackGiven] = useState<"up" | "down" | null>(null);
+  const [feedbackComment, setFeedbackComment] = useState("");
+  const [showFeedbackForm, setShowFeedbackForm] = useState(false);
+  const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
+  const [errorReported, setErrorReported] = useState(false);
+  const moreMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     fetch("/api/visit", {
@@ -591,6 +612,10 @@ export default function Home() {
       })
       .catch(() => {})
       .finally(() => setHeadlinesLoading(false));
+
+    // Check if Web Share API is available (primarily mobile)
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    setCanNativeShare(isMobile && typeof navigator.share === "function");
   }, []);
 
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -712,13 +737,213 @@ export default function Home() {
     return `${window.location.origin}/share?${params.toString()}`;
   };
 
+  const trackShareEvent = (
+    eventType: string,
+    metadata?: Record<string, string | number>
+  ) => {
+    if (!result?.success || result.score === undefined || !result.signalBreakdown) return;
+
+    const topBars = Object.entries(result.signalBreakdown)
+      .sort(([, a], [, b]) => b - a)
+      .slice(0, 3)
+      .map(([key]) => key);
+
+    fetch("/api/share", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        url,
+        shareType: eventType,
+        baitScoreBucket: getScoreBucket(result.score),
+        topBars,
+        ...metadata,
+      }),
+    }).catch(() => {});
+  };
+
+  // Submit feedback
+  const submitFeedback = async (rating: "up" | "down", comment?: string) => {
+    if (!result?.success || result.score === undefined) return;
+
+    setFeedbackGiven(rating);
+    if (rating === "down") {
+      setShowFeedbackForm(true);
+    } else {
+      setFeedbackSubmitted(true);
+    }
+
+    fetch("/api/feedback", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        url,
+        rating,
+        comment: comment || null,
+        score: result.score,
+        title: result.title,
+        sourceDomain: result.sourceDomain,
+        signalBreakdown: result.signalBreakdown,
+      }),
+    }).catch(() => {});
+  };
+
+  const submitFeedbackComment = () => {
+    if (!feedbackComment.trim()) {
+      setFeedbackSubmitted(true);
+      setShowFeedbackForm(false);
+      return;
+    }
+
+    fetch("/api/feedback", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        url,
+        rating: "down",
+        comment: feedbackComment,
+        score: result?.score,
+        title: result?.title,
+        sourceDomain: result?.sourceDomain,
+        signalBreakdown: result?.signalBreakdown,
+      }),
+    }).catch(() => {});
+
+    setFeedbackSubmitted(true);
+    setShowFeedbackForm(false);
+  };
+
+  // Get hook line for share text
+  const getHookLineForShare = () => {
+    if (!result?.success || result.score === undefined || !result.signalBreakdown) {
+      return "";
+    }
+    const topDrivers = getTopDrivers(result.signalBreakdown);
+    return getDeterministicHookLine(result.score, topDrivers);
+  };
+
   const copyShareCard = () => {
     if (!result?.success || result.score === undefined) return;
     const shareUrl = getShareUrl();
     navigator.clipboard.writeText(shareUrl);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+    trackShareEvent("copy_link_clicked");
+    setShowMoreMenu(false);
   };
+
+  const shareOnTwitter = () => {
+    if (!result?.success || result.score === undefined || !result.signalBreakdown) return;
+    const shareUrl = getShareUrl();
+    const hookLine = getHookLineForShare();
+    const text = getShareText("x", hookLine, shareUrl);
+    const twitterUrl = buildXIntentUrl(text, shareUrl);
+    window.open(twitterUrl, "_blank", "width=550,height=420");
+    trackShareEvent("share_x_clicked");
+    // Also copy image to clipboard for easy pasting
+    handleShareImage(true);
+  };
+
+  const shareOnBluesky = () => {
+    if (!result?.success || result.score === undefined || !result.signalBreakdown) return;
+    const shareUrl = getShareUrl();
+    const hookLine = getHookLineForShare();
+    const text = getShareText("bluesky", hookLine, shareUrl);
+    const blueskyUrl = buildBlueskyIntentUrl(text);
+    window.open(blueskyUrl, "_blank", "width=550,height=420");
+    trackShareEvent("share_bluesky_clicked");
+    // Also copy image to clipboard for easy pasting
+    handleShareImage(true);
+  };
+
+  const shareNative = async () => {
+    if (!result?.success || result.score === undefined || !result.signalBreakdown) return;
+    if (!navigator.share) return;
+
+    const shareUrl = getShareUrl();
+    const hookLine = getHookLineForShare();
+    const text = getShareText("native", hookLine, shareUrl);
+
+    try {
+      await navigator.share({
+        title: "RageCheck Analysis",
+        text,
+        url: shareUrl,
+      });
+      trackShareEvent("web_share_clicked");
+    } catch {
+      // User cancelled or share failed - ignore
+    }
+  };
+
+  // Check if this result is "worth sharing"
+  const showSharePrompt = useMemo(() => {
+    if (!result?.success || result.score === undefined || !result.signalBreakdown) {
+      return false;
+    }
+    return isWorthSharing(
+      result.score,
+      result.signalBreakdown.arousal,
+      result.signalBreakdown.call_to_conflict
+    );
+  }, [result]);
+
+  // Build share card API URL
+  const getShareCardUrl = (size: "x" | "bsky" = "x") => {
+    if (!result?.success || result.score === undefined || !result.signalBreakdown) return null;
+
+    const params = new URLSearchParams({
+      score: String(result.score),
+      title: result.title || "Content Analysis",
+      domain: result.sourceDomain || "unknown",
+      size,
+      arousal: String(result.signalBreakdown.arousal),
+      enemy: String(result.signalBreakdown.enemy_construction),
+      moral: String(result.signalBreakdown.moral_condemnation),
+      simplification: String(result.signalBreakdown.simplification),
+      conflict: String(result.signalBreakdown.call_to_conflict),
+    });
+
+    return `/api/share-card?${params.toString()}`;
+  };
+
+  // Primary share action - uses client-side canvas for clipboard copy
+  const handleShareImage = async (silent = false) => {
+    if (!result?.success || result.score === undefined || !result.signalBreakdown) return;
+
+    try {
+      const success = await copyShareImageToClipboard({
+        score: result.score,
+        title: result.title || "Content Analysis",
+        domain: result.sourceDomain || "unknown",
+        signalBreakdown: result.signalBreakdown,
+      });
+
+      if (success && !silent) {
+        setImageCopied(true);
+        setTimeout(() => setImageCopied(false), 3000);
+        trackShareEvent("share_image_success");
+      }
+    } catch (error) {
+      console.error("Failed to copy image:", error);
+    }
+  };
+
+  // Click handler for share image button
+  const onShareImageClick = async () => {
+    trackShareEvent("share_image_clicked");
+    await handleShareImage();
+  };
+
+  // Close more menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (moreMenuRef.current && !moreMenuRef.current.contains(event.target as Node)) {
+        setShowMoreMenu(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const handleShare = async () => {
     if (!result?.success || result.score === undefined) return;
@@ -1011,8 +1236,90 @@ export default function Home() {
                 <p>{result.error}</p>
               </div>
             ) : (
+              <>
+              {/* Share Buttons - Above Analysis */}
+              <div className="max-w-4xl mx-auto mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 px-4">
+                <div className="flex items-center gap-3">
+                  <span className="text-xs font-medium text-zinc-400">
+                    {activeFilter ? `Filtering: ${SIGNAL_LABELS[activeFilter as keyof SignalBreakdown]}` : "Showing all detected patterns"}
+                  </span>
+                  {showSharePrompt && !isDemo && (
+                    <span className="text-xs font-medium text-amber-600 dark:text-amber-400 animate-pulse">
+                      This one&apos;s worth sharing.
+                    </span>
+                  )}
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  {/* Primary CTA: Share Image */}
+                  <button
+                    onClick={onShareImageClick}
+                    className="flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white text-xs font-bold rounded-lg transition-all shadow-md hover:shadow-lg"
+                    title="Copy image to clipboard — paste anywhere"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    {imageCopied ? "Copied — paste anywhere!" : "Share Image"}
+                  </button>
+                  {/* Post on X */}
+                  <button
+                    onClick={shareOnTwitter}
+                    className="flex items-center gap-1.5 px-3 py-2 bg-black hover:bg-zinc-800 text-white text-xs font-bold rounded-lg transition-colors"
+                    title="Post on X"
+                  >
+                    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+                    </svg>
+                    Post on X
+                  </button>
+                  {/* Post on Bluesky */}
+                  <button
+                    onClick={shareOnBluesky}
+                    className="flex items-center gap-1.5 px-3 py-2 bg-[#0085ff] hover:bg-[#0070d6] text-white text-xs font-bold rounded-lg transition-colors"
+                    title="Post on Bluesky"
+                  >
+                    <svg className="w-3.5 h-3.5" viewBox="0 0 600 530" fill="currentColor">
+                      <path d="m135.72 44.03c66.496 49.921 138.02 151.14 164.28 205.46 26.262-54.316 97.782-155.54 164.28-205.46 47.98-36.021 125.72-63.892 125.72 24.795 0 17.712-10.155 148.79-16.111 170.07-20.703 73.984-96.144 92.854-163.25 81.433 117.3 19.964 147.14 86.092 82.697 152.22-122.39 125.59-175.91-31.511-189.63-71.766-2.514-7.38-3.69-10.832-3.69-7.914 0-2.918-1.176 0.534-3.69 7.914-13.72 40.255-67.24 197.36-189.63 71.766-64.444-66.128-34.605-132.26 82.697-152.22-67.108 11.421-142.55-7.449-163.25-81.433-5.9561-21.282-16.111-152.36-16.111-170.07 0-88.687 77.742-60.816 125.72-24.795z"/>
+                    </svg>
+                    Post on Bluesky
+                  </button>
+                  {/* More dropdown */}
+                  <div className="relative" ref={moreMenuRef}>
+                    <button
+                      onClick={() => setShowMoreMenu(!showMoreMenu)}
+                      className="flex items-center gap-1 px-2 py-2 text-xs font-medium text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 transition-colors"
+                      title="More options"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h.01M12 12h.01M19 12h.01M6 12a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0z" />
+                      </svg>
+                    </button>
+                    {showMoreMenu && (
+                      <div className="absolute right-0 top-full mt-1 w-40 bg-white dark:bg-zinc-800 rounded-lg shadow-lg border border-zinc-200 dark:border-zinc-700 py-1 z-50">
+                        <button
+                          onClick={copyShareCard}
+                          className="w-full text-left px-4 py-2 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 transition-colors"
+                        >
+                          {copied ? "Link Copied!" : "Copy Link"}
+                        </button>
+                        {canNativeShare && (
+                          <button
+                            onClick={() => {
+                              shareNative();
+                              setShowMoreMenu(false);
+                            }}
+                            className="w-full text-left px-4 py-2 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 transition-colors"
+                          >
+                            Share via...
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                
+
                 {/* Score & Context Card */}
                 <BentoCard className="lg:col-span-4 lg:sticky lg:top-24 h-fit" title="Assessment">
                   <div className="flex flex-col items-center justify-center text-center">
@@ -1185,6 +1492,7 @@ export default function Home() {
                   </BentoCard>
                 </div>
               </div>
+              </>
             )}
           </div>
         )}
