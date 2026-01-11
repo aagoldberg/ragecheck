@@ -512,36 +512,51 @@ export default function ClearviewPage() {
           </div>
         )}
 
-        {/* Archived Briefings */}
-        {!loading && !error && archived.length > 0 && (
-          <div className="mt-24 pt-16 border-t border-zinc-200 dark:border-zinc-800">
-            <div className="space-y-20">
-              {archived.map((briefing, briefingIndex) => (
-                <div key={briefingIndex} className="space-y-8">
-                  <div className="flex items-center gap-3">
-                    <div className="h-px flex-1 bg-zinc-200 dark:bg-zinc-800" />
-                    <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest px-3 py-1 bg-zinc-100 dark:bg-zinc-900 rounded-full">
-                      {new Date(briefing.generatedAt).toLocaleDateString(undefined, {
-                        weekday: 'short',
-                        month: 'short',
-                        day: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                      })}
-                    </span>
-                    <div className="h-px flex-1 bg-zinc-200 dark:bg-zinc-800" />
-                  </div>
+        {/* Archived Briefings - filtered to exclude topics already covered */}
+        {!loading && !error && archived.length > 0 && (() => {
+          // Get current story topics for deduplication
+          const currentTopics = new Set(stories.map(s => s.topic.toLowerCase().trim()));
 
-                  <div className="space-y-12 opacity-75 hover:opacity-100 transition-opacity">
-                    {briefing.stories.map((story) => (
-                      <StoryCard key={story.id} story={story} />
-                    ))}
+          // Filter archived briefings to only show unique stories
+          const filteredArchived = archived.map(briefing => ({
+            ...briefing,
+            stories: briefing.stories.filter(story =>
+              !currentTopics.has(story.topic.toLowerCase().trim())
+            )
+          })).filter(briefing => briefing.stories.length > 0);
+
+          if (filteredArchived.length === 0) return null;
+
+          return (
+            <div className="mt-24 pt-16 border-t border-zinc-200 dark:border-zinc-800">
+              <div className="space-y-20">
+                {filteredArchived.map((briefing, briefingIndex) => (
+                  <div key={briefingIndex} className="space-y-8">
+                    <div className="flex items-center gap-3">
+                      <div className="h-px flex-1 bg-zinc-200 dark:bg-zinc-800" />
+                      <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest px-3 py-1 bg-zinc-100 dark:bg-zinc-900 rounded-full">
+                        {new Date(briefing.generatedAt).toLocaleDateString(undefined, {
+                          weekday: 'short',
+                          month: 'short',
+                          day: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                      </span>
+                      <div className="h-px flex-1 bg-zinc-200 dark:bg-zinc-800" />
+                    </div>
+
+                    <div className="space-y-12 opacity-75 hover:opacity-100 transition-opacity">
+                      {briefing.stories.map((story) => (
+                        <StoryCard key={story.id} story={story} />
+                      ))}
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
 
         <footer className="mt-32 pt-12 border-t border-zinc-200 dark:border-zinc-800 text-center space-y-4">
             <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-[0.2em]">
