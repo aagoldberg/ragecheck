@@ -1,5 +1,5 @@
 // Canvas-based share image generator matching the "Scientific Report" design
-// Features: Monospace header, high-contrast title, manipulation analysis, precision data footer
+// Features: Monospace header, high-contrast title, forensic analysis, outlined precision data footer
 
 import { getScoreColor } from "@/lib/shareCard";
 import type { SignalBreakdown } from "@/lib/score";
@@ -81,7 +81,7 @@ export function generateShareImage(
     canvas.width = width;
     canvas.height = height;
     
-    // Scientific Palette
+    // Scientific Palette - Muted/Professional
     const getColors = (s: number) => {
       if (s <= 33) return { main: "#10b981", text: "#047857" }; // Emerald
       if (s <= 66) return { main: "#f59e0b", text: "#b45309" }; // Amber
@@ -89,9 +89,9 @@ export function generateShareImage(
     };
 
     const getRiskLabel = (s: number) => {
-      if (s <= 33) return "LOW_RISK_DETECTED";
-      if (s <= 66) return "MEDIUM_RISK_DETECTED";
-      return "HIGH_RISK_DETECTED";
+      if (s <= 33) return "LOW RISK";
+      if (s <= 66) return "MEDIUM RISK";
+      return "HIGH RISK";
     };
 
     const colors = getColors(data.score);
@@ -207,23 +207,25 @@ export function generateShareImage(
       ctx.fill();
     });
 
-    // === VERDICT SUMMARY ===
-    // Show Claude's punchy one-line summary of the manipulation verdict
-    if (data.shareCardSummary) {
-        const summaryY = signalGridY + 100;
-
+    // === FORENSIC ANALYSIS ===
+    if (data.techniqueExplanations?.length || data.sharingPatterns?.length) {
+        const analysisY = signalGridY + 100;
+        
         ctx.font = "500 20px monospace, 'Courier New', Courier";
         ctx.fillStyle = "#71717a";
-        ctx.fillText("VERDICT", contentPadding + frameWidth, summaryY);
+        ctx.fillText("FORENSIC_ANALYSIS", contentPadding + frameWidth, analysisY);
 
-        ctx.font = "600 26px system-ui, -apple-system, sans-serif";
+        ctx.font = "500 22px system-ui, -apple-system, sans-serif";
         ctx.fillStyle = "#18181b";
+        
+        const points = [
+            ...(data.techniqueExplanations || []).slice(0, 1),
+            ...(data.sharingPatterns || []).slice(0, 1)
+        ].map(p => p.length > 85 ? p.substring(0, 82) + "..." : p);
 
-        let summaryText = data.shareCardSummary;
-        // Truncate if too long
-        if (summaryText.length > 70) summaryText = summaryText.substring(0, 67) + "...";
-
-        ctx.fillText(summaryText, contentPadding + frameWidth, summaryY + 36);
+        points.forEach((point, i) => {
+            ctx.fillText(`• ${point}`, contentPadding + frameWidth, analysisY + 40 + (i * 36));
+        });
     }
 
     // === FOOTER (Data Dashboard) ===
@@ -258,7 +260,7 @@ export function generateShareImage(
     ctx.fillStyle = "#a1a1aa";
     ctx.fillText("/ 100", contentPadding + frameWidth + scoreTextWidth + 16, scoreY + 54);
 
-    // Right: Classification Badge
+    // Right: Classification Badge - CLEANER STYLE
     ctx.textAlign = "right";
     
     // Label
@@ -266,17 +268,18 @@ export function generateShareImage(
     ctx.fillStyle = "#71717a";
     ctx.fillText("CLASSIFICATION", width - (contentPadding + frameWidth), footerY);
     
-    // Badge
+    // Badge (Outlined instead of filled)
     const badgeY = scoreY + 10;
     ctx.font = "700 32px monospace, 'Courier New', Courier";
     const badgeTextWidth = ctx.measureText(riskLabel).width + 64;
     
-    ctx.fillStyle = colors.main;
+    ctx.strokeStyle = colors.main;
+    ctx.lineWidth = 4;
     ctx.beginPath();
     ctx.roundRect(width - (contentPadding + frameWidth) - badgeTextWidth, badgeY, badgeTextWidth, 70, 4);
-    ctx.fill();
+    ctx.stroke();
     
-    ctx.fillStyle = "#ffffff";
+    ctx.fillStyle = colors.text;
     ctx.textBaseline = "middle";
     ctx.fillText(riskLabel, width - (contentPadding + frameWidth) - 32, badgeY + 35);
 
