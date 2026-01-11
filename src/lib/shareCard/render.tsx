@@ -81,7 +81,7 @@ export function renderShareCard(
           <span>{analysis.sourceDomain.toUpperCase()}</span>
         </div>
 
-        {/* Main: Massive Hook */}
+        {/* Main: Massive Hook (Sentence Case) */}
         <div
           style={{
             display: "flex",
@@ -93,12 +93,12 @@ export function renderShareCard(
           <h1
             style={{
               fontSize: "92px",
-              fontWeight: 900,
+              fontWeight: 800, // Slightly lighter than 900
               color: "#fafafa",
-              lineHeight: 0.9,
-              letterSpacing: "-0.04em",
+              lineHeight: 1.0,
+              letterSpacing: "-0.03em",
               margin: 0,
-              textTransform: "uppercase",
+              // Removed textTransform: uppercase
             }}
           >
             {hookLine}
@@ -127,7 +127,7 @@ export function renderShareCard(
             alignItems: "flex-end",
           }}
         >
-          {/* Left: The "Sticker" Score */}
+          {/* Left: The "Data" Score (Upright) */}
           <div
             style={{
               display: "flex",
@@ -136,15 +136,16 @@ export function renderShareCard(
               justifyContent: "center",
               backgroundColor: scoreColor,
               padding: "16px 24px",
-              transform: "rotate(-4deg)",
+              // Removed transform rotation
               border: "4px solid white",
-              boxShadow: "8px 8px 0px rgba(255,255,255,0.1)",
+              boxShadow: "0px 4px 24px rgba(0,0,0,0.5)", // Soft shadow instead of hard drop
+              borderRadius: "4px", // Slight rounding
             }}
           >
             <span
               style={{
                 fontSize: "16px",
-                fontWeight: 800,
+                fontWeight: 700,
                 color: "#000",
                 textTransform: "uppercase",
                 letterSpacing: "0.1em",
@@ -165,7 +166,7 @@ export function renderShareCard(
             </span>
           </div>
 
-          {/* Right: Driver Tags */}
+          {/* Right: Driver Tags (Neutral Data Pills) */}
           <div
             style={{
               display: "flex",
@@ -179,20 +180,21 @@ export function renderShareCard(
                   display: "flex",
                   alignItems: "center",
                   padding: "12px 24px",
-                  backgroundColor: accentColor, // Solid fill
+                  backgroundColor: "rgba(255,255,255,0.05)", // Transparent/Subtle
+                  border: `2px solid ${accentColor}`, // Colored border
                   borderRadius: "100px",
                 }}
               >
                 <span
                   style={{
-                    color: "#000", // Black text on solid color
+                    color: accentColor,
                     fontSize: "24px",
-                    fontWeight: 800,
+                    fontWeight: 600,
                     textTransform: "uppercase",
-                    letterSpacing: "0.02em",
+                    letterSpacing: "0.05em",
                   }}
                 >
-                  ⚠️ {driver.label.replace("Emotional ", "")}
+                  {driver.label.replace("Emotional ", "")}
                 </span>
               </div>
             ))}
