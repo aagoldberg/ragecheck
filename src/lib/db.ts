@@ -985,6 +985,124 @@ export interface ViralMetrics {
   referralSources: { source: string; count: number }[];
 }
 
+// ============================================
+// FEEDBACK TRACKING
+// ============================================
+
+export interface FeedbackLog {
+  url: string;
+  rating: "up" | "down";
+  comment: string | null;
+  score: number;
+  title: string;
+  sourceDomain: string;
+  signalBreakdown: Record<string, number>;
+  ipAddress?: string;
+  userAgent?: string;
+}
+
+export async function initFeedbackTable() {
+  try {
+    await getDb()`
+      CREATE TABLE IF NOT EXISTS ragecheck_feedback (
+        id SERIAL PRIMARY KEY,
+        url TEXT NOT NULL,
+        rating TEXT NOT NULL,
+        comment TEXT,
+        score INTEGER,
+        title TEXT,
+        source_domain TEXT,
+        signal_breakdown JSONB,
+        ip_address TEXT,
+        user_agent TEXT,
+        created_at TIMESTAMP DEFAULT NOW()
+      )
+    `;
+  } catch (error) {
+    console.error("Failed to create feedback table:", error);
+  }
+}
+
+export async function logFeedback(data: FeedbackLog) {
+  try {
+    await withRetry(async () => {
+      await getDb()`
+        INSERT INTO ragecheck_feedback (
+          url, rating, comment, score, title, source_domain,
+          signal_breakdown, ip_address, user_agent
+        ) VALUES (
+          ${data.url},
+          ${data.rating},
+          ${data.comment},
+          ${data.score},
+          ${data.title},
+          ${data.sourceDomain},
+          ${JSON.stringify(data.signalBreakdown)}::jsonb,
+          ${data.ipAddress || null},
+          ${data.userAgent || null}
+        )
+      `;
+    });
+  } catch (error) {
+    console.error("Failed to log feedback:", error);
+  }
+}
+
+export interface FeedbackStats {
+  totalFeedback: number;
+  positiveCount: number;
+  negativeCount: number;
+  positiveRate: number;
+  recentFeedback: {
+    url: string;
+    rating: string;
+    comment: string | null;
+    score: number;
+    createdAt: Date;
+  }[];
+}
+
+export async function getFeedbackStats(): Promise<FeedbackStats> {
+  try {
+    const [totalResult] = await getDb()`SELECT COUNT(*) as count FROM ragecheck_feedback`;
+    const [positiveResult] = await getDb()`SELECT COUNT(*) as count FROM ragecheck_feedback WHERE rating = 'up'`;
+    const [negativeResult] = await getDb()`SELECT COUNT(*) as count FROM ragecheck_feedback WHERE rating = 'down'`;
+
+    const recentRows = await getDb()`
+      SELECT url, rating, comment, score, created_at
+      FROM ragecheck_feedback
+      ORDER BY created_at DESC
+      LIMIT 50
+    `;
+
+    const total = Number(totalResult.count) || 0;
+    const positive = Number(positiveResult.count) || 0;
+
+    return {
+      totalFeedback: total,
+      positiveCount: positive,
+      negativeCount: Number(negativeResult.count) || 0,
+      positiveRate: total > 0 ? Math.round((positive / total) * 100) : 0,
+      recentFeedback: recentRows.map((row) => ({
+        url: row.url,
+        rating: row.rating,
+        comment: row.comment,
+        score: Number(row.score),
+        createdAt: row.created_at,
+      })),
+    };
+  } catch (error) {
+    console.error("Failed to get feedback stats:", error);
+    return {
+      totalFeedback: 0,
+      positiveCount: 0,
+      negativeCount: 0,
+      positiveRate: 0,
+      recentFeedback: [],
+    };
+  }
+}
+
 export async function getViralMetrics(): Promise<ViralMetrics> {
   try {
     // Repeat users: visitors who came on 2+ different days
