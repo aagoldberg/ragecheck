@@ -114,10 +114,10 @@ const HOOK_LINES = {
   ],
   // Medium bait (50-74)
   medium: [
-    "Some emotional framing.",
-    "Worth a second look.",
-    "Mixed signals.",
-    "A few hooks in here.",
+    "A bit of spin.",
+    "Mix of facts and framing.",
+    "Leans persuasive.",
+    "Some emotional pull.",
   ],
   // Low bait (0-49)
   low: [
@@ -208,7 +208,7 @@ export function getDeterministicHookLine(
 
   // Medium (40-59)
   if (baitScore >= 40) {
-    return "Worth a second look.";
+    return "A bit of spin.";
   }
 
   // Low (0-39)
