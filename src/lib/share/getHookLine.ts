@@ -1,17 +1,9 @@
-import { SignalBreakdown } from "@/lib/score";
+import { SignalBreakdown, SIGNAL_LABELS } from "@/lib/score";
 
 export interface HookLineResult {
   hookLine: string;
   topSignals: string[];
 }
-
-const SIGNAL_LABELS: Record<keyof SignalBreakdown, string> = {
-  arousal: "Emotional Arousal",
-  enemy_construction: "Enemy Framing",
-  moral_condemnation: "Moral Outrage",
-  simplification: "Oversimplification",
-  call_to_conflict: "Call-to-Conflict",
-};
 
 const SIGNAL_SHORT_LABELS: Record<keyof SignalBreakdown, string> = {
   arousal: "Arousal",
@@ -103,4 +95,4 @@ export function getTriggersLine(topSignals: string[]): string {
   return `Triggers: ${topSignals.join(", ")}`;
 }
 
-export { SIGNAL_LABELS, SIGNAL_SHORT_LABELS };
+export { SIGNAL_SHORT_LABELS };

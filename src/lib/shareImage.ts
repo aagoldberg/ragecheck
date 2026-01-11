@@ -1,8 +1,8 @@
 // Canvas-based share image generator matching the "Scientific Report" design
-// Features: Monospace header, high-contrast title, precision data footer
+// Features: Monospace header, high-contrast title, manipulation analysis, precision data footer
 
 import { getScoreColor } from "@/lib/shareCard";
-import type { SignalBreakdown } from "@/lib/score";
+import { SIGNAL_LABELS, type SignalBreakdown } from "@/lib/score";
 
 export interface ShareImageData {
   score: number;
@@ -16,6 +16,15 @@ export type ImageSize = "x" | "bluesky";
 const SIZE_CONFIGS: Record<ImageSize, { width: number; height: number }> = {
   x: { width: 1200, height: 675 },
   bluesky: { width: 1200, height: 630 },
+};
+
+// Monospace-style labels for the scientific report design
+const SIGNAL_LABELS_MONO: Record<string, string> = {
+  arousal: "EMOTIONAL_AROUSAL",
+  enemy_construction: "ENEMY_CONSTRUCTION",
+  moral_condemnation: "MORAL_CONDEMNATION",
+  simplification: "OVERSIMPLIFICATION",
+  call_to_conflict: "CALL_TO_CONFLICT",
 };
 
 function wrapText(
@@ -99,6 +108,7 @@ export function generateShareImage(
     ctx.strokeRect(frameWidth/2, frameWidth/2, width - frameWidth, height - frameWidth);
 
     const contentPadding = 60;
+    const innerWidth = width - (contentPadding * 2 + frameWidth * 2);
     
     // === HEADER (Monospace) ===
     ctx.font = "500 24px monospace, 'Courier New', Courier";
@@ -144,15 +154,55 @@ export function generateShareImage(
     // Title
     const titleY = sourceY + 70;
     ctx.fillStyle = "#18181b";
-    ctx.font = "900 56px system-ui, -apple-system, sans-serif";
+    ctx.font = "900 52px system-ui, -apple-system, sans-serif";
     ctx.textBaseline = "top";
     
-    const maxTitleWidth = width - (contentPadding * 2 + frameWidth * 2);
-    const titleLines = wrapText(ctx, data.title, maxTitleWidth, 3);
-    const lineHeight = 64;
+    const titleLines = wrapText(ctx, data.title, innerWidth, 2);
+    const lineHeight = 60;
     
     titleLines.forEach((line, i) => {
       ctx.fillText(line, contentPadding + frameWidth, titleY + (i * lineHeight));
+    });
+
+    // === ANALYSIS SECTION ===
+    const analysisY = titleY + (titleLines.length * lineHeight) + 40;
+    
+    ctx.font = "500 20px monospace, 'Courier New', Courier";
+    ctx.fillStyle = "#71717a";
+    ctx.fillText("LINGUISTIC_SIGNALS_DETECTED", contentPadding + frameWidth, analysisY);
+
+    const sortedSignals = Object.entries(data.signalBreakdown)
+      .sort(([, a], [, b]) => b - a)
+      .filter(([, v]) => v > 10)
+      .slice(0, 3);
+
+    const signalGridY = analysisY + 40;
+    const colWidth = innerWidth / 3;
+
+    sortedSignals.forEach(([key, value], i) => {
+      const x = contentPadding + frameWidth + (i * colWidth);
+      
+      // Signal Label
+      ctx.font = "700 14px monospace, 'Courier New', Courier";
+      ctx.fillStyle = "#18181b";
+      ctx.fillText(SIGNAL_LABELS_MONO[key] || key.toUpperCase(), x, signalGridY);
+      
+      // Value
+      ctx.font = "900 32px system-ui, -apple-system, sans-serif";
+      ctx.fillStyle = value > 60 ? "#ef4444" : value > 30 ? "#f59e0b" : "#10b981";
+      ctx.fillText(`${Math.round(value)}%`, x, signalGridY + 25);
+
+      // Small Bar
+      const barWidth = colWidth - 40;
+      ctx.fillStyle = "#f4f4f5";
+      ctx.beginPath();
+      ctx.roundRect(x, signalGridY + 65, barWidth, 6, 3);
+      ctx.fill();
+
+      ctx.fillStyle = value > 60 ? "#ef4444" : value > 30 ? "#f59e0b" : "#10b981";
+      ctx.beginPath();
+      ctx.roundRect(x, signalGridY + 65, (value / 100) * barWidth, 6, 3);
+      ctx.fill();
     });
 
     // === FOOTER (Data Dashboard) ===

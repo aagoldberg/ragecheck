@@ -11,6 +11,7 @@ import {
 import {
   getDeterministicHookLine,
   getTopDrivers,
+  SIGNAL_LABELS,
 } from "@/lib/shareCard";
 import { copyShareImageToClipboard } from "@/lib/shareImage";
 
@@ -208,14 +209,6 @@ const LEAN_COLORS: Record<string, string> = {
   "Center": "bg-zinc-500 text-white",
   "Left": "bg-blue-400 text-white",
   "Far Left": "bg-blue-600 text-white",
-};
-
-const SIGNAL_LABELS: Record<keyof SignalBreakdown, string> = {
-  arousal: "Emotional Arousal",
-  enemy_construction: "Enemy Construction",
-  moral_condemnation: "Moral Condemnation",
-  simplification: "Oversimplification",
-  call_to_conflict: "Call-to-Conflict",
 };
 
 const SIGNAL_DESCRIPTIONS: Record<keyof SignalBreakdown, string> = {

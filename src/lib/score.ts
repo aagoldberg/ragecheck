@@ -50,6 +50,15 @@ const CATEGORY_DESCRIPTIONS: Record<SignalCategory, string> = {
   call_to_conflict: "Engagement bait and provocation",
 };
 
+// Canonical signal labels for UI display
+export const SIGNAL_LABELS: Record<SignalCategory, string> = {
+  arousal: "Emotional Arousal",
+  enemy_construction: "Enemy Construction",
+  moral_condemnation: "Moral Condemnation",
+  simplification: "Oversimplification",
+  call_to_conflict: "Call-to-Conflict",
+};
+
 /**
  * Analyze text using the new 5-bar model
  * Returns results in a format compatible with the existing API
