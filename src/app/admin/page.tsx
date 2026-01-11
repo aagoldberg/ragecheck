@@ -94,6 +94,20 @@ interface ViralMetrics {
   referralSources: { source: string; count: number }[];
 }
 
+interface FeedbackStats {
+  totalFeedback: number;
+  positiveCount: number;
+  negativeCount: number;
+  positiveRate: number;
+  recentFeedback: {
+    url: string;
+    rating: string;
+    comment: string | null;
+    score: number;
+    createdAt: Date;
+  }[];
+}
+
 interface ApiResponse {
   success?: boolean;
   error?: string;
@@ -101,6 +115,7 @@ interface ApiResponse {
   visitorStats?: VisitorStats;
   clearviewVisitorStats?: PageVisitorStats;
   viralMetrics?: ViralMetrics;
+  feedbackStats?: FeedbackStats;
   dbAvailable?: boolean;
 }
 
@@ -536,6 +551,7 @@ export default function AdminDashboard() {
   const [clearviewLoading, setClearviewLoading] = useState(false);
   const [clearviewVisitorStats, setClearviewVisitorStats] = useState<PageVisitorStats | null>(null);
   const [viralMetrics, setViralMetrics] = useState<ViralMetrics | null>(null);
+  const [feedbackStats, setFeedbackStats] = useState<FeedbackStats | null>(null);
 
   const fetchStats = async (adminKey: string) => {
     setLoading(true);
@@ -556,6 +572,7 @@ export default function AdminDashboard() {
         setVisitorStats(data.visitorStats || null);
         setClearviewVisitorStats(data.clearviewVisitorStats || null);
         setViralMetrics(data.viralMetrics || null);
+        setFeedbackStats(data.feedbackStats || null);
         setAuthenticated(true);
         // Save key to localStorage
         localStorage.setItem("ragecheck-admin-key", adminKey);
@@ -952,6 +969,143 @@ export default function AdminDashboard() {
                     </div>
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* Feedback & Error Reports Section */}
+            {feedbackStats && (
+              <div className="mb-8">
+                <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100 mb-4 flex items-center gap-2">
+                  Feedback & Error Reports
+                  {feedbackStats.recentFeedback.filter(f => f.comment?.includes("[SITE ERROR]")).length > 0 && (
+                    <span className="px-2 py-0.5 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 text-xs font-medium rounded-full">
+                      {feedbackStats.recentFeedback.filter(f => f.comment?.includes("[SITE ERROR]")).length} site errors
+                    </span>
+                  )}
+                </h2>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                  <StatCard
+                    title="Total Feedback"
+                    value={feedbackStats.totalFeedback}
+                  />
+                  <StatCard
+                    title="Positive"
+                    value={feedbackStats.positiveCount}
+                    subtitle={`${feedbackStats.positiveRate}% satisfaction`}
+                  />
+                  <StatCard
+                    title="Negative"
+                    value={feedbackStats.negativeCount}
+                  />
+                  <StatCard
+                    title="Site Errors"
+                    value={feedbackStats.recentFeedback.filter(f => f.comment?.includes("[SITE ERROR]")).length}
+                    subtitle="reported by users"
+                  />
+                </div>
+
+                {/* Site Errors Table */}
+                {feedbackStats.recentFeedback.filter(f => f.comment?.includes("[SITE ERROR]")).length > 0 && (
+                  <div className="bg-white dark:bg-zinc-900 border border-amber-200 dark:border-amber-800 rounded-xl p-6 mb-6">
+                    <h3 className="text-xs font-semibold uppercase tracking-wider text-amber-600 dark:text-amber-400 mb-4 flex items-center gap-2">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                      </svg>
+                      Sites Users Want Supported
+                    </h3>
+                    <div className="overflow-x-auto max-h-[300px] overflow-y-auto border border-zinc-100 dark:border-zinc-800 rounded-lg">
+                      <table className="w-full text-sm">
+                        <thead className="sticky top-0 bg-amber-50 dark:bg-amber-900/20">
+                          <tr className="border-b border-amber-200 dark:border-amber-800">
+                            <th className="text-left py-3 px-3 text-amber-700 dark:text-amber-300 font-medium">URL</th>
+                            <th className="text-left py-3 px-3 text-amber-700 dark:text-amber-300 font-medium">Error</th>
+                            <th className="text-left py-3 px-3 text-amber-700 dark:text-amber-300 font-medium">Time</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {feedbackStats.recentFeedback
+                            .filter(f => f.comment?.includes("[SITE ERROR]"))
+                            .map((f, i) => (
+                              <tr key={i} className="border-b border-zinc-100 dark:border-zinc-800 last:border-0 hover:bg-amber-50/50 dark:hover:bg-amber-900/10">
+                                <td className="py-2 px-3 max-w-[300px]">
+                                  <a href={f.url} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline truncate block">
+                                    {f.url}
+                                  </a>
+                                </td>
+                                <td className="py-2 px-3 text-zinc-600 dark:text-zinc-400 text-xs font-mono">
+                                  {f.comment?.replace("[SITE ERROR] ", "")}
+                                </td>
+                                <td className="py-2 px-3 text-zinc-500 text-xs whitespace-nowrap">
+                                  {new Date(f.createdAt).toLocaleString()}
+                                </td>
+                              </tr>
+                            ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {/* User Feedback Table */}
+                <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6">
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-4">
+                    Recent User Feedback
+                  </h3>
+                  <div className="overflow-x-auto max-h-[300px] overflow-y-auto border border-zinc-100 dark:border-zinc-800 rounded-lg">
+                    <table className="w-full text-sm">
+                      <thead className="sticky top-0 bg-zinc-50 dark:bg-zinc-800">
+                        <tr className="border-b border-zinc-200 dark:border-zinc-700">
+                          <th className="text-left py-3 px-3 text-zinc-500 font-medium">Rating</th>
+                          <th className="text-left py-3 px-3 text-zinc-500 font-medium">URL</th>
+                          <th className="text-left py-3 px-3 text-zinc-500 font-medium">Score</th>
+                          <th className="text-left py-3 px-3 text-zinc-500 font-medium">Comment</th>
+                          <th className="text-left py-3 px-3 text-zinc-500 font-medium">Time</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {feedbackStats.recentFeedback.length === 0 ? (
+                          <tr>
+                            <td colSpan={5} className="py-4 text-zinc-500 text-center">No feedback yet</td>
+                          </tr>
+                        ) : (
+                          feedbackStats.recentFeedback
+                            .filter(f => !f.comment?.includes("[SITE ERROR]"))
+                            .map((f, i) => (
+                              <tr key={i} className="border-b border-zinc-100 dark:border-zinc-800 last:border-0 hover:bg-zinc-50 dark:hover:bg-zinc-800/50">
+                                <td className="py-2 px-3">
+                                  <span className={`text-lg ${f.rating === "up" ? "text-green-500" : "text-rose-500"}`}>
+                                    {f.rating === "up" ? "👍" : "👎"}
+                                  </span>
+                                </td>
+                                <td className="py-2 px-3 max-w-[200px]">
+                                  <a href={f.url} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline truncate block text-xs">
+                                    {f.url}
+                                  </a>
+                                </td>
+                                <td className="py-2 px-3">
+                                  {f.score >= 0 && (
+                                    <span className={`text-xs font-medium px-2 py-0.5 rounded ${
+                                      f.score > 66 ? "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300" :
+                                      f.score > 33 ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300" :
+                                      "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300"
+                                    }`}>
+                                      {f.score}
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="py-2 px-3 text-zinc-600 dark:text-zinc-400 text-xs max-w-[200px] truncate" title={f.comment || undefined}>
+                                  {f.comment || "-"}
+                                </td>
+                                <td className="py-2 px-3 text-zinc-500 text-xs whitespace-nowrap">
+                                  {new Date(f.createdAt).toLocaleString()}
+                                </td>
+                              </tr>
+                            ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
               </div>
             )}
 
