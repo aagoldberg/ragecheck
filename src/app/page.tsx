@@ -558,6 +558,7 @@ export default function Home() {
   const [feedbackComment, setFeedbackComment] = useState("");
   const [showFeedbackForm, setShowFeedbackForm] = useState(false);
   const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
+  const [errorReported, setErrorReported] = useState(false);
   const moreMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -660,6 +661,7 @@ export default function Home() {
     setFeedbackComment("");
     setShowFeedbackForm(false);
     setFeedbackSubmitted(false);
+    setErrorReported(false);
     clearImage();
 
     try {
@@ -1230,12 +1232,85 @@ export default function Home() {
             )}
 
             {!result.success ? (
-              <div className="max-w-xl mx-auto p-6 bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 rounded-2xl text-center text-rose-700 dark:text-rose-300">
-                <svg className="w-12 h-12 mx-auto mb-4 text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
-                <p className="font-bold text-lg mb-1">Analysis Failed</p>
-                <p>{result.error}</p>
+              <div className="max-w-xl mx-auto p-8 bg-gradient-to-b from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/30 border border-amber-200 dark:border-amber-800 rounded-2xl text-center">
+                {errorReported ? (
+                  <div className="animate-in fade-in zoom-in duration-300">
+                    <div className="w-16 h-16 mx-auto mb-4 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center">
+                      <svg className="w-8 h-8 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                    </div>
+                    <h3 className="text-xl font-bold text-zinc-900 dark:text-zinc-100 mb-2">
+                      Thanks for reporting!
+                    </h3>
+                    <p className="text-zinc-600 dark:text-zinc-400">
+                      We&apos;ve logged this site and will work on adding support.
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="w-16 h-16 mx-auto mb-4 bg-amber-100 dark:bg-amber-900/30 rounded-full flex items-center justify-center">
+                      <svg className="w-8 h-8 text-amber-600 dark:text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                      </svg>
+                    </div>
+                    <h3 className="text-xl font-bold text-zinc-900 dark:text-zinc-100 mb-2">
+                      We couldn&apos;t analyze this page
+                    </h3>
+                    <p className="text-zinc-600 dark:text-zinc-400 mb-2">
+                      {result.error?.includes("403") || result.error?.includes("blocked")
+                        ? "This site blocks automated access."
+                        : result.error?.includes("400") || result.error?.includes("404")
+                        ? "This page couldn't be loaded."
+                        : result.error?.includes("login") || result.error?.includes("sign in")
+                        ? "This content requires login to view."
+                        : "Some sites have restrictions we haven't worked around yet."}
+                    </p>
+                    <p className="text-sm text-zinc-500 dark:text-zinc-500 mb-6">
+                      <span className="font-mono text-xs bg-zinc-100 dark:bg-zinc-800 px-2 py-1 rounded">
+                        {result.error}
+                      </span>
+                    </p>
+                    <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                      <button
+                        onClick={() => {
+                          fetch("/api/feedback", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                              url,
+                              rating: "down",
+                              comment: `[SITE ERROR] ${result.error}`,
+                              score: -1,
+                              title: "Error Report",
+                              sourceDomain: result.sourceDomain || new URL(url).hostname,
+                              signalBreakdown: {},
+                            }),
+                          }).catch(() => {});
+                          setErrorReported(true);
+                        }}
+                        className="px-6 py-3 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl transition-colors flex items-center justify-center gap-2"
+                      >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                        </svg>
+                        Let us know
+                      </button>
+                      <button
+                        onClick={() => {
+                          setResult(null);
+                          setUrl("");
+                        }}
+                        className="px-6 py-3 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 font-medium transition-colors"
+                      >
+                        Try another URL
+                      </button>
+                    </div>
+                    <p className="text-xs text-zinc-400 dark:text-zinc-600 mt-6">
+                      Tip: Try uploading a screenshot instead using the camera button
+                    </p>
+                  </>
+                )}
               </div>
             ) : (
               <>
