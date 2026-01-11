@@ -833,12 +833,20 @@ export default function Home() {
       const response = await fetch(cardUrl);
       if (!response.ok) throw new Error("Failed to fetch share card");
 
-      const blob = await response.blob();
+      const originalBlob = await response.blob();
+
+      // Ensure blob has correct PNG type (some browsers are strict)
+      const pngBlob = new Blob([originalBlob], { type: "image/png" });
+
+      // Check if clipboard API is available and supports images
+      if (!navigator.clipboard?.write) {
+        throw new Error("Clipboard API not supported");
+      }
 
       // Copy to clipboard
       await navigator.clipboard.write([
         new ClipboardItem({
-          "image/png": blob,
+          "image/png": pngBlob,
         }),
       ]);
 
@@ -849,14 +857,24 @@ export default function Home() {
       }
     } catch (error) {
       console.error("Failed to copy image:", error);
-      // Fallback: try to download the image
+      // Fallback: download the image instead
       if (!silent) {
-        const cardUrl = getShareCardUrl();
-        if (cardUrl) {
+        try {
+          const response = await fetch(cardUrl);
+          const blob = await response.blob();
+          const url = URL.createObjectURL(blob);
           const link = document.createElement("a");
-          link.href = cardUrl;
+          link.href = url;
           link.download = `ragecheck-${result?.score || 0}.png`;
+          document.body.appendChild(link);
           link.click();
+          document.body.removeChild(link);
+          URL.revokeObjectURL(url);
+          // Still show success since they got the image
+          setImageCopied(true);
+          setTimeout(() => setImageCopied(false), 3000);
+        } catch {
+          console.error("Failed to download image");
         }
       }
     }
