@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import Parser from "rss-parser";
 
+// Revalidate every 2 hours (7200 seconds)
+export const revalidate = 7200;
+
 const parser = new Parser({
   timeout: 10000,
   headers: {
@@ -62,10 +65,10 @@ interface HeadlineItem {
   publishedAt: string;
 }
 
-// Simple in-memory cache
+// Simple in-memory cache (backup for same-instance requests)
 let cachedHeadlines: HeadlineItem[] | null = null;
 let cacheTimestamp = 0;
-const CACHE_DURATION = 60 * 60 * 1000; // 1 hour
+const CACHE_DURATION = 2 * 60 * 60 * 1000; // 2 hours
 
 async function fetchFeed(source: FeedSource): Promise<HeadlineItem[]> {
   try {
@@ -122,11 +125,20 @@ export async function GET() {
   try {
     const headlines = await fetchAllHeadlines();
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       success: true,
       headlines,
       cachedAt: new Date(cacheTimestamp).toISOString(),
+      nextRefresh: new Date(cacheTimestamp + CACHE_DURATION).toISOString(),
     });
+
+    // Set cache headers for CDN - 2 hours with stale-while-revalidate
+    response.headers.set(
+      "Cache-Control",
+      "public, s-maxage=7200, stale-while-revalidate=3600"
+    );
+
+    return response;
   } catch (error) {
     console.error("Headlines API error:", error);
     return NextResponse.json(
