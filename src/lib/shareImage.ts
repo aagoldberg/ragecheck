@@ -38,31 +38,58 @@ function getBarColor(value: number): string {
 function getAnalysisInsights(baitScore: number, bars: { key: string; value: number }[]): string[] {
   const insights: string[] = [];
   const sorted = [...bars].sort((a, b) => b.value - a.value);
-  const top = sorted[0];
-  const second = sorted[1];
 
-  if (baitScore >= 70) {
-    if (top.key === "arousal" && top.value >= 50) {
-      insights.push("Uses emotionally charged language to provoke reaction");
-    } else if (top.key === "enemy_construction" && top.value >= 50) {
-      insights.push("Frames groups as threats or enemies");
-    } else if (top.key === "moral_condemnation" && top.value >= 50) {
-      insights.push("Appeals to moral outrage over factual analysis");
-    } else {
-      insights.push("Multiple manipulation patterns detected");
+  // Add insight for each significant signal
+  for (const bar of sorted) {
+    if (bar.value >= 40) {
+      switch (bar.key) {
+        case "arousal":
+          insights.push("Uses emotionally charged language designed to provoke strong reactions");
+          break;
+        case "enemy_construction":
+          insights.push("Frames individuals or groups as threats, enemies, or villains");
+          break;
+        case "moral_condemnation":
+          insights.push("Appeals to moral outrage rather than factual analysis");
+          break;
+        case "simplification":
+          insights.push("Oversimplifies complex issues into black-and-white narratives");
+          break;
+        case "call_to_conflict":
+          insights.push("Encourages confrontation or aggressive action against others");
+          break;
+      }
+    } else if (bar.value >= 20) {
+      switch (bar.key) {
+        case "arousal":
+          insights.push("Contains some emotionally charged language");
+          break;
+        case "enemy_construction":
+          insights.push("Some us-vs-them framing present");
+          break;
+        case "moral_condemnation":
+          insights.push("Mild moral framing detected");
+          break;
+        case "simplification":
+          insights.push("Some nuance may be missing");
+          break;
+        case "call_to_conflict":
+          insights.push("Subtle encouragement toward conflict");
+          break;
+      }
     }
+  }
+
+  // Add overall assessment
+  if (baitScore >= 70) {
+    insights.unshift("High manipulation potential - read critically");
   } else if (baitScore >= 40) {
-    insights.push("Some emotional framing present");
-  } else {
-    insights.push("Relatively balanced presentation");
+    insights.unshift("Moderate emotional framing detected");
+  } else if (baitScore < 20) {
+    insights.unshift("Relatively balanced and factual presentation");
   }
 
-  if (second && second.value >= 30 && insights.length < 2) {
-    const secondLabel = SIGNAL_LABELS[second.key] || second.key;
-    insights.push(`Notable ${secondLabel.toLowerCase()} detected`);
-  }
-
-  return insights.slice(0, 2);
+  return insights.slice(0, 4);
 }
 
 function wrapText(
@@ -235,21 +262,27 @@ export function generateShareImage(
     ctx.fillText("ANALYSIS", padding, analysisY);
 
     // Analysis insights
-    ctx.font = "400 14px system-ui, -apple-system, sans-serif";
+    ctx.font = "400 13px system-ui, -apple-system, sans-serif";
     insights.forEach((insight, i) => {
-      const insightY = analysisY + 22 + i * 24;
+      const insightY = analysisY + 20 + i * 20;
 
       // Bullet
       ctx.fillStyle = scoreColor;
       ctx.fillText("•", padding, insightY);
 
-      // Text
+      // Text (truncate if too long)
       ctx.fillStyle = "#3f3f46";
-      ctx.fillText(insight, padding + 16, insightY);
+      const maxInsightWidth = leftColWidth - 20;
+      let displayInsight = insight;
+      while (ctx.measureText(displayInsight).width > maxInsightWidth && displayInsight.length > 0) {
+        displayInsight = displayInsight.slice(0, -1);
+      }
+      if (displayInsight !== insight) displayInsight += "...";
+      ctx.fillText(displayInsight, padding + 14, insightY);
     });
 
     // Top driver tags
-    const tagsY = analysisY + 22 + insights.length * 24 + 16;
+    const tagsY = analysisY + 20 + insights.length * 20 + 12;
     let tagX = padding;
     topDrivers.forEach((driver) => {
       const label = driver.label.replace("Emotional ", "");
