@@ -39,57 +39,91 @@ function getAnalysisInsights(baitScore: number, bars: { key: string; value: numb
   const insights: string[] = [];
   const sorted = [...bars].sort((a, b) => b.value - a.value);
 
-  // Add insight for each significant signal
-  for (const bar of sorted) {
-    if (bar.value >= 40) {
-      switch (bar.key) {
-        case "arousal":
-          insights.push("Uses emotionally charged language designed to provoke strong reactions");
-          break;
-        case "enemy_construction":
-          insights.push("Frames individuals or groups as threats, enemies, or villains");
-          break;
-        case "moral_condemnation":
-          insights.push("Appeals to moral outrage rather than factual analysis");
-          break;
-        case "simplification":
-          insights.push("Oversimplifies complex issues into black-and-white narratives");
-          break;
-        case "call_to_conflict":
-          insights.push("Encourages confrontation or aggressive action against others");
-          break;
-      }
-    } else if (bar.value >= 20) {
-      switch (bar.key) {
-        case "arousal":
-          insights.push("Contains some emotionally charged language");
-          break;
-        case "enemy_construction":
-          insights.push("Some us-vs-them framing present");
-          break;
-        case "moral_condemnation":
-          insights.push("Mild moral framing detected");
-          break;
-        case "simplification":
-          insights.push("Some nuance may be missing");
-          break;
-        case "call_to_conflict":
-          insights.push("Subtle encouragement toward conflict");
-          break;
+  // HIGH SCORE (70+): Focus on what's wrong
+  if (baitScore >= 70) {
+    insights.push("High manipulation potential - approach with skepticism");
+
+    for (const bar of sorted) {
+      if (bar.value >= 40 && insights.length < 5) {
+        switch (bar.key) {
+          case "arousal":
+            insights.push("Heavy use of emotionally charged language");
+            break;
+          case "enemy_construction":
+            insights.push("Strong us-vs-them framing detected");
+            break;
+          case "moral_condemnation":
+            insights.push("Appeals to moral outrage over facts");
+            break;
+          case "simplification":
+            insights.push("Complex issues reduced to simple narratives");
+            break;
+          case "call_to_conflict":
+            insights.push("Encourages confrontation or action");
+            break;
+        }
       }
     }
   }
+  // MEDIUM SCORE (40-69): Mixed
+  else if (baitScore >= 40) {
+    insights.push("Some emotional framing detected");
 
-  // Add overall assessment
-  if (baitScore >= 70) {
-    insights.unshift("High manipulation potential - read critically");
-  } else if (baitScore >= 40) {
-    insights.unshift("Moderate emotional framing detected");
-  } else if (baitScore < 20) {
-    insights.unshift("Relatively balanced and factual presentation");
+    for (const bar of sorted) {
+      if (bar.value >= 30 && insights.length < 5) {
+        switch (bar.key) {
+          case "arousal":
+            insights.push("Contains emotionally charged language");
+            break;
+          case "enemy_construction":
+            insights.push("Some group-based framing present");
+            break;
+          case "moral_condemnation":
+            insights.push("Moral framing used in places");
+            break;
+          case "simplification":
+            insights.push("Some nuance may be missing");
+            break;
+          case "call_to_conflict":
+            insights.push("Subtle push toward taking sides");
+            break;
+        }
+      }
+    }
+  }
+  // LOW SCORE (<40): Focus on what's good/absent
+  else {
+    if (baitScore < 20) {
+      insights.push("Low manipulation - relatively balanced");
+    } else {
+      insights.push("Minimal emotional manipulation detected");
+    }
+
+    // Add positive observations based on what's LOW
+    const arousal = bars.find(b => b.key === "arousal")?.value || 0;
+    const enemy = bars.find(b => b.key === "enemy_construction")?.value || 0;
+    const moral = bars.find(b => b.key === "moral_condemnation")?.value || 0;
+    const simple = bars.find(b => b.key === "simplification")?.value || 0;
+    const conflict = bars.find(b => b.key === "call_to_conflict")?.value || 0;
+
+    if (arousal < 20) {
+      insights.push("Uses measured, factual language");
+    }
+    if (enemy < 20) {
+      insights.push("Avoids villainizing groups or individuals");
+    }
+    if (moral < 20 && insights.length < 5) {
+      insights.push("Presents information without moral judgment");
+    }
+    if (simple < 20 && insights.length < 5) {
+      insights.push("Acknowledges complexity of the issue");
+    }
+    if (conflict < 20 && insights.length < 5) {
+      insights.push("Doesn't push reader toward confrontation");
+    }
   }
 
-  return insights.slice(0, 4);
+  return insights.slice(0, 5);
 }
 
 function wrapText(
@@ -164,9 +198,6 @@ export function generateShareImage(
 
     // Get analysis insights
     const insights = getAnalysisInsights(data.score, barsArray);
-
-    // Get top drivers
-    const topDrivers = [...barsArray].sort((a, b) => b.value - a.value).slice(0, 2);
 
     // === BACKGROUND ===
     ctx.fillStyle = "#ffffff";
@@ -279,34 +310,6 @@ export function generateShareImage(
       }
       if (displayInsight !== insight) displayInsight += "...";
       ctx.fillText(displayInsight, padding + 14, insightY);
-    });
-
-    // Top driver tags
-    const tagsY = analysisY + 20 + insights.length * 20 + 12;
-    let tagX = padding;
-    topDrivers.forEach((driver) => {
-      const label = driver.label.replace("Emotional ", "");
-      ctx.font = "600 12px system-ui, -apple-system, sans-serif";
-      const tagWidth = ctx.measureText(label).width + 24;
-
-      // Tag background
-      ctx.fillStyle = scoreColor + "15";
-      ctx.beginPath();
-      ctx.roundRect(tagX, tagsY, tagWidth, 28, 6);
-      ctx.fill();
-
-      // Tag border
-      ctx.strokeStyle = scoreColor + "40";
-      ctx.lineWidth = 1;
-      ctx.stroke();
-
-      // Tag text
-      ctx.fillStyle = scoreColor;
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText(label, tagX + tagWidth / 2, tagsY + 14);
-
-      tagX += tagWidth + 8;
     });
 
     // === RIGHT COLUMN: Signal Bars ===

@@ -1045,6 +1045,8 @@ export interface FeedbackLog {
   signalBreakdown: Record<string, number>;
   ipAddress?: string;
   userAgent?: string;
+  country?: string;
+  referrer?: string;
 }
 
 export async function initFeedbackTable() {
@@ -1061,9 +1063,14 @@ export async function initFeedbackTable() {
         signal_breakdown JSONB,
         ip_address TEXT,
         user_agent TEXT,
+        country TEXT,
+        referrer TEXT,
         created_at TIMESTAMP DEFAULT NOW()
       )
     `;
+    // Add columns if they don't exist (for existing tables)
+    await getDb()`ALTER TABLE ragecheck_feedback ADD COLUMN IF NOT EXISTS country TEXT`;
+    await getDb()`ALTER TABLE ragecheck_feedback ADD COLUMN IF NOT EXISTS referrer TEXT`;
   } catch (error) {
     console.error("Failed to create feedback table:", error);
   }
@@ -1075,7 +1082,7 @@ export async function logFeedback(data: FeedbackLog) {
       await getDb()`
         INSERT INTO ragecheck_feedback (
           url, rating, comment, score, title, source_domain,
-          signal_breakdown, ip_address, user_agent
+          signal_breakdown, ip_address, user_agent, country, referrer
         ) VALUES (
           ${data.url},
           ${data.rating},
@@ -1085,7 +1092,9 @@ export async function logFeedback(data: FeedbackLog) {
           ${data.sourceDomain},
           ${JSON.stringify(data.signalBreakdown)}::jsonb,
           ${data.ipAddress || null},
-          ${data.userAgent || null}
+          ${data.userAgent || null},
+          ${data.country || null},
+          ${data.referrer || null}
         )
       `;
     });

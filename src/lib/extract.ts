@@ -4,6 +4,56 @@ import { parseHTML } from "linkedom";
 // In-memory cache for extracted content
 const cache = new Map<string, ExtractedContent>();
 
+// ScrapingBee API for bypassing Cloudflare and other bot protection
+const SCRAPINGBEE_API_KEY = process.env.SCRAPINGBEE_API_KEY;
+
+/**
+ * Detect if HTML response is a Cloudflare challenge page
+ */
+function isCloudflareChallenge(html: string): boolean {
+  return (
+    html.includes("Just a moment...") ||
+    html.includes("cf_chl_opt") ||
+    html.includes("challenge-platform") ||
+    html.includes("Enable JavaScript and cookies to continue")
+  );
+}
+
+/**
+ * Fetch URL using ScrapingBee (headless browser service)
+ * Used as fallback when normal fetch is blocked
+ */
+async function fetchWithScrapingBee(url: string): Promise<{ html: string; success: boolean; error?: string }> {
+  if (!SCRAPINGBEE_API_KEY) {
+    return { html: "", success: false, error: "ScrapingBee not configured" };
+  }
+
+  try {
+    const apiUrl = new URL("https://app.scrapingbee.com/api/v1/");
+    apiUrl.searchParams.set("api_key", SCRAPINGBEE_API_KEY);
+    apiUrl.searchParams.set("url", url);
+    apiUrl.searchParams.set("render_js", "true");
+    apiUrl.searchParams.set("premium_proxy", "true"); // Better for Cloudflare
+    apiUrl.searchParams.set("block_ads", "true");
+    apiUrl.searchParams.set("block_resources", "false"); // Need JS to render
+
+    const response = await fetch(apiUrl.toString(), {
+      method: "GET",
+      headers: { "Accept": "text/html" },
+    });
+
+    if (!response.ok) {
+      return { html: "", success: false, error: `ScrapingBee error: ${response.status}` };
+    }
+
+    const html = await response.text();
+    return { html, success: true };
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : "Unknown error";
+    return { html: "", success: false, error: `ScrapingBee failed: ${errorMessage}` };
+  }
+}
+
 export interface ExtractedContent {
   title: string;
   text: string;
@@ -837,14 +887,47 @@ export async function extractContent(urlString: string): Promise<ExtractedConten
     const response = await fetch(urlString, {
       signal: controller.signal,
       headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
         "Accept-Language": "en-US,en;q=0.9",
-        "Cache-Control": "no-cache",
+        "Referer": "https://www.google.com/",
+        "Connection": "keep-alive",
+        "Upgrade-Insecure-Requests": "1",
       },
     });
 
     clearTimeout(timeoutId);
+
+    // Handle blocked responses - try ScrapingBee fallback for 403
+    if (response.status === 403 && SCRAPINGBEE_API_KEY) {
+      const scrapingResult = await fetchWithScrapingBee(urlString);
+      if (scrapingResult.success) {
+        // Continue with ScrapingBee HTML below
+        const html = scrapingResult.html;
+        const { document } = parseHTML(html);
+        const scripts = document.querySelectorAll("script, style, noscript, iframe");
+        scripts.forEach((el: Element) => el.remove());
+        const reader = new Readability(document as unknown as Document);
+        const article = reader.parse();
+        const ogImage = document.querySelector('meta[property="og:image"]')?.getAttribute("content")
+                     || document.querySelector('meta[name="twitter:image"]')?.getAttribute("content");
+
+        if (article?.textContent) {
+          const cleanText = article.textContent.replace(/\s+/g, " ").trim();
+          if (cleanText.length >= 100) {
+            const result: ExtractedContent = {
+              title: article.title || document.title || "Untitled",
+              text: cleanText,
+              sourceDomain,
+              success: true,
+              image: ogImage || undefined,
+            };
+            cache.set(urlString, result);
+            return result;
+          }
+        }
+      }
+    }
 
     if (!response.ok) {
       return {
@@ -880,7 +963,33 @@ export async function extractContent(urlString: string): Promise<ExtractedConten
       };
     }
 
-    const html = await response.text();
+    let html = await response.text();
+
+    // Check for Cloudflare challenge and retry with ScrapingBee if available
+    if (isCloudflareChallenge(html)) {
+      if (SCRAPINGBEE_API_KEY) {
+        const scrapingResult = await fetchWithScrapingBee(urlString);
+        if (scrapingResult.success) {
+          html = scrapingResult.html;
+        } else {
+          return {
+            title: "",
+            text: "",
+            sourceDomain,
+            success: false,
+            error: "Site blocked by Cloudflare protection",
+          };
+        }
+      } else {
+        return {
+          title: "",
+          text: "",
+          sourceDomain,
+          success: false,
+          error: "Site blocked by Cloudflare protection",
+        };
+      }
+    }
 
     // Parse with linkedom (serverless-friendly alternative to jsdom)
     const { document } = parseHTML(html);
@@ -894,7 +1003,7 @@ export async function extractContent(urlString: string): Promise<ExtractedConten
     const article = reader.parse();
 
     // Extract OG Image
-    const ogImage = document.querySelector('meta[property="og:image"]')?.getAttribute("content") 
+    const ogImage = document.querySelector('meta[property="og:image"]')?.getAttribute("content")
                  || document.querySelector('meta[name="twitter:image"]')?.getAttribute("content");
 
     if (!article || !article.textContent) {

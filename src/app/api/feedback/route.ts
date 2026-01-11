@@ -25,6 +25,8 @@ export async function POST(request: NextRequest) {
       request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
       request.headers.get("x-real-ip") ||
       null;
+    const country = request.headers.get("x-vercel-ip-country") || null;
+    const referrer = request.headers.get("referer") || null;
 
     await logFeedback({
       url,
@@ -36,6 +38,8 @@ export async function POST(request: NextRequest) {
       signalBreakdown: signalBreakdown || {},
       ipAddress: ipAddress || undefined,
       userAgent: request.headers.get("user-agent") || undefined,
+      country: country || undefined,
+      referrer: referrer || undefined,
     });
 
     return NextResponse.json({ success: true });
