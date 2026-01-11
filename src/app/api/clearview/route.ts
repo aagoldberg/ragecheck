@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import Parser from "rss-parser";
 import Anthropic from "@anthropic-ai/sdk";
-import { getClearviewData, saveClearviewData, initClearviewTable, isDBAvailable } from "@/lib/db";
+import { getClearviewData, saveClearviewData, initClearviewTable, isDBAvailable, getArchivedClearviewData } from "@/lib/db";
 
 const parser = new Parser({
   timeout: 15000,
@@ -22,30 +22,70 @@ interface FeedSource {
 
 // Sources across the political spectrum
 const FEED_SOURCES: FeedSource[] = [
+  // Far Left
   {
     name: "Jacobin",
     lean: "Far Left",
     feedUrl: "https://jacobin.com/feed",
   },
+  // Left
   {
     name: "NPR",
     lean: "Left",
-    feedUrl: "https://feeds.npr.org/1001/rss.xml", // NPR News
+    feedUrl: "https://feeds.npr.org/1001/rss.xml",
   },
+  {
+    name: "The Guardian",
+    lean: "Left",
+    feedUrl: "https://www.theguardian.com/us-news/rss",
+  },
+  {
+    name: "Vox",
+    lean: "Left",
+    feedUrl: "https://www.vox.com/rss/index.xml",
+  },
+  // Center
   {
     name: "PBS",
     lean: "Center",
     feedUrl: "https://www.pbs.org/newshour/feeds/rss/headlines",
   },
   {
+    name: "AP News",
+    lean: "Center",
+    feedUrl: "https://feedx.net/rss/ap.xml",
+  },
+  {
+    name: "Reuters",
+    lean: "Center",
+    feedUrl: "https://www.reutersagency.com/feed/?taxonomy=best-topics&post_type=best",
+  },
+  // Right
+  {
     name: "Fox News",
     lean: "Right",
     feedUrl: "https://moxie.foxnews.com/google-publisher/politics.xml",
   },
   {
+    name: "The Hill",
+    lean: "Right",
+    feedUrl: "https://thehill.com/feed/",
+  },
+  {
+    name: "National Review",
+    lean: "Right",
+    feedUrl: "https://www.nationalreview.com/feed/",
+  },
+  // Far Right
+  {
     name: "Breitbart",
     lean: "Far Right",
     feedUrl: "https://feeds.feedburner.com/breitbart",
+  },
+  {
+    name: "Daily Wire",
+    lean: "Far Right",
+    feedUrl: "https://www.dailywire.com/feeds/rss.xml",
   },
 ];
 
@@ -96,10 +136,17 @@ interface StoryCluster {
   }[];
 }
 
+interface ArchivedBriefing {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  stories: any[];
+  generatedAt: string;
+}
+
 interface ClearviewResponse {
   success: boolean;
   stories: StoryCluster[];
   generatedAt: string;
+  archived?: ArchivedBriefing[];
   error?: string;
 }
 
@@ -270,6 +317,7 @@ export async function GET() {
   try {
     // Check database cache first
     const dbAvailable = await isDBAvailable();
+    let archived: ArchivedBriefing[] = [];
 
     if (dbAvailable) {
       await initClearviewTable();
@@ -277,10 +325,19 @@ export async function GET() {
 
       if (cached && cached.stories.length > 0) {
         console.log("Returning cached Clearview data from DB");
+
+        // Also get archived stories
+        const archivedData = await getArchivedClearviewData(cached.id);
+        archived = archivedData.map(a => ({
+          stories: a.stories,
+          generatedAt: a.generatedAt,
+        }));
+
         return NextResponse.json({
           success: true,
           stories: cached.stories,
           generatedAt: cached.generatedAt,
+          archived,
           cached: true,
         });
       }
@@ -309,17 +366,25 @@ export async function GET() {
     // Cluster and analyze with AI
     const stories = await clusterAndAnalyze(headlines);
 
-    const response: ClearviewResponse = {
-      success: true,
-      stories,
-      generatedAt: new Date().toISOString(),
-    };
-
     // Save to database for persistence
     if (dbAvailable) {
       await saveClearviewData(stories);
       console.log("Saved Clearview data to DB");
+
+      // Get archived stories after saving
+      const archivedData = await getArchivedClearviewData();
+      archived = archivedData.map(a => ({
+        stories: a.stories,
+        generatedAt: a.generatedAt,
+      }));
     }
+
+    const response: ClearviewResponse = {
+      success: true,
+      stories,
+      generatedAt: new Date().toISOString(),
+      archived,
+    };
 
     return NextResponse.json(response);
   } catch (error) {

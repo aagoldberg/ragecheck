@@ -50,6 +50,11 @@ interface StoryCluster {
   factualDisputes?: FactualDispute[];
 }
 
+interface ArchivedBriefing {
+  stories: StoryCluster[];
+  generatedAt: string;
+}
+
 // --- Constants & Utils ---
 
 const LEAN_CONFIG: Record<string, { color: string; bg: string; border: string; label: string }> = {
@@ -389,6 +394,7 @@ function LoadingState() {
 
 export default function ClearviewPage() {
   const [stories, setStories] = useState<StoryCluster[]>([]);
+  const [archived, setArchived] = useState<ArchivedBriefing[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [generatedAt, setGeneratedAt] = useState<string | null>(null);
@@ -400,6 +406,7 @@ export default function ClearviewPage() {
         if (data.success) {
           setStories(data.stories);
           setGeneratedAt(data.generatedAt);
+          setArchived(data.archived || []);
         } else {
           setError(data.error || "Failed to load analysis");
         }
@@ -502,6 +509,42 @@ export default function ClearviewPage() {
             {stories.map((story) => (
               <StoryCard key={story.id} story={story} />
             ))}
+          </div>
+        )}
+
+        {/* Archived Briefings */}
+        {!loading && !error && archived.length > 0 && (
+          <div className="mt-24 pt-16 border-t border-zinc-200 dark:border-zinc-800">
+            <div className="text-center mb-12">
+              <h2 className="text-2xl font-bold text-zinc-900 dark:text-white mb-2">Previous Briefings</h2>
+              <p className="text-zinc-500 text-sm">Older stories from the past few days</p>
+            </div>
+
+            <div className="space-y-20">
+              {archived.map((briefing, briefingIndex) => (
+                <div key={briefingIndex} className="space-y-8">
+                  <div className="flex items-center gap-3">
+                    <div className="h-px flex-1 bg-zinc-200 dark:bg-zinc-800" />
+                    <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest px-3 py-1 bg-zinc-100 dark:bg-zinc-900 rounded-full">
+                      {new Date(briefing.generatedAt).toLocaleDateString(undefined, {
+                        weekday: 'short',
+                        month: 'short',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })}
+                    </span>
+                    <div className="h-px flex-1 bg-zinc-200 dark:bg-zinc-800" />
+                  </div>
+
+                  <div className="space-y-12 opacity-75 hover:opacity-100 transition-opacity">
+                    {briefing.stories.map((story) => (
+                      <StoryCard key={story.id} story={story} />
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 

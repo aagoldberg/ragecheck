@@ -605,6 +605,7 @@ export interface ClearviewStory {
 }
 
 export interface ClearviewCache {
+  id?: number;
   stories: ClearviewStory[];
   generatedAt: string;
 }
@@ -630,8 +631,8 @@ export async function saveClearviewData(stories: ClearviewStory[]): Promise<void
     const generatedAt = new Date().toISOString();
 
     await withRetry(async () => {
-      // Delete old entries (keep only the latest)
-      await getDb()`DELETE FROM ragecheck_clearview WHERE generated_at < NOW() - INTERVAL '1 day'`;
+      // Delete old entries (keep 3 days of history)
+      await getDb()`DELETE FROM ragecheck_clearview WHERE generated_at < NOW() - INTERVAL '3 days'`;
 
       // Insert new entry
       await getDb()`
@@ -651,7 +652,7 @@ export async function getClearviewData(maxAgeHours: number = 4): Promise<Clearvi
 
     const result = await withRetry(async () => {
       const [row] = await getDb()`
-        SELECT data, generated_at
+        SELECT id, data, generated_at
         FROM ragecheck_clearview
         WHERE generated_at > ${cutoffTime}
         ORDER BY generated_at DESC
@@ -663,6 +664,7 @@ export async function getClearviewData(maxAgeHours: number = 4): Promise<Clearvi
     if (result) {
       const data = typeof result.data === "string" ? JSON.parse(result.data) : result.data;
       return {
+        id: result.id,
         stories: data.stories || [],
         generatedAt: result.generated_at.toISOString(),
       };
@@ -672,6 +674,42 @@ export async function getClearviewData(maxAgeHours: number = 4): Promise<Clearvi
   } catch (error) {
     console.error("Failed to get clearview data:", error);
     return null;
+  }
+}
+
+export async function getArchivedClearviewData(excludeLatestId?: number): Promise<ClearviewCache[]> {
+  try {
+    const result = await withRetry(async () => {
+      // Get older entries from the past 3 days, excluding the current one
+      if (excludeLatestId) {
+        return await getDb()`
+          SELECT id, data, generated_at
+          FROM ragecheck_clearview
+          WHERE id != ${excludeLatestId}
+          ORDER BY generated_at DESC
+          LIMIT 5
+        `;
+      }
+      return await getDb()`
+        SELECT id, data, generated_at
+        FROM ragecheck_clearview
+        ORDER BY generated_at DESC
+        OFFSET 1
+        LIMIT 5
+      `;
+    });
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return result.map((row: any) => {
+      const data = typeof row.data === "string" ? JSON.parse(row.data) : row.data;
+      return {
+        stories: data.stories || [],
+        generatedAt: row.generated_at.toISOString(),
+      };
+    });
+  } catch (error) {
+    console.error("Failed to get archived clearview data:", error);
+    return [];
   }
 }
 
