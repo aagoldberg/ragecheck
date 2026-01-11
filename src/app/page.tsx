@@ -890,6 +890,8 @@ export default function Home() {
         title: result.title || "Content Analysis",
         domain: result.sourceDomain || "unknown",
         signalBreakdown: result.signalBreakdown,
+        techniqueExplanations: result.techniqueExplanations,
+        sharingPatterns: result.sharingPatterns,
       });
 
       if (success && !silent) {

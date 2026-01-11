@@ -2,13 +2,15 @@
 // Features: Monospace header, high-contrast title, manipulation analysis, precision data footer
 
 import { getScoreColor } from "@/lib/shareCard";
-import { SIGNAL_LABELS, type SignalBreakdown } from "@/lib/score";
+import type { SignalBreakdown } from "@/lib/score";
 
 export interface ShareImageData {
   score: number;
   title: string;
   domain: string;
   signalBreakdown: SignalBreakdown;
+  techniqueExplanations?: string[];
+  sharingPatterns?: string[];
 }
 
 export type ImageSize = "x" | "bluesky";
@@ -18,8 +20,7 @@ const SIZE_CONFIGS: Record<ImageSize, { width: number; height: number }> = {
   bluesky: { width: 1200, height: 630 },
 };
 
-// Monospace-style labels for the scientific report design
-const SIGNAL_LABELS_MONO: Record<string, string> = {
+const SIGNAL_LABELS: Record<string, string> = {
   arousal: "EMOTIONAL_AROUSAL",
   enemy_construction: "ENEMY_CONSTRUCTION",
   moral_condemnation: "MORAL_CONDEMNATION",
@@ -164,19 +165,19 @@ export function generateShareImage(
       ctx.fillText(line, contentPadding + frameWidth, titleY + (i * lineHeight));
     });
 
-    // === ANALYSIS SECTION ===
-    const analysisY = titleY + (titleLines.length * lineHeight) + 40;
+    // === SIGNALS DETECTED ===
+    const signalsY = titleY + (titleLines.length * lineHeight) + 40;
     
     ctx.font = "500 20px monospace, 'Courier New', Courier";
     ctx.fillStyle = "#71717a";
-    ctx.fillText("LINGUISTIC_SIGNALS_DETECTED", contentPadding + frameWidth, analysisY);
+    ctx.fillText("LINGUISTIC_SIGNALS_DETECTED", contentPadding + frameWidth, signalsY);
 
     const sortedSignals = Object.entries(data.signalBreakdown)
       .sort(([, a], [, b]) => b - a)
       .filter(([, v]) => v > 10)
       .slice(0, 3);
 
-    const signalGridY = analysisY + 40;
+    const signalGridY = signalsY + 40;
     const colWidth = innerWidth / 3;
 
     sortedSignals.forEach(([key, value], i) => {
@@ -185,7 +186,7 @@ export function generateShareImage(
       // Signal Label
       ctx.font = "700 14px monospace, 'Courier New', Courier";
       ctx.fillStyle = "#18181b";
-      ctx.fillText(SIGNAL_LABELS_MONO[key] || key.toUpperCase(), x, signalGridY);
+      ctx.fillText(SIGNAL_LABELS[key] || key.toUpperCase(), x, signalGridY);
       
       // Value
       ctx.font = "900 32px system-ui, -apple-system, sans-serif";
@@ -204,6 +205,42 @@ export function generateShareImage(
       ctx.roundRect(x, signalGridY + 65, (value / 100) * barWidth, 6, 3);
       ctx.fill();
     });
+
+    // === FORENSIC NOTES (New Section) ===
+    // If we have techniques or triggers, show them
+    if (data.techniqueExplanations?.length || data.sharingPatterns?.length) {
+        const notesY = signalGridY + 100;
+        
+        ctx.font = "500 20px monospace, 'Courier New', Courier";
+        ctx.fillStyle = "#71717a";
+        ctx.fillText("FORENSIC_NOTES", contentPadding + frameWidth, notesY);
+
+        let noteIndex = 0;
+        const noteLineHeight = 36;
+        const noteStartTextY = notesY + 40;
+
+        ctx.font = "500 22px system-ui, -apple-system, sans-serif";
+        ctx.fillStyle = "#3f3f46";
+
+        // Show top technique
+        if (data.techniqueExplanations && data.techniqueExplanations.length > 0) {
+            let textToDraw = `• ${data.techniqueExplanations[0]}`;
+
+            // Truncate if too long
+            if (textToDraw.length > 85) textToDraw = textToDraw.substring(0, 82) + "...";
+
+            ctx.fillText(textToDraw, contentPadding + frameWidth, noteStartTextY + (noteIndex * noteLineHeight));
+            noteIndex++;
+        }
+
+        // Show top viral trigger
+        if (data.sharingPatterns && data.sharingPatterns.length > 0 && noteIndex < 2) {
+             let pattern = data.sharingPatterns[0];
+             let textToDraw = `• ${pattern}`;
+             if (textToDraw.length > 85) textToDraw = textToDraw.substring(0, 82) + "...";
+             ctx.fillText(textToDraw, contentPadding + frameWidth, noteStartTextY + (noteIndex * noteLineHeight));
+        }
+    }
 
     // === FOOTER (Data Dashboard) ===
     const footerY = height - (contentPadding + frameWidth) - 100;
