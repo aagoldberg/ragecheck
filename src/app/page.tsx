@@ -520,7 +520,7 @@ function MicroDemoCard() {
         {/* Content */}
         <div className="px-5 pb-5">
           <p className="text-[15px] leading-relaxed text-zinc-800 dark:text-zinc-200">
-            The <mark className="bg-indigo-100 text-indigo-800 px-0.5 rounded font-medium">corrupt elites</mark> are working to <mark className="bg-rose-100 text-rose-800 px-0.5 rounded font-medium">destroy</mark> your family&apos;s future.
+            EXPOSED: The <mark className="bg-indigo-100 text-indigo-800 px-0.5 rounded font-medium">Radical Left&apos;s</mark> Secret Plan to <mark className="bg-rose-100 text-rose-800 px-0.5 rounded font-medium">Destroy America</mark>
           </p>
         </div>
 
