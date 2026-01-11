@@ -780,7 +780,7 @@ export default function Home() {
                   </button>
                 </div>
                 <button type="button" onClick={analyzeImage} disabled={loading} className="mt-4 w-full px-6 py-4 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 rounded-xl font-bold text-lg hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-all shadow-lg hover:shadow-xl disabled:opacity-70">
-                  {loading ? "Scanning Image..." : "Analyze Screenshot (~5s)"}
+                  {loading ? "Scanning Image..." : "Analyze Screenshot"}
                 </button>
               </div>
             )}
@@ -796,7 +796,7 @@ export default function Home() {
                       <input id="image-upload" type="file" accept="image/jpeg,image/png,image/gif,image/webp" onChange={handleImageSelect} className="hidden" />
                     </label>
                     <button type="submit" disabled={loading || !url.trim()} className="px-6 py-3 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 rounded-xl text-base font-bold hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-all shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed min-w-[120px]">
-                      {loading ? <svg className="animate-spin h-4 w-4 mx-auto" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" /></svg> : <div className="flex flex-col leading-none"><span>Analyze</span><span className="text-[10px] opacity-60 font-medium mt-0.5">~5s</span></div>}
+                      {loading ? <svg className="animate-spin h-4 w-4 mx-auto" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" /></svg> : "Analyze"}
                     </button>
                   </div>
                 </div>
