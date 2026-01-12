@@ -283,7 +283,8 @@ function RealtimeChart({ data }: { data: { time: string; visitors: number; analy
   if (!data || data.length === 0) return null;
 
   const maxValue = Math.max(...data.map(d => Math.max(d.visitors, d.analyses)), 1);
-  const width = 800;
+  // 3x width (2400) to maintain same density as before when showing 3 days instead of 1
+  const width = 2400;
   const height = 200;
   const padding = { top: 20, right: 20, bottom: 20, left: 20 };
   const chartWidth = width - padding.left - padding.right;
@@ -308,17 +309,20 @@ function RealtimeChart({ data }: { data: { time: string; visitors: number; analy
   const visitorsPoints = data.map((d, i) => ({ x: getX(i), y: getY(d.visitors) }));
   const analysesPoints = data.map((d, i) => ({ x: getX(i), y: getY(d.analyses) }));
 
-  // Format time labels
-  const formatTime = (isoString: string) => {
+  // Format time labels - include date for multi-day view
+  const formatTimeWithDate = (isoString: string) => {
     const d = new Date(isoString);
-    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return d.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
+
+  // Generate label positions (7 labels for 3-day view)
+  const labelIndices = [0, 1/6, 2/6, 3/6, 4/6, 5/6, 1].map(ratio => Math.floor(ratio * (data.length - 1)));
 
   return (
     <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 mb-8">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-          Realtime Activity (Last 24 Hours - 30 min intervals)
+          Realtime Activity (Last 3 Days - 30 min intervals)
         </h3>
         <div className="flex items-center gap-4 text-xs">
           <div className="flex items-center gap-1.5">
@@ -332,60 +336,61 @@ function RealtimeChart({ data }: { data: { time: string; visitors: number; analy
         </div>
       </div>
       <div className="relative">
-        <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-40" preserveAspectRatio="xMidYMid meet">
-          {/* Grid lines */}
-          {[0, 0.25, 0.5, 0.75, 1].map((ratio) => (
-            <line
-              key={ratio}
-              x1={padding.left}
-              y1={padding.top + chartHeight * (1 - ratio)}
-              x2={width - padding.right}
-              y2={padding.top + chartHeight * (1 - ratio)}
-              stroke="currentColor"
-              className="text-zinc-100 dark:text-zinc-800"
-              strokeWidth="1"
-            />
-          ))}
-          {/* Visitors area */}
-          <path
-            d={createAreaPath(visitorsPoints)}
-            fill="rgba(99, 102, 241, 0.15)"
-          />
-          {/* Analyses area */}
-          <path
-            d={createAreaPath(analysesPoints)}
-            fill="rgba(16, 185, 129, 0.15)"
-          />
-          {/* Visitors line */}
-          <polyline
-            points={visitorsPoints.map(p => `${p.x},${p.y}`).join(' ')}
-            fill="none"
-            stroke="#6366f1"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          {/* Analyses line */}
-          <polyline
-            points={analysesPoints.map(p => `${p.x},${p.y}`).join(' ')}
-            fill="none"
-            stroke="#10b981"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-        {/* X-axis labels */}
-        <div className="flex justify-between mt-2 text-xs text-zinc-400">
-          <span>{data[0] ? formatTime(data[0].time) : ''}</span>
-          <span>{data[Math.floor(data.length / 4)] ? formatTime(data[Math.floor(data.length / 4)].time) : ''}</span>
-          <span>{data[Math.floor(data.length / 2)] ? formatTime(data[Math.floor(data.length / 2)].time) : ''}</span>
-          <span>{data[Math.floor(data.length * 3 / 4)] ? formatTime(data[Math.floor(data.length * 3 / 4)].time) : ''}</span>
-          <span>{data[data.length - 1] ? formatTime(data[data.length - 1].time) : ''}</span>
-        </div>
-        {/* Y-axis label */}
-        <div className="absolute top-0 right-0 text-xs text-zinc-400">
+        {/* Y-axis label - outside scroll area */}
+        <div className="absolute top-0 right-0 text-xs text-zinc-400 z-10 bg-white dark:bg-zinc-900 px-1">
           max: {maxValue}
+        </div>
+        {/* Scrollable chart container */}
+        <div className="overflow-x-auto">
+          <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} className="h-40" style={{ minWidth: width }}>
+            {/* Grid lines */}
+            {[0, 0.25, 0.5, 0.75, 1].map((ratio) => (
+              <line
+                key={ratio}
+                x1={padding.left}
+                y1={padding.top + chartHeight * (1 - ratio)}
+                x2={width - padding.right}
+                y2={padding.top + chartHeight * (1 - ratio)}
+                stroke="currentColor"
+                className="text-zinc-100 dark:text-zinc-800"
+                strokeWidth="1"
+              />
+            ))}
+            {/* Visitors area */}
+            <path
+              d={createAreaPath(visitorsPoints)}
+              fill="rgba(99, 102, 241, 0.15)"
+            />
+            {/* Analyses area */}
+            <path
+              d={createAreaPath(analysesPoints)}
+              fill="rgba(16, 185, 129, 0.15)"
+            />
+            {/* Visitors line */}
+            <polyline
+              points={visitorsPoints.map(p => `${p.x},${p.y}`).join(' ')}
+              fill="none"
+              stroke="#6366f1"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+            {/* Analyses line */}
+            <polyline
+              points={analysesPoints.map(p => `${p.x},${p.y}`).join(' ')}
+              fill="none"
+              stroke="#10b981"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+          {/* X-axis labels - inside scroll area */}
+          <div className="flex justify-between mt-2 text-xs text-zinc-400" style={{ minWidth: width }}>
+            {labelIndices.map((idx, i) => (
+              <span key={i}>{data[idx] ? formatTimeWithDate(data[idx].time) : ''}</span>
+            ))}
+          </div>
         </div>
       </div>
     </div>

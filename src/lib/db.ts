@@ -813,14 +813,14 @@ export async function getVisitorStats(): Promise<VisitorStats> {
       .sort((a, b) => a[0].localeCompare(b[0]))
       .map(([date, data]) => ({ date, ...data }));
 
-    // Realtime series - 30 minute buckets for last 24 hours
+    // Realtime series - 30 minute buckets for last 3 days (72 hours)
     const visitorRealtime = await getDb()`
       SELECT
         date_trunc('hour', created_at) +
         (floor(extract(minute FROM created_at) / 30) * interval '30 minutes') as bucket,
         COUNT(*) as count
       FROM ragecheck_visitors
-      WHERE created_at > NOW() - INTERVAL '24 hours'
+      WHERE created_at > NOW() - INTERVAL '72 hours'
       GROUP BY bucket
       ORDER BY bucket ASC
     `;
@@ -831,7 +831,7 @@ export async function getVisitorStats(): Promise<VisitorStats> {
         (floor(extract(minute FROM created_at) / 30) * interval '30 minutes') as bucket,
         COUNT(*) as count
       FROM ragecheck_analyses
-      WHERE created_at > NOW() - INTERVAL '24 hours'
+      WHERE created_at > NOW() - INTERVAL '72 hours'
       GROUP BY bucket
       ORDER BY bucket ASC
     `;
@@ -839,11 +839,11 @@ export async function getVisitorStats(): Promise<VisitorStats> {
     // Merge realtime data into 30-minute buckets
     const realtimeMap = new Map<string, { visitors: number; analyses: number }>();
 
-    // Initialize last 24 hours in 30-minute intervals (48 buckets, excluding current incomplete bucket)
+    // Initialize last 3 days (72 hours) in 30-minute intervals (144 buckets, excluding current incomplete bucket)
     const now = new Date();
     // Round down to current 30-min bucket start
     now.setMinutes(Math.floor(now.getMinutes() / 30) * 30, 0, 0);
-    for (let i = 48; i >= 1; i--) {
+    for (let i = 144; i >= 1; i--) {
       const d = new Date(now.getTime() - i * 30 * 60 * 1000);
       const timeStr = d.toISOString();
       realtimeMap.set(timeStr, { visitors: 0, analyses: 0 });
