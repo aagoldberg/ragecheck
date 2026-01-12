@@ -1,19 +1,9 @@
 "use client";
 
-import { useState, useMemo, useEffect, useRef } from "react";
-import {
-  getShareText,
-  buildXIntentUrl,
-  buildBlueskyIntentUrl,
-  isWorthSharing,
-  getScoreBucket,
-} from "@/lib/share";
-import {
-  getDeterministicHookLine,
-  getTopDrivers,
-  SIGNAL_LABELS,
-} from "@/lib/shareCard";
-import { copyShareImageToClipboard, generateShareImage } from "@/lib/shareImage";
+import { useState, useMemo, useEffect } from "react";
+import { getScoreBucket } from "@/lib/share";
+import { SIGNAL_LABELS } from "@/lib/shareCard";
+import { copyShareImageToClipboard } from "@/lib/shareImage";
 
 interface Highlight {
   start: number;
@@ -574,22 +564,17 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<AnalysisResult | null>(DEMO_RESULT);
   const [isDemo, setIsDemo] = useState(true);
-  const [copied, setCopied] = useState(false);
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
   const [headlines, setHeadlines] = useState<Headline[]>([]);
   const [headlinesLoading, setHeadlinesLoading] = useState(true);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageError, setImageError] = useState<string | null>(null);
   const [imageCopied, setImageCopied] = useState(false);
-  const [shareCardPreviewUrl, setShareCardPreviewUrl] = useState<string | null>(null);
-  const [canNativeShare, setCanNativeShare] = useState(false);
-  const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [feedbackGiven, setFeedbackGiven] = useState<"up" | "down" | null>(null);
   const [feedbackComment, setFeedbackComment] = useState("");
   const [showFeedbackForm, setShowFeedbackForm] = useState(false);
   const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
   const [errorReported, setErrorReported] = useState(false);
-  const moreMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     fetch("/api/visit", {
@@ -607,41 +592,7 @@ export default function Home() {
       })
       .catch(() => {})
       .finally(() => setHeadlinesLoading(false));
-
-    // Check if Web Share API is available (primarily mobile)
-    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-    setCanNativeShare(isMobile && typeof navigator.share === "function");
   }, []);
-
-  // Generate share card preview when results change
-  useEffect(() => {
-    if (!result?.success || result.score === undefined || !result.signalBreakdown) {
-      setShareCardPreviewUrl(null);
-      return;
-    }
-
-    let cancelled = false;
-    generateShareImage({
-      score: result.score,
-      title: result.title || "Content Analysis",
-      domain: result.sourceDomain || "unknown",
-      signalBreakdown: result.signalBreakdown,
-      techniqueExplanations: result.techniqueExplanations,
-      sharingPatterns: result.sharingPatterns,
-      shareCardSummary: result.shareCardSummary,
-    }).then((blob) => {
-      if (!cancelled) {
-        const url = URL.createObjectURL(blob);
-        setShareCardPreviewUrl(url);
-      }
-    }).catch(() => {
-      // Ignore errors - preview is optional
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [result]);
 
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -837,81 +788,6 @@ export default function Home() {
     setShowFeedbackForm(false);
   };
 
-  // Get hook line for share text
-  const getHookLineForShare = () => {
-    if (!result?.success || result.score === undefined || !result.signalBreakdown) {
-      return "";
-    }
-    const topDrivers = getTopDrivers(result.signalBreakdown);
-    return getDeterministicHookLine(result.score, topDrivers);
-  };
-
-  const copyShareCard = () => {
-    if (!result?.success || result.score === undefined) return;
-    const shareUrl = getShareUrl();
-    navigator.clipboard.writeText(shareUrl);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-    trackShareEvent("copy_link_clicked");
-    setShowMoreMenu(false);
-  };
-
-  const shareOnTwitter = () => {
-    if (!result?.success || result.score === undefined || !result.signalBreakdown) return;
-    const shareUrl = getShareUrl();
-    const hookLine = getHookLineForShare();
-    const text = getShareText("x", hookLine, shareUrl);
-    const twitterUrl = buildXIntentUrl(text, shareUrl);
-    window.open(twitterUrl, "_blank", "width=550,height=420");
-    trackShareEvent("share_x_clicked");
-    // Also copy image to clipboard for easy pasting
-    handleShareImage(true);
-  };
-
-  const shareOnBluesky = () => {
-    if (!result?.success || result.score === undefined || !result.signalBreakdown) return;
-    const shareUrl = getShareUrl();
-    const hookLine = getHookLineForShare();
-    const text = getShareText("bluesky", hookLine, shareUrl);
-    const blueskyUrl = buildBlueskyIntentUrl(text);
-    window.open(blueskyUrl, "_blank", "width=550,height=420");
-    trackShareEvent("share_bluesky_clicked");
-    // Also copy image to clipboard for easy pasting
-    handleShareImage(true);
-  };
-
-  const shareNative = async () => {
-    if (!result?.success || result.score === undefined || !result.signalBreakdown) return;
-    if (!navigator.share) return;
-
-    const shareUrl = getShareUrl();
-    const hookLine = getHookLineForShare();
-    const text = getShareText("native", hookLine, shareUrl);
-
-    try {
-      await navigator.share({
-        title: "RageCheck Analysis",
-        text,
-        url: shareUrl,
-      });
-      trackShareEvent("web_share_clicked");
-    } catch {
-      // User cancelled or share failed - ignore
-    }
-  };
-
-  // Check if this result is "worth sharing"
-  const showSharePrompt = useMemo(() => {
-    if (!result?.success || result.score === undefined || !result.signalBreakdown) {
-      return false;
-    }
-    return isWorthSharing(
-      result.score,
-      result.signalBreakdown.arousal,
-      result.signalBreakdown.call_to_conflict
-    );
-  }, [result]);
-
   // Primary share action - uses client-side canvas for clipboard copy
   const handleShareImage = async (silent = false) => {
     if (!result?.success || result.score === undefined || !result.signalBreakdown) return;
@@ -941,37 +817,6 @@ export default function Home() {
   const onShareImageClick = async () => {
     trackShareEvent("share_image_clicked");
     await handleShareImage();
-  };
-
-  // Close more menu when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (moreMenuRef.current && !moreMenuRef.current.contains(event.target as Node)) {
-        setShowMoreMenu(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
-  const handleShare = async () => {
-    if (!result?.success || result.score === undefined) return;
-    const shareUrl = getShareUrl();
-    const shareData = {
-      title: `RageCheck: ${result.score}/100`,
-      text: `${result.title || "Content"} scored ${result.score}/100 for manipulative patterns`,
-      url: shareUrl,
-    };
-
-    if (navigator.share && navigator.canShare?.(shareData)) {
-      try {
-        await navigator.share(shareData);
-      } catch {
-        copyShareCard();
-      }
-    } else {
-      copyShareCard();
-    }
   };
 
   return (
@@ -1256,135 +1101,41 @@ export default function Home() {
               </div>
             ) : (
               <>
-              {/* Share Card Preview - Prominent CTA */}
-              {!isDemo && (
-                <div className="max-w-4xl mx-auto mb-8 px-4">
-                  <div className="bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 dark:from-indigo-950/40 dark:via-purple-950/40 dark:to-pink-950/40 border border-indigo-200 dark:border-indigo-800 rounded-2xl p-6 shadow-lg">
-                    <div className="flex flex-col md:flex-row gap-6 items-center">
-                      {/* Preview Thumbnail */}
-                      <div className="flex-shrink-0">
-                        {shareCardPreviewUrl ? (
-                          <div className="relative group cursor-pointer" onClick={onShareImageClick}>
-                            <img
-                              src={shareCardPreviewUrl}
-                              alt="Share card preview"
-                              className="w-64 h-auto rounded-xl shadow-md border border-white/50 group-hover:shadow-xl transition-shadow"
-                            />
-                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 rounded-xl transition-colors flex items-center justify-center">
-                              <span className="opacity-0 group-hover:opacity-100 bg-white/90 dark:bg-zinc-800/90 text-zinc-900 dark:text-zinc-100 text-xs font-bold px-3 py-1.5 rounded-full shadow transition-opacity">
-                                Click to copy
-                              </span>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="w-64 h-36 bg-zinc-200 dark:bg-zinc-700 rounded-xl animate-pulse" />
-                        )}
-                      </div>
-                      {/* CTA Text + Buttons */}
-                      <div className="flex-1 text-center md:text-left">
-                        <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-100 mb-2">
-                          {imageCopied ? "Image copied! Paste it anywhere." : "Share this analysis"}
-                        </h3>
-                        <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-4">
-                          {imageCopied
-                            ? "The image is in your clipboard. Paste directly into X, Bluesky, iMessage, or anywhere else."
-                            : "Copy the share card image with one click, then paste it into your post."
-                          }
-                        </p>
-                        <div className="flex flex-wrap gap-3 justify-center md:justify-start">
-                          {/* Big Copy Image Button */}
-                          <button
-                            onClick={onShareImageClick}
-                            className={`flex items-center gap-2 px-6 py-3 text-white font-bold rounded-xl transition-all shadow-lg hover:shadow-xl ${
-                              imageCopied
-                                ? "bg-green-500 hover:bg-green-600"
-                                : "bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500"
-                            }`}
-                          >
-                            {imageCopied ? (
-                              <>
-                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                </svg>
-                                Copied!
-                              </>
-                            ) : (
-                              <>
-                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
-                                </svg>
-                                Copy Image
-                              </>
-                            )}
-                          </button>
-                          {/* X Button */}
-                          <button
-                            onClick={shareOnTwitter}
-                            className="flex items-center gap-2 px-4 py-3 bg-black hover:bg-zinc-800 text-white font-bold rounded-xl transition-colors"
-                          >
-                            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
-                              <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
-                            </svg>
-                            Post on X
-                          </button>
-                          {/* Bluesky Button */}
-                          <button
-                            onClick={shareOnBluesky}
-                            className="flex items-center gap-2 px-4 py-3 bg-[#0085ff] hover:bg-[#0070d6] text-white font-bold rounded-xl transition-colors"
-                          >
-                            <svg className="w-4 h-4" viewBox="0 0 600 530" fill="currentColor">
-                              <path d="m135.72 44.03c66.496 49.921 138.02 151.14 164.28 205.46 26.262-54.316 97.782-155.54 164.28-205.46 47.98-36.021 125.72-63.892 125.72 24.795 0 17.712-10.155 148.79-16.111 170.07-20.703 73.984-96.144 92.854-163.25 81.433 117.3 19.964 147.14 86.092 82.697 152.22-122.39 125.59-175.91-31.511-189.63-71.766-2.514-7.38-3.69-10.832-3.69-7.914 0-2.918-1.176 0.534-3.69 7.914-13.72 40.255-67.24 197.36-189.63 71.766-64.444-66.128-34.605-132.26 82.697-152.22-67.108 11.421-142.55-7.449-163.25-81.433-5.9561-21.282-16.111-152.36-16.111-170.07 0-88.687 77.742-60.816 125.72-24.795z"/>
-                            </svg>
-                            Bluesky
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Filter info bar */}
+              {/* Simple share bar */}
               <div className="max-w-4xl mx-auto mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 px-4">
                 <div className="flex items-center gap-3">
                   <span className="text-xs font-medium text-zinc-400">
                     {activeFilter ? `Filtering: ${SIGNAL_LABELS[activeFilter as keyof SignalBreakdown]}` : "Showing all detected patterns"}
                   </span>
                 </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  {/* More dropdown */}
-                  <div className="relative" ref={moreMenuRef}>
+                <div className="flex items-center gap-2">
+                  {/* Simple Share Button */}
+                  {!isDemo && (
                     <button
-                      onClick={() => setShowMoreMenu(!showMoreMenu)}
-                      className="flex items-center gap-1 px-2 py-2 text-xs font-medium text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 transition-colors"
-                      title="More options"
+                      onClick={onShareImageClick}
+                      className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+                        imageCopied
+                          ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300"
+                          : "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700"
+                      }`}
                     >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h.01M12 12h.01M19 12h.01M6 12a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0z" />
-                      </svg>
+                      {imageCopied ? (
+                        <>
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                          Copied!
+                        </>
+                      ) : (
+                        <>
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                          </svg>
+                          Share
+                        </>
+                      )}
                     </button>
-                    {showMoreMenu && (
-                      <div className="absolute right-0 top-full mt-1 w-40 bg-white dark:bg-zinc-800 rounded-lg shadow-lg border border-zinc-200 dark:border-zinc-700 py-1 z-50">
-                        <button
-                          onClick={copyShareCard}
-                          className="w-full text-left px-4 py-2 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 transition-colors"
-                        >
-                          {copied ? "Link Copied!" : "Copy Link"}
-                        </button>
-                        {canNativeShare && (
-                          <button
-                            onClick={() => {
-                              shareNative();
-                              setShowMoreMenu(false);
-                            }}
-                            className="w-full text-left px-4 py-2 text-sm text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 transition-colors"
-                          >
-                            Share via...
-                          </button>
-                        )}
-                      </div>
-                    )}
-                  </div>
+                  )}
                 </div>
               </div>
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -1536,28 +1287,34 @@ export default function Home() {
                         )}
                       </div>
                     </div>
-                    <div className="mt-6 pt-4 border-t border-zinc-100 dark:border-zinc-800 flex justify-between items-center">
-                       <span className="text-xs font-medium text-zinc-400">
-                         {activeFilter ? `Filtering: ${SIGNAL_LABELS[activeFilter as keyof SignalBreakdown]}` : "Showing all detected patterns"}
-                       </span>
-                       <div className="flex items-center gap-3">
-                         <button
-                           onClick={copyShareCard}
-                           className="text-xs font-bold text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 transition-colors"
-                         >
-                           {copied ? "Copied!" : "Copy Link"}
-                         </button>
-                         <button
-                           onClick={handleShare}
-                           className="flex items-center gap-2 px-4 py-2 bg-zinc-900 dark:bg-zinc-100 hover:bg-zinc-800 dark:hover:bg-zinc-200 text-white dark:text-zinc-900 text-xs font-bold rounded-lg transition-colors shadow-sm"
-                         >
-                           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
-                           </svg>
-                           Share Analysis
-                         </button>
-                       </div>
-                    </div>
+                    {!isDemo && (
+                      <div className="mt-6 pt-4 border-t border-zinc-100 dark:border-zinc-800 flex justify-end">
+                        <button
+                          onClick={onShareImageClick}
+                          className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-medium transition-colors ${
+                            imageCopied
+                              ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300"
+                              : "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700"
+                          }`}
+                        >
+                          {imageCopied ? (
+                            <>
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                              </svg>
+                              Copied!
+                            </>
+                          ) : (
+                            <>
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                              </svg>
+                              Share
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    )}
                   </BentoCard>
                 </div>
               </div>
