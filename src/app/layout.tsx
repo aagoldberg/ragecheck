@@ -70,22 +70,51 @@ export const metadata: Metadata = {
 
 const jsonLd = {
   "@context": "https://schema.org",
-  "@type": "WebApplication",
-  name: "RageCheck",
-  description: "A pattern detector for manipulative outrage framing in media. Analyze articles for loaded language, us-vs-them framing, and engagement bait.",
-  url: "https://ragecheck.com",
-  applicationCategory: "UtilityApplication",
-  operatingSystem: "Any",
-  offers: {
-    "@type": "Offer",
-    price: "0",
-    priceCurrency: "USD",
-  },
-  creator: {
-    "@type": "Organization",
-    name: "RageCheck",
-    url: "https://ragecheck.com",
-  },
+  "@graph": [
+    {
+      "@type": "WebSite",
+      "@id": "https://ragecheck.com/#website",
+      url: "https://ragecheck.com",
+      name: "RageCheck",
+      description: "Detect outrage bait and manipulative framing in news and social media",
+      publisher: { "@id": "https://ragecheck.com/#organization" },
+      potentialAction: {
+        "@type": "SearchAction",
+        target: {
+          "@type": "EntryPoint",
+          urlTemplate: "https://ragecheck.com/?url={search_term_string}",
+        },
+        "query-input": "required name=search_term_string",
+      },
+    },
+    {
+      "@type": "Organization",
+      "@id": "https://ragecheck.com/#organization",
+      name: "RageCheck",
+      url: "https://ragecheck.com",
+      logo: {
+        "@type": "ImageObject",
+        url: "https://ragecheck.com/icon-512.png",
+      },
+      sameAs: [],
+    },
+    {
+      "@type": "WebApplication",
+      "@id": "https://ragecheck.com/#webapp",
+      name: "RageCheck",
+      description: "A pattern detector for manipulative outrage framing in media. Analyze articles for loaded language, us-vs-them framing, and engagement bait.",
+      url: "https://ragecheck.com",
+      applicationCategory: "UtilityApplication",
+      operatingSystem: "Any",
+      isAccessibleForFree: true,
+      offers: {
+        "@type": "Offer",
+        price: "0",
+        priceCurrency: "USD",
+      },
+      creator: { "@id": "https://ragecheck.com/#organization" },
+    },
+  ],
 };
 
 export default function RootLayout({
