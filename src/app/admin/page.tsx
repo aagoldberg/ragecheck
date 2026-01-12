@@ -98,6 +98,7 @@ interface ViralMetrics {
     visitors: number[];
     shares: number[];
     repeatVisitors: number[];
+    repeatRate: number[];
     analyses: number[];
     kFactor: number[];
     trafficRatio: number[];
@@ -1061,9 +1062,9 @@ export default function AdminDashboard() {
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
                   <StatCardWithSparkline
                     title="Repeat Users"
-                    value={viralMetrics.repeatUsers}
-                    subtitle={`${viralMetrics.repeatRate}% return`}
-                    sparklineData={viralMetrics.trends?.repeatVisitors}
+                    value={`${viralMetrics.repeatRate}%`}
+                    subtitle={`${viralMetrics.repeatUsers} users`}
+                    sparklineData={viralMetrics.trends?.repeatRate}
                     sparklineColor="#10b981"
                   />
                   <StatCardWithSparkline

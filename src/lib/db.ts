@@ -1040,6 +1040,7 @@ export interface ViralMetrics {
     visitors: number[];       // Daily unique visitors
     shares: number[];         // Daily shares
     repeatVisitors: number[]; // Daily repeat visitors
+    repeatRate: number[];     // Daily repeat rate percentage
     analyses: number[];       // Daily analyses
     kFactor: number[];        // Daily K-factor approximation
     trafficRatio: number[];   // Daily traffic vs 7-day avg
@@ -1374,6 +1375,13 @@ export async function getViralMetrics(): Promise<ViralMetrics> {
     const dailyVisitors = trendDates.map(d => visitorMap.get(d) || 0);
     const dailyShares = trendDates.map(d => shareMap.get(d) || 0);
     const dailyAnalyses = trendDates.map(d => analysisMap.get(d) || 0);
+    const dailyRepeatVisitors = trendDates.map(d => repeatMap.get(d) || 0);
+
+    // Calculate daily repeat rate: repeat visitors / total visitors * 100
+    const dailyRepeatRate = dailyVisitors.map((visitors, i) => {
+      if (visitors === 0) return 0;
+      return Math.round((dailyRepeatVisitors[i] / visitors) * 1000) / 10; // e.g., 6.3%
+    });
 
     // Calculate daily K-factor approximation: (sharers/visitors) * estimated conversion
     // Simplified: shares / visitors as a proxy (higher = more viral potential)
@@ -1394,7 +1402,8 @@ export async function getViralMetrics(): Promise<ViralMetrics> {
       visitors: dailyVisitors,
       shares: dailyShares,
       analyses: dailyAnalyses,
-      repeatVisitors: trendDates.map(d => repeatMap.get(d) || 0),
+      repeatVisitors: dailyRepeatVisitors,
+      repeatRate: dailyRepeatRate,
       kFactor: dailyKFactor,
       trafficRatio: dailyTrafficRatio,
     };
@@ -1432,7 +1441,7 @@ export async function getViralMetrics(): Promise<ViralMetrics> {
       trafficVsBaseline: 1,
       isSpike: false,
       referralSources: [],
-      trends: { visitors: [], shares: [], analyses: [], repeatVisitors: [], kFactor: [], trafficRatio: [] },
+      trends: { visitors: [], shares: [], analyses: [], repeatVisitors: [], repeatRate: [], kFactor: [], trafficRatio: [] },
     };
   }
 }
