@@ -99,6 +99,8 @@ interface ViralMetrics {
     shares: number[];
     repeatVisitors: number[];
     analyses: number[];
+    kFactor: number[];
+    trafficRatio: number[];
   };
 }
 
@@ -193,30 +195,35 @@ function StatCardWithSparkline({
 }) {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
 
-  // Calculate trend direction
-  const trend = sparklineData && sparklineData.length >= 2
+  // Calculate trend direction (compare last 2 days to first 2 days for stability)
+  const trend = sparklineData && sparklineData.length >= 4
+    ? (sparklineData[sparklineData.length - 1] + sparklineData[sparklineData.length - 2]) / 2 -
+      (sparklineData[0] + sparklineData[1]) / 2
+    : sparklineData && sparklineData.length >= 2
     ? sparklineData[sparklineData.length - 1] - sparklineData[0]
     : 0;
 
+  const hasSparkline = sparklineData && sparklineData.length >= 2 && sparklineData.some(v => v > 0);
+
   return (
-    <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 relative group">
-      <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-2">
+    <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-5 relative group">
+      <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-3">
         {title}
       </h3>
-      <div className="flex items-end justify-between gap-4">
-        <div>
-          <p className="text-3xl font-bold text-zinc-900 dark:text-zinc-100">{value}</p>
-          {subtitle && <p className="text-sm text-zinc-500 mt-1">{subtitle}</p>}
+      <div className="flex items-end justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <p className="text-2xl font-bold text-zinc-900 dark:text-zinc-100 truncate">{value}</p>
+          {subtitle && <p className="text-xs text-zinc-500 mt-1 truncate">{subtitle}</p>}
         </div>
-        {sparklineData && sparklineData.length >= 2 && (
+        {hasSparkline && (
           <div
-            className="relative flex-shrink-0"
+            className="relative flex-shrink-0 pb-1"
             onMouseLeave={() => setHoveredIndex(null)}
           >
             <div className="relative">
               {/* Interactive hover zones */}
-              <div className="absolute inset-0 flex">
-                {sparklineData.map((val, i) => (
+              <div className="absolute inset-0 flex z-10">
+                {sparklineData.map((_, i) => (
                   <div
                     key={i}
                     className="flex-1 h-full cursor-pointer"
@@ -224,27 +231,21 @@ function StatCardWithSparkline({
                   />
                 ))}
               </div>
-              <Sparkline data={sparklineData} color={sparklineColor} />
+              <Sparkline data={sparklineData} color={sparklineColor} width={70} height={28} />
             </div>
             {/* Tooltip */}
             {hoveredIndex !== null && (
-              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 text-xs rounded shadow-lg whitespace-nowrap z-10">
-                Day {hoveredIndex + 1}: {sparklineData[hoveredIndex]}
+              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-zinc-800 text-white text-xs rounded shadow-lg whitespace-nowrap z-20 pointer-events-none">
+                {sparklineData[hoveredIndex]}
               </div>
             )}
             {/* Trend indicator */}
-            <div className={`absolute -top-1 -right-1 text-xs font-medium ${trend > 0 ? 'text-emerald-500' : trend < 0 ? 'text-rose-500' : 'text-zinc-400'}`}>
-              {trend > 0 ? '↑' : trend < 0 ? '↓' : '→'}
+            <div className={`absolute -top-2 -right-2 text-[10px] font-bold ${trend > 0 ? 'text-emerald-500' : trend < 0 ? 'text-rose-500' : 'text-zinc-400'}`}>
+              {trend > 0 ? '↑' : trend < 0 ? '↓' : ''}
             </div>
           </div>
         )}
       </div>
-      {/* 7-day label on hover */}
-      {sparklineData && sparklineData.length >= 2 && (
-        <div className="absolute bottom-1 right-2 text-[10px] text-zinc-400 opacity-0 group-hover:opacity-100 transition-opacity">
-          7-day trend
-        </div>
-      )}
     </div>
   );
 }
@@ -1055,25 +1056,25 @@ export default function AdminDashboard() {
                       TRAFFIC SPIKE
                     </span>
                   )}
-                  <span className="text-xs text-zinc-400 font-normal">(hover sparklines for details)</span>
+                  <span className="text-xs text-zinc-400 font-normal ml-2">(hover for daily values)</span>
                 </h2>
-                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 mb-6">
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
                   <StatCardWithSparkline
                     title="Repeat Users"
                     value={viralMetrics.repeatUsers}
-                    subtitle={`${viralMetrics.repeatRate}% of visitors`}
+                    subtitle={`${viralMetrics.repeatRate}% return`}
                     sparklineData={viralMetrics.trends?.repeatVisitors}
                     sparklineColor="#10b981"
                   />
                   <StatCardWithSparkline
-                    title="Unique Visitors"
+                    title="Visitors"
                     value={viralMetrics.trends?.visitors?.reduce((a, b) => a + b, 0) || 0}
                     subtitle="7-day total"
                     sparklineData={viralMetrics.trends?.visitors}
                     sparklineColor="#6366f1"
                   />
                   <StatCardWithSparkline
-                    title="Unique Sharers"
+                    title="Shares"
                     value={viralMetrics.uniqueSharers}
                     subtitle={`${viralMetrics.todayUniqueSharers} today`}
                     sparklineData={viralMetrics.trends?.shares}
@@ -1086,15 +1087,19 @@ export default function AdminDashboard() {
                     sparklineData={viralMetrics.trends?.analyses}
                     sparklineColor="#8b5cf6"
                   />
-                  <StatCard
+                  <StatCardWithSparkline
                     title="K-Factor"
                     value={viralMetrics.kFactor}
                     subtitle={viralMetrics.kFactor >= 1 ? "Viral!" : viralMetrics.kFactor >= 0.5 ? "Good" : "Building"}
+                    sparklineData={viralMetrics.trends?.kFactor}
+                    sparklineColor="#ec4899"
                   />
-                  <StatCard
+                  <StatCardWithSparkline
                     title="Traffic vs Avg"
                     value={`${viralMetrics.trafficVsBaseline}x`}
-                    subtitle={viralMetrics.isSpike ? "Spike detected!" : "vs 7-day avg"}
+                    subtitle={viralMetrics.isSpike ? "Spike!" : "vs 7-day avg"}
+                    sparklineData={viralMetrics.trends?.trafficRatio}
+                    sparklineColor="#14b8a6"
                   />
                 </div>
 

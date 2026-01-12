@@ -1037,10 +1037,12 @@ export interface ViralMetrics {
 
   // 7-day trends for sparklines
   trends: {
-    visitors: number[];      // Daily unique visitors
-    shares: number[];        // Daily shares
+    visitors: number[];       // Daily unique visitors
+    shares: number[];         // Daily shares
     repeatVisitors: number[]; // Daily repeat visitors
-    analyses: number[];      // Daily analyses
+    analyses: number[];       // Daily analyses
+    kFactor: number[];        // Daily K-factor approximation
+    trafficRatio: number[];   // Daily traffic vs 7-day avg
   };
 }
 
@@ -1369,11 +1371,32 @@ export async function getViralMetrics(): Promise<ViralMetrics> {
       return [`${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`, Number(r.count)];
     }));
 
+    const dailyVisitors = trendDates.map(d => visitorMap.get(d) || 0);
+    const dailyShares = trendDates.map(d => shareMap.get(d) || 0);
+    const dailyAnalyses = trendDates.map(d => analysisMap.get(d) || 0);
+
+    // Calculate daily K-factor approximation: (sharers/visitors) * estimated conversion
+    // Simplified: shares / visitors as a proxy (higher = more viral potential)
+    const dailyKFactor = dailyVisitors.map((visitors, i) => {
+      if (visitors === 0) return 0;
+      const shareRate = dailyShares[i] / visitors;
+      // Assume ~0.5 conversion from shares (rough estimate)
+      return Math.round(shareRate * 0.5 * 1000) / 1000;
+    });
+
+    // Calculate traffic ratio: each day vs overall 7-day average
+    const avgDailyTraffic = dailyVisitors.reduce((a, b) => a + b, 0) / 7 || 1;
+    const dailyTrafficRatio = dailyVisitors.map(v =>
+      Math.round((v / avgDailyTraffic) * 100) / 100
+    );
+
     const trends = {
-      visitors: trendDates.map(d => visitorMap.get(d) || 0),
-      shares: trendDates.map(d => shareMap.get(d) || 0),
-      analyses: trendDates.map(d => analysisMap.get(d) || 0),
+      visitors: dailyVisitors,
+      shares: dailyShares,
+      analyses: dailyAnalyses,
       repeatVisitors: trendDates.map(d => repeatMap.get(d) || 0),
+      kFactor: dailyKFactor,
+      trafficRatio: dailyTrafficRatio,
     };
 
     return {
@@ -1409,7 +1432,7 @@ export async function getViralMetrics(): Promise<ViralMetrics> {
       trafficVsBaseline: 1,
       isSpike: false,
       referralSources: [],
-      trends: { visitors: [], shares: [], analyses: [], repeatVisitors: [] },
+      trends: { visitors: [], shares: [], analyses: [], repeatVisitors: [], kFactor: [], trafficRatio: [] },
     };
   }
 }
