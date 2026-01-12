@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 
 interface DashboardStats {
   totalAnalyses: number;
@@ -280,6 +280,15 @@ function TimeSeriesChart({ data }: { data: { date: string; visitors: number; ana
 }
 
 function RealtimeChart({ data }: { data: { time: string; visitors: number; analyses: number }[] }) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Scroll to the right (most recent) on mount
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollLeft = scrollRef.current.scrollWidth;
+    }
+  }, [data]);
+
   if (!data || data.length === 0) return null;
 
   const maxValue = Math.max(...data.map(d => Math.max(d.visitors, d.analyses)), 1);
@@ -346,7 +355,7 @@ function RealtimeChart({ data }: { data: { time: string; visitors: number; analy
           max: {maxValue}
         </div>
         {/* Scrollable chart container */}
-        <div className="overflow-x-auto">
+        <div ref={scrollRef} className="overflow-x-auto">
           <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} className="h-40" style={{ minWidth: width }}>
             {/* Grid lines */}
             {[0, 0.25, 0.5, 0.75, 1].map((ratio) => (
