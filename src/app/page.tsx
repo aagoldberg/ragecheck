@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { getScoreBucket } from "@/lib/share";
 import { SIGNAL_LABELS } from "@/lib/shareCard";
 import { copyShareImageToClipboard } from "@/lib/shareImage";
@@ -631,6 +631,84 @@ export default function Home() {
     if (fileInput) fileInput.value = "";
   };
 
+  const [isDragging, setIsDragging] = useState(false);
+
+  // Handle paste from clipboard (Cmd/Ctrl+V)
+  const handlePaste = useCallback((e: React.ClipboardEvent) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      if (item.type.startsWith("image/")) {
+        e.preventDefault();
+        const file = item.getAsFile();
+        if (!file) continue;
+
+        if (file.size > 5 * 1024 * 1024) {
+          setImageError("Image too large (max 5MB)");
+          return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          setImagePreview(event.target?.result as string);
+          setUrl("");
+          setImageError(null);
+        };
+        reader.readAsDataURL(file);
+        return;
+      }
+    }
+  }, []);
+
+  // Handle drag over (required to allow drop)
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.dataTransfer.types.includes("Files")) {
+      setIsDragging(true);
+    }
+  }, []);
+
+  // Handle drag leave
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  }, []);
+
+  // Handle drop
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+
+    const files = e.dataTransfer.files;
+    if (!files || files.length === 0) return;
+
+    const file = files[0];
+    const allowedTypes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+
+    if (!allowedTypes.includes(file.type)) {
+      setImageError("Please drop a JPEG, PNG, GIF, or WebP image");
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setImageError("Image too large (max 5MB)");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      setImagePreview(event.target?.result as string);
+      setUrl("");
+      setImageError(null);
+    };
+    reader.readAsDataURL(file);
+  }, []);
+
   const analyzeImage = async () => {
     if (!imagePreview) return;
 
@@ -854,7 +932,33 @@ export default function Home() {
           )}
 
           {/* Search Input */}
-          <form onSubmit={handleSubmit} className={`relative ${result && !isDemo ? 'max-w-xl' : 'max-w-2xl'} mx-auto`}>
+          <form
+            onSubmit={handleSubmit}
+            onPaste={handlePaste}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+            className={`relative ${result && !isDemo ? 'max-w-xl' : 'max-w-2xl'} mx-auto ${isDragging ? 'ring-2 ring-indigo-500 ring-offset-2 rounded-2xl' : ''}`}
+          >
+            {/* Drag overlay */}
+            {isDragging && (
+              <div className="absolute inset-0 z-50 bg-indigo-500/10 border-2 border-dashed border-indigo-500 rounded-2xl flex items-center justify-center backdrop-blur-sm">
+                <div className="text-center">
+                  <svg className="w-12 h-12 mx-auto text-indigo-500 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  <p className="text-indigo-600 dark:text-indigo-400 font-bold">Drop screenshot here</p>
+                </div>
+              </div>
+            )}
+
+            {/* Image error message */}
+            {imageError && (
+              <div className="mb-4 p-3 bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 rounded-xl text-rose-700 dark:text-rose-300 text-sm text-center">
+                {imageError}
+              </div>
+            )}
+
             {imagePreview && (
               <div className="mb-6 relative animate-in fade-in zoom-in duration-300">
                 <div className="relative rounded-2xl overflow-hidden border border-zinc-200 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-800 shadow-lg">
@@ -888,11 +992,16 @@ export default function Home() {
             )}
 
             {!imagePreview && (!result || isDemo) && (
-              <div className="mt-6 flex flex-wrap items-center justify-center gap-2 text-sm text-zinc-500">
-                <span>Try an example:</span>
-                <button type="button" onClick={() => tryExample("news")} className="px-3 py-1 rounded-full bg-zinc-100 dark:bg-zinc-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors font-medium text-xs">News Article</button>
-                <button type="button" onClick={() => tryExample("tweet")} className="px-3 py-1 rounded-full bg-zinc-100 dark:bg-zinc-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors font-medium text-xs">Viral Tweet</button>
-                <button type="button" onClick={() => tryExample("bluesky")} className="px-3 py-1 rounded-full bg-zinc-100 dark:bg-zinc-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors font-medium text-xs">Bluesky Post</button>
+              <div className="mt-6 space-y-3">
+                <div className="flex flex-wrap items-center justify-center gap-2 text-sm text-zinc-500">
+                  <span>Try an example:</span>
+                  <button type="button" onClick={() => tryExample("news")} className="px-3 py-1 rounded-full bg-zinc-100 dark:bg-zinc-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors font-medium text-xs">News Article</button>
+                  <button type="button" onClick={() => tryExample("tweet")} className="px-3 py-1 rounded-full bg-zinc-100 dark:bg-zinc-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors font-medium text-xs">Viral Tweet</button>
+                  <button type="button" onClick={() => tryExample("bluesky")} className="px-3 py-1 rounded-full bg-zinc-100 dark:bg-zinc-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors font-medium text-xs">Bluesky Post</button>
+                </div>
+                <p className="text-xs text-zinc-400 text-center">
+                  Or paste a screenshot (⌘V) or drag & drop an image
+                </p>
               </div>
             )}
           </form>
