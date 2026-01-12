@@ -1055,8 +1055,11 @@ export default function AdminDashboard() {
                                     {f.url}
                                   </a>
                                 </td>
-                                <td className="py-2 px-3 text-zinc-600 dark:text-zinc-400 text-xs font-mono">
-                                  {f.comment?.replace("[SITE ERROR] ", "")}
+                                <td className="py-2 px-3 text-zinc-600 dark:text-zinc-400 text-xs font-mono" title={f.comment?.replace("[SITE ERROR] ", "")}>
+                                  {(() => {
+                                    const msg = f.comment?.replace("[SITE ERROR] ", "") || "";
+                                    return msg.length > 100 ? msg.slice(0, 100) + "..." : msg;
+                                  })()}
                                 </td>
                                 <td className="py-2 px-3 text-zinc-500 text-xs whitespace-nowrap">
                                   {new Date(f.createdAt).toLocaleString()}
@@ -1118,7 +1121,9 @@ export default function AdminDashboard() {
                                 </td>
                                 <td className="py-3 px-3 text-zinc-700 dark:text-zinc-300 text-sm">
                                   {f.comment ? (
-                                    <span className="block max-w-md">{f.comment}</span>
+                                    <span className="block max-w-md" title={f.comment}>
+                                      {f.comment.length > 150 ? f.comment.slice(0, 150) + "..." : f.comment}
+                                    </span>
                                   ) : (
                                     <span className="text-zinc-400 italic">No comment provided</span>
                                   )}

@@ -1526,8 +1526,10 @@ export default function Home() {
                           placeholder="The score seems too high because... / I expected... / The analysis missed..."
                           className="w-full p-4 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
                           rows={3}
+                          maxLength={500}
                           autoFocus
                         />
+                        <p className="text-xs text-zinc-400 mt-1 text-right">{feedbackComment.length}/500</p>
                         <div className="flex gap-3 mt-4 justify-center">
                           <button
                             onClick={submitFeedbackComment}

@@ -28,10 +28,13 @@ export async function POST(request: NextRequest) {
     const country = request.headers.get("x-vercel-ip-country") || null;
     const referrer = request.headers.get("referer") || null;
 
+    // Truncate comment to 500 chars max
+    const truncatedComment = comment ? comment.slice(0, 500) : null;
+
     await logFeedback({
       url,
       rating,
-      comment: comment || null,
+      comment: truncatedComment,
       score,
       title: title || "",
       sourceDomain: sourceDomain || "",
