@@ -992,19 +992,24 @@ export default function Home() {
         </div>
       </nav>
 
-      <div className="max-w-6xl mx-auto px-4 py-12 lg:py-24">
+      <div className={`max-w-6xl mx-auto px-4 ${result && !isDemo ? 'py-6 lg:py-8' : 'py-12 lg:py-24'}`}>
         
-        {/* Hero Section */}
-        <div className="text-center max-w-3xl mx-auto mb-20 animate-in fade-in slide-in-from-bottom-4 duration-700">
-          <h1 className="text-4xl md:text-6xl font-black tracking-tight text-zinc-900 dark:text-zinc-100 mb-6 leading-[1.1]">
-            Is that post <span className="text-transparent bg-clip-text bg-gradient-to-r from-rose-500 to-indigo-600">designed</span> to make you angry?
-          </h1>
-          <p className="text-xl text-zinc-600 dark:text-zinc-400 mb-10 leading-relaxed max-w-2xl mx-auto">
-            Identify engagement bait, fear-mongering, and manipulation patterns in news and social media instantly.
-          </p>
+        {/* Hero Section - Collapses after analysis */}
+        <div className={`text-center max-w-3xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-700 ${result && !isDemo ? 'mb-8' : 'mb-20'}`}>
+          {/* Hero text - hidden after analysis */}
+          {(!result || isDemo) && (
+            <>
+              <h1 className="text-4xl md:text-6xl font-black tracking-tight text-zinc-900 dark:text-zinc-100 mb-6 leading-[1.1]">
+                Is that post <span className="text-transparent bg-clip-text bg-gradient-to-r from-rose-500 to-indigo-600">designed</span> to make you angry?
+              </h1>
+              <p className="text-xl text-zinc-600 dark:text-zinc-400 mb-10 leading-relaxed max-w-2xl mx-auto">
+                Identify engagement bait, fear-mongering, and manipulation patterns in news and social media instantly.
+              </p>
+            </>
+          )}
 
           {/* Search Input */}
-          <form onSubmit={handleSubmit} className="relative max-w-2xl mx-auto">
+          <form onSubmit={handleSubmit} className={`relative ${result && !isDemo ? 'max-w-xl' : 'max-w-2xl'} mx-auto`}>
             {imagePreview && (
               <div className="mb-6 relative animate-in fade-in zoom-in duration-300">
                 <div className="relative rounded-2xl overflow-hidden border border-zinc-200 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-800 shadow-lg">
@@ -1037,7 +1042,7 @@ export default function Home() {
               </div>
             )}
 
-            {!imagePreview && (
+            {!imagePreview && (!result || isDemo) && (
               <div className="mt-6 flex flex-wrap items-center justify-center gap-2 text-sm text-zinc-500">
                 <span>Try an example:</span>
                 <button type="button" onClick={() => tryExample("news")} className="px-3 py-1 rounded-full bg-zinc-100 dark:bg-zinc-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors font-medium text-xs">News Article</button>
@@ -1214,24 +1219,6 @@ export default function Home() {
                   className="px-5 py-2 bg-white text-indigo-600 rounded-lg font-bold text-sm hover:bg-indigo-50 transition-colors shadow-sm"
                 >
                   Analyze Your Own Link
-                </button>
-              </div>
-            )}
-
-            {!isDemo && (
-              <div className="flex justify-center">
-                <button
-                  onClick={() => {
-                    setResult(DEMO_RESULT);
-                    setIsDemo(true);
-                    setUrl("");
-                  }}
-                  className="group flex items-center gap-2 px-4 py-2 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-full text-sm font-medium text-zinc-600 dark:text-zinc-300 transition-colors"
-                >
-                  <svg className="w-4 h-4 text-zinc-400 group-hover:text-zinc-600 dark:group-hover:text-zinc-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                  </svg>
-                  Analyze Another
                 </button>
               </div>
             )}
