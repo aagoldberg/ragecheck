@@ -13,7 +13,7 @@ import {
   getTopDrivers,
   SIGNAL_LABELS,
 } from "@/lib/shareCard";
-import { copyShareImageToClipboard } from "@/lib/shareImage";
+import { copyShareImageToClipboard, generateShareImage } from "@/lib/shareImage";
 
 interface Highlight {
   start: number;
@@ -581,6 +581,7 @@ export default function Home() {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageError, setImageError] = useState<string | null>(null);
   const [imageCopied, setImageCopied] = useState(false);
+  const [shareCardPreviewUrl, setShareCardPreviewUrl] = useState<string | null>(null);
   const [canNativeShare, setCanNativeShare] = useState(false);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [feedbackGiven, setFeedbackGiven] = useState<"up" | "down" | null>(null);
@@ -611,6 +612,36 @@ export default function Home() {
     const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
     setCanNativeShare(isMobile && typeof navigator.share === "function");
   }, []);
+
+  // Generate share card preview when results change
+  useEffect(() => {
+    if (!result?.success || result.score === undefined || !result.signalBreakdown) {
+      setShareCardPreviewUrl(null);
+      return;
+    }
+
+    let cancelled = false;
+    generateShareImage({
+      score: result.score,
+      title: result.title || "Content Analysis",
+      domain: result.sourceDomain || "unknown",
+      signalBreakdown: result.signalBreakdown,
+      techniqueExplanations: result.techniqueExplanations,
+      sharingPatterns: result.sharingPatterns,
+      shareCardSummary: result.shareCardSummary,
+    }).then((blob) => {
+      if (!cancelled) {
+        const url = URL.createObjectURL(blob);
+        setShareCardPreviewUrl(url);
+      }
+    }).catch(() => {
+      // Ignore errors - preview is optional
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [result]);
 
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -1238,52 +1269,102 @@ export default function Home() {
               </div>
             ) : (
               <>
-              {/* Share Buttons - Above Analysis */}
+              {/* Share Card Preview - Prominent CTA */}
+              {!isDemo && (
+                <div className="max-w-4xl mx-auto mb-8 px-4">
+                  <div className="bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 dark:from-indigo-950/40 dark:via-purple-950/40 dark:to-pink-950/40 border border-indigo-200 dark:border-indigo-800 rounded-2xl p-6 shadow-lg">
+                    <div className="flex flex-col md:flex-row gap-6 items-center">
+                      {/* Preview Thumbnail */}
+                      <div className="flex-shrink-0">
+                        {shareCardPreviewUrl ? (
+                          <div className="relative group cursor-pointer" onClick={onShareImageClick}>
+                            <img
+                              src={shareCardPreviewUrl}
+                              alt="Share card preview"
+                              className="w-64 h-auto rounded-xl shadow-md border border-white/50 group-hover:shadow-xl transition-shadow"
+                            />
+                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 rounded-xl transition-colors flex items-center justify-center">
+                              <span className="opacity-0 group-hover:opacity-100 bg-white/90 dark:bg-zinc-800/90 text-zinc-900 dark:text-zinc-100 text-xs font-bold px-3 py-1.5 rounded-full shadow transition-opacity">
+                                Click to copy
+                              </span>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="w-64 h-36 bg-zinc-200 dark:bg-zinc-700 rounded-xl animate-pulse" />
+                        )}
+                      </div>
+                      {/* CTA Text + Buttons */}
+                      <div className="flex-1 text-center md:text-left">
+                        <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-100 mb-2">
+                          {imageCopied ? "Image copied! Paste it anywhere." : "Share this analysis"}
+                        </h3>
+                        <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-4">
+                          {imageCopied
+                            ? "The image is in your clipboard. Paste directly into X, Bluesky, iMessage, or anywhere else."
+                            : "Copy the share card image with one click, then paste it into your post."
+                          }
+                        </p>
+                        <div className="flex flex-wrap gap-3 justify-center md:justify-start">
+                          {/* Big Copy Image Button */}
+                          <button
+                            onClick={onShareImageClick}
+                            className={`flex items-center gap-2 px-6 py-3 text-white font-bold rounded-xl transition-all shadow-lg hover:shadow-xl ${
+                              imageCopied
+                                ? "bg-green-500 hover:bg-green-600"
+                                : "bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500"
+                            }`}
+                          >
+                            {imageCopied ? (
+                              <>
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                </svg>
+                                Copied!
+                              </>
+                            ) : (
+                              <>
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+                                </svg>
+                                Copy Image
+                              </>
+                            )}
+                          </button>
+                          {/* X Button */}
+                          <button
+                            onClick={shareOnTwitter}
+                            className="flex items-center gap-2 px-4 py-3 bg-black hover:bg-zinc-800 text-white font-bold rounded-xl transition-colors"
+                          >
+                            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                              <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+                            </svg>
+                            Post on X
+                          </button>
+                          {/* Bluesky Button */}
+                          <button
+                            onClick={shareOnBluesky}
+                            className="flex items-center gap-2 px-4 py-3 bg-[#0085ff] hover:bg-[#0070d6] text-white font-bold rounded-xl transition-colors"
+                          >
+                            <svg className="w-4 h-4" viewBox="0 0 600 530" fill="currentColor">
+                              <path d="m135.72 44.03c66.496 49.921 138.02 151.14 164.28 205.46 26.262-54.316 97.782-155.54 164.28-205.46 47.98-36.021 125.72-63.892 125.72 24.795 0 17.712-10.155 148.79-16.111 170.07-20.703 73.984-96.144 92.854-163.25 81.433 117.3 19.964 147.14 86.092 82.697 152.22-122.39 125.59-175.91-31.511-189.63-71.766-2.514-7.38-3.69-10.832-3.69-7.914 0-2.918-1.176 0.534-3.69 7.914-13.72 40.255-67.24 197.36-189.63 71.766-64.444-66.128-34.605-132.26 82.697-152.22-67.108 11.421-142.55-7.449-163.25-81.433-5.9561-21.282-16.111-152.36-16.111-170.07 0-88.687 77.742-60.816 125.72-24.795z"/>
+                            </svg>
+                            Bluesky
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Filter info bar */}
               <div className="max-w-4xl mx-auto mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 px-4">
                 <div className="flex items-center gap-3">
                   <span className="text-xs font-medium text-zinc-400">
                     {activeFilter ? `Filtering: ${SIGNAL_LABELS[activeFilter as keyof SignalBreakdown]}` : "Showing all detected patterns"}
                   </span>
-                  {showSharePrompt && !isDemo && (
-                    <span className="text-xs font-medium text-amber-600 dark:text-amber-400 animate-pulse">
-                      This one&apos;s worth sharing.
-                    </span>
-                  )}
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
-                  {/* Primary CTA: Share Image */}
-                  <button
-                    onClick={onShareImageClick}
-                    className="flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white text-xs font-bold rounded-lg transition-all shadow-md hover:shadow-lg"
-                    title="Copy image to clipboard — paste anywhere"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
-                    {imageCopied ? "Copied — paste anywhere!" : "Share Image"}
-                  </button>
-                  {/* Post on X */}
-                  <button
-                    onClick={shareOnTwitter}
-                    className="flex items-center gap-1.5 px-3 py-2 bg-black hover:bg-zinc-800 text-white text-xs font-bold rounded-lg transition-colors"
-                    title="Post on X"
-                  >
-                    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
-                    </svg>
-                    Post on X
-                  </button>
-                  {/* Post on Bluesky */}
-                  <button
-                    onClick={shareOnBluesky}
-                    className="flex items-center gap-1.5 px-3 py-2 bg-[#0085ff] hover:bg-[#0070d6] text-white text-xs font-bold rounded-lg transition-colors"
-                    title="Post on Bluesky"
-                  >
-                    <svg className="w-3.5 h-3.5" viewBox="0 0 600 530" fill="currentColor">
-                      <path d="m135.72 44.03c66.496 49.921 138.02 151.14 164.28 205.46 26.262-54.316 97.782-155.54 164.28-205.46 47.98-36.021 125.72-63.892 125.72 24.795 0 17.712-10.155 148.79-16.111 170.07-20.703 73.984-96.144 92.854-163.25 81.433 117.3 19.964 147.14 86.092 82.697 152.22-122.39 125.59-175.91-31.511-189.63-71.766-2.514-7.38-3.69-10.832-3.69-7.914 0-2.918-1.176 0.534-3.69 7.914-13.72 40.255-67.24 197.36-189.63 71.766-64.444-66.128-34.605-132.26 82.697-152.22-67.108 11.421-142.55-7.449-163.25-81.433-5.9561-21.282-16.111-152.36-16.111-170.07 0-88.687 77.742-60.816 125.72-24.795z"/>
-                    </svg>
-                    Post on Bluesky
-                  </button>
                   {/* More dropdown */}
                   <div className="relative" ref={moreMenuRef}>
                     <button
