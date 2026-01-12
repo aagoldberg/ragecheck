@@ -1034,6 +1034,14 @@ export interface ViralMetrics {
 
   // Referral breakdown
   referralSources: { source: string; count: number }[];
+
+  // 7-day trends for sparklines
+  trends: {
+    visitors: number[];      // Daily unique visitors
+    shares: number[];        // Daily shares
+    repeatVisitors: number[]; // Daily repeat visitors
+    analyses: number[];      // Daily analyses
+  };
 }
 
 // ============================================
@@ -1296,6 +1304,78 @@ export async function getViralMetrics(): Promise<ViralMetrics> {
     const trafficVsBaseline = todayVisitors / avgDailyVisitors;
     const isSpike = trafficVsBaseline > 3; // 3x normal = spike
 
+    // Get 7-day trends for sparklines
+    const visitorTrends = await getDb()`
+      SELECT DATE(created_at) as day, COUNT(DISTINCT ip_address) as count
+      FROM ragecheck_visitors
+      WHERE created_at > NOW() - INTERVAL '7 days' AND ip_address IS NOT NULL
+      GROUP BY DATE(created_at)
+      ORDER BY day ASC
+    `;
+
+    const shareTrends = await getDb()`
+      SELECT DATE(created_at) as day, COUNT(*) as count
+      FROM ragecheck_shares
+      WHERE created_at > NOW() - INTERVAL '7 days'
+      GROUP BY DATE(created_at)
+      ORDER BY day ASC
+    `;
+
+    const analysisTrends = await getDb()`
+      SELECT DATE(created_at) as day, COUNT(*) as count
+      FROM ragecheck_analyses
+      WHERE created_at > NOW() - INTERVAL '7 days' AND success = true
+      GROUP BY DATE(created_at)
+      ORDER BY day ASC
+    `;
+
+    // Repeat visitors per day (visitors who had visited before that day)
+    const repeatVisitorTrends = await getDb()`
+      SELECT DATE(v.created_at) as day, COUNT(DISTINCT v.ip_address) as count
+      FROM ragecheck_visitors v
+      WHERE v.created_at > NOW() - INTERVAL '7 days'
+        AND v.ip_address IS NOT NULL
+        AND EXISTS (
+          SELECT 1 FROM ragecheck_visitors v2
+          WHERE v2.ip_address = v.ip_address
+            AND DATE(v2.created_at) < DATE(v.created_at)
+        )
+      GROUP BY DATE(v.created_at)
+      ORDER BY day ASC
+    `;
+
+    // Build trend arrays (7 days, oldest to newest)
+    const trendDates: string[] = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      trendDates.push(d.toISOString().split("T")[0]);
+    }
+
+    const visitorMap = new Map(visitorTrends.map(r => {
+      const d = new Date(r.day);
+      return [`${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`, Number(r.count)];
+    }));
+    const shareMap = new Map(shareTrends.map(r => {
+      const d = new Date(r.day);
+      return [`${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`, Number(r.count)];
+    }));
+    const analysisMap = new Map(analysisTrends.map(r => {
+      const d = new Date(r.day);
+      return [`${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`, Number(r.count)];
+    }));
+    const repeatMap = new Map(repeatVisitorTrends.map(r => {
+      const d = new Date(r.day);
+      return [`${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`, Number(r.count)];
+    }));
+
+    const trends = {
+      visitors: trendDates.map(d => visitorMap.get(d) || 0),
+      shares: trendDates.map(d => shareMap.get(d) || 0),
+      analyses: trendDates.map(d => analysisMap.get(d) || 0),
+      repeatVisitors: trendDates.map(d => repeatMap.get(d) || 0),
+    };
+
     return {
       repeatUsers,
       repeatRate: Math.round(repeatRate * 10) / 10,
@@ -1312,6 +1392,7 @@ export async function getViralMetrics(): Promise<ViralMetrics> {
         source: r.source,
         count: Number(r.count),
       })),
+      trends,
     };
   } catch (error) {
     console.error("Failed to get viral metrics:", error);
@@ -1328,6 +1409,7 @@ export async function getViralMetrics(): Promise<ViralMetrics> {
       trafficVsBaseline: 1,
       isSpike: false,
       referralSources: [],
+      trends: { visitors: [], shares: [], analyses: [], repeatVisitors: [] },
     };
   }
 }
