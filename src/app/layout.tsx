@@ -124,8 +124,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" translate="yes">
       <head>
+        <meta name="google" content="translate" />
+        <meta httpEquiv="Content-Language" content="en" />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
