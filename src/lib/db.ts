@@ -344,7 +344,9 @@ export interface DashboardStats {
     firstDaySearches: number;
     totalDays: number;
     totalSearches: number;
+    firstSeen: Date;
     lastSeen: Date;
+    isMidnightCrossover: boolean; // True if 2 days but session < 4 hours (likely just crossed midnight)
   }[];
 }
 
@@ -500,6 +502,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
       ud.user_agent,
       ud.total_days,
       ud.total_searches,
+      ud.first_seen,
       ud.last_seen,
       fa.first_platform,
       fa.first_referrer,
@@ -509,17 +512,28 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     ORDER BY ud.total_days DESC, ud.total_searches DESC
     LIMIT 50
   `;
-  const repeatUsers = repeatUserRows.map((row) => ({
-    ipAddress: row.ip_address,
-    country: row.country || null,
-    device: getDeviceType(row.user_agent),
-    firstPlatform: row.first_platform || "unknown",
-    firstReferrer: row.first_referrer || null,
-    firstDaySearches: Number(row.first_day_searches) || 1,
-    totalDays: Number(row.total_days),
-    totalSearches: Number(row.total_searches),
-    lastSeen: row.last_seen,
-  }));
+  const repeatUsers = repeatUserRows.map((row) => {
+    const firstSeen = new Date(row.first_seen);
+    const lastSeen = new Date(row.last_seen);
+    const totalDays = Number(row.total_days);
+    const hoursBetween = (lastSeen.getTime() - firstSeen.getTime()) / (1000 * 60 * 60);
+    // Flag as midnight crossover if exactly 2 days but less than 4 hours apart
+    const isMidnightCrossover = totalDays === 2 && hoursBetween < 4;
+
+    return {
+      ipAddress: row.ip_address,
+      country: row.country || null,
+      device: getDeviceType(row.user_agent),
+      firstPlatform: row.first_platform || "unknown",
+      firstReferrer: row.first_referrer || null,
+      firstDaySearches: Number(row.first_day_searches) || 1,
+      totalDays,
+      totalSearches: Number(row.total_searches),
+      firstSeen,
+      lastSeen,
+      isMidnightCrossover,
+    };
+  });
 
   return {
     totalAnalyses: Number(totalResult.count),

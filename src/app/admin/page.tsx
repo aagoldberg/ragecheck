@@ -81,7 +81,9 @@ interface DashboardStats {
     firstDaySearches: number;
     totalDays: number;
     totalSearches: number;
+    firstSeen: Date;
     lastSeen: Date;
+    isMidnightCrossover: boolean;
   }[];
 }
 
@@ -2523,8 +2525,12 @@ export default function AdminDashboard() {
                           </td>
                           <td className="py-2 px-3 text-zinc-900 dark:text-zinc-100 text-center">{u.firstDaySearches}</td>
                           <td className="py-2 px-3">
-                            <span className="text-xs font-medium px-2 py-0.5 rounded bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300">
-                              {u.totalDays} days
+                            <span className={`text-xs font-medium px-2 py-0.5 rounded ${
+                              u.isMidnightCrossover
+                                ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
+                                : "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300"
+                            }`} title={u.isMidnightCrossover ? "Likely midnight crossover - session < 4 hours" : ""}>
+                              {u.totalDays} days{u.isMidnightCrossover ? " ⚠️" : ""}
                             </span>
                           </td>
                           <td className="py-2 px-3 text-zinc-900 dark:text-zinc-100 font-medium text-center">{u.totalSearches}</td>
