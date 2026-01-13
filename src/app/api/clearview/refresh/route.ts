@@ -210,7 +210,7 @@ WHY IT MATTERS - POLITICAL PSYCHOLOGY RULES:
 
   const response = await client.messages.create({
     model: "claude-sonnet-4-20250514",
-    max_tokens: 4000,
+    max_tokens: 8000,
     messages: [{ role: "user", content: prompt }],
   });
 
@@ -225,7 +225,13 @@ WHY IT MATTERS - POLITICAL PSYCHOLOGY RULES:
   }
 
   const parsed = JSON.parse(jsonMatch[0]);
-  return parsed.stories || [];
+  const stories = parsed.stories || [];
+
+  // Log which stories have whyItMatters
+  const storiesWithWhy = stories.filter((s: { whyItMatters?: unknown }) => s.whyItMatters);
+  console.log(`Cron: ${storiesWithWhy.length}/${stories.length} stories have whyItMatters`);
+
+  return stories;
 }
 
 export async function GET(request: NextRequest) {
