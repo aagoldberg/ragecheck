@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { initDB, getDashboardStats, getVisitorStats, getPageVisitorStats, getViralMetrics, isDBAvailable, invalidateIncompleteCache, getFeedbackStats, initFeedbackTable, getTimeToAnalysisMetrics, getConversionMetrics, getConversionInsights, getFunnelMetrics } from "@/lib/db";
+import { initDB, getDashboardStats, getVisitorStats, getPageVisitorStats, getViralMetrics, isDBAvailable, invalidateIncompleteCache, recomputeBotFlags, getFeedbackStats, initFeedbackTable, getTimeToAnalysisMetrics, getConversionMetrics, getConversionInsights, getFunnelMetrics } from "@/lib/db";
 
 export async function GET(request: NextRequest) {
   // Simple password protection via query param
@@ -80,6 +80,16 @@ export async function POST(request: NextRequest) {
         action,
         invalidatedCount: count,
         message: `Invalidated ${count} incomplete cache entries`,
+      });
+    }
+
+    if (action === "recompute_bot_flags") {
+      const result = await recomputeBotFlags();
+      return NextResponse.json({
+        success: true,
+        action,
+        ...result,
+        message: `Updated ${result.analysesUpdated} analyses and ${result.visitorsUpdated} visitors`,
       });
     }
 

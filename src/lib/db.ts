@@ -101,7 +101,14 @@ const BOT_PATTERNS = [
 
 export function isBot(userAgent: string | null | undefined): boolean {
   if (!userAgent || userAgent.trim() === "") return true; // Empty UA = likely bot
-  return BOT_PATTERNS.some((pattern) => pattern.test(userAgent));
+  if (BOT_PATTERNS.some((pattern) => pattern.test(userAgent))) return true;
+
+  // If both OS and Browser are "Other", it's likely a bot with a fake/minimal user agent
+  const os = getOS(userAgent);
+  const browser = getBrowser(userAgent);
+  if (os === "Other" && browser === "Other") return true;
+
+  return false;
 }
 
 // Initialize table if it doesn't exist
@@ -530,6 +537,46 @@ export async function invalidateIncompleteCache(): Promise<number> {
   } catch (error) {
     console.error("Failed to invalidate incomplete cache:", error);
     return 0;
+  }
+}
+
+// Recompute bot flags for all records based on current detection logic
+export async function recomputeBotFlags(): Promise<{ analysesUpdated: number; visitorsUpdated: number }> {
+  if (!process.env.DATABASE_URL) return { analysesUpdated: 0, visitorsUpdated: 0 };
+
+  try {
+    // Get all analyses with user agents
+    const analyses = await getDb()`
+      SELECT id, user_agent FROM ragecheck_analyses WHERE user_agent IS NOT NULL
+    `;
+
+    let analysesUpdated = 0;
+    for (const row of analyses) {
+      const shouldBeBot = isBot(row.user_agent);
+      await getDb()`
+        UPDATE ragecheck_analyses SET is_bot = ${shouldBeBot} WHERE id = ${row.id}
+      `;
+      analysesUpdated++;
+    }
+
+    // Get all visitors with user agents
+    const visitors = await getDb()`
+      SELECT id, user_agent FROM ragecheck_visitors WHERE user_agent IS NOT NULL
+    `;
+
+    let visitorsUpdated = 0;
+    for (const row of visitors) {
+      const shouldBeBot = isBot(row.user_agent);
+      await getDb()`
+        UPDATE ragecheck_visitors SET is_bot = ${shouldBeBot} WHERE id = ${row.id}
+      `;
+      visitorsUpdated++;
+    }
+
+    return { analysesUpdated, visitorsUpdated };
+  } catch (error) {
+    console.error("Failed to recompute bot flags:", error);
+    return { analysesUpdated: 0, visitorsUpdated: 0 };
   }
 }
 
