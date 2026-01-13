@@ -1525,7 +1525,13 @@ export async function getViralMetrics(): Promise<ViralMetrics> {
 }
 
 // Time to Analysis metrics
-type StatGroup = { avgSeconds: number; medianSeconds: number; count: number };
+type StatGroup = {
+  avgSeconds: number;
+  medianSeconds: number;
+  p10Seconds: number;
+  p90Seconds: number;
+  count: number;
+};
 
 export interface TimeToAnalysisMetrics {
   overall: StatGroup;
@@ -1588,13 +1594,17 @@ export async function getTimeToAnalysisMetrics(): Promise<TimeToAnalysisMetrics>
     }
 
     const calcStats = (arr: number[]): StatGroup => {
-      if (arr.length === 0) return { avgSeconds: 0, medianSeconds: 0, count: 0 };
+      if (arr.length === 0) return { avgSeconds: 0, medianSeconds: 0, p10Seconds: 0, p90Seconds: 0, count: 0 };
       const sorted = [...arr].sort((a, b) => a - b);
       const avg = arr.reduce((a, b) => a + b, 0) / arr.length;
-      const median = sorted[Math.floor(sorted.length / 2)];
+      const p10Index = Math.floor(sorted.length * 0.1);
+      const p50Index = Math.floor(sorted.length * 0.5);
+      const p90Index = Math.floor(sorted.length * 0.9);
       return {
         avgSeconds: Math.round(avg),
-        medianSeconds: Math.round(median),
+        medianSeconds: Math.round(sorted[p50Index]),
+        p10Seconds: Math.round(sorted[p10Index]),
+        p90Seconds: Math.round(sorted[p90Index]),
         count: arr.length,
       };
     };
@@ -1619,7 +1629,7 @@ export async function getTimeToAnalysisMetrics(): Promise<TimeToAnalysisMetrics>
     };
   } catch (error) {
     console.error("Failed to get time-to-analysis metrics:", error);
-    const emptyStats: StatGroup = { avgSeconds: 0, medianSeconds: 0, count: 0 };
+    const emptyStats: StatGroup = { avgSeconds: 0, medianSeconds: 0, p10Seconds: 0, p90Seconds: 0, count: 0 };
     return {
       overall: emptyStats,
       byDevice: {
@@ -1942,8 +1952,16 @@ export interface FunnelStep {
   dropoff: number; // percentage that dropped off from previous step
 }
 
+interface ConversionTrendPoint {
+  date: string;
+  visitors: number;
+  converted: number;
+  rate: number;
+}
+
 export interface FunnelMetrics {
   steps: FunnelStep[];
+  trend: ConversionTrendPoint[];
   period: string;
 }
 
@@ -2011,14 +2029,84 @@ export async function getFunnelMetrics(): Promise<FunnelMetrics> {
       },
     ];
 
+    // Get daily conversion trend (last 14 days)
+    const dailyVisitors = await getDb()`
+      SELECT
+        DATE(created_at AT TIME ZONE 'America/New_York') as date,
+        COUNT(DISTINCT ip_address) as count
+      FROM ragecheck_visitors
+      WHERE created_at > NOW() - INTERVAL '14 days'
+        AND ip_address IS NOT NULL
+        AND (
+          user_agent IS NULL OR
+          NOT (
+            user_agent ILIKE '%bot%' OR
+            user_agent ILIKE '%crawler%' OR
+            user_agent ILIKE '%spider%' OR
+            user_agent ILIKE '%python%' OR
+            user_agent ILIKE '%curl%'
+          )
+        )
+      GROUP BY DATE(created_at AT TIME ZONE 'America/New_York')
+      ORDER BY date ASC
+    `;
+
+    const dailyConverted = await getDb()`
+      SELECT
+        DATE(created_at AT TIME ZONE 'America/New_York') as date,
+        COUNT(DISTINCT ip_address) as count
+      FROM ragecheck_analyses
+      WHERE created_at > NOW() - INTERVAL '14 days'
+        AND ip_address IS NOT NULL
+        AND success = true
+      GROUP BY DATE(created_at AT TIME ZONE 'America/New_York')
+      ORDER BY date ASC
+    `;
+
+    // Build trend data
+    const trendMap = new Map<string, { visitors: number; converted: number }>();
+
+    // Initialize last 14 days
+    for (let i = 13; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const dateStr = d.toISOString().split('T')[0];
+      trendMap.set(dateStr, { visitors: 0, converted: 0 });
+    }
+
+    for (const row of dailyVisitors) {
+      const dateStr = new Date(row.date).toISOString().split('T')[0];
+      if (trendMap.has(dateStr)) {
+        trendMap.get(dateStr)!.visitors = Number(row.count);
+      }
+    }
+
+    for (const row of dailyConverted) {
+      const dateStr = new Date(row.date).toISOString().split('T')[0];
+      if (trendMap.has(dateStr)) {
+        trendMap.get(dateStr)!.converted = Number(row.count);
+      }
+    }
+
+    const trend: ConversionTrendPoint[] = Array.from(trendMap.entries())
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([date, data]) => ({
+        date,
+        visitors: data.visitors,
+        converted: data.converted,
+        rate: data.visitors > 0 ? Math.round((data.converted / data.visitors) * 1000) / 10 : 0,
+      }));
+
     return {
       steps,
+      trend,
       period: "Last 7 days",
     };
   } catch (error) {
     console.error("Failed to get funnel metrics:", error);
     return {
       steps: [],
+      trend: [],
       period: "Last 7 days",
     };
   }
