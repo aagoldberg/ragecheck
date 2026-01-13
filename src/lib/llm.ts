@@ -192,19 +192,32 @@ export async function analyzeImageWithVision(
     return { success: false, error: "LLM not available" };
   }
 
-  // Extract media type and base64 data from data URL
-  const match = imageBase64.match(/^data:(image\/\w+);base64,(.+)$/);
+  // Extract media type and base64 data from data URL (more flexible regex)
+  const match = imageBase64.match(/^data:(image\/[a-zA-Z0-9+-]+)(?:;[^;,]+)*;base64,(.+)$/);
   if (!match) {
-    return { success: false, error: "Invalid image format" };
+    console.error("Image format regex failed. Prefix:", imageBase64.substring(0, 50));
+    return { success: false, error: "Invalid image format - could not parse data URL" };
   }
 
-  const mediaType = match[1] as "image/jpeg" | "image/png" | "image/gif" | "image/webp";
+  let mediaType = match[1] as "image/jpeg" | "image/png" | "image/gif" | "image/webp";
   const base64Data = match[2];
+
+  // Normalize media type (some browsers use image/jpg)
+  if (mediaType === "image/jpg" as string) {
+    mediaType = "image/jpeg";
+  }
 
   // Validate media type
   const allowedTypes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
   if (!allowedTypes.includes(mediaType)) {
-    return { success: false, error: "Unsupported image type" };
+    console.error("Unsupported image type:", mediaType);
+    return { success: false, error: `Unsupported image type: ${mediaType}` };
+  }
+
+  // Validate base64 data exists and isn't too short
+  if (!base64Data || base64Data.length < 100) {
+    console.error("Base64 data too short or missing");
+    return { success: false, error: "Image data is invalid or empty" };
   }
 
   try {
@@ -235,16 +248,25 @@ export async function analyzeImageWithVision(
     // Extract text from response
     const content = response.content[0];
     if (content.type !== "text") {
-      return { success: false, error: "Unexpected response format" };
+      console.error("Unexpected response type:", content.type);
+      return { success: false, error: "Unexpected response format from AI" };
     }
 
     // Parse JSON from response
     const jsonMatch = content.text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
-      return { success: false, error: "Failed to parse analysis" };
+      console.error("Failed to extract JSON from response:", content.text.substring(0, 200));
+      return { success: false, error: "Failed to parse AI analysis response" };
     }
 
-    const parsed = JSON.parse(jsonMatch[0]);
+    let parsed;
+    try {
+      parsed = JSON.parse(jsonMatch[0]);
+    } catch (parseError) {
+      console.error("JSON parse error:", parseError, "Raw:", jsonMatch[0].substring(0, 200));
+      return { success: false, error: "Invalid JSON in AI response" };
+    }
+
     const score = Math.min(100, Math.max(0, parsed.score || 0));
 
     return {
@@ -272,7 +294,8 @@ export async function analyzeImageWithVision(
       shareCardSummary: parsed.shareCardSummary,
     };
   } catch (error) {
-    console.error("Image analysis failed:", error);
-    return { success: false, error: "Failed to analyze image" };
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    console.error("Image analysis failed:", errorMessage, error);
+    return { success: false, error: `Analysis failed: ${errorMessage}` };
   }
 }
