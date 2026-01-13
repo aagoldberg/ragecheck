@@ -1,5 +1,14 @@
 import { neon, NeonQueryFunction } from "@neondatabase/serverless";
 
+// Helper to detect device type from user agent
+function getDeviceType(userAgent: string | null): "mobile" | "tablet" | "desktop" {
+  if (!userAgent) return "desktop";
+  const ua = userAgent.toLowerCase();
+  if (/ipad|tablet|playbook|silk|(android(?!.*mobile))/i.test(ua)) return "tablet";
+  if (/mobile|iphone|ipod|android.*mobile|windows phone|blackberry|opera mini|opera mobi/i.test(ua)) return "mobile";
+  return "desktop";
+}
+
 // Cache the database connection
 let dbInstance: NeonQueryFunction<false, false> | null = null;
 
@@ -263,13 +272,25 @@ export interface DashboardStats {
   recentAnalyses: {
     url: string;
     sourceDomain: string;
+    platform: string;
     score: number;
     label: string;
+    llmEnhanced: boolean;
+    signals: {
+      loadedLanguage: number;
+      absolutist: number;
+      threatPanic: number;
+      usVsThem: number;
+      engagementBait: number;
+    };
+    success: boolean;
+    error: string | null;
+    title: string | null;
     createdAt: Date;
     ipAddress: string | null;
-    userAgent: string | null;
     country: string | null;
     isBot: boolean;
+    device: "mobile" | "tablet" | "desktop";
   }[];
   topUsers: {
     ipAddress: string;
@@ -342,9 +363,12 @@ export async function getDashboardStats(): Promise<DashboardStats> {
   const totalHumans = Number(totalResult.count) - totalBots;
   const botRate = totalResult.count > 0 ? (totalBots / Number(totalResult.count)) * 100 : 0;
 
-  // Recent analyses
+  // Recent analyses - include all fields
   const recentRows = await getDb()`
-    SELECT url, source_domain, score, label, created_at, success, ip_address, user_agent, country, is_bot
+    SELECT url, source_domain, platform, score, label, llm_enhanced,
+           signal_loaded_language, signal_absolutist, signal_threat_panic,
+           signal_us_vs_them, signal_engagement_bait,
+           success, error, title, created_at, ip_address, user_agent, country, is_bot
     FROM ragecheck_analyses
     ORDER BY created_at DESC
     LIMIT 100
@@ -352,13 +376,25 @@ export async function getDashboardStats(): Promise<DashboardStats> {
   const recentAnalyses = recentRows.map((row) => ({
     url: row.url,
     sourceDomain: row.source_domain || "unknown",
-    score: Number(row.score),
+    platform: row.platform || "unknown",
+    score: Number(row.score) || 0,
     label: row.label || "Unknown",
+    llmEnhanced: row.llm_enhanced || false,
+    signals: {
+      loadedLanguage: Number(row.signal_loaded_language) || 0,
+      absolutist: Number(row.signal_absolutist) || 0,
+      threatPanic: Number(row.signal_threat_panic) || 0,
+      usVsThem: Number(row.signal_us_vs_them) || 0,
+      engagementBait: Number(row.signal_engagement_bait) || 0,
+    },
+    success: row.success !== false,
+    error: row.error || null,
+    title: row.title || null,
     createdAt: row.created_at,
     ipAddress: row.ip_address || null,
-    userAgent: row.user_agent || null,
     country: row.country || null,
     isBot: row.is_bot || false,
+    device: getDeviceType(row.user_agent),
   }));
 
   // Top users by analysis count
@@ -574,6 +610,8 @@ export interface VisitorStats {
     ipAddress: string | null;
     country: string | null;
     referrer: string | null;
+    pagePath: string;
+    device: "mobile" | "tablet" | "desktop";
     createdAt: Date;
     isBot: boolean;
   }[];
@@ -753,16 +791,18 @@ export async function getVisitorStats(): Promise<VisitorStats> {
       : 0;
 
     const recentRows = await getDb()`
-      SELECT ip_address, country, referrer, created_at, is_bot
+      SELECT ip_address, user_agent, country, referrer, page_path, created_at, is_bot
       FROM ragecheck_visitors
       ORDER BY created_at DESC
-      LIMIT 50
+      LIMIT 100
     `;
 
     const recentVisitors = recentRows.map((row) => ({
       ipAddress: row.ip_address || null,
       country: row.country || null,
       referrer: row.referrer || null,
+      pagePath: row.page_path || "/",
+      device: getDeviceType(row.user_agent),
       createdAt: row.created_at,
       isBot: row.is_bot || false,
     }));
