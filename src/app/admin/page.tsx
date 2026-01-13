@@ -115,6 +115,11 @@ interface VisitorStats {
     visitors: number;
     analyses: number;
   }[];
+  uniqueRealtimeSeries: {
+    time: string;
+    uniqueVisitors: number;
+    uniqueAnalyzers: number;
+  }[];
 }
 
 interface PageVisitorStats {
@@ -915,6 +920,125 @@ function RealtimeChart({ data }: { data: { time: string; visitors: number; analy
   );
 }
 
+function UniqueSessionsChart({ data }: { data: { time: string; uniqueVisitors: number; uniqueAnalyzers: number }[] }) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Scroll to the right (most recent) on mount
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollLeft = scrollRef.current.scrollWidth;
+    }
+  }, [data]);
+
+  if (!data || data.length === 0) return null;
+
+  const maxValue = Math.max(...data.map(d => Math.max(d.uniqueVisitors, d.uniqueAnalyzers)), 1);
+  const width = 2400;
+  const height = 200;
+  const padding = { top: 20, right: 20, bottom: 20, left: 20 };
+  const chartWidth = width - padding.left - padding.right;
+  const chartHeight = height - padding.top - padding.bottom;
+
+  const getX = (i: number) => padding.left + (i / (data.length - 1)) * chartWidth;
+  const getY = (value: number) => padding.top + chartHeight - (value / maxValue) * chartHeight;
+
+  const createAreaPath = (points: { x: number; y: number }[]): string => {
+    if (points.length < 2) return '';
+    let path = `M ${points[0].x} ${padding.top + chartHeight}`;
+    path += ` L ${points[0].x} ${points[0].y}`;
+    for (let i = 1; i < points.length; i++) {
+      path += ` L ${points[i].x} ${points[i].y}`;
+    }
+    path += ` L ${points[points.length - 1].x} ${padding.top + chartHeight}`;
+    path += ' Z';
+    return path;
+  };
+
+  const visitorsPoints = data.map((d, i) => ({ x: getX(i), y: getY(d.uniqueVisitors) }));
+  const analyzersPoints = data.map((d, i) => ({ x: getX(i), y: getY(d.uniqueAnalyzers) }));
+
+  const formatTimeEST = (isoString: string) => {
+    const d = new Date(isoString);
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'America/New_York' }) + ' ' +
+           d.toLocaleTimeString('en-US', { hour: 'numeric', hour12: true, timeZone: 'America/New_York' });
+  };
+
+  const labelIndices: number[] = [];
+  for (let i = 0; i <= 12; i++) {
+    labelIndices.push(Math.min(Math.floor(i * 12), data.length - 1));
+  }
+
+  return (
+    <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 mb-8">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+          Unique Sessions (Last 3 Days - deduplicated per 30 min window, EST)
+        </h3>
+        <div className="flex items-center gap-4 text-xs">
+          <div className="flex items-center gap-1.5">
+            <div className="w-3 h-0.5 bg-amber-500 rounded" />
+            <span className="text-zinc-500">Unique Visitors</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-3 h-0.5 bg-purple-500 rounded" />
+            <span className="text-zinc-500">Unique Analyzers</span>
+          </div>
+        </div>
+      </div>
+      <div className="relative">
+        <div className="absolute top-0 right-0 text-xs text-zinc-400 z-10 bg-white dark:bg-zinc-900 px-1">
+          max: {maxValue}
+        </div>
+        <div ref={scrollRef} className="overflow-x-auto">
+          <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} className="h-40" style={{ minWidth: width }}>
+            {[0, 0.25, 0.5, 0.75, 1].map((ratio) => (
+              <line
+                key={ratio}
+                x1={padding.left}
+                y1={padding.top + chartHeight * (1 - ratio)}
+                x2={width - padding.right}
+                y2={padding.top + chartHeight * (1 - ratio)}
+                stroke="currentColor"
+                className="text-zinc-100 dark:text-zinc-800"
+                strokeWidth="1"
+              />
+            ))}
+            <path
+              d={createAreaPath(visitorsPoints)}
+              fill="rgba(245, 158, 11, 0.15)"
+            />
+            <path
+              d={createAreaPath(analyzersPoints)}
+              fill="rgba(168, 85, 247, 0.15)"
+            />
+            <polyline
+              points={visitorsPoints.map(p => `${p.x},${p.y}`).join(' ')}
+              fill="none"
+              stroke="#f59e0b"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+            <polyline
+              points={analyzersPoints.map(p => `${p.x},${p.y}`).join(' ')}
+              fill="none"
+              stroke="#a855f7"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+          <div className="flex justify-between mt-2 text-xs text-zinc-400" style={{ minWidth: width }}>
+            {labelIndices.map((idx, i) => (
+              <span key={i}>{data[idx] ? formatTimeEST(data[idx].time) : ''}</span>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function PageTrafficChart({ data, title }: { data: { time: string; visitors: number }[]; title: string }) {
   if (!data || data.length === 0) return null;
 
@@ -1505,6 +1629,11 @@ export default function AdminDashboard() {
             {/* Realtime Chart (10-min intervals) */}
             {visitorStats && visitorStats.realtimeSeries && visitorStats.realtimeSeries.length > 0 && (
               <RealtimeChart data={visitorStats.realtimeSeries} />
+            )}
+
+            {/* Unique Sessions Chart (deduplicated) */}
+            {visitorStats && visitorStats.uniqueRealtimeSeries && visitorStats.uniqueRealtimeSeries.length > 0 && (
+              <UniqueSessionsChart data={visitorStats.uniqueRealtimeSeries} />
             )}
 
             {/* Viral Metrics Section */}

@@ -792,6 +792,11 @@ export interface VisitorStats {
     visitors: number;
     analyses: number;
   }[];
+  uniqueRealtimeSeries: {
+    time: string;
+    uniqueVisitors: number;
+    uniqueAnalyzers: number;
+  }[];
 }
 
 // Clearview cache storage
@@ -1091,6 +1096,58 @@ export async function getVisitorStats(): Promise<VisitorStats> {
       .sort((a, b) => a[0].localeCompare(b[0]))
       .map(([time, data]) => ({ time, ...data }));
 
+    // Unique sessions - count distinct IP addresses per bucket
+    // This shows unique visitors rather than total page loads
+    const uniqueVisitorRealtime = await getDb()`
+      SELECT
+        date_trunc('hour', created_at) +
+        (floor(extract(minute FROM created_at) / 30) * interval '30 minutes') as bucket,
+        COUNT(DISTINCT ip_address) as count
+      FROM ragecheck_visitors
+      WHERE is_bot = false AND ip_address IS NOT NULL AND created_at > NOW() - INTERVAL '72 hours'
+      GROUP BY bucket
+      ORDER BY bucket ASC
+    `;
+
+    const uniqueAnalyzerRealtime = await getDb()`
+      SELECT
+        date_trunc('hour', created_at) +
+        (floor(extract(minute FROM created_at) / 30) * interval '30 minutes') as bucket,
+        COUNT(DISTINCT ip_address) as count
+      FROM ragecheck_analyses
+      WHERE is_bot = false AND ip_address IS NOT NULL AND created_at > NOW() - INTERVAL '72 hours'
+      GROUP BY bucket
+      ORDER BY bucket ASC
+    `;
+
+    // Build unique realtime map
+    const uniqueRealtimeMap = new Map<string, { uniqueVisitors: number; uniqueAnalyzers: number }>();
+
+    // Initialize same 144 buckets
+    for (let i = 144; i >= 1; i--) {
+      const d = new Date(now.getTime() - i * 30 * 60 * 1000);
+      const timeStr = d.toISOString();
+      uniqueRealtimeMap.set(timeStr, { uniqueVisitors: 0, uniqueAnalyzers: 0 });
+    }
+
+    for (const row of uniqueVisitorRealtime) {
+      const timeStr = new Date(row.bucket).toISOString();
+      const existing = uniqueRealtimeMap.get(timeStr) || { uniqueVisitors: 0, uniqueAnalyzers: 0 };
+      existing.uniqueVisitors = Number(row.count);
+      uniqueRealtimeMap.set(timeStr, existing);
+    }
+
+    for (const row of uniqueAnalyzerRealtime) {
+      const timeStr = new Date(row.bucket).toISOString();
+      const existing = uniqueRealtimeMap.get(timeStr) || { uniqueVisitors: 0, uniqueAnalyzers: 0 };
+      existing.uniqueAnalyzers = Number(row.count);
+      uniqueRealtimeMap.set(timeStr, existing);
+    }
+
+    const uniqueRealtimeSeries = Array.from(uniqueRealtimeMap.entries())
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([time, data]) => ({ time, ...data }));
+
     return {
       totalVisitors: Number(totalResult.count),
       todayVisitors: Number(todayResult.count),
@@ -1099,6 +1156,7 @@ export async function getVisitorStats(): Promise<VisitorStats> {
       recentVisitors,
       timeSeries,
       realtimeSeries,
+      uniqueRealtimeSeries,
     };
   } catch (error) {
     console.error("Failed to get visitor stats:", error);
@@ -1110,6 +1168,7 @@ export async function getVisitorStats(): Promise<VisitorStats> {
       recentVisitors: [],
       timeSeries: [],
       realtimeSeries: [],
+      uniqueRealtimeSeries: [],
     };
   }
 }
