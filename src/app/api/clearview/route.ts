@@ -134,6 +134,22 @@ interface StoryCluster {
     rightPosition: string;
     evidenceStatus: "supported" | "mixed" | "unsupported" | "misleading";
   }[];
+  // Political psychology context
+  whyItMatters?: {
+    left: {
+      coreValue: string; // The underlying value at stake (e.g., "equality", "protection")
+      motivation: string; // Plain-language explanation of why they care
+      stance: "offensive" | "defensive" | "mobilizing"; // Are they pushing change, defending status quo, or rallying base
+      emotionalAppeal: string; // What emotion this activates (fear, hope, anger, pride)
+    };
+    right: {
+      coreValue: string;
+      motivation: string;
+      stance: "offensive" | "defensive" | "mobilizing";
+      emotionalAppeal: string;
+    };
+    bottomLine: string; // One sentence explaining the real fight
+  };
 }
 
 interface ArchivedBriefing {
@@ -209,6 +225,7 @@ Your task:
    - The key perspectives from different political viewpoints
    - CRITICAL: Identify if there's scientific/expert consensus on the underlying facts
    - Distinguish between factual disputes vs policy/values debates
+   - WHY each side cares about this issue (psychological/political motivations)
 
 Respond with this exact JSON structure:
 {
@@ -257,7 +274,22 @@ Respond with this exact JSON structure:
           "rightPosition": "What right-leaning sources claim",
           "evidenceStatus": "supported|mixed|unsupported|misleading"
         }
-      ]
+      ],
+      "whyItMatters": {
+        "left": {
+          "coreValue": "The underlying value at stake (equality, fairness, protection, progress, etc.)",
+          "motivation": "Plain-language explanation of why this matters to them - write like you're explaining to a friend",
+          "stance": "offensive|defensive|mobilizing",
+          "emotionalAppeal": "What emotion this activates (fear, hope, anger, pride, moral outrage, etc.)"
+        },
+        "right": {
+          "coreValue": "The underlying value at stake (liberty, tradition, security, order, etc.)",
+          "motivation": "Plain-language explanation of why this matters to them - write like you're explaining to a friend",
+          "stance": "offensive|defensive|mobilizing",
+          "emotionalAppeal": "What emotion this activates"
+        },
+        "bottomLine": "One sentence explaining what this fight is really about at its core"
+      }
     }
   ]
 }
@@ -290,7 +322,21 @@ EXPERT CONSENSUS RULES:
   - "mixed" if it involves multiple types
 - For factualDisputes, honestly assess whether claims are supported by evidence
 - evidenceStatus "misleading" means the claim contains some truth but is framed deceptively
-- Don't create false balance: if one side's claims contradict expert consensus, say so`;
+- Don't create false balance: if one side's claims contradict expert consensus, say so
+
+WHY IT MATTERS - POLITICAL PSYCHOLOGY RULES:
+- REQUIRED: Every story MUST include the whyItMatters object
+- Write motivations in plain, accessible language - like explaining to a smart friend who doesn't follow politics
+- Use moral foundations theory as a guide:
+  - Left typically prioritizes: Care/Harm, Fairness/Equality, Liberty from oppression
+  - Right typically prioritizes: Loyalty/Tradition, Authority/Stability, Sanctity/Purity, Liberty from government
+- Stance meanings:
+  - "offensive" = They're pushing for change, trying to advance their position
+  - "defensive" = They're protecting something they feel is under threat
+  - "mobilizing" = They're rallying their base, making this a tribal identity issue
+- emotionalAppeal should identify the primary emotion being activated (fear, anger, hope, pride, disgust, moral outrage, anxiety, righteous indignation)
+- bottomLine should cut through the noise and state what this fight is REALLY about in one honest sentence
+- Be empathetic to both sides - help readers understand WHY reasonable people disagree, not just THAT they disagree`;
 
   const response = await client.messages.create({
     model: "claude-sonnet-4-20250514",

@@ -35,6 +35,22 @@ interface FactualDispute {
   evidenceStatus: "supported" | "mixed" | "unsupported" | "misleading";
 }
 
+interface WhyItMatters {
+  left: {
+    coreValue: string;
+    motivation: string;
+    stance: "offensive" | "defensive" | "mobilizing";
+    emotionalAppeal: string;
+  };
+  right: {
+    coreValue: string;
+    motivation: string;
+    stance: "offensive" | "defensive" | "mobilizing";
+    emotionalAppeal: string;
+  };
+  bottomLine: string;
+}
+
 interface StoryCluster {
   id: string;
   topic: string;
@@ -48,6 +64,7 @@ interface StoryCluster {
   debateQuestion?: string;
   commonGround?: string[];
   factualDisputes?: FactualDispute[];
+  whyItMatters?: WhyItMatters;
 }
 
 interface ArchivedBriefing {
@@ -185,6 +202,105 @@ function ExpertConsensusBox({ consensus }: { consensus?: ExpertConsensus }) {
   );
 }
 
+function StanceBadge({ stance }: { stance: string }) {
+  const config: Record<string, { bg: string; text: string; icon: string }> = {
+    offensive: { bg: "bg-amber-50 dark:bg-amber-900/20", text: "text-amber-700 dark:text-amber-400", icon: "→" },
+    defensive: { bg: "bg-blue-50 dark:bg-blue-900/20", text: "text-blue-700 dark:text-blue-400", icon: "⊙" },
+    mobilizing: { bg: "bg-purple-50 dark:bg-purple-900/20", text: "text-purple-700 dark:text-purple-400", icon: "◉" },
+  };
+  const c = config[stance] || config.defensive;
+  return (
+    <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-tight ${c.bg} ${c.text}`}>
+      <span>{c.icon}</span>
+      {stance === "offensive" ? "Pushing" : stance === "defensive" ? "Defending" : "Rallying"}
+    </span>
+  );
+}
+
+function WhyItMattersBox({ whyItMatters }: { whyItMatters?: WhyItMatters }) {
+  if (!whyItMatters) return null;
+
+  return (
+    <div className="p-5 bg-gradient-to-br from-zinc-50 to-zinc-100/50 dark:from-zinc-900/50 dark:to-zinc-800/30 rounded-xl border border-zinc-200 dark:border-zinc-800">
+      <h3 className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mb-4 flex items-center gap-2">
+        <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+        Why Each Side Cares
+      </h3>
+
+      {/* Bottom Line - The Real Fight */}
+      <div className="mb-5 p-3 bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-700">
+        <p className="text-sm font-medium text-zinc-800 dark:text-zinc-200 leading-relaxed">
+          <span className="text-amber-600 dark:text-amber-400 font-bold">The real fight:</span> {whyItMatters.bottomLine}
+        </p>
+      </div>
+
+      <div className="grid md:grid-cols-2 gap-4">
+        {/* Left Side */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h4 className="text-[10px] font-bold uppercase tracking-widest text-blue-600 dark:text-blue-400">
+              Why the Left Cares
+            </h4>
+            <StanceBadge stance={whyItMatters.left.stance} />
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex items-start gap-2">
+              <span className="text-blue-500 text-sm mt-0.5">♥</span>
+              <div>
+                <span className="text-[10px] font-bold text-zinc-400 uppercase">Core Value:</span>
+                <p className="text-xs text-zinc-700 dark:text-zinc-300">{whyItMatters.left.coreValue}</p>
+              </div>
+            </div>
+
+            <p className="text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed pl-5 border-l-2 border-blue-200 dark:border-blue-800">
+              {whyItMatters.left.motivation}
+            </p>
+
+            <div className="flex items-center gap-1.5 pl-5">
+              <span className="text-[10px] font-bold text-zinc-400">Activates:</span>
+              <span className="text-[10px] font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 px-1.5 py-0.5 rounded">
+                {whyItMatters.left.emotionalAppeal}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Right Side */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h4 className="text-[10px] font-bold uppercase tracking-widest text-rose-600 dark:text-rose-400">
+              Why the Right Cares
+            </h4>
+            <StanceBadge stance={whyItMatters.right.stance} />
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex items-start gap-2">
+              <span className="text-rose-500 text-sm mt-0.5">♥</span>
+              <div>
+                <span className="text-[10px] font-bold text-zinc-400 uppercase">Core Value:</span>
+                <p className="text-xs text-zinc-700 dark:text-zinc-300">{whyItMatters.right.coreValue}</p>
+              </div>
+            </div>
+
+            <p className="text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed pl-5 border-l-2 border-rose-200 dark:border-rose-800">
+              {whyItMatters.right.motivation}
+            </p>
+
+            <div className="flex items-center gap-1.5 pl-5">
+              <span className="text-[10px] font-bold text-zinc-400">Activates:</span>
+              <span className="text-[10px] font-medium text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-900/30 px-1.5 py-0.5 rounded">
+                {whyItMatters.right.emotionalAppeal}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function StoryCard({ story }: { story: StoryCluster }) {
   const [expanded, setExpanded] = useState(false);
   
@@ -242,6 +358,8 @@ function StoryCard({ story }: { story: StoryCluster }) {
         </div>
 
         <ExpertConsensusBox consensus={story.expertConsensus} />
+
+        <WhyItMattersBox whyItMatters={story.whyItMatters} />
       </div>
 
       {/* Expand Bar */}
