@@ -576,8 +576,9 @@ export default function ClearviewPage() {
                 RageCheck Intelligence Engine • Analyzing 50+ Global Outlets
             </p>
             <div className="flex justify-center gap-6">
-                <Link href="/methodology" className="text-xs font-medium text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100">Our Methodology</Link>
-                <Link href="/about" className="text-xs font-medium text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100">About RageCheck</Link>
+                <Link href="/clearview/methodology" className="text-xs font-medium text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100">Methodology</Link>
+                <Link href="/clearview/about" className="text-xs font-medium text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100">About ClearView</Link>
+                <Link href="/" className="text-xs font-medium text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100">RageCheck Analyzer</Link>
             </div>
         </footer>
 
