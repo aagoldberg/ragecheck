@@ -327,6 +327,7 @@ export interface DashboardStats {
     device: "mobile" | "tablet" | "desktop";
     shared: boolean;
     failedImageUrl: string | null;
+    isRepeatUser: boolean;
   }[];
   topUsers: {
     ipAddress: string;
@@ -407,7 +408,8 @@ export async function getDashboardStats(): Promise<DashboardStats> {
            a.signal_us_vs_them, a.signal_engagement_bait,
            a.success, a.error, a.title, a.created_at, a.ip_address, a.user_agent, a.country, a.is_bot,
            a.failed_image_url,
-           EXISTS (SELECT 1 FROM ragecheck_shares s WHERE s.url = a.url) as shared
+           EXISTS (SELECT 1 FROM ragecheck_shares s WHERE s.url = a.url) as shared,
+           (SELECT COUNT(*) FROM ragecheck_analyses a2 WHERE a2.ip_address = a.ip_address AND a.ip_address IS NOT NULL) > 1 as is_repeat_user
     FROM ragecheck_analyses a
     WHERE a.created_at > NOW() - INTERVAL '3 days'
     ORDER BY a.created_at DESC
@@ -436,6 +438,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     device: getDeviceType(row.user_agent),
     shared: row.shared || false,
     failedImageUrl: row.failed_image_url || null,
+    isRepeatUser: row.is_repeat_user || false,
   }));
 
   // Top users by analysis count (excluding bots)
@@ -698,6 +701,7 @@ export interface VisitorStats {
     createdAt: Date;
     hasLlmAnalysis: boolean;
     isBot: boolean;
+    isRepeatUser: boolean;
   }[];
   timeSeries: {
     date: string;
@@ -883,7 +887,8 @@ export async function getVisitorStats(): Promise<VisitorStats> {
              EXISTS (
                SELECT 1 FROM ragecheck_analyses a
                WHERE a.ip_address = v.ip_address AND a.llm_enhanced = true
-             ) as has_llm_analysis
+             ) as has_llm_analysis,
+             (SELECT COUNT(*) FROM ragecheck_visitors v2 WHERE v2.ip_address = v.ip_address AND v.ip_address IS NOT NULL) > 1 as is_repeat_user
       FROM ragecheck_visitors v
       WHERE v.created_at > NOW() - INTERVAL '3 days'
       ORDER BY v.created_at DESC
@@ -900,6 +905,7 @@ export async function getVisitorStats(): Promise<VisitorStats> {
       createdAt: row.created_at,
       hasLlmAnalysis: row.has_llm_analysis || false,
       isBot: row.is_bot || false,
+      isRepeatUser: row.is_repeat_user || false,
     }));
 
     // Time series for last 14 days (grouped by EST date, excluding bots)

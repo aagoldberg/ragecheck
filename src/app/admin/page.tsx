@@ -64,6 +64,7 @@ interface DashboardStats {
     device: "mobile" | "tablet" | "desktop";
     shared: boolean;
     failedImageUrl: string | null;
+    isRepeatUser: boolean;
   }[];
   topUsers: {
     ipAddress: string;
@@ -89,6 +90,7 @@ interface VisitorStats {
     createdAt: string;
     hasLlmAnalysis: boolean;
     isBot: boolean;
+    isRepeatUser: boolean;
   }[];
   timeSeries: {
     date: string;
@@ -1592,7 +1594,12 @@ export default function AdminDashboard() {
                             {a.country || "-"}
                           </td>
                           <td className="py-2 px-3 text-zinc-500 text-xs font-mono">
-                            {a.ipAddress || "-"}
+                            <span className="flex items-center gap-1">
+                              {a.ipAddress || "-"}
+                              {a.isRepeatUser && (
+                                <span className="text-[9px] px-1 py-0.5 bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 rounded font-sans font-medium">repeat</span>
+                              )}
+                            </span>
                           </td>
                         </tr>
                       ))
@@ -1657,7 +1664,12 @@ export default function AdminDashboard() {
                               {v.referrer || "-"}
                             </td>
                             <td className="py-2 px-3 text-zinc-500 text-xs font-mono">
-                              {v.ipAddress || "-"}
+                              <span className="flex items-center gap-1">
+                                {v.ipAddress || "-"}
+                                {v.isRepeatUser && (
+                                  <span className="text-[9px] px-1 py-0.5 bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 rounded font-sans font-medium">repeat</span>
+                                )}
+                              </span>
                             </td>
                             <td className="py-2 px-3 text-xs">
                               {v.isBot ? (
