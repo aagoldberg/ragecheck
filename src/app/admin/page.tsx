@@ -1606,57 +1606,101 @@ export default function AdminDashboard() {
                   Conversion Rate
                 </h2>
                 <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6">
-                  {/* By Device */}
-                  <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-4">By Device</h3>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-6">
-                    {/* Overall */}
-                    <div className="text-center">
-                      <div className="text-3xl font-bold text-zinc-900 dark:text-zinc-100">
+                  {/* Overall headline metric */}
+                  <div className="flex items-center justify-between mb-6 pb-4 border-b border-zinc-100 dark:border-zinc-800">
+                    <div>
+                      <div className="text-4xl font-bold text-zinc-900 dark:text-zinc-100">
                         {conversionMetrics.overall.rate}%
                       </div>
-                      <div className="text-xs text-zinc-500 mt-1">Overall</div>
-                      <div className="text-xs text-zinc-400">{conversionMetrics.overall.converted}/{conversionMetrics.overall.visitors}</div>
+                      <div className="text-sm text-zinc-500 mt-1">Overall conversion rate</div>
                     </div>
-                    {/* Mobile */}
-                    <div className="text-center">
-                      <div className="text-3xl font-bold text-indigo-600 dark:text-indigo-400">
-                        {conversionMetrics.byDevice.mobile.visitors > 0 ? `${conversionMetrics.byDevice.mobile.rate}%` : "-"}
-                      </div>
-                      <div className="text-xs text-zinc-500 mt-1">📱 Mobile</div>
-                      <div className="text-xs text-zinc-400">{conversionMetrics.byDevice.mobile.converted}/{conversionMetrics.byDevice.mobile.visitors}</div>
-                    </div>
-                    {/* Tablet */}
-                    <div className="text-center">
-                      <div className="text-3xl font-bold text-amber-600 dark:text-amber-400">
-                        {conversionMetrics.byDevice.tablet.visitors > 0 ? `${conversionMetrics.byDevice.tablet.rate}%` : "-"}
-                      </div>
-                      <div className="text-xs text-zinc-500 mt-1">📱 Tablet</div>
-                      <div className="text-xs text-zinc-400">{conversionMetrics.byDevice.tablet.converted}/{conversionMetrics.byDevice.tablet.visitors}</div>
-                    </div>
-                    {/* Desktop */}
-                    <div className="text-center">
-                      <div className="text-3xl font-bold text-emerald-600 dark:text-emerald-400">
-                        {conversionMetrics.byDevice.desktop.visitors > 0 ? `${conversionMetrics.byDevice.desktop.rate}%` : "-"}
-                      </div>
-                      <div className="text-xs text-zinc-500 mt-1">💻 Desktop</div>
-                      <div className="text-xs text-zinc-400">{conversionMetrics.byDevice.desktop.converted}/{conversionMetrics.byDevice.desktop.visitors}</div>
+                    <div className="text-right text-sm text-zinc-400">
+                      {conversionMetrics.overall.converted.toLocaleString()} / {conversionMetrics.overall.visitors.toLocaleString()} visitors
                     </div>
                   </div>
-                  {/* By OS */}
-                  <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-4">By OS</h3>
-                  <div className="grid grid-cols-3 md:grid-cols-6 gap-4">
-                    {(["iOS", "Android", "Windows", "macOS", "Linux", "Other"] as const).map((os) => (
-                      <div key={os} className="text-center">
-                        <div className="text-xl font-bold text-zinc-700 dark:text-zinc-300">
-                          {conversionMetrics.byOS[os].visitors > 0 ? `${conversionMetrics.byOS[os].rate}%` : "-"}
+
+                  {/* By Device - Horizontal bars */}
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-4">By Device</h3>
+                  <div className="space-y-3 mb-6">
+                    {([
+                      { key: 'desktop', label: 'Desktop', icon: '💻', data: conversionMetrics.byDevice.desktop },
+                      { key: 'mobile', label: 'Mobile', icon: '📱', data: conversionMetrics.byDevice.mobile },
+                      { key: 'tablet', label: 'Tablet', icon: '📱', data: conversionMetrics.byDevice.tablet },
+                    ] as const).map(({ key, label, icon, data }) => {
+                      const avgRate = conversionMetrics.overall.rate;
+                      const isAboveAvg = data.rate >= avgRate;
+                      const barWidth = Math.min(100, (data.rate / Math.max(avgRate * 1.5, 1)) * 100);
+                      return (
+                        <div key={key} className="group">
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-sm text-zinc-600 dark:text-zinc-400">{icon} {label}</span>
+                            <div className="flex items-center gap-3">
+                              <span className="text-xs text-zinc-400">{data.converted}/{data.visitors}</span>
+                              <span className={`font-bold text-sm w-14 text-right ${isAboveAvg ? 'text-emerald-600' : 'text-zinc-900 dark:text-zinc-100'}`}>
+                                {data.visitors > 0 ? `${data.rate}%` : '-'}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="relative h-2 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+                            <div
+                              className={`h-full rounded-full transition-all ${isAboveAvg ? 'bg-emerald-500' : 'bg-indigo-500'}`}
+                              style={{ width: `${data.visitors > 0 ? barWidth : 0}%` }}
+                            />
+                            {/* Average line marker */}
+                            <div
+                              className="absolute top-0 bottom-0 w-0.5 bg-zinc-400"
+                              style={{ left: `${(avgRate / Math.max(avgRate * 1.5, 1)) * 100}%` }}
+                              title={`Avg: ${avgRate}%`}
+                            />
+                          </div>
                         </div>
-                        <div className="text-xs text-zinc-500 mt-1">{os}</div>
-                        <div className="text-xs text-zinc-400">{conversionMetrics.byOS[os].converted}/{conversionMetrics.byOS[os].visitors}</div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
-                  <div className="mt-4 text-center text-xs text-zinc-400">
-                    Visitors who performed at least one analysis (last 7 days)
+
+                  {/* By OS - Horizontal bars */}
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-4">By OS</h3>
+                  <div className="space-y-3">
+                    {(["Windows", "macOS", "iOS", "Android", "Linux", "Other"] as const).map((os) => {
+                      const data = conversionMetrics.byOS[os];
+                      const avgRate = conversionMetrics.overall.rate;
+                      const isAboveAvg = data.rate >= avgRate;
+                      const barWidth = Math.min(100, (data.rate / Math.max(avgRate * 1.5, 1)) * 100);
+                      return (
+                        <div key={os} className="group">
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-sm text-zinc-600 dark:text-zinc-400">{os}</span>
+                            <div className="flex items-center gap-3">
+                              <span className="text-xs text-zinc-400">{data.converted}/{data.visitors}</span>
+                              <span className={`font-bold text-sm w-14 text-right ${isAboveAvg ? 'text-emerald-600' : 'text-zinc-900 dark:text-zinc-100'}`}>
+                                {data.visitors > 0 ? `${data.rate}%` : '-'}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="relative h-2 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+                            <div
+                              className={`h-full rounded-full transition-all ${isAboveAvg ? 'bg-emerald-500' : 'bg-indigo-500'}`}
+                              style={{ width: `${data.visitors > 0 ? barWidth : 0}%` }}
+                            />
+                            <div
+                              className="absolute top-0 bottom-0 w-0.5 bg-zinc-400"
+                              style={{ left: `${(avgRate / Math.max(avgRate * 1.5, 1)) * 100}%` }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div className="mt-4 flex items-center justify-center gap-4 text-xs text-zinc-400">
+                    <div className="flex items-center gap-1">
+                      <div className="w-3 h-0.5 bg-zinc-400" />
+                      <span>Average</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <div className="w-3 h-2 bg-emerald-500 rounded" />
+                      <span>Above avg</span>
+                    </div>
+                    <span>Last 7 days</span>
                   </div>
                 </div>
               </div>
@@ -1679,7 +1723,7 @@ export default function AdminDashboard() {
                     </div>
                     <div className="text-center">
                       <div className="text-2xl font-bold text-zinc-700 dark:text-zinc-300">
-                        {conversionInsights.summary.totalVisitors}
+                        {conversionInsights.summary.totalVisitors.toLocaleString()}
                       </div>
                       <div className="text-xs text-zinc-500">Total Visitors</div>
                     </div>
@@ -1701,20 +1745,33 @@ export default function AdminDashboard() {
                     )}
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {/* Segment breakdowns with horizontal bars */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
                     {/* By Referrer Type */}
                     <div>
                       <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-3">By Referrer</h3>
                       <div className="space-y-2">
-                        {conversionInsights.byReferrerType.slice(0, 5).map((row) => (
-                          <div key={row.name} className="flex justify-between items-center text-sm">
-                            <span className="text-zinc-600 dark:text-zinc-400 truncate max-w-[120px]">{row.name}</span>
-                            <div className="flex items-center gap-2">
-                              <span className="text-zinc-400 text-xs">{row.converted}/{row.visitors}</span>
-                              <span className="font-medium text-zinc-900 dark:text-zinc-100 w-12 text-right">{row.rate}%</span>
+                        {conversionInsights.byReferrerType.slice(0, 5).map((row) => {
+                          const avgRate = conversionInsights.summary.overallRate;
+                          const isAboveAvg = row.rate >= avgRate;
+                          const barWidth = Math.min(100, (row.rate / Math.max(avgRate * 1.5, 1)) * 100);
+                          return (
+                            <div key={row.name}>
+                              <div className="flex justify-between items-center text-sm mb-1">
+                                <span className="text-zinc-600 dark:text-zinc-400 truncate max-w-[100px]">{row.name}</span>
+                                <span className={`font-bold text-sm ${isAboveAvg ? 'text-emerald-600' : 'text-zinc-900 dark:text-zinc-100'}`}>
+                                  {row.rate}%
+                                </span>
+                              </div>
+                              <div className="h-1.5 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+                                <div
+                                  className={`h-full rounded-full ${isAboveAvg ? 'bg-emerald-500' : 'bg-indigo-400'}`}
+                                  style={{ width: `${barWidth}%` }}
+                                />
+                              </div>
                             </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     </div>
 
@@ -1722,15 +1779,27 @@ export default function AdminDashboard() {
                     <div>
                       <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-3">By Page</h3>
                       <div className="space-y-2">
-                        {conversionInsights.byLandingPage.slice(0, 5).map((row) => (
-                          <div key={row.name} className="flex justify-between items-center text-sm">
-                            <span className="text-zinc-600 dark:text-zinc-400 truncate max-w-[120px]">{row.name}</span>
-                            <div className="flex items-center gap-2">
-                              <span className="text-zinc-400 text-xs">{row.converted}/{row.visitors}</span>
-                              <span className="font-medium text-zinc-900 dark:text-zinc-100 w-12 text-right">{row.rate}%</span>
+                        {conversionInsights.byLandingPage.slice(0, 5).map((row) => {
+                          const avgRate = conversionInsights.summary.overallRate;
+                          const isAboveAvg = row.rate >= avgRate;
+                          const barWidth = Math.min(100, (row.rate / Math.max(avgRate * 1.5, 1)) * 100);
+                          return (
+                            <div key={row.name}>
+                              <div className="flex justify-between items-center text-sm mb-1">
+                                <span className="text-zinc-600 dark:text-zinc-400 truncate max-w-[100px]">{row.name}</span>
+                                <span className={`font-bold text-sm ${isAboveAvg ? 'text-emerald-600' : 'text-zinc-900 dark:text-zinc-100'}`}>
+                                  {row.rate}%
+                                </span>
+                              </div>
+                              <div className="h-1.5 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+                                <div
+                                  className={`h-full rounded-full ${isAboveAvg ? 'bg-emerald-500' : 'bg-indigo-400'}`}
+                                  style={{ width: `${barWidth}%` }}
+                                />
+                              </div>
                             </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     </div>
 
@@ -1738,53 +1807,123 @@ export default function AdminDashboard() {
                     <div>
                       <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-3">By Country</h3>
                       <div className="space-y-2">
-                        {conversionInsights.byCountry.slice(0, 5).map((row) => (
-                          <div key={row.name} className="flex justify-between items-center text-sm">
-                            <span className="text-zinc-600 dark:text-zinc-400 truncate max-w-[120px]">{row.name}</span>
-                            <div className="flex items-center gap-2">
-                              <span className="text-zinc-400 text-xs">{row.converted}/{row.visitors}</span>
-                              <span className="font-medium text-zinc-900 dark:text-zinc-100 w-12 text-right">{row.rate}%</span>
+                        {conversionInsights.byCountry.slice(0, 5).map((row) => {
+                          const avgRate = conversionInsights.summary.overallRate;
+                          const isAboveAvg = row.rate >= avgRate;
+                          const barWidth = Math.min(100, (row.rate / Math.max(avgRate * 1.5, 1)) * 100);
+                          return (
+                            <div key={row.name}>
+                              <div className="flex justify-between items-center text-sm mb-1">
+                                <span className="text-zinc-600 dark:text-zinc-400 truncate max-w-[100px]">{row.name}</span>
+                                <span className={`font-bold text-sm ${isAboveAvg ? 'text-emerald-600' : 'text-zinc-900 dark:text-zinc-100'}`}>
+                                  {row.rate}%
+                                </span>
+                              </div>
+                              <div className="h-1.5 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+                                <div
+                                  className={`h-full rounded-full ${isAboveAvg ? 'bg-emerald-500' : 'bg-indigo-400'}`}
+                                  style={{ width: `${barWidth}%` }}
+                                />
+                              </div>
                             </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* By Hour of Day */}
-                    <div>
-                      <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-3">By Hour (EST)</h3>
-                      <div className="space-y-2">
-                        {conversionInsights.byHourOfDay.slice(0, 5).map((row) => (
-                          <div key={row.name} className="flex justify-between items-center text-sm">
-                            <span className="text-zinc-600 dark:text-zinc-400">{row.name}</span>
-                            <div className="flex items-center gap-2">
-                              <span className="text-zinc-400 text-xs">{row.converted}/{row.visitors}</span>
-                              <span className="font-medium text-zinc-900 dark:text-zinc-100 w-12 text-right">{row.rate}%</span>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* By Day of Week */}
-                    <div>
-                      <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-3">By Day</h3>
-                      <div className="space-y-2">
-                        {conversionInsights.byDayOfWeek.map((row) => (
-                          <div key={row.name} className="flex justify-between items-center text-sm">
-                            <span className="text-zinc-600 dark:text-zinc-400">{row.name}</span>
-                            <div className="flex items-center gap-2">
-                              <span className="text-zinc-400 text-xs">{row.converted}/{row.visitors}</span>
-                              <span className="font-medium text-zinc-900 dark:text-zinc-100 w-12 text-right">{row.rate}%</span>
-                            </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     </div>
                   </div>
 
-                  <div className="mt-4 text-center text-xs text-zinc-400">
-                    Conversion insights based on last 7 days of visitor data
+                  {/* Time-based heatmaps */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* By Day of Week - Horizontal heatmap */}
+                    <div>
+                      <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-3">By Day of Week</h3>
+                      <div className="flex gap-1">
+                        {conversionInsights.byDayOfWeek.map((row) => {
+                          const avgRate = conversionInsights.summary.overallRate;
+                          const intensity = Math.min(1, row.rate / (avgRate * 1.5));
+                          const isAboveAvg = row.rate >= avgRate;
+                          return (
+                            <div key={row.name} className="flex-1 group relative">
+                              <div
+                                className={`h-12 rounded flex items-center justify-center text-xs font-bold transition-colors ${
+                                  isAboveAvg
+                                    ? 'text-white'
+                                    : 'text-zinc-600 dark:text-zinc-400'
+                                }`}
+                                style={{
+                                  backgroundColor: isAboveAvg
+                                    ? `rgba(16, 185, 129, ${0.3 + intensity * 0.7})`
+                                    : `rgba(99, 102, 241, ${0.1 + intensity * 0.3})`
+                                }}
+                              >
+                                {row.rate}%
+                              </div>
+                              <div className="text-[10px] text-zinc-500 text-center mt-1">{row.name.slice(0, 3)}</div>
+                              {/* Tooltip */}
+                              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover:block z-10">
+                                <div className="bg-zinc-900 text-white text-xs px-2 py-1 rounded shadow-lg whitespace-nowrap">
+                                  {row.name}: {row.converted}/{row.visitors}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* By Hour - Bar chart */}
+                    <div>
+                      <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-3">By Hour (EST)</h3>
+                      {(() => {
+                        const hourData = conversionInsights.byHourOfDay;
+                        const maxRate = Math.max(...hourData.map(h => h.rate), 1);
+                        const avgRate = conversionInsights.summary.overallRate;
+                        return (
+                          <div className="relative h-16">
+                            {/* Average line */}
+                            <div
+                              className="absolute w-full border-t border-dashed border-zinc-400"
+                              style={{ bottom: `${(avgRate / maxRate) * 100}%` }}
+                            />
+                            <div className="flex items-end h-full gap-px">
+                              {hourData.map((row) => {
+                                const height = (row.rate / maxRate) * 100;
+                                const isAboveAvg = row.rate >= avgRate;
+                                return (
+                                  <div key={row.name} className="flex-1 group relative">
+                                    <div
+                                      className={`w-full rounded-t transition-colors ${isAboveAvg ? 'bg-emerald-500' : 'bg-indigo-400'}`}
+                                      style={{ height: `${Math.max(height, 2)}%` }}
+                                    />
+                                    {/* Tooltip */}
+                                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover:block z-10">
+                                      <div className="bg-zinc-900 text-white text-xs px-2 py-1 rounded shadow-lg whitespace-nowrap">
+                                        {row.name}: {row.rate}% ({row.converted}/{row.visitors})
+                                      </div>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                            <div className="flex justify-between text-[9px] text-zinc-400 mt-1">
+                              <span>12am</span>
+                              <span>6am</span>
+                              <span>12pm</span>
+                              <span>6pm</span>
+                              <span>11pm</span>
+                            </div>
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  </div>
+
+                  <div className="mt-4 flex items-center justify-center gap-4 text-xs text-zinc-400">
+                    <div className="flex items-center gap-1">
+                      <div className="w-3 h-2 bg-emerald-500 rounded" />
+                      <span>Above avg</span>
+                    </div>
+                    <span>Last 7 days</span>
                   </div>
                 </div>
               </div>
