@@ -207,6 +207,18 @@ interface ConversionInsights {
   };
 }
 
+interface FunnelStep {
+  name: string;
+  count: number;
+  percentage: number;
+  dropoff: number;
+}
+
+interface FunnelMetrics {
+  steps: FunnelStep[];
+  period: string;
+}
+
 interface ApiResponse {
   success?: boolean;
   error?: string;
@@ -218,6 +230,7 @@ interface ApiResponse {
   timeToAnalysis?: TimeToAnalysisMetrics;
   conversionMetrics?: ConversionMetrics;
   conversionInsights?: ConversionInsights;
+  funnelMetrics?: FunnelMetrics;
   dbAvailable?: boolean;
 }
 
@@ -337,6 +350,80 @@ function StatCardWithSparkline({
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+function FunnelChart({ steps, period }: { steps: FunnelStep[]; period: string }) {
+  if (!steps || steps.length === 0) return null;
+
+  const maxCount = steps[0]?.count || 1;
+
+  return (
+    <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6">
+      <div className="flex items-center justify-between mb-6">
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+          Conversion Funnel
+        </h3>
+        <span className="text-xs text-zinc-400">{period}</span>
+      </div>
+
+      <div className="space-y-4">
+        {steps.map((step, i) => {
+          const widthPercent = maxCount > 0 ? (step.count / maxCount) * 100 : 0;
+          const isFirst = i === 0;
+          const prevStep = steps[i - 1];
+
+          return (
+            <div key={step.name}>
+              {/* Step label and stats */}
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-3">
+                  <span className="w-6 h-6 rounded-full bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 text-xs font-bold flex items-center justify-center">
+                    {i + 1}
+                  </span>
+                  <span className="font-medium text-zinc-900 dark:text-zinc-100">{step.name}</span>
+                </div>
+                <div className="flex items-center gap-4 text-sm">
+                  <span className="font-bold text-zinc-900 dark:text-zinc-100">{step.count.toLocaleString()}</span>
+                  <span className={`font-medium ${isFirst ? 'text-zinc-400' : step.percentage >= 50 ? 'text-emerald-600' : step.percentage >= 20 ? 'text-amber-600' : 'text-rose-600'}`}>
+                    {step.percentage}%
+                  </span>
+                </div>
+              </div>
+
+              {/* Funnel bar */}
+              <div className="relative">
+                <div className="h-10 bg-zinc-100 dark:bg-zinc-800 rounded-lg overflow-hidden">
+                  <div
+                    className="h-full bg-gradient-to-r from-indigo-500 to-indigo-600 rounded-lg transition-all duration-500"
+                    style={{ width: `${Math.max(widthPercent, 2)}%` }}
+                  />
+                </div>
+
+                {/* Drop-off indicator between steps */}
+                {!isFirst && prevStep && step.dropoff > 0 && (
+                  <div className="absolute -top-5 right-0 text-xs text-rose-500 font-medium">
+                    -{step.dropoff}% drop
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Summary */}
+      {steps.length >= 2 && (
+        <div className="mt-6 pt-4 border-t border-zinc-100 dark:border-zinc-800">
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-zinc-500">Overall Conversion</span>
+            <span className={`font-bold ${steps[steps.length - 1].percentage >= 10 ? 'text-emerald-600' : steps[steps.length - 1].percentage >= 5 ? 'text-amber-600' : 'text-rose-600'}`}>
+              {steps[0].count} → {steps[steps.length - 1].count} ({steps[steps.length - 1].percentage}%)
+            </span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -785,6 +872,7 @@ export default function AdminDashboard() {
   const [timeToAnalysis, setTimeToAnalysis] = useState<TimeToAnalysisMetrics | null>(null);
   const [conversionMetrics, setConversionMetrics] = useState<ConversionMetrics | null>(null);
   const [conversionInsights, setConversionInsights] = useState<ConversionInsights | null>(null);
+  const [funnelMetrics, setFunnelMetrics] = useState<FunnelMetrics | null>(null);
 
   const fetchStats = async (adminKey: string) => {
     setLoading(true);
@@ -809,6 +897,7 @@ export default function AdminDashboard() {
         setTimeToAnalysis(data.timeToAnalysis || null);
         setConversionMetrics(data.conversionMetrics || null);
         setConversionInsights(data.conversionInsights || null);
+        setFunnelMetrics(data.funnelMetrics || null);
         setAuthenticated(true);
         // Save key to localStorage
         localStorage.setItem("ragecheck-admin-key", adminKey);
@@ -1219,6 +1308,16 @@ export default function AdminDashboard() {
             {/* Conversions Tab */}
             {activeTab === "conversions" && (
             <>
+            {/* Funnel Chart */}
+            {funnelMetrics && funnelMetrics.steps.length > 0 && (
+              <div className="mb-8">
+                <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100 mb-4">
+                  Conversion Funnel
+                </h2>
+                <FunnelChart steps={funnelMetrics.steps} period={funnelMetrics.period} />
+              </div>
+            )}
+
             {/* Time to Analysis Card */}
             {timeToAnalysis && timeToAnalysis.overall.count > 0 && (
               <div className="mb-8">

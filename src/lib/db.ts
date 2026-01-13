@@ -1933,3 +1933,93 @@ export async function getConversionInsights(): Promise<ConversionInsights> {
     };
   }
 }
+
+// Funnel metrics for conversion visualization
+export interface FunnelStep {
+  name: string;
+  count: number;
+  percentage: number; // of total (first step)
+  dropoff: number; // percentage that dropped off from previous step
+}
+
+export interface FunnelMetrics {
+  steps: FunnelStep[];
+  period: string;
+}
+
+export async function getFunnelMetrics(): Promise<FunnelMetrics> {
+  try {
+    await initDB();
+
+    // Get unique visitors (non-bot) in last 7 days
+    const [visitorsResult] = await getDb()`
+      SELECT COUNT(DISTINCT ip_address) as count
+      FROM ragecheck_visitors
+      WHERE created_at > NOW() - INTERVAL '7 days'
+        AND ip_address IS NOT NULL
+        AND (
+          user_agent IS NULL OR
+          NOT (
+            user_agent ILIKE '%bot%' OR
+            user_agent ILIKE '%crawler%' OR
+            user_agent ILIKE '%spider%' OR
+            user_agent ILIKE '%python%' OR
+            user_agent ILIKE '%curl%'
+          )
+        )
+    `;
+
+    // Get unique visitors who completed at least one analysis
+    const [analyzedResult] = await getDb()`
+      SELECT COUNT(DISTINCT ip_address) as count
+      FROM ragecheck_analyses
+      WHERE created_at > NOW() - INTERVAL '7 days'
+        AND ip_address IS NOT NULL
+        AND success = true
+    `;
+
+    // Get unique visitors who shared
+    const [sharedResult] = await getDb()`
+      SELECT COUNT(DISTINCT ip_address) as count
+      FROM ragecheck_shares
+      WHERE created_at > NOW() - INTERVAL '7 days'
+        AND ip_address IS NOT NULL
+    `;
+
+    const visitors = Number(visitorsResult?.count || 0);
+    const analyzed = Number(analyzedResult?.count || 0);
+    const shared = Number(sharedResult?.count || 0);
+
+    const steps: FunnelStep[] = [
+      {
+        name: "Visited",
+        count: visitors,
+        percentage: 100,
+        dropoff: 0,
+      },
+      {
+        name: "Analyzed",
+        count: analyzed,
+        percentage: visitors > 0 ? Math.round((analyzed / visitors) * 1000) / 10 : 0,
+        dropoff: visitors > 0 ? Math.round(((visitors - analyzed) / visitors) * 1000) / 10 : 0,
+      },
+      {
+        name: "Shared",
+        count: shared,
+        percentage: visitors > 0 ? Math.round((shared / visitors) * 1000) / 10 : 0,
+        dropoff: analyzed > 0 ? Math.round(((analyzed - shared) / analyzed) * 1000) / 10 : 0,
+      },
+    ];
+
+    return {
+      steps,
+      period: "Last 7 days",
+    };
+  } catch (error) {
+    console.error("Failed to get funnel metrics:", error);
+    return {
+      steps: [],
+      period: "Last 7 days",
+    };
+  }
+}
