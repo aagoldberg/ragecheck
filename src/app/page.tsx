@@ -1008,9 +1008,8 @@ export default function Home() {
             <div className="flex items-center justify-between mb-8">
               <h2 className="text-xl font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
                 <span className="w-2 h-8 bg-indigo-500 rounded-full inline-block"></span>
-                Trending Headlines
+                Analyze Trending Headlines
               </h2>
-              <span className="text-sm text-zinc-400 hidden sm:inline-block">Click any to analyze</span>
             </div>
 
             {/* News Grid */}
