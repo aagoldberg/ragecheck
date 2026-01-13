@@ -91,6 +91,27 @@ export async function POST(request: NextRequest): Promise<NextResponse<AnalyzeRe
         );
       }
 
+      // Check if this is not a social media screenshot
+      if (result.platform === "not_social_media") {
+        logAnalysis({
+          url: "image-upload",
+          sourceDomain: "not_social_media",
+          success: false,
+          error: "Image is not a social media screenshot",
+          ipAddress: ipAddress || undefined,
+          userAgent: userAgent || undefined,
+          country: country || undefined,
+        });
+
+        return NextResponse.json(
+          {
+            success: false,
+            error: "This doesn't appear to be a social media screenshot. Please upload a screenshot of a tweet, Facebook post, or other social media content with text to analyze."
+          },
+          { status: 422 }
+        );
+      }
+
       // Log successful image analysis
       logAnalysis({
         url: "image-upload",

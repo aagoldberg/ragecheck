@@ -157,6 +157,8 @@ const IMAGE_ANALYSIS_PROMPT = `You are analyzing a screenshot of a social media 
 2. IDENTIFY the platform (Twitter/X, Facebook, Instagram, TikTok, Reddit, Threads, Bluesky, news article, or "unknown")
 3. ANALYZE the content for outrage bait and manipulation patterns
 
+IMPORTANT: If the image is NOT a social media screenshot (e.g., it's just a photo, meme without text, or unrelated image), you MUST still respond with valid JSON. Set extractedText to describe what you see, platform to "not_social_media", score to 0, and reasons explaining this is not analyzable social media content.
+
 Key patterns to detect:
 - **Loaded Language**: Emotionally charged words meant to provoke
 - **Us-vs-Them Framing**: Creating in-group/out-group divisions
