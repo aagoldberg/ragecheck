@@ -15,6 +15,7 @@ import {
 } from "@/lib/asymmetricValue";
 import { AsymmetricValuePanel } from "@/components/AsymmetricValuePanel";
 import { SharecardSelector } from "@/components/SharecardSelector";
+import { detectConversationShape, ConversationShape } from "@/lib/conversationShape";
 
 interface Highlight {
   start: number;
@@ -616,6 +617,18 @@ function HomeContent() {
       return null;
     }
   }, [result, url]);
+
+  // Conversation shape detection
+  const conversationShape = useMemo<ConversationShape | null>(() => {
+    if (!result?.success || !result.signalBreakdown) return null;
+    return detectConversationShape({
+      signalBreakdown: result.signalBreakdown,
+      techniqueExplanations: result.techniqueExplanations,
+      sharingPatterns: result.sharingPatterns,
+      score: result.score,
+    });
+  }, [result]);
+
   const [showFeedbackForm, setShowFeedbackForm] = useState(false);
   const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
   const [errorReported, setErrorReported] = useState(false);
@@ -1381,6 +1394,33 @@ function HomeContent() {
                               <p className="text-sm text-zinc-600 dark:text-zinc-400 leading-snug">{pattern}</p>
                             </div>
                           ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* How This Usually Plays Out */}
+                    {conversationShape && (
+                      <div className="mt-8 pt-6 border-t border-zinc-100 dark:border-zinc-800 w-full text-left">
+                        <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-4">
+                          How This Usually Plays Out
+                        </h4>
+                        <div className="space-y-3">
+                          <p className="text-base font-semibold text-zinc-900 dark:text-zinc-100">
+                            {conversationShape.displayLabel}
+                          </p>
+                          <p className="text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed">
+                            {conversationShape.explanation}
+                          </p>
+                          {conversationShape.microSignals.length > 0 && (
+                            <div className="mt-3 space-y-1.5">
+                              {conversationShape.microSignals.map((signal, i) => (
+                                <div key={i} className="flex items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400">
+                                  <span className="w-1 h-1 rounded-full bg-zinc-400 dark:bg-zinc-500" />
+                                  <span>{signal}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       </div>
                     )}
