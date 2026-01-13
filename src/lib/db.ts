@@ -614,6 +614,7 @@ export interface VisitorStats {
     device: "mobile" | "tablet" | "desktop";
     createdAt: Date;
     isBot: boolean;
+    hasLlmAnalysis: boolean;
   }[];
   timeSeries: {
     date: string;
@@ -791,10 +792,14 @@ export async function getVisitorStats(): Promise<VisitorStats> {
       : 0;
 
     const recentRows = await getDb()`
-      SELECT ip_address, user_agent, country, referrer, page_path, created_at, is_bot
-      FROM ragecheck_visitors
-      WHERE created_at > NOW() - INTERVAL '3 days'
-      ORDER BY created_at DESC
+      SELECT v.ip_address, v.user_agent, v.country, v.referrer, v.page_path, v.created_at, v.is_bot,
+             EXISTS (
+               SELECT 1 FROM ragecheck_analyses a
+               WHERE a.ip_address = v.ip_address AND a.llm_enhanced = true
+             ) as has_llm_analysis
+      FROM ragecheck_visitors v
+      WHERE v.created_at > NOW() - INTERVAL '3 days'
+      ORDER BY v.created_at DESC
     `;
 
     const recentVisitors = recentRows.map((row) => ({
@@ -805,6 +810,7 @@ export async function getVisitorStats(): Promise<VisitorStats> {
       device: getDeviceType(row.user_agent),
       createdAt: row.created_at,
       isBot: row.is_bot || false,
+      hasLlmAnalysis: row.has_llm_analysis || false,
     }));
 
     // Time series for last 14 days (grouped by EST date)

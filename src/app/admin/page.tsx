@@ -84,6 +84,7 @@ interface VisitorStats {
     device: "mobile" | "tablet" | "desktop";
     createdAt: string;
     isBot: boolean;
+    hasLlmAnalysis: boolean;
   }[];
   timeSeries: {
     date: string;
@@ -1495,13 +1496,14 @@ export default function AdminDashboard() {
                         <th className="text-left py-3 px-3 text-zinc-500 font-medium">Country</th>
                         <th className="text-left py-3 px-3 text-zinc-500 font-medium">Referrer</th>
                         <th className="text-left py-3 px-3 text-zinc-500 font-medium">IP</th>
+                        <th className="text-left py-3 px-3 text-zinc-500 font-medium">AI</th>
                         <th className="text-left py-3 px-3 text-zinc-500 font-medium">Bot</th>
                       </tr>
                     </thead>
                     <tbody>
                       {visitorStats.recentVisitors.length === 0 ? (
                         <tr>
-                          <td colSpan={7} className="py-4 text-zinc-500 text-center">No visitors yet</td>
+                          <td colSpan={8} className="py-4 text-zinc-500 text-center">No visitors yet</td>
                         </tr>
                       ) : (
                         visitorStats.recentVisitors.map((v, i) => (
@@ -1523,6 +1525,9 @@ export default function AdminDashboard() {
                             </td>
                             <td className="py-2 px-3 text-zinc-500 text-xs font-mono">
                               {v.ipAddress || "-"}
+                            </td>
+                            <td className="py-2 px-3 text-zinc-500 text-xs">
+                              {v.hasLlmAnalysis ? "✓" : "-"}
                             </td>
                             <td className="py-2 px-3 text-zinc-500 text-xs">
                               {v.isBot ? "🤖" : "-"}
