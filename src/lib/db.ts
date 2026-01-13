@@ -646,6 +646,7 @@ export interface VisitorStats {
     browser: "Chrome" | "Safari" | "Firefox" | "Edge" | "Other";
     createdAt: Date;
     hasLlmAnalysis: boolean;
+    isBot: boolean;
   }[];
   timeSeries: {
     date: string;
@@ -847,6 +848,7 @@ export async function getVisitorStats(): Promise<VisitorStats> {
       browser: getBrowser(row.user_agent),
       createdAt: row.created_at,
       hasLlmAnalysis: row.has_llm_analysis || false,
+      isBot: row.is_bot || false,
     }));
 
     // Time series for last 14 days (grouped by EST date, excluding bots)

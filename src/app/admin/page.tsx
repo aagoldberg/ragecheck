@@ -87,6 +87,7 @@ interface VisitorStats {
     browser: "Chrome" | "Safari" | "Firefox" | "Edge" | "Other";
     createdAt: string;
     hasLlmAnalysis: boolean;
+    isBot: boolean;
   }[];
   timeSeries: {
     date: string;
@@ -1465,6 +1466,88 @@ export default function AdminDashboard() {
                 )}
               </div>
             )}
+
+            {/* Recent Analyses */}
+            <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 mb-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+                  Recent Analyses
+                </h3>
+                <span className="text-xs text-zinc-400">Last {stats.recentAnalyses.length}</span>
+              </div>
+              <div className="overflow-x-auto max-h-[500px] overflow-y-auto border border-zinc-100 dark:border-zinc-800 rounded-lg">
+                <table className="w-full text-sm">
+                  <thead className="sticky top-0 bg-zinc-50 dark:bg-zinc-800">
+                    <tr className="border-b border-zinc-200 dark:border-zinc-700">
+                      <th className="text-left py-3 px-3 text-zinc-500 font-medium">Time</th>
+                      <th className="text-left py-3 px-3 text-zinc-500 font-medium">URL</th>
+                      <th className="text-left py-3 px-3 text-zinc-500 font-medium">Platform</th>
+                      <th className="text-left py-3 px-3 text-zinc-500 font-medium">Score</th>
+                      <th className="text-left py-3 px-3 text-zinc-500 font-medium">AI</th>
+                      <th className="text-left py-3 px-3 text-zinc-500 font-medium">Share</th>
+                      <th className="text-left py-3 px-3 text-zinc-500 font-medium">Device</th>
+                      <th className="text-left py-3 px-3 text-zinc-500 font-medium">Country</th>
+                      <th className="text-left py-3 px-3 text-zinc-500 font-medium">IP</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {stats.recentAnalyses.length === 0 ? (
+                      <tr>
+                        <td colSpan={9} className="py-4 text-zinc-500 text-center">No analyses yet</td>
+                      </tr>
+                    ) : (
+                      stats.recentAnalyses.map((a, i) => (
+                        <tr key={i} className={`border-b border-zinc-100 dark:border-zinc-800 last:border-0 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 ${!a.success ? 'opacity-50' : ''}`}>
+                          <td className="py-2 px-3 text-zinc-500 text-xs whitespace-nowrap">
+                            {formatDateTimeEST(a.createdAt)}
+                          </td>
+                          <td className="py-2 px-3 max-w-[200px] truncate" title={a.title || a.url}>
+                            <a href={a.url} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline">
+                              {a.title || a.sourceDomain || a.url}
+                            </a>
+                          </td>
+                          <td className="py-2 px-3 text-zinc-600 dark:text-zinc-400 text-xs capitalize">
+                            {a.platform}
+                          </td>
+                          <td className="py-2 px-3">
+                            {a.success ? (
+                              <span className={`text-xs font-medium px-2 py-0.5 rounded ${
+                                a.score > 66 ? "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300" :
+                                a.score > 33 ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300" :
+                                "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300"
+                              }`}>
+                                {a.score}
+                              </span>
+                            ) : (
+                              <span className="text-xs text-rose-500" title={a.error || undefined}>err</span>
+                            )}
+                          </td>
+                          <td className="py-2 px-3 text-zinc-500 text-xs">
+                            {a.llmEnhanced ? "✓" : "-"}
+                          </td>
+                          <td className="py-2 px-3 text-xs">
+                            {a.shared ? (
+                              <span className="text-emerald-600">✓</span>
+                            ) : (
+                              <span className="text-zinc-400">-</span>
+                            )}
+                          </td>
+                          <td className="py-2 px-3 text-zinc-600 dark:text-zinc-400 text-xs capitalize">
+                            {a.device}
+                          </td>
+                          <td className="py-2 px-3 text-zinc-600 dark:text-zinc-400 text-xs">
+                            {a.country || "-"}
+                          </td>
+                          <td className="py-2 px-3 text-zinc-500 text-xs font-mono">
+                            {a.ipAddress || "-"}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
             </>
             )}
 
@@ -2186,88 +2269,6 @@ export default function AdminDashboard() {
                 </div>
               </div>
             </div>
-
-            {/* Recent Analyses */}
-            <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 mb-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-                  Recent Analyses
-                </h3>
-                <span className="text-xs text-zinc-400">Last {stats.recentAnalyses.length}</span>
-              </div>
-              <div className="overflow-x-auto max-h-[500px] overflow-y-auto border border-zinc-100 dark:border-zinc-800 rounded-lg">
-                <table className="w-full text-sm">
-                  <thead className="sticky top-0 bg-zinc-50 dark:bg-zinc-800">
-                    <tr className="border-b border-zinc-200 dark:border-zinc-700">
-                      <th className="text-left py-3 px-3 text-zinc-500 font-medium">Time</th>
-                      <th className="text-left py-3 px-3 text-zinc-500 font-medium">URL</th>
-                      <th className="text-left py-3 px-3 text-zinc-500 font-medium">Platform</th>
-                      <th className="text-left py-3 px-3 text-zinc-500 font-medium">Score</th>
-                      <th className="text-left py-3 px-3 text-zinc-500 font-medium">AI</th>
-                      <th className="text-left py-3 px-3 text-zinc-500 font-medium">Share</th>
-                      <th className="text-left py-3 px-3 text-zinc-500 font-medium">Device</th>
-                      <th className="text-left py-3 px-3 text-zinc-500 font-medium">Country</th>
-                      <th className="text-left py-3 px-3 text-zinc-500 font-medium">IP</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {stats.recentAnalyses.length === 0 ? (
-                      <tr>
-                        <td colSpan={9} className="py-4 text-zinc-500 text-center">No analyses yet</td>
-                      </tr>
-                    ) : (
-                      stats.recentAnalyses.map((a, i) => (
-                        <tr key={i} className={`border-b border-zinc-100 dark:border-zinc-800 last:border-0 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 ${!a.success ? 'opacity-50' : ''}`}>
-                          <td className="py-2 px-3 text-zinc-500 text-xs whitespace-nowrap">
-                            {formatDateTimeEST(a.createdAt)}
-                          </td>
-                          <td className="py-2 px-3 max-w-[200px] truncate" title={a.title || a.url}>
-                            <a href={a.url} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline">
-                              {a.title || a.sourceDomain || a.url}
-                            </a>
-                          </td>
-                          <td className="py-2 px-3 text-zinc-600 dark:text-zinc-400 text-xs capitalize">
-                            {a.platform}
-                          </td>
-                          <td className="py-2 px-3">
-                            {a.success ? (
-                              <span className={`text-xs font-medium px-2 py-0.5 rounded ${
-                                a.score > 66 ? "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300" :
-                                a.score > 33 ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300" :
-                                "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300"
-                              }`}>
-                                {a.score}
-                              </span>
-                            ) : (
-                              <span className="text-xs text-rose-500" title={a.error || undefined}>err</span>
-                            )}
-                          </td>
-                          <td className="py-2 px-3 text-zinc-500 text-xs">
-                            {a.llmEnhanced ? "✓" : "-"}
-                          </td>
-                          <td className="py-2 px-3 text-xs">
-                            {a.shared ? (
-                              <span className="text-emerald-600">✓</span>
-                            ) : (
-                              <span className="text-zinc-400">-</span>
-                            )}
-                          </td>
-                          <td className="py-2 px-3 text-zinc-600 dark:text-zinc-400 text-xs capitalize">
-                            {a.device}
-                          </td>
-                          <td className="py-2 px-3 text-zinc-600 dark:text-zinc-400 text-xs">
-                            {a.country || "-"}
-                          </td>
-                          <td className="py-2 px-3 text-zinc-500 text-xs font-mono">
-                            {a.ipAddress || "-"}
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
             </>
             )}
 
@@ -2295,17 +2296,18 @@ export default function AdminDashboard() {
                         <th className="text-left py-3 px-3 text-zinc-500 font-medium">Country</th>
                         <th className="text-left py-3 px-3 text-zinc-500 font-medium">Referrer</th>
                         <th className="text-left py-3 px-3 text-zinc-500 font-medium">IP</th>
+                        <th className="text-left py-3 px-3 text-zinc-500 font-medium">Bot</th>
                         <th className="text-left py-3 px-3 text-zinc-500 font-medium">AI</th>
                       </tr>
                     </thead>
                     <tbody>
                       {visitorStats.recentVisitors.length === 0 ? (
                         <tr>
-                          <td colSpan={9} className="py-4 text-zinc-500 text-center">No visitors yet</td>
+                          <td colSpan={10} className="py-4 text-zinc-500 text-center">No visitors yet</td>
                         </tr>
                       ) : (
                         visitorStats.recentVisitors.map((v, i) => (
-                          <tr key={i} className="border-b border-zinc-100 dark:border-zinc-800 last:border-0 hover:bg-zinc-50 dark:hover:bg-zinc-800/50">
+                          <tr key={i} className={`border-b border-zinc-100 dark:border-zinc-800 last:border-0 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 ${v.isBot ? 'opacity-50' : ''}`}>
                             <td className="py-2 px-3 text-zinc-500 text-xs whitespace-nowrap">
                               {formatDateTimeEST(v.createdAt)}
                             </td>
@@ -2329,6 +2331,13 @@ export default function AdminDashboard() {
                             </td>
                             <td className="py-2 px-3 text-zinc-500 text-xs font-mono">
                               {v.ipAddress || "-"}
+                            </td>
+                            <td className="py-2 px-3 text-xs">
+                              {v.isBot ? (
+                                <span className="text-orange-600">Bot</span>
+                              ) : (
+                                <span className="text-zinc-400">-</span>
+                              )}
                             </td>
                             <td className="py-2 px-3 text-zinc-500 text-xs">
                               {v.hasLlmAnalysis ? "✓" : "-"}
