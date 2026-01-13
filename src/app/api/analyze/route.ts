@@ -3,7 +3,7 @@ import { extractContent } from "@/lib/extract";
 import { analyzeText, SignalBreakdown, Highlight } from "@/lib/score";
 import { enhanceWithLLM, isLLMAvailable, analyzeImageWithVision } from "@/lib/llm";
 import { logAnalysis, getCachedAnalysis } from "@/lib/db";
-import { saveFailedImage } from "@/lib/blob";
+import { saveFailedImage, saveUploadedImage } from "@/lib/blob";
 
 // Extend function timeout for slow sites
 export const maxDuration = 60; // 60 seconds
@@ -112,6 +112,9 @@ export async function POST(request: NextRequest): Promise<NextResponse<AnalyzeRe
         );
       }
 
+      // Save successful image to blob storage
+      const imageUrl = await saveUploadedImage(image, "uploads");
+
       // Log successful image analysis
       logAnalysis({
         url: "image-upload",
@@ -124,6 +127,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<AnalyzeRe
         ipAddress: ipAddress || undefined,
         userAgent: userAgent || undefined,
         country: country || undefined,
+        failedImageUrl: imageUrl || undefined, // Reusing this field for all uploaded images
       });
 
       return NextResponse.json({

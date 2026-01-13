@@ -1537,7 +1537,7 @@ export default function AdminDashboard() {
                           <td className="py-2 px-3 max-w-[200px] truncate" title={a.title || a.url}>
                             {a.failedImageUrl ? (
                               <a href={a.failedImageUrl} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline">
-                                image
+                                {a.sourceDomain || "image"}
                               </a>
                             ) : (
                               <a href={a.url} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline">
