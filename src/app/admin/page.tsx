@@ -756,7 +756,7 @@ function PageDailyChart({ data, title }: { data: { date: string; visitors: numbe
   );
 }
 
-type TabType = "overview" | "clearview";
+type TabType = "overview" | "users" | "conversions" | "feedback" | "content" | "clearview";
 
 interface ClearviewStats {
   lastGenerated: string | null;
@@ -944,26 +944,19 @@ export default function AdminDashboard() {
         {/* Tabs */}
         <div className="max-w-7xl mx-auto px-4">
           <div className="flex gap-6 -mb-px">
-            <button
-              onClick={() => setActiveTab("overview")}
-              className={`py-3 text-sm font-medium border-b-2 transition-colors ${
-                activeTab === "overview"
-                  ? "border-indigo-500 text-indigo-600 dark:text-indigo-400"
-                  : "border-transparent text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
-              }`}
-            >
-              Overview
-            </button>
-            <button
-              onClick={() => setActiveTab("clearview")}
-              className={`py-3 text-sm font-medium border-b-2 transition-colors ${
-                activeTab === "clearview"
-                  ? "border-indigo-500 text-indigo-600 dark:text-indigo-400"
-                  : "border-transparent text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
-              }`}
-            >
-              Clearview
-            </button>
+            {(["overview", "users", "conversions", "feedback", "content", "clearview"] as const).map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
+                  activeTab === tab
+                    ? "border-indigo-500 text-indigo-600 dark:text-indigo-400"
+                    : "border-transparent text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
+                }`}
+              >
+                {tab.charAt(0).toUpperCase() + tab.slice(1)}
+              </button>
+            ))}
           </div>
         </div>
       </nav>
@@ -1220,7 +1213,12 @@ export default function AdminDashboard() {
                 )}
               </div>
             )}
+            </>
+            )}
 
+            {/* Conversions Tab */}
+            {activeTab === "conversions" && (
+            <>
             {/* Time to Analysis Card */}
             {timeToAnalysis && timeToAnalysis.overall.count > 0 && (
               <div className="mb-8">
@@ -1373,143 +1371,131 @@ export default function AdminDashboard() {
                 </h2>
                 <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6">
                   {/* Summary */}
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                    <div className="text-center p-4 bg-zinc-50 dark:bg-zinc-800 rounded-lg">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 pb-6 border-b border-zinc-100 dark:border-zinc-800">
+                    <div className="text-center">
                       <div className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">
                         {conversionInsights.summary.overallRate}%
                       </div>
-                      <div className="text-xs text-zinc-500 mt-1">Overall Rate</div>
-                      <div className="text-xs text-zinc-400">{conversionInsights.summary.totalConverted}/{conversionInsights.summary.totalVisitors}</div>
+                      <div className="text-xs text-zinc-500">Overall Rate</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-zinc-700 dark:text-zinc-300">
+                        {conversionInsights.summary.totalVisitors}
+                      </div>
+                      <div className="text-xs text-zinc-500">Total Visitors</div>
                     </div>
                     {conversionInsights.summary.bestPerforming && (
-                      <div className="text-center p-4 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg">
+                      <div className="text-center">
                         <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
                           {conversionInsights.summary.bestPerforming.rate}%
                         </div>
-                        <div className="text-xs text-emerald-600 dark:text-emerald-400 mt-1">Best: {conversionInsights.summary.bestPerforming.name}</div>
-                        <div className="text-xs text-zinc-400">{conversionInsights.summary.bestPerforming.factor}</div>
+                        <div className="text-xs text-zinc-500">Best: {conversionInsights.summary.bestPerforming.name}</div>
                       </div>
                     )}
                     {conversionInsights.summary.worstPerforming && (
-                      <div className="text-center p-4 bg-rose-50 dark:bg-rose-900/20 rounded-lg">
+                      <div className="text-center">
                         <div className="text-2xl font-bold text-rose-600 dark:text-rose-400">
                           {conversionInsights.summary.worstPerforming.rate}%
                         </div>
-                        <div className="text-xs text-rose-600 dark:text-rose-400 mt-1">Worst: {conversionInsights.summary.worstPerforming.name}</div>
-                        <div className="text-xs text-zinc-400">{conversionInsights.summary.worstPerforming.factor}</div>
+                        <div className="text-xs text-zinc-500">Worst: {conversionInsights.summary.worstPerforming.name}</div>
                       </div>
                     )}
-                    <div className="text-center p-4 bg-zinc-50 dark:bg-zinc-800 rounded-lg">
-                      <div className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">
-                        {conversionInsights.summary.totalVisitors - conversionInsights.summary.totalConverted}
-                      </div>
-                      <div className="text-xs text-zinc-500 mt-1">Did Not Convert</div>
-                      <div className="text-xs text-zinc-400">last 14 days</div>
-                    </div>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {/* By Referrer */}
-                    {conversionInsights.byReferrerType.length > 0 && (
-                      <div>
-                        <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-3">By Traffic Source</h3>
-                        <div className="space-y-2">
-                          {conversionInsights.byReferrerType.map((row) => (
-                            <div key={row.name} className="flex items-center justify-between text-sm">
-                              <span className="text-zinc-600 dark:text-zinc-400">{row.name}</span>
-                              <div className="flex items-center gap-2">
-                                <span className="text-xs text-zinc-400">{row.converted}/{row.visitors}</span>
-                                <span className={`font-medium ${row.rate >= conversionInsights.summary.overallRate ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
-                                  {row.rate}%
-                                </span>
-                              </div>
+                    {/* By Referrer Type */}
+                    <div>
+                      <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-3">By Referrer</h3>
+                      <div className="space-y-2">
+                        {conversionInsights.byReferrerType.slice(0, 5).map((row) => (
+                          <div key={row.name} className="flex justify-between items-center text-sm">
+                            <span className="text-zinc-600 dark:text-zinc-400 truncate max-w-[120px]">{row.name}</span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-zinc-400 text-xs">{row.converted}/{row.visitors}</span>
+                              <span className="font-medium text-zinc-900 dark:text-zinc-100 w-12 text-right">{row.rate}%</span>
                             </div>
-                          ))}
-                        </div>
+                          </div>
+                        ))}
                       </div>
-                    )}
+                    </div>
 
                     {/* By Landing Page */}
-                    {conversionInsights.byLandingPage.length > 0 && (
-                      <div>
-                        <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-3">By Landing Page</h3>
-                        <div className="space-y-2">
-                          {conversionInsights.byLandingPage.slice(0, 5).map((row) => (
-                            <div key={row.name} className="flex items-center justify-between text-sm">
-                              <span className="text-zinc-600 dark:text-zinc-400 truncate max-w-[120px]" title={row.name}>{row.name}</span>
-                              <div className="flex items-center gap-2">
-                                <span className="text-xs text-zinc-400">{row.converted}/{row.visitors}</span>
-                                <span className={`font-medium ${row.rate >= conversionInsights.summary.overallRate ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
-                                  {row.rate}%
-                                </span>
-                              </div>
+                    <div>
+                      <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-3">By Page</h3>
+                      <div className="space-y-2">
+                        {conversionInsights.byLandingPage.slice(0, 5).map((row) => (
+                          <div key={row.name} className="flex justify-between items-center text-sm">
+                            <span className="text-zinc-600 dark:text-zinc-400 truncate max-w-[120px]">{row.name}</span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-zinc-400 text-xs">{row.converted}/{row.visitors}</span>
+                              <span className="font-medium text-zinc-900 dark:text-zinc-100 w-12 text-right">{row.rate}%</span>
                             </div>
-                          ))}
-                        </div>
+                          </div>
+                        ))}
                       </div>
-                    )}
+                    </div>
 
                     {/* By Country */}
-                    {conversionInsights.byCountry.length > 0 && (
-                      <div>
-                        <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-3">By Country</h3>
-                        <div className="space-y-2">
-                          {conversionInsights.byCountry.slice(0, 5).map((row) => (
-                            <div key={row.name} className="flex items-center justify-between text-sm">
-                              <span className="text-zinc-600 dark:text-zinc-400">{row.name}</span>
-                              <div className="flex items-center gap-2">
-                                <span className="text-xs text-zinc-400">{row.converted}/{row.visitors}</span>
-                                <span className={`font-medium ${row.rate >= conversionInsights.summary.overallRate ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
-                                  {row.rate}%
-                                </span>
-                              </div>
+                    <div>
+                      <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-3">By Country</h3>
+                      <div className="space-y-2">
+                        {conversionInsights.byCountry.slice(0, 5).map((row) => (
+                          <div key={row.name} className="flex justify-between items-center text-sm">
+                            <span className="text-zinc-600 dark:text-zinc-400 truncate max-w-[120px]">{row.name}</span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-zinc-400 text-xs">{row.converted}/{row.visitors}</span>
+                              <span className="font-medium text-zinc-900 dark:text-zinc-100 w-12 text-right">{row.rate}%</span>
                             </div>
-                          ))}
-                        </div>
+                          </div>
+                        ))}
                       </div>
-                    )}
-
-                    {/* By Day of Week */}
-                    {conversionInsights.byDayOfWeek.length > 0 && (
-                      <div>
-                        <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-3">By Day of Week</h3>
-                        <div className="flex gap-2 flex-wrap">
-                          {conversionInsights.byDayOfWeek.map((row) => (
-                            <div key={row.name} className={`text-center px-3 py-2 rounded-lg ${row.rate >= conversionInsights.summary.overallRate ? 'bg-emerald-50 dark:bg-emerald-900/20' : 'bg-zinc-50 dark:bg-zinc-800'}`}>
-                              <div className={`text-sm font-medium ${row.rate >= conversionInsights.summary.overallRate ? 'text-emerald-600 dark:text-emerald-400' : 'text-zinc-600 dark:text-zinc-400'}`}>
-                                {row.rate}%
-                              </div>
-                              <div className="text-xs text-zinc-500">{row.name}</div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
+                    </div>
 
                     {/* By Hour of Day */}
-                    {conversionInsights.byHourOfDay.length > 0 && (
-                      <div className="md:col-span-2">
-                        <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-3">By Hour (EST)</h3>
-                        <div className="flex gap-1 flex-wrap">
-                          {conversionInsights.byHourOfDay.map((row) => (
-                            <div key={row.name} className={`text-center px-2 py-1 rounded ${row.rate >= conversionInsights.summary.overallRate ? 'bg-emerald-100 dark:bg-emerald-900/30' : 'bg-zinc-100 dark:bg-zinc-800'}`} title={`${row.name}: ${row.rate}% (${row.converted}/${row.visitors})`}>
-                              <div className={`text-xs font-medium ${row.rate >= conversionInsights.summary.overallRate ? 'text-emerald-700 dark:text-emerald-400' : 'text-zinc-500'}`}>
-                                {row.name}
-                              </div>
+                    <div>
+                      <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-3">By Hour (EST)</h3>
+                      <div className="space-y-2">
+                        {conversionInsights.byHourOfDay.slice(0, 5).map((row) => (
+                          <div key={row.name} className="flex justify-between items-center text-sm">
+                            <span className="text-zinc-600 dark:text-zinc-400">{row.name}</span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-zinc-400 text-xs">{row.converted}/{row.visitors}</span>
+                              <span className="font-medium text-zinc-900 dark:text-zinc-100 w-12 text-right">{row.rate}%</span>
                             </div>
-                          ))}
-                        </div>
+                          </div>
+                        ))}
                       </div>
-                    )}
+                    </div>
+
+                    {/* By Day of Week */}
+                    <div>
+                      <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-3">By Day</h3>
+                      <div className="space-y-2">
+                        {conversionInsights.byDayOfWeek.map((row) => (
+                          <div key={row.name} className="flex justify-between items-center text-sm">
+                            <span className="text-zinc-600 dark:text-zinc-400">{row.name}</span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-zinc-400 text-xs">{row.converted}/{row.visitors}</span>
+                              <span className="font-medium text-zinc-900 dark:text-zinc-100 w-12 text-right">{row.rate}%</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   </div>
 
                   <div className="mt-4 text-center text-xs text-zinc-400">
-                    Conversion analysis based on last 14 days (min 5 visitors per segment)
+                    Conversion insights based on last 7 days of visitor data
                   </div>
                 </div>
               </div>
             )}
+            </>
+            )}
 
+            {/* Feedback Tab */}
+            {activeTab === "feedback" && (
+            <>
             {/* Feedback & Error Reports Section */}
             {feedbackStats && (
               <div className="mb-8">
@@ -1655,7 +1641,12 @@ export default function AdminDashboard() {
                 </div>
               </div>
             )}
+            </>
+            )}
 
+            {/* Content Tab */}
+            {activeTab === "content" && (
+            <>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
               {/* Score Distribution */}
               <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6">
@@ -1830,7 +1821,12 @@ export default function AdminDashboard() {
                 </table>
               </div>
             </div>
+            </>
+            )}
 
+            {/* Users Tab */}
+            {activeTab === "users" && (
+            <>
             {/* Recent Visitors */}
             {visitorStats && (
               <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 mb-6">

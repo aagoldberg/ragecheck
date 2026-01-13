@@ -1006,7 +1006,36 @@ export async function extractContent(urlString: string): Promise<ExtractedConten
     const ogImage = document.querySelector('meta[property="og:image"]')?.getAttribute("content")
                  || document.querySelector('meta[name="twitter:image"]')?.getAttribute("content");
 
-    if (!article || !article.textContent) {
+    if (!article || !article.textContent || article.textContent.replace(/\s+/g, " ").trim().length < 100) {
+      // Try ScrapingBee as fallback for JS-rendered content
+      if (SCRAPINGBEE_API_KEY) {
+        const scrapingResult = await fetchWithScrapingBee(urlString);
+        if (scrapingResult.success) {
+          const { document: sbDoc } = parseHTML(scrapingResult.html);
+          const sbScripts = sbDoc.querySelectorAll("script, style, noscript, iframe");
+          sbScripts.forEach((el: Element) => el.remove());
+          const sbReader = new Readability(sbDoc as unknown as Document);
+          const sbArticle = sbReader.parse();
+          const sbOgImage = sbDoc.querySelector('meta[property="og:image"]')?.getAttribute("content")
+                        || sbDoc.querySelector('meta[name="twitter:image"]')?.getAttribute("content");
+
+          if (sbArticle?.textContent) {
+            const sbCleanText = sbArticle.textContent.replace(/\s+/g, " ").trim();
+            if (sbCleanText.length >= 100) {
+              const result: ExtractedContent = {
+                title: sbArticle.title || sbDoc.title || "Untitled",
+                text: sbCleanText,
+                sourceDomain,
+                success: true,
+                image: sbOgImage || undefined,
+              };
+              cache.set(urlString, result);
+              return result;
+            }
+          }
+        }
+      }
+
       return {
         title: document.title || "",
         text: "",
