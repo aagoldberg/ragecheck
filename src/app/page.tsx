@@ -917,7 +917,7 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-black text-zinc-900 dark:text-zinc-100 font-sans selection:bg-indigo-100 dark:selection:bg-indigo-900/50">
+    <div className="min-h-screen bg-zinc-50 dark:bg-black text-zinc-900 dark:text-zinc-100 font-sans selection:bg-indigo-100 dark:selection:bg-indigo-900/50 flex flex-col">
       
       {/* Navigation */}
       <nav className="sticky top-0 z-50 border-b border-zinc-200 dark:border-zinc-800 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md">
@@ -934,7 +934,7 @@ export default function Home() {
         </div>
       </nav>
 
-      <div className={`max-w-6xl mx-auto px-4 ${result && !isDemo ? 'py-6 lg:py-8' : 'py-12 lg:py-24'}`}>
+      <div className={`flex-1 max-w-6xl mx-auto px-4 ${result && !isDemo ? 'py-6 lg:py-8' : 'py-12 lg:py-24'}`}>
         
         {/* Hero Section - Collapses after analysis */}
         <div className={`text-center max-w-3xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-700 ${result && !isDemo ? 'mb-8' : 'mb-20'}`}>
@@ -1548,6 +1548,17 @@ export default function Home() {
         )}
 
       </div>
+
+      {/* Footer */}
+      <footer className="border-t border-zinc-200 dark:border-zinc-800 py-6 mt-auto">
+        <div className="max-w-2xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-center gap-4 text-sm text-zinc-500 dark:text-zinc-400">
+          <a href="/about" className="hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors">About</a>
+          <span className="hidden sm:inline">·</span>
+          <a href="/methodology" className="hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors">Methodology</a>
+          <span className="hidden sm:inline">·</span>
+          <a href="mailto:hello@ragecheck.com" className="hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors">Contact</a>
+        </div>
+      </footer>
 
       <style jsx global>{`
         .custom-scrollbar::-webkit-scrollbar {
