@@ -160,7 +160,7 @@ const IMAGE_ANALYSIS_PROMPT = `You are analyzing an image for outrage bait and m
 Your task is to:
 1. EXTRACT all visible text from the image (post content, meme text, headlines, usernames, comments, etc.)
 2. IDENTIFY the type: social media platform name, "meme", "news", or "unknown"
-3. ANALYZE the content for outrage bait and manipulation patterns
+3. ANALYZE the content for outrage bait and manipulation patterns - consider how the TEXT and IMAGE work TOGETHER. A meme's manipulation often comes from the combination (e.g., unflattering photo + inflammatory caption, or image that adds context making text more provocative)
 
 IMPORTANT: If the image has NO readable text or is just a photo without any text overlay, you MUST still respond with valid JSON. Set extractedText to describe what you see, platform to "no_text_content", score to 0, and reasons explaining there is no text to analyze.
 
