@@ -245,14 +245,44 @@ interface ApiResponse {
   dbAvailable?: boolean;
 }
 
-function StatCard({ title, value, subtitle }: { title: string; value: string | number; subtitle?: string }) {
+function StatCard({ title, value, subtitle, icon, accent = "indigo" }: {
+  title: string;
+  value: string | number;
+  subtitle?: string;
+  icon?: React.ReactNode;
+  accent?: "indigo" | "emerald" | "amber" | "rose" | "purple";
+}) {
+  const accentColors = {
+    indigo: "from-indigo-500 to-indigo-600 text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/50",
+    emerald: "from-emerald-500 to-emerald-600 text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50",
+    amber: "from-amber-500 to-amber-600 text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/50",
+    rose: "from-rose-500 to-rose-600 text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/50",
+    purple: "from-purple-500 to-purple-600 text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-950/50",
+  };
+  const [gradient, textColor, bgColor] = accentColors[accent].split(" ").reduce((acc, cls) => {
+    if (cls.startsWith("from-") || cls.startsWith("to-")) acc[0] += " " + cls;
+    else if (cls.startsWith("text-")) acc[1] += " " + cls;
+    else if (cls.startsWith("bg-") || cls.startsWith("dark:bg-")) acc[2] += " " + cls;
+    return acc;
+  }, ["", "", ""]);
+
   return (
-    <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6">
-      <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-2">
-        {title}
-      </h3>
-      <p className="text-3xl font-bold text-zinc-900 dark:text-zinc-100">{value}</p>
-      {subtitle && <p className="text-sm text-zinc-500 mt-1">{subtitle}</p>}
+    <div className="relative overflow-hidden bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-5 hover:shadow-lg transition-shadow group">
+      <div className={`absolute top-0 left-0 w-1 h-full bg-gradient-to-b ${gradient}`}></div>
+      <div className="flex items-start justify-between">
+        <div>
+          <h3 className="text-[11px] font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 mb-1">
+            {title}
+          </h3>
+          <p className={`text-3xl font-bold ${textColor}`}>{value}</p>
+          {subtitle && <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-1">{subtitle}</p>}
+        </div>
+        {icon && (
+          <div className={`p-2 rounded-lg ${bgColor}`}>
+            {icon}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -1364,19 +1394,61 @@ export default function AdminDashboard() {
             <>
             {/* Overview Stats */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-              <StatCard title="Total Analyses" value={stats.totalAnalyses} />
-              <StatCard title="Today" value={stats.todayAnalyses} />
-              <StatCard title="This Week" value={stats.weekAnalyses} />
-              <StatCard title="Avg Score" value={stats.avgScore} subtitle="/100" />
+              <StatCard
+                title="Total Analyses"
+                value={stats.totalAnalyses.toLocaleString()}
+                accent="indigo"
+                icon={<svg className="w-5 h-5 text-indigo-600 dark:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>}
+              />
+              <StatCard
+                title="Today"
+                value={stats.todayAnalyses.toLocaleString()}
+                accent="emerald"
+                icon={<svg className="w-5 h-5 text-emerald-600 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
+              />
+              <StatCard
+                title="This Week"
+                value={stats.weekAnalyses.toLocaleString()}
+                accent="purple"
+                icon={<svg className="w-5 h-5 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>}
+              />
+              <StatCard
+                title="Avg Score"
+                value={stats.avgScore}
+                subtitle="/100"
+                accent="amber"
+                icon={<svg className="w-5 h-5 text-amber-600 dark:text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>}
+              />
             </div>
 
             {/* Visitor Stats */}
             {visitorStats && (
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-                <StatCard title="Total Visitors" value={visitorStats.totalVisitors} />
-                <StatCard title="Visitors Today" value={visitorStats.todayVisitors} />
-                <StatCard title="Visitors This Week" value={visitorStats.weekVisitors} />
-                <StatCard title="Conversion Rate" value={`${visitorStats.conversionRate}%`} subtitle="visitors → analyses" />
+                <StatCard
+                  title="Total Visitors"
+                  value={visitorStats.totalVisitors.toLocaleString()}
+                  accent="indigo"
+                  icon={<svg className="w-5 h-5 text-indigo-600 dark:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>}
+                />
+                <StatCard
+                  title="Visitors Today"
+                  value={visitorStats.todayVisitors.toLocaleString()}
+                  accent="emerald"
+                  icon={<svg className="w-5 h-5 text-emerald-600 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
+                />
+                <StatCard
+                  title="Visitors This Week"
+                  value={visitorStats.weekVisitors.toLocaleString()}
+                  accent="purple"
+                  icon={<svg className="w-5 h-5 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>}
+                />
+                <StatCard
+                  title="Conversion Rate"
+                  value={`${visitorStats.conversionRate}%`}
+                  subtitle="visitors → analyses"
+                  accent="rose"
+                  icon={<svg className="w-5 h-5 text-rose-600 dark:text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>}
+                />
               </div>
             )}
 
