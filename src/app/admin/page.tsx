@@ -72,6 +72,17 @@ interface DashboardStats {
     analysisCount: number;
     avgScore: number;
   }[];
+  repeatUsers: {
+    ipAddress: string;
+    country: string | null;
+    device: "mobile" | "tablet" | "desktop";
+    firstPlatform: string;
+    firstReferrer: string | null;
+    firstDaySearches: number;
+    totalDays: number;
+    totalSearches: number;
+    lastSeen: Date;
+  }[];
 }
 
 interface VisitorStats {
@@ -1410,7 +1421,7 @@ export default function AdminDashboard() {
               />
               {visitorStats && (
                 <StatCard
-                  title="Conversion"
+                  title="Conversion Today"
                   value={`${visitorStats.conversionRate}%`}
                   accent="rose"
                 />
@@ -2459,6 +2470,65 @@ export default function AdminDashboard() {
                               {u.avgScore}
                             </span>
                           </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Repeat Users */}
+            <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 mt-6">
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-4">
+                Repeat Users (Multi-Day Visitors)
+              </h3>
+              <div className="overflow-x-auto max-h-[400px] overflow-y-auto border border-zinc-100 dark:border-zinc-800 rounded-lg">
+                <table className="w-full text-sm">
+                  <thead className="sticky top-0 bg-zinc-50 dark:bg-zinc-800">
+                    <tr className="border-b border-zinc-200 dark:border-zinc-700">
+                      <th className="text-left py-3 px-3 text-zinc-500 font-medium">IP Address</th>
+                      <th className="text-left py-3 px-3 text-zinc-500 font-medium">Country</th>
+                      <th className="text-left py-3 px-3 text-zinc-500 font-medium">Device</th>
+                      <th className="text-left py-3 px-3 text-zinc-500 font-medium">First Platform</th>
+                      <th className="text-left py-3 px-3 text-zinc-500 font-medium">First Referrer</th>
+                      <th className="text-left py-3 px-3 text-zinc-500 font-medium">1st Day Searches</th>
+                      <th className="text-left py-3 px-3 text-zinc-500 font-medium">Days Returned</th>
+                      <th className="text-left py-3 px-3 text-zinc-500 font-medium">Total Searches</th>
+                      <th className="text-left py-3 px-3 text-zinc-500 font-medium">Last Seen</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {stats.repeatUsers.length === 0 ? (
+                      <tr>
+                        <td colSpan={9} className="py-4 text-zinc-500 text-center">No repeat users yet</td>
+                      </tr>
+                    ) : (
+                      stats.repeatUsers.map((u, i) => (
+                        <tr key={i} className="border-b border-zinc-100 dark:border-zinc-800 last:border-0 hover:bg-zinc-50 dark:hover:bg-zinc-800/50">
+                          <td className="py-2 px-3 text-zinc-500 text-xs font-mono">{u.ipAddress}</td>
+                          <td className="py-2 px-3 text-zinc-600 dark:text-zinc-400 text-xs">{u.country || "-"}</td>
+                          <td className="py-2 px-3">
+                            <span className={`text-xs px-2 py-0.5 rounded ${
+                              u.device === "mobile" ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300" :
+                              u.device === "tablet" ? "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300" :
+                              "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
+                            }`}>
+                              {u.device}
+                            </span>
+                          </td>
+                          <td className="py-2 px-3 text-zinc-600 dark:text-zinc-400 text-xs">{u.firstPlatform}</td>
+                          <td className="py-2 px-3 text-zinc-500 text-xs truncate max-w-[150px]" title={u.firstReferrer || "-"}>
+                            {u.firstReferrer || "-"}
+                          </td>
+                          <td className="py-2 px-3 text-zinc-900 dark:text-zinc-100 text-center">{u.firstDaySearches}</td>
+                          <td className="py-2 px-3">
+                            <span className="text-xs font-medium px-2 py-0.5 rounded bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300">
+                              {u.totalDays} days
+                            </span>
+                          </td>
+                          <td className="py-2 px-3 text-zinc-900 dark:text-zinc-100 font-medium text-center">{u.totalSearches}</td>
+                          <td className="py-2 px-3 text-zinc-500 text-xs">{formatDateTimeEST(u.lastSeen)}</td>
                         </tr>
                       ))
                     )}

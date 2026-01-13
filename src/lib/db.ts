@@ -335,6 +335,17 @@ export interface DashboardStats {
     analysisCount: number;
     avgScore: number;
   }[];
+  repeatUsers: {
+    ipAddress: string;
+    country: string | null;
+    device: "mobile" | "tablet" | "desktop";
+    firstPlatform: string;
+    firstReferrer: string | null;
+    firstDaySearches: number;
+    totalDays: number;
+    totalSearches: number;
+    lastSeen: Date;
+  }[];
 }
 
 export async function getDashboardStats(): Promise<DashboardStats> {
@@ -457,6 +468,59 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     avgScore: Math.round(Number(row.avg_score) || 0),
   }));
 
+  // Repeat users - users who visited on multiple distinct days (excluding bots)
+  const repeatUserRows = await getDb()`
+    WITH user_days AS (
+      SELECT
+        ip_address,
+        country,
+        user_agent,
+        COUNT(DISTINCT DATE(created_at)) as total_days,
+        COUNT(*) as total_searches,
+        MIN(created_at) as first_seen,
+        MAX(created_at) as last_seen
+      FROM ragecheck_analyses
+      WHERE is_bot = false AND ip_address IS NOT NULL
+      GROUP BY ip_address, country, user_agent
+      HAVING COUNT(DISTINCT DATE(created_at)) > 1
+    ),
+    first_analysis AS (
+      SELECT DISTINCT ON (a.ip_address)
+        a.ip_address,
+        a.platform as first_platform,
+        (SELECT v.referrer FROM ragecheck_visitors v WHERE v.ip_address = a.ip_address ORDER BY v.created_at LIMIT 1) as first_referrer,
+        (SELECT COUNT(*) FROM ragecheck_analyses a2 WHERE a2.ip_address = a.ip_address AND DATE(a2.created_at) = DATE(a.created_at)) as first_day_searches
+      FROM ragecheck_analyses a
+      WHERE a.is_bot = false AND a.ip_address IS NOT NULL
+      ORDER BY a.ip_address, a.created_at
+    )
+    SELECT
+      ud.ip_address,
+      ud.country,
+      ud.user_agent,
+      ud.total_days,
+      ud.total_searches,
+      ud.last_seen,
+      fa.first_platform,
+      fa.first_referrer,
+      fa.first_day_searches
+    FROM user_days ud
+    LEFT JOIN first_analysis fa ON ud.ip_address = fa.ip_address
+    ORDER BY ud.total_days DESC, ud.total_searches DESC
+    LIMIT 50
+  `;
+  const repeatUsers = repeatUserRows.map((row) => ({
+    ipAddress: row.ip_address,
+    country: row.country || null,
+    device: getDeviceType(row.user_agent),
+    firstPlatform: row.first_platform || "unknown",
+    firstReferrer: row.first_referrer || null,
+    firstDaySearches: Number(row.first_day_searches) || 1,
+    totalDays: Number(row.total_days),
+    totalSearches: Number(row.total_searches),
+    lastSeen: row.last_seen,
+  }));
+
   return {
     totalAnalyses: Number(totalResult.count),
     todayAnalyses: Number(todayResult.count),
@@ -485,6 +549,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     },
     recentAnalyses,
     topUsers,
+    repeatUsers,
   };
 }
 
