@@ -48,57 +48,61 @@ export default function Methodology() {
 
           <div className="space-y-6">
             <div className="p-6 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl">
-              <h3 className="font-bold text-lg mb-2 text-rose-600 dark:text-rose-400">Loaded Language</h3>
+              <h3 className="font-bold text-lg mb-2 text-rose-600 dark:text-rose-400">Emotional Arousal</h3>
               <p className="text-zinc-600 dark:text-zinc-400 leading-relaxed mb-3">
-                Emotionally charged words designed to provoke reactions rather than convey information.
+                Language designed to activate strong emotional responses—fear, anger, disgust, or outrage—rather than inform.
               </p>
               <p className="text-sm text-zinc-500">
-                <strong>Examples:</strong> Dehumanizing terms, inflammatory adjectives, insults disguised
-                as descriptors, words that presuppose guilt or malice.
+                <strong>Examples:</strong> "Shocking," "horrifying," "unbelievable," "disgusting," inflammatory
+                adjectives, ALL CAPS emphasis, excessive punctuation, urgent calls to action.
               </p>
             </div>
 
             <div className="p-6 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl">
-              <h3 className="font-bold text-lg mb-2 text-indigo-600 dark:text-indigo-400">Absolutist Phrasing</h3>
+              <h3 className="font-bold text-lg mb-2 text-indigo-600 dark:text-indigo-400">Enemy Construction</h3>
               <p className="text-zinc-600 dark:text-zinc-400 leading-relaxed mb-3">
-                Black-and-white language that eliminates nuance and complexity.
+                Framing that constructs an adversary—dehumanizing groups, attributing malicious intent,
+                or creating artificial us-vs-them divisions.
               </p>
               <p className="text-sm text-zinc-500">
-                <strong>Examples:</strong> "Always," "never," "everyone knows," "no one can deny,"
-                "the only way," "completely," "totally."
+                <strong>Examples:</strong> "They want to destroy," "the elite," "those people," "the enemy within,"
+                collective blame, conspiracy framing, dehumanizing labels.
               </p>
             </div>
 
             <div className="p-6 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl">
-              <h3 className="font-bold text-lg mb-2 text-orange-600 dark:text-orange-400">Threat & Panic</h3>
+              <h3 className="font-bold text-lg mb-2 text-orange-600 dark:text-orange-400">Moral Condemnation</h3>
               <p className="text-zinc-600 dark:text-zinc-400 leading-relaxed mb-3">
-                Fear-mongering language that emphasizes danger, catastrophe, or existential threats.
+                Appeals to moral outrage, purity rhetoric, and righteous indignation that frame issues
+                as battles between good and evil.
               </p>
               <p className="text-sm text-zinc-500">
-                <strong>Examples:</strong> "Dangerous," "threat," "crisis," "catastrophe," "destroy,"
-                "end of," "collapse," urgent calls to action based on fear.
+                <strong>Examples:</strong> "Evil," "immoral," "corruption," "betrayal," "disgusting behavior,"
+                virtue signaling, moral absolutism, purity tests.
               </p>
             </div>
 
             <div className="p-6 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl">
-              <h3 className="font-bold text-lg mb-2 text-blue-600 dark:text-blue-400">Us-vs-Them Framing</h3>
+              <h3 className="font-bold text-lg mb-2 text-blue-600 dark:text-blue-400">Oversimplification</h3>
               <p className="text-zinc-600 dark:text-zinc-400 leading-relaxed mb-3">
-                Tribal language that creates artificial divisions between groups.
+                Black-and-white framing that eliminates nuance, presents false dichotomies, or reduces
+                complex issues to simple narratives.
               </p>
               <p className="text-sm text-zinc-500">
-                <strong>Examples:</strong> "They want to," "those people," "the elite," "real Americans,"
-                "our side," "the enemy," collective blame attribution.
+                <strong>Examples:</strong> "Always," "never," "everyone knows," "the only solution,"
+                "it's simple," false equivalences, strawman arguments, ignoring counterevidence.
               </p>
             </div>
 
             <div className="p-6 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl">
-              <h3 className="font-bold text-lg mb-2 text-amber-600 dark:text-amber-400">Engagement Bait</h3>
+              <h3 className="font-bold text-lg mb-2 text-amber-600 dark:text-amber-400">Call-to-Conflict</h3>
               <p className="text-zinc-600 dark:text-zinc-400 leading-relaxed mb-3">
-                Phrases designed to maximize clicks, shares, and emotional responses.
+                Direct provocations, engagement bait, and language designed to mobilize action or
+                spread content virally.
               </p>
               <p className="text-sm text-zinc-500">
-                <strong>Examples:</strong> "You won't believe," "share this before," "what happens next,"
-                "the truth about," "what they don't want you to know."
+                <strong>Examples:</strong> "Share before they delete this," "wake up," "fight back,"
+                "they don't want you to know," rhetorical questions designed to provoke, call-outs.
               </p>
             </div>
           </div>
@@ -159,6 +163,47 @@ export default function Methodology() {
           </div>
         </section>
 
+        {/* Image Analysis */}
+        <section className="mb-12">
+          <h2 className="text-2xl font-bold mb-4">Image & Screenshot Analysis</h2>
+          <p className="text-zinc-600 dark:text-zinc-400 leading-relaxed mb-4">
+            RageCheck can analyze screenshots of social media posts, memes with text, and news headlines
+            using computer vision.
+          </p>
+          <div className="space-y-4">
+            <div>
+              <h3 className="font-bold text-lg mb-2">How It Works</h3>
+              <ol className="list-decimal list-inside text-zinc-600 dark:text-zinc-400 space-y-1 ml-4">
+                <li>Upload an image (screenshot, meme, or photo of text content)</li>
+                <li>Vision AI extracts all visible text from the image</li>
+                <li>The platform is identified (Twitter, Facebook, Instagram, Reddit, etc.)</li>
+                <li>Extracted text is analyzed using the same 5-signal framework</li>
+                <li>For memes, the AI considers how image and text work together</li>
+              </ol>
+            </div>
+            <p className="text-zinc-600 dark:text-zinc-400 leading-relaxed">
+              This allows analysis of content that can't be linked directly—screenshots shared in
+              group chats, posts from private accounts, or memes circulating on social media.
+            </p>
+          </div>
+        </section>
+
+        {/* Academic Foundation */}
+        <section className="mb-12">
+          <h2 className="text-2xl font-bold mb-4">Academic Foundation</h2>
+          <p className="text-zinc-600 dark:text-zinc-400 leading-relaxed mb-4">
+            RageCheck's signal categories draw from established research in media psychology,
+            propaganda studies, and affective computing:
+          </p>
+          <ul className="list-disc list-inside text-zinc-600 dark:text-zinc-400 space-y-2 ml-4">
+            <li><strong>Emotional Arousal</strong> — Based on dimensional models of emotion (Russell, 1980) and research on emotional contagion in social media (Kramer et al., 2014)</li>
+            <li><strong>Enemy Construction</strong> — Draws from intergroup conflict theory (Tajfel & Turner, 1979) and research on dehumanization (Haslam, 2006)</li>
+            <li><strong>Moral Condemnation</strong> — Informed by moral foundations theory (Haidt & Graham, 2007) and research on moral outrage online (Crockett, 2017)</li>
+            <li><strong>Oversimplification</strong> — Based on research on cognitive biases and the appeal of simple narratives (Kahneman, 2011)</li>
+            <li><strong>Call-to-Conflict</strong> — Draws from propaganda analysis frameworks (Ellul, 1965) and research on viral content dynamics (Berger & Milkman, 2012)</li>
+          </ul>
+        </section>
+
         {/* Limitations */}
         <section className="mb-12">
           <h2 className="text-2xl font-bold mb-4">Limitations</h2>
@@ -169,6 +214,7 @@ export default function Methodology() {
             <li>Very short content (under ~50 words) may produce unreliable scores</li>
             <li>Sophisticated manipulation that avoids common patterns may score low</li>
             <li>A high score does not mean content is false—just that it uses manipulative framing</li>
+            <li>Satire and irony may be misinterpreted (though AI enhancement helps)</li>
           </ul>
         </section>
 
