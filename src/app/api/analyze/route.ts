@@ -74,7 +74,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<AnalyzeRe
         // Save failed image to blob storage for diagnosis
         const failedImageUrl = await saveFailedImage(image, result.error || "Unknown error");
 
-        logAnalysis({
+        await logAnalysis({
           url: "image-upload",
           sourceDomain: "image",
           success: false,
@@ -93,7 +93,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<AnalyzeRe
 
       // Check if the image has no analyzable text content
       if (result.platform === "not_social_media" || result.platform === "no_text_content") {
-        logAnalysis({
+        await logAnalysis({
           url: "image-upload",
           sourceDomain: result.platform,
           success: false,
@@ -116,7 +116,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<AnalyzeRe
       const imageUrl = await saveUploadedImage(image, "uploads");
 
       // Log successful image analysis
-      logAnalysis({
+      await logAnalysis({
         url: "image-upload",
         sourceDomain: result.platform || "image",
         score: result.score,
@@ -195,7 +195,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<AnalyzeRe
 
     if (!extracted.success) {
       // Log failed extraction
-      logAnalysis({
+      await logAnalysis({
         url,
         sourceDomain: extracted.sourceDomain,
         success: false,
@@ -255,7 +255,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<AnalyzeRe
     const label = getLabel(finalScore);
 
     // Log successful analysis with full data for caching
-    logAnalysis({
+    await logAnalysis({
       url,
       sourceDomain: extracted.sourceDomain,
       score: finalScore,
