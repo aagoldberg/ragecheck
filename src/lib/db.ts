@@ -336,32 +336,32 @@ export interface DashboardStats {
 }
 
 export async function getDashboardStats(): Promise<DashboardStats> {
-  // Total counts
+  // Total counts (excluding bots)
   // Use EST timezone for "today" calculations
-  const [totalResult] = await getDb()`SELECT COUNT(*) as count FROM ragecheck_analyses`;
-  const [todayResult] = await getDb()`SELECT COUNT(*) as count FROM ragecheck_analyses WHERE created_at >= DATE_TRUNC('day', NOW() AT TIME ZONE 'America/New_York') AT TIME ZONE 'America/New_York'`;
-  const [weekResult] = await getDb()`SELECT COUNT(*) as count FROM ragecheck_analyses WHERE created_at > NOW() - INTERVAL '7 days'`;
+  const [totalResult] = await getDb()`SELECT COUNT(*) as count FROM ragecheck_analyses WHERE is_bot = false`;
+  const [todayResult] = await getDb()`SELECT COUNT(*) as count FROM ragecheck_analyses WHERE is_bot = false AND created_at >= DATE_TRUNC('day', NOW() AT TIME ZONE 'America/New_York') AT TIME ZONE 'America/New_York'`;
+  const [weekResult] = await getDb()`SELECT COUNT(*) as count FROM ragecheck_analyses WHERE is_bot = false AND created_at > NOW() - INTERVAL '7 days'`;
 
-  // Average score
-  const [avgResult] = await getDb()`SELECT AVG(score) as avg FROM ragecheck_analyses WHERE score IS NOT NULL`;
+  // Average score (excluding bots)
+  const [avgResult] = await getDb()`SELECT AVG(score) as avg FROM ragecheck_analyses WHERE is_bot = false AND score IS NOT NULL`;
 
-  // Score distribution
-  const [lowCount] = await getDb()`SELECT COUNT(*) as count FROM ragecheck_analyses WHERE score IS NOT NULL AND score <= 33`;
-  const [medCount] = await getDb()`SELECT COUNT(*) as count FROM ragecheck_analyses WHERE score IS NOT NULL AND score > 33 AND score <= 66`;
-  const [highCount] = await getDb()`SELECT COUNT(*) as count FROM ragecheck_analyses WHERE score IS NOT NULL AND score > 66`;
+  // Score distribution (excluding bots)
+  const [lowCount] = await getDb()`SELECT COUNT(*) as count FROM ragecheck_analyses WHERE is_bot = false AND score IS NOT NULL AND score <= 33`;
+  const [medCount] = await getDb()`SELECT COUNT(*) as count FROM ragecheck_analyses WHERE is_bot = false AND score IS NOT NULL AND score > 33 AND score <= 66`;
+  const [highCount] = await getDb()`SELECT COUNT(*) as count FROM ragecheck_analyses WHERE is_bot = false AND score IS NOT NULL AND score > 66`;
 
-  // Platform breakdown
-  const platformRows = await getDb()`SELECT platform, COUNT(*) as count FROM ragecheck_analyses GROUP BY platform`;
+  // Platform breakdown (excluding bots)
+  const platformRows = await getDb()`SELECT platform, COUNT(*) as count FROM ragecheck_analyses WHERE is_bot = false GROUP BY platform`;
   const platformBreakdown: Record<string, number> = {};
   for (const row of platformRows) {
     platformBreakdown[row.platform || "unknown"] = Number(row.count);
   }
 
-  // Top domains
+  // Top domains (excluding bots)
   const topDomainRows = await getDb()`
     SELECT source_domain as domain, COUNT(*) as count, AVG(score) as avg_score
     FROM ragecheck_analyses
-    WHERE source_domain IS NOT NULL
+    WHERE is_bot = false AND source_domain IS NOT NULL
     GROUP BY source_domain
     ORDER BY count DESC
     LIMIT 10
@@ -372,7 +372,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     avgScore: Math.round(Number(row.avg_score) || 0),
   }));
 
-  // Signal averages
+  // Signal averages (excluding bots)
   const [signalAvgs] = await getDb()`
     SELECT
       AVG(signal_loaded_language) as loaded_language,
@@ -381,22 +381,23 @@ export async function getDashboardStats(): Promise<DashboardStats> {
       AVG(signal_us_vs_them) as us_vs_them,
       AVG(signal_engagement_bait) as engagement_bait
     FROM ragecheck_analyses
-    WHERE score IS NOT NULL
+    WHERE is_bot = false AND score IS NOT NULL
   `;
 
-  // Success rate
-  const [successResult] = await getDb()`SELECT COUNT(*) as count FROM ragecheck_analyses WHERE success = true`;
+  // Success rate (excluding bots)
+  const [successResult] = await getDb()`SELECT COUNT(*) as count FROM ragecheck_analyses WHERE is_bot = false AND success = true`;
   const successRate = totalResult.count > 0 ? (Number(successResult.count) / Number(totalResult.count)) * 100 : 0;
 
-  // LLM enhanced rate
-  const [llmResult] = await getDb()`SELECT COUNT(*) as count FROM ragecheck_analyses WHERE llm_enhanced = true`;
+  // LLM enhanced rate (excluding bots)
+  const [llmResult] = await getDb()`SELECT COUNT(*) as count FROM ragecheck_analyses WHERE is_bot = false AND llm_enhanced = true`;
   const llmEnhancedRate = totalResult.count > 0 ? (Number(llmResult.count) / Number(totalResult.count)) * 100 : 0;
 
-  // Bot stats
+  // Bot stats (count all to show bot totals)
+  const [allAnalyses] = await getDb()`SELECT COUNT(*) as count FROM ragecheck_analyses`;
   const [botCount] = await getDb()`SELECT COUNT(*) as count FROM ragecheck_analyses WHERE is_bot = true`;
   const totalBots = Number(botCount?.count || 0);
-  const totalHumans = Number(totalResult.count) - totalBots;
-  const botRate = totalResult.count > 0 ? (totalBots / Number(totalResult.count)) * 100 : 0;
+  const totalHumans = Number(allAnalyses.count) - totalBots;
+  const botRate = Number(allAnalyses.count) > 0 ? (totalBots / Number(allAnalyses.count)) * 100 : 0;
 
   // Recent analyses - include all fields (last 3 days)
   const recentRows = await getDb()`
@@ -434,11 +435,11 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     shared: row.shared || false,
   }));
 
-  // Top users by analysis count
+  // Top users by analysis count (excluding bots)
   const topUserRows = await getDb()`
     SELECT ip_address, country, COUNT(*) as analysis_count, AVG(score) as avg_score
     FROM ragecheck_analyses
-    WHERE ip_address IS NOT NULL
+    WHERE is_bot = false AND ip_address IS NOT NULL
     GROUP BY ip_address, country
     ORDER BY analysis_count DESC
     LIMIT 15
@@ -1314,35 +1315,35 @@ export async function getFeedbackStats(): Promise<FeedbackStats> {
 
 export async function getViralMetrics(): Promise<ViralMetrics> {
   try {
-    // Repeat users: visitors who came on 2+ different days
+    // Repeat users: visitors who came on 2+ different days (excluding bots)
     const repeatUserResult = await getDb()`
       SELECT COUNT(*) as count FROM (
         SELECT ip_address
         FROM ragecheck_visitors
-        WHERE ip_address IS NOT NULL
+        WHERE is_bot = false AND ip_address IS NOT NULL
         GROUP BY ip_address
         HAVING COUNT(DISTINCT DATE(created_at AT TIME ZONE 'America/New_York')) >= 2
       ) as repeat_users
     `;
 
-    // Total unique users
+    // Total unique users (excluding bots)
     const [uniqueUsersResult] = await getDb()`
       SELECT COUNT(DISTINCT ip_address) as count
       FROM ragecheck_visitors
-      WHERE ip_address IS NOT NULL
+      WHERE is_bot = false AND ip_address IS NOT NULL
     `;
 
-    // Average visits per user (by EST date)
+    // Average visits per user (by EST date, excluding bots)
     const [avgVisitsResult] = await getDb()`
       SELECT AVG(visit_count) as avg FROM (
         SELECT ip_address, COUNT(DISTINCT DATE(created_at AT TIME ZONE 'America/New_York')) as visit_count
         FROM ragecheck_visitors
-        WHERE ip_address IS NOT NULL
+        WHERE is_bot = false AND ip_address IS NOT NULL
         GROUP BY ip_address
       ) as user_visits
     `;
 
-    // Share counts (total and unique by IP)
+    // Share counts (total and unique by IP) - shares are human-initiated so no bot filter needed
     const [totalSharesResult] = await getDb()`
       SELECT COUNT(*) as count FROM ragecheck_shares
     `;
@@ -1363,10 +1364,10 @@ export async function getViralMetrics(): Promise<ViralMetrics> {
       WHERE created_at >= DATE_TRUNC('day', NOW() AT TIME ZONE 'America/New_York') AT TIME ZONE 'America/New_York' AND ip_address IS NOT NULL
     `;
 
-    // Unique users for share rate calculation (unique sharers / unique analyzers)
+    // Unique users for share rate calculation (unique sharers / unique analyzers, excluding bots)
     const [weekUniqueAnalyzersResult] = await getDb()`
       SELECT COUNT(DISTINCT ip_address) as count FROM ragecheck_analyses
-      WHERE created_at > NOW() - INTERVAL '7 days' AND success = true AND ip_address IS NOT NULL
+      WHERE is_bot = false AND created_at > NOW() - INTERVAL '7 days' AND success = true AND ip_address IS NOT NULL
     `;
 
     const [weekUniqueSharersResult] = await getDb()`
@@ -1374,23 +1375,23 @@ export async function getViralMetrics(): Promise<ViralMetrics> {
       WHERE created_at > NOW() - INTERVAL '7 days' AND ip_address IS NOT NULL
     `;
 
-    // Traffic baseline comparison (today in EST vs 7-day average)
+    // Traffic baseline comparison (today in EST vs 7-day average, excluding bots)
     const [todayVisitorsResult] = await getDb()`
       SELECT COUNT(*) as count FROM ragecheck_visitors
-      WHERE created_at >= DATE_TRUNC('day', NOW() AT TIME ZONE 'America/New_York') AT TIME ZONE 'America/New_York'
+      WHERE is_bot = false AND created_at >= DATE_TRUNC('day', NOW() AT TIME ZONE 'America/New_York') AT TIME ZONE 'America/New_York'
     `;
 
     const [avgDailyVisitorsResult] = await getDb()`
       SELECT AVG(daily_count) as avg FROM (
         SELECT DATE(created_at AT TIME ZONE 'America/New_York') as day, COUNT(*) as daily_count
         FROM ragecheck_visitors
-        WHERE created_at > NOW() - INTERVAL '8 days'
+        WHERE is_bot = false AND created_at > NOW() - INTERVAL '8 days'
           AND created_at < DATE_TRUNC('day', NOW() AT TIME ZONE 'America/New_York') AT TIME ZONE 'America/New_York'
         GROUP BY DATE(created_at AT TIME ZONE 'America/New_York')
       ) as daily_visits
     `;
 
-    // Referral sources (external referrers)
+    // Referral sources (external referrers, excluding bots)
     const referralSources = await getDb()`
       SELECT
         CASE
@@ -1406,7 +1407,7 @@ export async function getViralMetrics(): Promise<ViralMetrics> {
         END as source,
         COUNT(*) as count
       FROM ragecheck_visitors
-      WHERE created_at > NOW() - INTERVAL '7 days'
+      WHERE is_bot = false AND created_at > NOW() - INTERVAL '7 days'
       GROUP BY source
       ORDER BY count DESC
       LIMIT 10
@@ -1417,10 +1418,10 @@ export async function getViralMetrics(): Promise<ViralMetrics> {
     const uniqueSharers = Number(uniqueSharersResult.count) || 0;
     const shareRateDecimal = uniqueSharers / uniqueUsers; // What % of users share
 
-    // Estimate conversion from shares (visitors with referrer containing our domain or share params)
+    // Estimate conversion from shares (visitors with referrer containing our domain or share params, excluding bots)
     const [referralVisitsResult] = await getDb()`
       SELECT COUNT(*) as count FROM ragecheck_visitors
-      WHERE referrer LIKE '%ragecheck%' OR referrer LIKE '%share%'
+      WHERE is_bot = false AND (referrer LIKE '%ragecheck%' OR referrer LIKE '%share%')
     `;
     const referralConversion = uniqueSharers > 0
       ? Number(referralVisitsResult.count) / uniqueSharers
@@ -1444,11 +1445,11 @@ export async function getViralMetrics(): Promise<ViralMetrics> {
     const trafficVsBaseline = todayVisitors / avgDailyVisitors;
     const isSpike = trafficVsBaseline > 3; // 3x normal = spike
 
-    // Get 7-day trends for sparklines (grouped by EST date)
+    // Get 7-day trends for sparklines (grouped by EST date, excluding bots)
     const visitorTrends = await getDb()`
       SELECT DATE(created_at AT TIME ZONE 'America/New_York') as day, COUNT(DISTINCT ip_address) as count
       FROM ragecheck_visitors
-      WHERE created_at > NOW() - INTERVAL '7 days' AND ip_address IS NOT NULL
+      WHERE is_bot = false AND created_at > NOW() - INTERVAL '7 days' AND ip_address IS NOT NULL
       GROUP BY DATE(created_at AT TIME ZONE 'America/New_York')
       ORDER BY day ASC
     `;
@@ -1464,20 +1465,20 @@ export async function getViralMetrics(): Promise<ViralMetrics> {
     const analysisTrends = await getDb()`
       SELECT DATE(created_at AT TIME ZONE 'America/New_York') as day, COUNT(*) as count
       FROM ragecheck_analyses
-      WHERE created_at > NOW() - INTERVAL '7 days' AND success = true
+      WHERE is_bot = false AND created_at > NOW() - INTERVAL '7 days' AND success = true
       GROUP BY DATE(created_at AT TIME ZONE 'America/New_York')
       ORDER BY day ASC
     `;
 
-    // Repeat visitors per day (visitors who had visited before that day)
+    // Repeat visitors per day (visitors who had visited before that day, excluding bots)
     const repeatVisitorTrends = await getDb()`
       SELECT DATE(v.created_at AT TIME ZONE 'America/New_York') as day, COUNT(DISTINCT v.ip_address) as count
       FROM ragecheck_visitors v
-      WHERE v.created_at > NOW() - INTERVAL '7 days'
+      WHERE v.is_bot = false AND v.created_at > NOW() - INTERVAL '7 days'
         AND v.ip_address IS NOT NULL
         AND EXISTS (
           SELECT 1 FROM ragecheck_visitors v2
-          WHERE v2.ip_address = v.ip_address
+          WHERE v2.is_bot = false AND v2.ip_address = v.ip_address
             AND DATE(v2.created_at AT TIME ZONE 'America/New_York') < DATE(v.created_at AT TIME ZONE 'America/New_York')
         )
       GROUP BY DATE(v.created_at AT TIME ZONE 'America/New_York')
