@@ -949,11 +949,11 @@ export async function getVisitorStats(): Promise<VisitorStats> {
       .sort((a, b) => a[0].localeCompare(b[0]))
       .map(([date, data]) => ({ date, ...data }));
 
-    // Realtime series - 30 minute buckets for last 3 days (72 hours), excluding bots
+    // Realtime series - 30 minute buckets for last 3 days (72 hours), excluding bots, in EST
     const visitorRealtime = await getDb()`
       SELECT
-        date_trunc('hour', created_at) +
-        (floor(extract(minute FROM created_at) / 30) * interval '30 minutes') as bucket,
+        date_trunc('hour', created_at AT TIME ZONE 'America/New_York') +
+        (floor(extract(minute FROM created_at AT TIME ZONE 'America/New_York') / 30) * interval '30 minutes') as bucket,
         COUNT(*) as count
       FROM ragecheck_visitors
       WHERE is_bot = false AND created_at > NOW() - INTERVAL '72 hours'
@@ -963,8 +963,8 @@ export async function getVisitorStats(): Promise<VisitorStats> {
 
     const analysisRealtime = await getDb()`
       SELECT
-        date_trunc('hour', created_at) +
-        (floor(extract(minute FROM created_at) / 30) * interval '30 minutes') as bucket,
+        date_trunc('hour', created_at AT TIME ZONE 'America/New_York') +
+        (floor(extract(minute FROM created_at AT TIME ZONE 'America/New_York') / 30) * interval '30 minutes') as bucket,
         COUNT(*) as count
       FROM ragecheck_analyses
       WHERE is_bot = false AND created_at > NOW() - INTERVAL '72 hours'
@@ -1047,11 +1047,11 @@ export async function getPageVisitorStats(pagePath: string): Promise<PageVisitor
     const [todayResult] = await getDb()`SELECT COUNT(*) as count FROM ragecheck_visitors WHERE is_bot = false AND page_path = ${pagePath} AND created_at >= DATE_TRUNC('day', NOW() AT TIME ZONE 'America/New_York') AT TIME ZONE 'America/New_York'`;
     const [weekResult] = await getDb()`SELECT COUNT(*) as count FROM ragecheck_visitors WHERE is_bot = false AND page_path = ${pagePath} AND created_at > NOW() - INTERVAL '7 days'`;
 
-    // Realtime series - 30 minute buckets for last 24 hours (excluding bots)
+    // Realtime series - 30 minute buckets for last 24 hours (excluding bots, in EST)
     const visitorRealtime = await getDb()`
       SELECT
-        date_trunc('hour', created_at) +
-        (floor(extract(minute FROM created_at) / 30) * interval '30 minutes') as bucket,
+        date_trunc('hour', created_at AT TIME ZONE 'America/New_York') +
+        (floor(extract(minute FROM created_at AT TIME ZONE 'America/New_York') / 30) * interval '30 minutes') as bucket,
         COUNT(*) as count
       FROM ragecheck_visitors
       WHERE is_bot = false AND page_path = ${pagePath} AND created_at > NOW() - INTERVAL '24 hours'
