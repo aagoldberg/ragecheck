@@ -796,6 +796,27 @@ export async function extractContent(urlString: string): Promise<ExtractedConten
 
   const sourceDomain = url.hostname;
 
+  // Facebook and Instagram require login - suggest screenshot upload
+  if (sourceDomain.includes("facebook.com") || sourceDomain.includes("fb.com") || sourceDomain.includes("fb.watch")) {
+    return {
+      title: "",
+      text: "",
+      sourceDomain: "www.facebook.com",
+      success: false,
+      error: "Facebook requires login. Please take a screenshot and use the image upload feature instead.",
+    };
+  }
+
+  if (sourceDomain.includes("instagram.com")) {
+    return {
+      title: "",
+      text: "",
+      sourceDomain: "www.instagram.com",
+      success: false,
+      error: "Instagram requires login. Please take a screenshot and use the image upload feature instead.",
+    };
+  }
+
   // Try platform-specific extractors first
   if (sourceDomain.includes("bsky.app")) {
     const result = await extractBluesky(urlString);

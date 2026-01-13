@@ -170,6 +170,7 @@ export async function initDB() {
     await getDb()`ALTER TABLE ragecheck_analyses ADD COLUMN IF NOT EXISTS sharing_patterns JSONB`;
     await getDb()`ALTER TABLE ragecheck_analyses ADD COLUMN IF NOT EXISTS technique_explanations JSONB`;
     await getDb()`ALTER TABLE ragecheck_analyses ADD COLUMN IF NOT EXISTS share_card_summary TEXT`;
+    await getDb()`ALTER TABLE ragecheck_analyses ADD COLUMN IF NOT EXISTS failed_image_url TEXT`;
   } catch {
     // Columns may already exist
   }
@@ -204,6 +205,7 @@ export interface AnalysisLog {
   sharingPatterns?: string[];
   techniqueExplanations?: string[];
   shareCardSummary?: string;
+  failedImageUrl?: string;
 }
 
 function detectPlatform(domain: string): string {
@@ -235,7 +237,7 @@ export async function logAnalysis(data: AnalysisLog) {
           signal_us_vs_them, signal_engagement_bait, success, error,
           ip_address, user_agent, country, is_bot,
           title, reasons, highlights, context_notes, text_preview,
-          sharing_patterns, technique_explanations, share_card_summary
+          sharing_patterns, technique_explanations, share_card_summary, failed_image_url
         ) VALUES (
           ${data.url},
           ${data.sourceDomain || null},
@@ -261,7 +263,8 @@ export async function logAnalysis(data: AnalysisLog) {
           ${data.textPreview || null},
           ${data.sharingPatterns ? JSON.stringify(data.sharingPatterns) : null},
           ${data.techniqueExplanations ? JSON.stringify(data.techniqueExplanations) : null},
-          ${data.shareCardSummary || null}
+          ${data.shareCardSummary || null},
+          ${data.failedImageUrl || null}
         )
       `;
     });
