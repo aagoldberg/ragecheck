@@ -32,17 +32,17 @@ const SHAPE_LABELS: Record<ConversationShapeLabel, string> = {
 
 const SHAPE_EXPLANATIONS: Record<ConversationShapeLabel, string> = {
   splits_sides:
-    "Content like this tends to sort people into opposing camps, with each side reinforcing its own view.",
+    "People tend to pick a team and dig in. Each side talks mostly to itself.",
   invites_pileon:
-    "This framing tends to draw collective criticism toward a target, often escalating quickly.",
+    "There's a clear target, and criticism tends to snowball fast.",
   endless_arguing:
-    "Threads on content like this often loop without resolution, with participants talking past each other.",
+    "Comments go in circles. People talk past each other without anyone changing their mind.",
   rewards_stance:
-    "Engagement tends to flow toward those who take the strongest position, regardless of nuance.",
+    "The strongest takes get the most attention, whether or not they're right.",
   spreads_burns:
-    "High initial sharing followed by rapid decline as the emotional charge fades.",
+    "Gets shared a lot at first, then fades once the emotional charge wears off.",
   stays_informational:
-    "Discussion tends to focus on facts and context rather than emotional reactions.",
+    "Replies tend to stay on topic and focus on the actual facts.",
 };
 
 interface SignalBreakdown {
@@ -113,60 +113,60 @@ export function detectConversationShape(input: DetectionInput): ConversationShap
 
     if (shape === "splits_sides") {
       if (signalBreakdown.enemy_construction >= 40)
-        signals.push("Uses us-vs-them framing");
+        signals.push("Sets up an 'us vs them'");
       if (signalBreakdown.moral_condemnation >= 40)
-        signals.push("Activates moral certainty");
+        signals.push("Makes it feel like a moral issue");
       if (signalBreakdown.arousal >= 50 || hasKeyword(["threat", "fear", "danger"]))
-        signals.push("Heightens sense of threat");
+        signals.push("Plays up a sense of threat");
       if (hasKeyword(["identity", "group", "tribe", "real"]))
-        signals.push("Engages group identity");
+        signals.push("Ties into group identity");
     }
 
     if (shape === "invites_pileon") {
       if (signalBreakdown.call_to_conflict >= 40)
-        signals.push("Frames target for criticism");
+        signals.push("Points at someone to criticize");
       if (hasKeyword(["outrage", "unacceptable", "disgrace"]))
-        signals.push("Uses outrage framing");
+        signals.push("Frames it as outrageous");
       if (signalBreakdown.enemy_construction >= 40)
-        signals.push("Constructs a clear villain");
+        signals.push("Paints a clear villain");
       if (hasKeyword(["punish", "accountable", "consequences"]))
-        signals.push("Suggests collective response");
+        signals.push("Hints that 'something should be done'");
     }
 
     if (shape === "endless_arguing") {
       if (signalBreakdown.simplification >= 40)
-        signals.push("Oversimplifies complex issue");
+        signals.push("Flattens a complex issue");
       if (hasKeyword(["status", "signal", "virtue"]))
-        signals.push("Rewards status signaling");
+        signals.push("Rewards strong opinions over nuance");
       if (signalBreakdown.moral_condemnation >= 30)
-        signals.push("Frames as moral question");
+        signals.push("Turns it into a right-vs-wrong debate");
     }
 
     if (shape === "rewards_stance") {
       if (signalBreakdown.moral_condemnation >= 50)
-        signals.push("Rewards moral certainty");
+        signals.push("Rewards being sure of yourself");
       if (hasKeyword(["identity", "stand", "believe"]))
-        signals.push("Ties to identity expression");
+        signals.push("Makes your take feel like your identity");
       if (signalBreakdown.simplification >= 40)
-        signals.push("Favors clear positions");
+        signals.push("Favors bold, simple positions");
     }
 
     if (shape === "spreads_burns") {
       if (signalBreakdown.arousal >= 60)
         signals.push("High emotional charge");
       if (hasKeyword(["urgent", "breaking", "just in"]))
-        signals.push("Creates urgency to share");
+        signals.push("Feels urgent to share now");
       if (hasKeyword(["fear", "shocking", "unbelievable"]))
-        signals.push("Novelty-driven engagement");
+        signals.push("Novelty grabs attention");
     }
 
     if (shape === "stays_informational") {
       if (signalBreakdown.arousal < 30)
-        signals.push("Low emotional intensity");
+        signals.push("Low emotional heat");
       if (signalBreakdown.simplification < 30)
-        signals.push("Preserves context and nuance");
+        signals.push("Keeps the nuance intact");
       if (score !== undefined && score < 35)
-        signals.push("Minimal persuasion signals");
+        signals.push("Not trying hard to persuade");
     }
 
     // Return top 3 signals

@@ -86,8 +86,8 @@ Respond with this exact JSON structure:
   "adjustedScore": <number 0-100, adjust rule-based score based on context>,
   "reasons": [<3-5 concise bullet points explaining the score>],
   "contextNotes": "<optional: note if rule-based score was misleading due to context>",
-  "sharingPatterns": [<2-3 reasons why content like this tends to spread, e.g. "Validates pre-existing fears about X", "Creates strong in-group identification", "Outrage drives more engagement than nuance">],
-  "techniqueExplanations": [<2-3 specific manipulation techniques used, with brief explanations, e.g. "Fear appeal: Uses threat of harm to bypass rational evaluation", "Loaded framing: Describes neutral facts using emotionally charged language">],
+  "sharingPatterns": [<2-3 reasons why people share this, in plain conversational English. e.g. "Confirms what many already suspect about X", "Makes readers feel part of a group who 'gets it'", "The outrage feels satisfying to pass along">],
+  "techniqueExplanations": [<2-3 specific techniques used, explained simply. Start with a short label, then explain like you're telling a friend. e.g. "Playing on fear: Makes a threat feel urgent so you react before thinking", "Loaded words: Describes ordinary things using emotional language to make them seem worse">],
   "shareCardSummary": "<ONE punchy 8-12 word sentence summarizing the manipulation verdict for social sharing, e.g. 'Uses fear framing to bypass critical thinking' or 'Straightforward reporting with minimal emotional spin'>"
 }`;
 
@@ -187,8 +187,8 @@ Respond with this exact JSON structure:
   },
   "reasons": [<3-5 concise bullet points explaining the score>],
   "highlights": [{"text": "<problematic phrase>", "category": "<signal category>"}],
-  "sharingPatterns": [<2-3 reasons why this content spreads>],
-  "techniqueExplanations": [<2-3 specific manipulation techniques used>],
+  "sharingPatterns": [<2-3 reasons why people share this, in plain conversational English>],
+  "techniqueExplanations": [<2-3 specific techniques used, explained simply like you're telling a friend>],
   "shareCardSummary": "<ONE punchy 8-12 word sentence summarizing the verdict for social sharing>"
 }`;
 
