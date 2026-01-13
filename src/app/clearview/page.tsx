@@ -309,24 +309,37 @@ function StoryCard({ story }: { story: StoryCluster }) {
                 <h4 className="text-xs font-bold text-zinc-900 dark:text-white uppercase tracking-widest">Source Analysis</h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {story.sources.map((source, i) => (
-                        <a 
-                            key={i} 
-                            href={source.url} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="group/source block p-4 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl hover:border-zinc-400 dark:hover:border-zinc-600 transition-colors"
+                        <div
+                            key={i}
+                            className="group/source p-4 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl hover:border-zinc-400 dark:hover:border-zinc-600 transition-colors"
                         >
                             <div className="flex justify-between items-center mb-2">
                                 <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">{source.name}</span>
                                 <BiasBadge lean={source.lean} />
                             </div>
-                            <p className="text-sm font-bold text-zinc-900 dark:text-zinc-100 mb-2 group-hover/source:text-indigo-600 dark:group-hover/source:text-indigo-400">
-                                {source.title}
-                            </p>
-                            <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">
+                            <a
+                                href={source.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="block"
+                            >
+                                <p className="text-sm font-bold text-zinc-900 dark:text-zinc-100 mb-2 group-hover/source:text-indigo-600 dark:group-hover/source:text-indigo-400">
+                                    {source.title}
+                                </p>
+                            </a>
+                            <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed mb-3">
                                 <span className="text-zinc-400 font-medium">Framing:</span> {source.framing}
                             </p>
-                        </a>
+                            <a
+                                href={`/?url=${encodeURIComponent(source.url)}`}
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 rounded-lg hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors"
+                            >
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                                </svg>
+                                Analyze
+                            </a>
+                        </div>
                     ))}
                 </div>
             </div>

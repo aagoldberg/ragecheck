@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useMemo, useEffect, useCallback, useRef } from "react";
+import { useState, useMemo, useEffect, useCallback, useRef, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { getScoreBucket } from "@/lib/share";
 import { SIGNAL_LABELS } from "@/lib/shareCard";
 import { copyShareImageToClipboard } from "@/lib/shareImage";
@@ -560,11 +561,13 @@ function MicroDemoCard() {
   );
 }
 
-export default function Home() {
+function HomeContent() {
+  const searchParams = useSearchParams();
   const [url, setUrl] = useState("");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<AnalysisResult | null>(DEMO_RESULT);
   const [isDemo, setIsDemo] = useState(true);
+  const [autoAnalyzeTriggered, setAutoAnalyzeTriggered] = useState(false);
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
   const [headlines, setHeadlines] = useState<Headline[]>([]);
   const [headlinesLoading, setHeadlinesLoading] = useState(true);
@@ -783,6 +786,19 @@ export default function Home() {
       setLoading(false);
     }
   };
+
+  // Handle URL param from Clearview "Analyze" button
+  useEffect(() => {
+    const urlParam = searchParams.get("url");
+    if (urlParam && !autoAnalyzeTriggered) {
+      setUrl(urlParam);
+      setAutoAnalyzeTriggered(true);
+      // Small delay to ensure state is set
+      setTimeout(() => {
+        analyze(urlParam);
+      }, 100);
+    }
+  }, [searchParams, autoAnalyzeTriggered]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -1586,5 +1602,13 @@ export default function Home() {
         }
       `}</style>
     </div>
+  );
+}
+
+export default function Home() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-zinc-50 dark:bg-zinc-950" />}>
+      <HomeContent />
+    </Suspense>
   );
 }
