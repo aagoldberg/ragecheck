@@ -791,26 +791,30 @@ export async function getVisitorStats(): Promise<VisitorStats> {
     // Use EST timezone for "today" calculations
     const estTodayStart = `DATE_TRUNC('day', NOW() AT TIME ZONE 'America/New_York') AT TIME ZONE 'America/New_York'`;
 
-    const [totalResult] = await getDb()`SELECT COUNT(*) as count FROM ragecheck_visitors`;
-    const [todayResult] = await getDb()`SELECT COUNT(*) as count FROM ragecheck_visitors WHERE created_at >= DATE_TRUNC('day', NOW() AT TIME ZONE 'America/New_York') AT TIME ZONE 'America/New_York'`;
-    const [weekResult] = await getDb()`SELECT COUNT(*) as count FROM ragecheck_visitors WHERE created_at > NOW() - INTERVAL '7 days'`;
+    // Exclude bots from visitor counts
+    const [totalResult] = await getDb()`SELECT COUNT(*) as count FROM ragecheck_visitors WHERE is_bot = false`;
+    const [todayResult] = await getDb()`SELECT COUNT(*) as count FROM ragecheck_visitors WHERE is_bot = false AND created_at >= DATE_TRUNC('day', NOW() AT TIME ZONE 'America/New_York') AT TIME ZONE 'America/New_York'`;
+    const [weekResult] = await getDb()`SELECT COUNT(*) as count FROM ragecheck_visitors WHERE is_bot = false AND created_at > NOW() - INTERVAL '7 days'`;
 
     // True conversion rate: unique visitors who performed at least one analysis (today in EST)
     const [uniqueVisitorsToday] = await getDb()`
       SELECT COUNT(DISTINCT ip_address) as count
       FROM ragecheck_visitors
-      WHERE created_at >= DATE_TRUNC('day', NOW() AT TIME ZONE 'America/New_York') AT TIME ZONE 'America/New_York'
+      WHERE is_bot = false
+        AND created_at >= DATE_TRUNC('day', NOW() AT TIME ZONE 'America/New_York') AT TIME ZONE 'America/New_York'
         AND ip_address IS NOT NULL
     `;
 
     const [convertedVisitors] = await getDb()`
       SELECT COUNT(DISTINCT v.ip_address) as count
       FROM ragecheck_visitors v
-      WHERE v.created_at >= DATE_TRUNC('day', NOW() AT TIME ZONE 'America/New_York') AT TIME ZONE 'America/New_York'
+      WHERE v.is_bot = false
+        AND v.created_at >= DATE_TRUNC('day', NOW() AT TIME ZONE 'America/New_York') AT TIME ZONE 'America/New_York'
         AND v.ip_address IS NOT NULL
         AND EXISTS (
           SELECT 1 FROM ragecheck_analyses a
           WHERE a.ip_address = v.ip_address
+            AND a.is_bot = false
             AND a.created_at >= DATE_TRUNC('day', NOW() AT TIME ZONE 'America/New_York') AT TIME ZONE 'America/New_York'
         )
     `;
@@ -842,11 +846,11 @@ export async function getVisitorStats(): Promise<VisitorStats> {
       hasLlmAnalysis: row.has_llm_analysis || false,
     }));
 
-    // Time series for last 14 days (grouped by EST date)
+    // Time series for last 14 days (grouped by EST date, excluding bots)
     const visitorTimeSeries = await getDb()`
       SELECT DATE(created_at AT TIME ZONE 'America/New_York') as date, COUNT(*) as count
       FROM ragecheck_visitors
-      WHERE created_at > NOW() - INTERVAL '14 days'
+      WHERE is_bot = false AND created_at > NOW() - INTERVAL '14 days'
       GROUP BY DATE(created_at AT TIME ZONE 'America/New_York')
       ORDER BY date ASC
     `;
@@ -854,7 +858,7 @@ export async function getVisitorStats(): Promise<VisitorStats> {
     const analysisTimeSeries = await getDb()`
       SELECT DATE(created_at AT TIME ZONE 'America/New_York') as date, COUNT(*) as count
       FROM ragecheck_analyses
-      WHERE created_at > NOW() - INTERVAL '14 days'
+      WHERE is_bot = false AND created_at > NOW() - INTERVAL '14 days'
       GROUP BY DATE(created_at AT TIME ZONE 'America/New_York')
       ORDER BY date ASC
     `;
@@ -985,19 +989,19 @@ export interface PageVisitorStats {
 
 export async function getPageVisitorStats(pagePath: string): Promise<PageVisitorStats> {
   try {
-    // Use EST timezone for "today" calculations
-    const [totalResult] = await getDb()`SELECT COUNT(*) as count FROM ragecheck_visitors WHERE page_path = ${pagePath}`;
-    const [todayResult] = await getDb()`SELECT COUNT(*) as count FROM ragecheck_visitors WHERE page_path = ${pagePath} AND created_at >= DATE_TRUNC('day', NOW() AT TIME ZONE 'America/New_York') AT TIME ZONE 'America/New_York'`;
-    const [weekResult] = await getDb()`SELECT COUNT(*) as count FROM ragecheck_visitors WHERE page_path = ${pagePath} AND created_at > NOW() - INTERVAL '7 days'`;
+    // Use EST timezone for "today" calculations, excluding bots
+    const [totalResult] = await getDb()`SELECT COUNT(*) as count FROM ragecheck_visitors WHERE is_bot = false AND page_path = ${pagePath}`;
+    const [todayResult] = await getDb()`SELECT COUNT(*) as count FROM ragecheck_visitors WHERE is_bot = false AND page_path = ${pagePath} AND created_at >= DATE_TRUNC('day', NOW() AT TIME ZONE 'America/New_York') AT TIME ZONE 'America/New_York'`;
+    const [weekResult] = await getDb()`SELECT COUNT(*) as count FROM ragecheck_visitors WHERE is_bot = false AND page_path = ${pagePath} AND created_at > NOW() - INTERVAL '7 days'`;
 
-    // Realtime series - 30 minute buckets for last 24 hours
+    // Realtime series - 30 minute buckets for last 24 hours (excluding bots)
     const visitorRealtime = await getDb()`
       SELECT
         date_trunc('hour', created_at) +
         (floor(extract(minute FROM created_at) / 30) * interval '30 minutes') as bucket,
         COUNT(*) as count
       FROM ragecheck_visitors
-      WHERE page_path = ${pagePath} AND created_at > NOW() - INTERVAL '24 hours'
+      WHERE is_bot = false AND page_path = ${pagePath} AND created_at > NOW() - INTERVAL '24 hours'
       GROUP BY bucket
       ORDER BY bucket ASC
     `;
@@ -1021,11 +1025,11 @@ export async function getPageVisitorStats(pagePath: string): Promise<PageVisitor
       .sort((a, b) => a[0].localeCompare(b[0]))
       .map(([time, visitors]) => ({ time, visitors }));
 
-    // Daily time series for last 14 days (grouped by EST date)
+    // Daily time series for last 14 days (grouped by EST date, excluding bots)
     const dailyData = await getDb()`
       SELECT DATE(created_at AT TIME ZONE 'America/New_York') as date, COUNT(*) as count
       FROM ragecheck_visitors
-      WHERE page_path = ${pagePath} AND created_at > NOW() - INTERVAL '14 days'
+      WHERE is_bot = false AND page_path = ${pagePath} AND created_at > NOW() - INTERVAL '14 days'
       GROUP BY DATE(created_at AT TIME ZONE 'America/New_York')
       ORDER BY date ASC
     `;
@@ -1555,19 +1559,21 @@ export interface TimeToAnalysisMetrics {
 
 export async function getTimeToAnalysisMetrics(): Promise<TimeToAnalysisMetrics> {
   try {
-    // Get time differences between first visit and first analysis per IP (last 7 days)
+    // Get time differences between first visit and first analysis per IP (last 7 days, excluding bots)
     const results = await getDb()`
       WITH visitor_first AS (
         SELECT ip_address, user_agent, MIN(created_at) as first_visit
         FROM ragecheck_visitors
-        WHERE ip_address IS NOT NULL
+        WHERE is_bot = false
+          AND ip_address IS NOT NULL
           AND created_at > NOW() - INTERVAL '7 days'
         GROUP BY ip_address, user_agent
       ),
       analysis_first AS (
         SELECT ip_address, MIN(created_at) as first_analysis
         FROM ragecheck_analyses
-        WHERE ip_address IS NOT NULL
+        WHERE is_bot = false
+          AND ip_address IS NOT NULL
           AND success = true
           AND created_at > NOW() - INTERVAL '7 days'
         GROUP BY ip_address
@@ -1674,20 +1680,22 @@ export interface ConversionMetrics {
 
 export async function getConversionMetrics(): Promise<ConversionMetrics> {
   try {
-    // Get all visitors with their user agent (last 7 days)
+    // Get all visitors with their user agent (last 7 days, excluding bots)
     const visitors = await getDb()`
       SELECT ip_address, user_agent
       FROM ragecheck_visitors
-      WHERE ip_address IS NOT NULL
+      WHERE is_bot = false
+        AND ip_address IS NOT NULL
         AND created_at > NOW() - INTERVAL '7 days'
       GROUP BY ip_address, user_agent
     `;
 
-    // Get all IPs that converted (performed an analysis)
+    // Get all IPs that converted (performed an analysis, excluding bots)
     const convertedIPs = await getDb()`
       SELECT DISTINCT ip_address
       FROM ragecheck_analyses
-      WHERE ip_address IS NOT NULL
+      WHERE is_bot = false
+        AND ip_address IS NOT NULL
         AND success = true
         AND created_at > NOW() - INTERVAL '7 days'
     `;
@@ -1804,23 +1812,17 @@ export async function getConversionInsights(): Promise<ConversionInsights> {
         EXTRACT(HOUR FROM v.created_at AT TIME ZONE 'America/New_York') as hour_of_day,
         EXTRACT(DOW FROM v.created_at AT TIME ZONE 'America/New_York') as day_of_week
       FROM ragecheck_visitors v
-      WHERE v.ip_address IS NOT NULL
+      WHERE v.is_bot = false
+        AND v.ip_address IS NOT NULL
         AND v.created_at > NOW() - INTERVAL '14 days'
-        AND NOT (
-          v.user_agent ILIKE '%bot%' OR
-          v.user_agent ILIKE '%crawler%' OR
-          v.user_agent ILIKE '%spider%' OR
-          v.user_agent ILIKE '%python%' OR
-          v.user_agent ILIKE '%curl%' OR
-          v.user_agent IS NULL
-        )
     `;
 
-    // Get all IPs that converted
+    // Get all IPs that converted (exclude bots)
     const convertedIPs = await getDb()`
       SELECT DISTINCT ip_address
       FROM ragecheck_analyses
-      WHERE ip_address IS NOT NULL
+      WHERE is_bot = false
+        AND ip_address IS NOT NULL
         AND success = true
         AND created_at > NOW() - INTERVAL '14 days'
     `;
@@ -1976,25 +1978,17 @@ export async function getFunnelMetrics(): Promise<FunnelMetrics> {
     const [visitorsResult] = await getDb()`
       SELECT COUNT(DISTINCT ip_address) as count
       FROM ragecheck_visitors
-      WHERE created_at > NOW() - INTERVAL '7 days'
+      WHERE is_bot = false
+        AND created_at > NOW() - INTERVAL '7 days'
         AND ip_address IS NOT NULL
-        AND (
-          user_agent IS NULL OR
-          NOT (
-            user_agent ILIKE '%bot%' OR
-            user_agent ILIKE '%crawler%' OR
-            user_agent ILIKE '%spider%' OR
-            user_agent ILIKE '%python%' OR
-            user_agent ILIKE '%curl%'
-          )
-        )
     `;
 
-    // Get unique visitors who completed at least one analysis
+    // Get unique visitors who completed at least one analysis (non-bot)
     const [analyzedResult] = await getDb()`
       SELECT COUNT(DISTINCT ip_address) as count
       FROM ragecheck_analyses
-      WHERE created_at > NOW() - INTERVAL '7 days'
+      WHERE is_bot = false
+        AND created_at > NOW() - INTERVAL '7 days'
         AND ip_address IS NOT NULL
         AND success = true
     `;
@@ -2032,24 +2026,15 @@ export async function getFunnelMetrics(): Promise<FunnelMetrics> {
       },
     ];
 
-    // Get daily conversion trend (last 14 days)
+    // Get daily conversion trend (last 14 days, excluding bots)
     const dailyVisitors = await getDb()`
       SELECT
         DATE(created_at AT TIME ZONE 'America/New_York') as date,
         COUNT(DISTINCT ip_address) as count
       FROM ragecheck_visitors
-      WHERE created_at > NOW() - INTERVAL '14 days'
+      WHERE is_bot = false
+        AND created_at > NOW() - INTERVAL '14 days'
         AND ip_address IS NOT NULL
-        AND (
-          user_agent IS NULL OR
-          NOT (
-            user_agent ILIKE '%bot%' OR
-            user_agent ILIKE '%crawler%' OR
-            user_agent ILIKE '%spider%' OR
-            user_agent ILIKE '%python%' OR
-            user_agent ILIKE '%curl%'
-          )
-        )
       GROUP BY DATE(created_at AT TIME ZONE 'America/New_York')
       ORDER BY date ASC
     `;
@@ -2059,7 +2044,8 @@ export async function getFunnelMetrics(): Promise<FunnelMetrics> {
         DATE(created_at AT TIME ZONE 'America/New_York') as date,
         COUNT(DISTINCT ip_address) as count
       FROM ragecheck_analyses
-      WHERE created_at > NOW() - INTERVAL '14 days'
+      WHERE is_bot = false
+        AND created_at > NOW() - INTERVAL '14 days'
         AND ip_address IS NOT NULL
         AND success = true
       GROUP BY DATE(created_at AT TIME ZONE 'America/New_York')
