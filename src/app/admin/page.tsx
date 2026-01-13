@@ -1548,6 +1548,82 @@ export default function AdminDashboard() {
                 </table>
               </div>
             </div>
+
+            {/* Recent Visitors */}
+            {visitorStats && (
+              <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 mb-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+                    Recent Visitors
+                  </h3>
+                  <span className="text-xs text-zinc-400">Last {visitorStats.recentVisitors.length}</span>
+                </div>
+                <div className="overflow-x-auto max-h-[500px] overflow-y-auto border border-zinc-100 dark:border-zinc-800 rounded-lg">
+                  <table className="w-full text-sm">
+                    <thead className="sticky top-0 bg-zinc-50 dark:bg-zinc-800">
+                      <tr className="border-b border-zinc-200 dark:border-zinc-700">
+                        <th className="text-left py-3 px-3 text-zinc-500 font-medium">Time</th>
+                        <th className="text-left py-3 px-3 text-zinc-500 font-medium">Page</th>
+                        <th className="text-left py-3 px-3 text-zinc-500 font-medium">Device</th>
+                        <th className="text-left py-3 px-3 text-zinc-500 font-medium">OS</th>
+                        <th className="text-left py-3 px-3 text-zinc-500 font-medium">Browser</th>
+                        <th className="text-left py-3 px-3 text-zinc-500 font-medium">Country</th>
+                        <th className="text-left py-3 px-3 text-zinc-500 font-medium">Referrer</th>
+                        <th className="text-left py-3 px-3 text-zinc-500 font-medium">IP</th>
+                        <th className="text-left py-3 px-3 text-zinc-500 font-medium">Bot</th>
+                        <th className="text-left py-3 px-3 text-zinc-500 font-medium">AI</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {visitorStats.recentVisitors.length === 0 ? (
+                        <tr>
+                          <td colSpan={10} className="py-4 text-zinc-500 text-center">No visitors yet</td>
+                        </tr>
+                      ) : (
+                        visitorStats.recentVisitors.map((v, i) => (
+                          <tr key={i} className={`border-b border-zinc-100 dark:border-zinc-800 last:border-0 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 ${v.isBot ? 'opacity-50' : ''}`}>
+                            <td className="py-2 px-3 text-zinc-500 text-xs whitespace-nowrap">
+                              {formatDateTimeEST(v.createdAt)}
+                            </td>
+                            <td className="py-2 px-3 text-zinc-600 dark:text-zinc-400 text-xs">
+                              {v.pagePath}
+                            </td>
+                            <td className="py-2 px-3 text-zinc-600 dark:text-zinc-400 text-xs capitalize">
+                              {v.device}
+                            </td>
+                            <td className="py-2 px-3 text-zinc-600 dark:text-zinc-400 text-xs">
+                              {v.os}
+                            </td>
+                            <td className="py-2 px-3 text-zinc-600 dark:text-zinc-400 text-xs">
+                              {v.browser}
+                            </td>
+                            <td className="py-2 px-3 text-zinc-600 dark:text-zinc-400 text-xs">
+                              {v.country || "-"}
+                            </td>
+                            <td className="py-2 px-3 text-zinc-500 text-xs max-w-[200px] truncate" title={v.referrer || undefined}>
+                              {v.referrer || "-"}
+                            </td>
+                            <td className="py-2 px-3 text-zinc-500 text-xs font-mono">
+                              {v.ipAddress || "-"}
+                            </td>
+                            <td className="py-2 px-3 text-xs">
+                              {v.isBot ? (
+                                <span className="text-orange-600">Bot</span>
+                              ) : (
+                                <span className="text-zinc-400">-</span>
+                              )}
+                            </td>
+                            <td className="py-2 px-3 text-zinc-500 text-xs">
+                              {v.hasLlmAnalysis ? "✓" : "-"}
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
             </>
             )}
 
@@ -2275,82 +2351,6 @@ export default function AdminDashboard() {
             {/* Users Tab */}
             {activeTab === "users" && (
             <>
-            {/* Recent Visitors */}
-            {visitorStats && (
-              <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 mb-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-                    Recent Visitors
-                  </h3>
-                  <span className="text-xs text-zinc-400">Last {visitorStats.recentVisitors.length}</span>
-                </div>
-                <div className="overflow-x-auto max-h-[500px] overflow-y-auto border border-zinc-100 dark:border-zinc-800 rounded-lg">
-                  <table className="w-full text-sm">
-                    <thead className="sticky top-0 bg-zinc-50 dark:bg-zinc-800">
-                      <tr className="border-b border-zinc-200 dark:border-zinc-700">
-                        <th className="text-left py-3 px-3 text-zinc-500 font-medium">Time</th>
-                        <th className="text-left py-3 px-3 text-zinc-500 font-medium">Page</th>
-                        <th className="text-left py-3 px-3 text-zinc-500 font-medium">Device</th>
-                        <th className="text-left py-3 px-3 text-zinc-500 font-medium">OS</th>
-                        <th className="text-left py-3 px-3 text-zinc-500 font-medium">Browser</th>
-                        <th className="text-left py-3 px-3 text-zinc-500 font-medium">Country</th>
-                        <th className="text-left py-3 px-3 text-zinc-500 font-medium">Referrer</th>
-                        <th className="text-left py-3 px-3 text-zinc-500 font-medium">IP</th>
-                        <th className="text-left py-3 px-3 text-zinc-500 font-medium">Bot</th>
-                        <th className="text-left py-3 px-3 text-zinc-500 font-medium">AI</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {visitorStats.recentVisitors.length === 0 ? (
-                        <tr>
-                          <td colSpan={10} className="py-4 text-zinc-500 text-center">No visitors yet</td>
-                        </tr>
-                      ) : (
-                        visitorStats.recentVisitors.map((v, i) => (
-                          <tr key={i} className={`border-b border-zinc-100 dark:border-zinc-800 last:border-0 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 ${v.isBot ? 'opacity-50' : ''}`}>
-                            <td className="py-2 px-3 text-zinc-500 text-xs whitespace-nowrap">
-                              {formatDateTimeEST(v.createdAt)}
-                            </td>
-                            <td className="py-2 px-3 text-zinc-600 dark:text-zinc-400 text-xs">
-                              {v.pagePath}
-                            </td>
-                            <td className="py-2 px-3 text-zinc-600 dark:text-zinc-400 text-xs capitalize">
-                              {v.device}
-                            </td>
-                            <td className="py-2 px-3 text-zinc-600 dark:text-zinc-400 text-xs">
-                              {v.os}
-                            </td>
-                            <td className="py-2 px-3 text-zinc-600 dark:text-zinc-400 text-xs">
-                              {v.browser}
-                            </td>
-                            <td className="py-2 px-3 text-zinc-600 dark:text-zinc-400 text-xs">
-                              {v.country || "-"}
-                            </td>
-                            <td className="py-2 px-3 text-zinc-500 text-xs max-w-[200px] truncate" title={v.referrer || undefined}>
-                              {v.referrer || "-"}
-                            </td>
-                            <td className="py-2 px-3 text-zinc-500 text-xs font-mono">
-                              {v.ipAddress || "-"}
-                            </td>
-                            <td className="py-2 px-3 text-xs">
-                              {v.isBot ? (
-                                <span className="text-orange-600">Bot</span>
-                              ) : (
-                                <span className="text-zinc-400">-</span>
-                              )}
-                            </td>
-                            <td className="py-2 px-3 text-zinc-500 text-xs">
-                              {v.hasLlmAnalysis ? "✓" : "-"}
-                            </td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-
             {/* Top Users */}
             <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6">
               <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-4">
