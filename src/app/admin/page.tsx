@@ -62,6 +62,7 @@ interface DashboardStats {
     country: string | null;
     isBot: boolean;
     device: "mobile" | "tablet" | "desktop";
+    shared: boolean;
   }[];
   topUsers: {
     ipAddress: string;
@@ -2203,6 +2204,7 @@ export default function AdminDashboard() {
                       <th className="text-left py-3 px-3 text-zinc-500 font-medium">Platform</th>
                       <th className="text-left py-3 px-3 text-zinc-500 font-medium">Score</th>
                       <th className="text-left py-3 px-3 text-zinc-500 font-medium">AI</th>
+                      <th className="text-left py-3 px-3 text-zinc-500 font-medium">Share</th>
                       <th className="text-left py-3 px-3 text-zinc-500 font-medium">Device</th>
                       <th className="text-left py-3 px-3 text-zinc-500 font-medium">Country</th>
                       <th className="text-left py-3 px-3 text-zinc-500 font-medium">IP</th>
@@ -2211,7 +2213,7 @@ export default function AdminDashboard() {
                   <tbody>
                     {stats.recentAnalyses.length === 0 ? (
                       <tr>
-                        <td colSpan={8} className="py-4 text-zinc-500 text-center">No analyses yet</td>
+                        <td colSpan={9} className="py-4 text-zinc-500 text-center">No analyses yet</td>
                       </tr>
                     ) : (
                       stats.recentAnalyses.map((a, i) => (
@@ -2242,6 +2244,13 @@ export default function AdminDashboard() {
                           </td>
                           <td className="py-2 px-3 text-zinc-500 text-xs">
                             {a.llmEnhanced ? "✓" : "-"}
+                          </td>
+                          <td className="py-2 px-3 text-xs">
+                            {a.shared ? (
+                              <span className="text-emerald-600">✓</span>
+                            ) : (
+                              <span className="text-zinc-400">-</span>
+                            )}
                           </td>
                           <td className="py-2 px-3 text-zinc-600 dark:text-zinc-400 text-xs capitalize">
                             {a.device}

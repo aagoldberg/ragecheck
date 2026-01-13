@@ -318,6 +318,7 @@ export interface DashboardStats {
     country: string | null;
     isBot: boolean;
     device: "mobile" | "tablet" | "desktop";
+    shared: boolean;
   }[];
   topUsers: {
     ipAddress: string;
@@ -392,13 +393,14 @@ export async function getDashboardStats(): Promise<DashboardStats> {
 
   // Recent analyses - include all fields (last 3 days)
   const recentRows = await getDb()`
-    SELECT url, source_domain, platform, score, label, llm_enhanced,
-           signal_loaded_language, signal_absolutist, signal_threat_panic,
-           signal_us_vs_them, signal_engagement_bait,
-           success, error, title, created_at, ip_address, user_agent, country, is_bot
-    FROM ragecheck_analyses
-    WHERE created_at > NOW() - INTERVAL '3 days'
-    ORDER BY created_at DESC
+    SELECT a.url, a.source_domain, a.platform, a.score, a.label, a.llm_enhanced,
+           a.signal_loaded_language, a.signal_absolutist, a.signal_threat_panic,
+           a.signal_us_vs_them, a.signal_engagement_bait,
+           a.success, a.error, a.title, a.created_at, a.ip_address, a.user_agent, a.country, a.is_bot,
+           EXISTS (SELECT 1 FROM ragecheck_shares s WHERE s.url = a.url) as shared
+    FROM ragecheck_analyses a
+    WHERE a.created_at > NOW() - INTERVAL '3 days'
+    ORDER BY a.created_at DESC
   `;
   const recentAnalyses = recentRows.map((row) => ({
     url: row.url,
@@ -422,6 +424,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     country: row.country || null,
     isBot: row.is_bot || false,
     device: getDeviceType(row.user_agent),
+    shared: row.shared || false,
   }));
 
   // Top users by analysis count
