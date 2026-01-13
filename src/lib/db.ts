@@ -326,6 +326,7 @@ export interface DashboardStats {
     isBot: boolean;
     device: "mobile" | "tablet" | "desktop";
     shared: boolean;
+    failedImageUrl: string | null;
   }[];
   topUsers: {
     ipAddress: string;
@@ -405,6 +406,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
            a.signal_loaded_language, a.signal_absolutist, a.signal_threat_panic,
            a.signal_us_vs_them, a.signal_engagement_bait,
            a.success, a.error, a.title, a.created_at, a.ip_address, a.user_agent, a.country, a.is_bot,
+           a.failed_image_url,
            EXISTS (SELECT 1 FROM ragecheck_shares s WHERE s.url = a.url) as shared
     FROM ragecheck_analyses a
     WHERE a.created_at > NOW() - INTERVAL '3 days'
@@ -433,6 +435,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     isBot: row.is_bot || false,
     device: getDeviceType(row.user_agent),
     shared: row.shared || false,
+    failedImageUrl: row.failed_image_url || null,
   }));
 
   // Top users by analysis count (excluding bots)

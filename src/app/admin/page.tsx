@@ -63,6 +63,7 @@ interface DashboardStats {
     isBot: boolean;
     device: "mobile" | "tablet" | "desktop";
     shared: boolean;
+    failedImageUrl: string | null;
   }[];
   topUsers: {
     ipAddress: string;
@@ -1479,9 +1480,15 @@ export default function AdminDashboard() {
                             {formatDateTimeEST(a.createdAt)}
                           </td>
                           <td className="py-2 px-3 max-w-[200px] truncate" title={a.title || a.url}>
-                            <a href={a.url} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline">
-                              {a.title || a.sourceDomain || a.url}
-                            </a>
+                            {a.failedImageUrl ? (
+                              <a href={a.failedImageUrl} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline">
+                                image
+                              </a>
+                            ) : (
+                              <a href={a.url} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline">
+                                {a.title || a.sourceDomain || a.url}
+                              </a>
+                            )}
                           </td>
                           <td className="py-2 px-3 text-zinc-600 dark:text-zinc-400 text-xs capitalize">
                             {a.platform}
