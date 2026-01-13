@@ -19,8 +19,11 @@ export default function Methodology() {
 
       <div className="max-w-4xl mx-auto px-4 py-12 md:py-20">
         <h1 className="text-4xl font-bold tracking-tight mb-4">Methodology</h1>
-        <p className="text-lg text-zinc-600 dark:text-zinc-400 mb-12">
+        <p className="text-lg text-zinc-600 dark:text-zinc-400 mb-4">
           How RageCheck detects manipulative patterns in content.
+        </p>
+        <p className="text-sm text-zinc-500 dark:text-zinc-500 mb-12">
+          If you're seeing the "Techniques Detected," "Viral Triggers," or "How This Usually Plays Out" sections in a report, this page explains the model behind them.
         </p>
 
         {/* Overview */}
@@ -33,9 +36,53 @@ export default function Methodology() {
           </p>
           <p className="text-zinc-600 dark:text-zinc-400 leading-relaxed">
             The system analyzes text for linguistic patterns commonly associated with manipulative
-            framing—language designed to provoke emotional reactions rather than inform. It does not
+            framing—language optimized to provoke high-arousal reactions over understanding. It does not
             assess factual accuracy or political bias.
           </p>
+        </section>
+
+        {/* Why this breakdown */}
+        <section className="mb-12">
+          <h2 className="text-2xl font-bold mb-4">Why This Breakdown</h2>
+          <p className="text-zinc-600 dark:text-zinc-400 leading-relaxed mb-4">
+            RageCheck organizes analysis the same way influence typically works in the real world:
+          </p>
+          <ol className="list-decimal list-inside text-zinc-600 dark:text-zinc-400 space-y-2 ml-4 mb-6">
+            <li><strong>How content is constructed</strong> — tone, framing, rhetoric</li>
+            <li><strong>Why it spreads</strong> — share mechanics, identity signaling, conflict cues</li>
+            <li><strong>How it tends to affect people</strong> — likely emotional intensity and discussion style</li>
+          </ol>
+
+          <div className="p-4 bg-zinc-100 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700 rounded-lg mb-6">
+            <p className="text-sm text-zinc-600 dark:text-zinc-400">
+              <strong>Note:</strong> This is probabilistic pattern detection. It does not infer intent and it is not truth scoring. It estimates patterns that tend to correlate with higher-arousal, lower-nuance media.
+            </p>
+          </div>
+
+          <h3 className="font-bold text-lg mb-3">How the UI Sections Map to Signals</h3>
+          <div className="space-y-3">
+            <div className="p-4 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                <span className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 sm:min-w-[180px]">Techniques Detected</span>
+                <span className="text-zinc-400 hidden sm:inline">→</span>
+                <span className="text-sm text-zinc-600 dark:text-zinc-400"><strong>Construction:</strong> Emotional Arousal, Moral Condemnation, Oversimplification</span>
+              </div>
+            </div>
+            <div className="p-4 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                <span className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 sm:min-w-[180px]">Viral Triggers</span>
+                <span className="text-zinc-400 hidden sm:inline">→</span>
+                <span className="text-sm text-zinc-600 dark:text-zinc-400"><strong>Transmission:</strong> Call-to-Conflict, Enemy Construction</span>
+              </div>
+            </div>
+            <div className="p-4 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                <span className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 sm:min-w-[180px]">How This Usually Plays Out</span>
+                <span className="text-zinc-400 hidden sm:inline">→</span>
+                <span className="text-sm text-zinc-600 dark:text-zinc-400"><strong>Impact:</strong> Combined signal read predicting likely reaction patterns</span>
+              </div>
+            </div>
+          </div>
         </section>
 
         {/* Signal Categories */}
