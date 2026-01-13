@@ -9,6 +9,30 @@ function getDeviceType(userAgent: string | null): "mobile" | "tablet" | "desktop
   return "desktop";
 }
 
+// Helper to detect OS from user agent
+function getOS(userAgent: string | null): "iOS" | "Android" | "Windows" | "macOS" | "Linux" | "Other" {
+  if (!userAgent) return "Other";
+  const ua = userAgent;
+  if (/iPhone|iPad|iPod/i.test(ua)) return "iOS";
+  if (/Android/i.test(ua)) return "Android";
+  if (/Windows/i.test(ua)) return "Windows";
+  if (/Mac OS X|Macintosh/i.test(ua)) return "macOS";
+  if (/Linux|CrOS/i.test(ua)) return "Linux";
+  return "Other";
+}
+
+// Helper to detect browser from user agent
+function getBrowser(userAgent: string | null): "Chrome" | "Safari" | "Firefox" | "Edge" | "Other" {
+  if (!userAgent) return "Other";
+  const ua = userAgent;
+  // Order matters - Edge contains Chrome, Chrome contains Safari
+  if (/Edg\//i.test(ua)) return "Edge";
+  if (/Chrome/i.test(ua) && !/Chromium/i.test(ua)) return "Chrome";
+  if (/Safari/i.test(ua) && !/Chrome/i.test(ua)) return "Safari";
+  if (/Firefox/i.test(ua)) return "Firefox";
+  return "Other";
+}
+
 // Cache the database connection
 let dbInstance: NeonQueryFunction<false, false> | null = null;
 
@@ -612,8 +636,9 @@ export interface VisitorStats {
     referrer: string | null;
     pagePath: string;
     device: "mobile" | "tablet" | "desktop";
+    os: "iOS" | "Android" | "Windows" | "macOS" | "Linux" | "Other";
+    browser: "Chrome" | "Safari" | "Firefox" | "Edge" | "Other";
     createdAt: Date;
-    isBot: boolean;
     hasLlmAnalysis: boolean;
   }[];
   timeSeries: {
@@ -808,8 +833,9 @@ export async function getVisitorStats(): Promise<VisitorStats> {
       referrer: row.referrer || null,
       pagePath: row.page_path || "/",
       device: getDeviceType(row.user_agent),
+      os: getOS(row.user_agent),
+      browser: getBrowser(row.user_agent),
       createdAt: row.created_at,
-      isBot: row.is_bot || false,
       hasLlmAnalysis: row.has_llm_analysis || false,
     }));
 
@@ -1499,16 +1525,22 @@ export async function getViralMetrics(): Promise<ViralMetrics> {
 }
 
 // Time to Analysis metrics
+type StatGroup = { avgSeconds: number; medianSeconds: number; count: number };
+
 export interface TimeToAnalysisMetrics {
-  overall: {
-    avgSeconds: number;
-    medianSeconds: number;
-    count: number;
-  };
+  overall: StatGroup;
   byDevice: {
-    mobile: { avgSeconds: number; medianSeconds: number; count: number };
-    tablet: { avgSeconds: number; medianSeconds: number; count: number };
-    desktop: { avgSeconds: number; medianSeconds: number; count: number };
+    mobile: StatGroup;
+    tablet: StatGroup;
+    desktop: StatGroup;
+  };
+  byOS: {
+    iOS: StatGroup;
+    Android: StatGroup;
+    Windows: StatGroup;
+    macOS: StatGroup;
+    Linux: StatGroup;
+    Other: StatGroup;
   };
 }
 
@@ -1540,22 +1572,22 @@ export async function getTimeToAnalysisMetrics(): Promise<TimeToAnalysisMetrics>
         AND a.first_analysis - v.first_visit < INTERVAL '1 hour'
     `;
 
-    // Categorize by device and calculate stats
-    const mobile: number[] = [];
-    const tablet: number[] = [];
-    const desktop: number[] = [];
+    // Categorize by device and OS, calculate stats
+    const byDevice = { mobile: [] as number[], tablet: [] as number[], desktop: [] as number[] };
+    const byOS = { iOS: [] as number[], Android: [] as number[], Windows: [] as number[], macOS: [] as number[], Linux: [] as number[], Other: [] as number[] };
 
     for (const row of results) {
       const seconds = Number(row.seconds_to_analysis);
       if (seconds < 0 || seconds > 3600) continue; // Skip invalid values
 
       const device = getDeviceType(row.user_agent);
-      if (device === "mobile") mobile.push(seconds);
-      else if (device === "tablet") tablet.push(seconds);
-      else desktop.push(seconds);
+      const os = getOS(row.user_agent);
+
+      byDevice[device].push(seconds);
+      byOS[os].push(seconds);
     }
 
-    const calcStats = (arr: number[]) => {
+    const calcStats = (arr: number[]): StatGroup => {
       if (arr.length === 0) return { avgSeconds: 0, medianSeconds: 0, count: 0 };
       const sorted = [...arr].sort((a, b) => a - b);
       const avg = arr.reduce((a, b) => a + b, 0) / arr.length;
@@ -1567,25 +1599,151 @@ export async function getTimeToAnalysisMetrics(): Promise<TimeToAnalysisMetrics>
       };
     };
 
-    const all = [...mobile, ...tablet, ...desktop];
+    const all = [...byDevice.mobile, ...byDevice.tablet, ...byDevice.desktop];
 
     return {
       overall: calcStats(all),
       byDevice: {
-        mobile: calcStats(mobile),
-        tablet: calcStats(tablet),
-        desktop: calcStats(desktop),
+        mobile: calcStats(byDevice.mobile),
+        tablet: calcStats(byDevice.tablet),
+        desktop: calcStats(byDevice.desktop),
+      },
+      byOS: {
+        iOS: calcStats(byOS.iOS),
+        Android: calcStats(byOS.Android),
+        Windows: calcStats(byOS.Windows),
+        macOS: calcStats(byOS.macOS),
+        Linux: calcStats(byOS.Linux),
+        Other: calcStats(byOS.Other),
       },
     };
   } catch (error) {
     console.error("Failed to get time-to-analysis metrics:", error);
+    const emptyStats: StatGroup = { avgSeconds: 0, medianSeconds: 0, count: 0 };
     return {
-      overall: { avgSeconds: 0, medianSeconds: 0, count: 0 },
+      overall: emptyStats,
       byDevice: {
-        mobile: { avgSeconds: 0, medianSeconds: 0, count: 0 },
-        tablet: { avgSeconds: 0, medianSeconds: 0, count: 0 },
-        desktop: { avgSeconds: 0, medianSeconds: 0, count: 0 },
+        mobile: emptyStats,
+        tablet: emptyStats,
+        desktop: emptyStats,
       },
+      byOS: {
+        iOS: emptyStats,
+        Android: emptyStats,
+        Windows: emptyStats,
+        macOS: emptyStats,
+        Linux: emptyStats,
+        Other: emptyStats,
+      },
+    };
+  }
+}
+
+// Conversion rate metrics by device and OS
+type ConversionGroup = { visitors: number; converted: number; rate: number };
+
+export interface ConversionMetrics {
+  overall: ConversionGroup;
+  byDevice: {
+    mobile: ConversionGroup;
+    tablet: ConversionGroup;
+    desktop: ConversionGroup;
+  };
+  byOS: {
+    iOS: ConversionGroup;
+    Android: ConversionGroup;
+    Windows: ConversionGroup;
+    macOS: ConversionGroup;
+    Linux: ConversionGroup;
+    Other: ConversionGroup;
+  };
+}
+
+export async function getConversionMetrics(): Promise<ConversionMetrics> {
+  try {
+    // Get all visitors with their user agent (last 7 days)
+    const visitors = await getDb()`
+      SELECT ip_address, user_agent
+      FROM ragecheck_visitors
+      WHERE ip_address IS NOT NULL
+        AND created_at > NOW() - INTERVAL '7 days'
+      GROUP BY ip_address, user_agent
+    `;
+
+    // Get all IPs that converted (performed an analysis)
+    const convertedIPs = await getDb()`
+      SELECT DISTINCT ip_address
+      FROM ragecheck_analyses
+      WHERE ip_address IS NOT NULL
+        AND success = true
+        AND created_at > NOW() - INTERVAL '7 days'
+    `;
+
+    const convertedSet = new Set(convertedIPs.map(r => r.ip_address));
+
+    // Count visitors and conversions by device and OS
+    const byDevice = {
+      mobile: { visitors: 0, converted: 0 },
+      tablet: { visitors: 0, converted: 0 },
+      desktop: { visitors: 0, converted: 0 },
+    };
+    const byOS = {
+      iOS: { visitors: 0, converted: 0 },
+      Android: { visitors: 0, converted: 0 },
+      Windows: { visitors: 0, converted: 0 },
+      macOS: { visitors: 0, converted: 0 },
+      Linux: { visitors: 0, converted: 0 },
+      Other: { visitors: 0, converted: 0 },
+    };
+
+    for (const row of visitors) {
+      const device = getDeviceType(row.user_agent);
+      const os = getOS(row.user_agent);
+      const converted = convertedSet.has(row.ip_address);
+
+      byDevice[device].visitors++;
+      if (converted) byDevice[device].converted++;
+
+      byOS[os].visitors++;
+      if (converted) byOS[os].converted++;
+    }
+
+    const calcRate = (g: { visitors: number; converted: number }): ConversionGroup => ({
+      visitors: g.visitors,
+      converted: g.converted,
+      rate: g.visitors > 0 ? Math.round((g.converted / g.visitors) * 1000) / 10 : 0,
+    });
+
+    const totalVisitors = byDevice.mobile.visitors + byDevice.tablet.visitors + byDevice.desktop.visitors;
+    const totalConverted = byDevice.mobile.converted + byDevice.tablet.converted + byDevice.desktop.converted;
+
+    return {
+      overall: {
+        visitors: totalVisitors,
+        converted: totalConverted,
+        rate: totalVisitors > 0 ? Math.round((totalConverted / totalVisitors) * 1000) / 10 : 0,
+      },
+      byDevice: {
+        mobile: calcRate(byDevice.mobile),
+        tablet: calcRate(byDevice.tablet),
+        desktop: calcRate(byDevice.desktop),
+      },
+      byOS: {
+        iOS: calcRate(byOS.iOS),
+        Android: calcRate(byOS.Android),
+        Windows: calcRate(byOS.Windows),
+        macOS: calcRate(byOS.macOS),
+        Linux: calcRate(byOS.Linux),
+        Other: calcRate(byOS.Other),
+      },
+    };
+  } catch (error) {
+    console.error("Failed to get conversion metrics:", error);
+    const emptyGroup: ConversionGroup = { visitors: 0, converted: 0, rate: 0 };
+    return {
+      overall: emptyGroup,
+      byDevice: { mobile: emptyGroup, tablet: emptyGroup, desktop: emptyGroup },
+      byOS: { iOS: emptyGroup, Android: emptyGroup, Windows: emptyGroup, macOS: emptyGroup, Linux: emptyGroup, Other: emptyGroup },
     };
   }
 }

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { initDB, getDashboardStats, getVisitorStats, getPageVisitorStats, getViralMetrics, isDBAvailable, invalidateIncompleteCache, getFeedbackStats, initFeedbackTable, getTimeToAnalysisMetrics } from "@/lib/db";
+import { initDB, getDashboardStats, getVisitorStats, getPageVisitorStats, getViralMetrics, isDBAvailable, invalidateIncompleteCache, getFeedbackStats, initFeedbackTable, getTimeToAnalysisMetrics, getConversionMetrics } from "@/lib/db";
 
 export async function GET(request: NextRequest) {
   // Simple password protection via query param
@@ -34,6 +34,7 @@ export async function GET(request: NextRequest) {
     const viralMetrics = await getViralMetrics();
     const feedbackStats = await getFeedbackStats();
     const timeToAnalysis = await getTimeToAnalysisMetrics();
+    const conversionMetrics = await getConversionMetrics();
 
     return NextResponse.json({
       success: true,
@@ -44,6 +45,7 @@ export async function GET(request: NextRequest) {
       viralMetrics,
       feedbackStats,
       timeToAnalysis,
+      conversionMetrics,
     });
   } catch (error) {
     console.error("Admin API error:", error);

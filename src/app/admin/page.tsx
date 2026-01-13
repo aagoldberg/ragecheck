@@ -82,8 +82,9 @@ interface VisitorStats {
     referrer: string | null;
     pagePath: string;
     device: "mobile" | "tablet" | "desktop";
+    os: "iOS" | "Android" | "Windows" | "macOS" | "Linux" | "Other";
+    browser: "Chrome" | "Safari" | "Firefox" | "Edge" | "Other";
     createdAt: string;
-    isBot: boolean;
     hasLlmAnalysis: boolean;
   }[];
   timeSeries: {
@@ -151,16 +152,41 @@ interface FeedbackStats {
   }[];
 }
 
+type StatGroup = { avgSeconds: number; medianSeconds: number; count: number };
+
 interface TimeToAnalysisMetrics {
-  overall: {
-    avgSeconds: number;
-    medianSeconds: number;
-    count: number;
-  };
+  overall: StatGroup;
   byDevice: {
-    mobile: { avgSeconds: number; medianSeconds: number; count: number };
-    tablet: { avgSeconds: number; medianSeconds: number; count: number };
-    desktop: { avgSeconds: number; medianSeconds: number; count: number };
+    mobile: StatGroup;
+    tablet: StatGroup;
+    desktop: StatGroup;
+  };
+  byOS: {
+    iOS: StatGroup;
+    Android: StatGroup;
+    Windows: StatGroup;
+    macOS: StatGroup;
+    Linux: StatGroup;
+    Other: StatGroup;
+  };
+}
+
+type ConversionGroup = { visitors: number; converted: number; rate: number };
+
+interface ConversionMetrics {
+  overall: ConversionGroup;
+  byDevice: {
+    mobile: ConversionGroup;
+    tablet: ConversionGroup;
+    desktop: ConversionGroup;
+  };
+  byOS: {
+    iOS: ConversionGroup;
+    Android: ConversionGroup;
+    Windows: ConversionGroup;
+    macOS: ConversionGroup;
+    Linux: ConversionGroup;
+    Other: ConversionGroup;
   };
 }
 
@@ -173,6 +199,7 @@ interface ApiResponse {
   viralMetrics?: ViralMetrics;
   feedbackStats?: FeedbackStats;
   timeToAnalysis?: TimeToAnalysisMetrics;
+  conversionMetrics?: ConversionMetrics;
   dbAvailable?: boolean;
 }
 
@@ -738,6 +765,7 @@ export default function AdminDashboard() {
   const [viralMetrics, setViralMetrics] = useState<ViralMetrics | null>(null);
   const [feedbackStats, setFeedbackStats] = useState<FeedbackStats | null>(null);
   const [timeToAnalysis, setTimeToAnalysis] = useState<TimeToAnalysisMetrics | null>(null);
+  const [conversionMetrics, setConversionMetrics] = useState<ConversionMetrics | null>(null);
 
   const fetchStats = async (adminKey: string) => {
     setLoading(true);
@@ -760,6 +788,7 @@ export default function AdminDashboard() {
         setViralMetrics(data.viralMetrics || null);
         setFeedbackStats(data.feedbackStats || null);
         setTimeToAnalysis(data.timeToAnalysis || null);
+        setConversionMetrics(data.conversionMetrics || null);
         setAuthenticated(true);
         // Save key to localStorage
         localStorage.setItem("ragecheck-admin-key", adminKey);
@@ -1176,10 +1205,12 @@ export default function AdminDashboard() {
             {timeToAnalysis && timeToAnalysis.overall.count > 0 && (
               <div className="mb-8">
                 <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100 mb-4">
-                  Time to Analysis by Device
+                  Time to Analysis
                 </h2>
                 <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6">
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                  {/* By Device */}
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-4">By Device</h3>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-6">
                     {/* Overall */}
                     <div className="text-center">
                       <div className="text-3xl font-bold text-zinc-900 dark:text-zinc-100">
@@ -1227,8 +1258,88 @@ export default function AdminDashboard() {
                       <div className="text-xs text-zinc-400">{timeToAnalysis.byDevice.desktop.count} samples</div>
                     </div>
                   </div>
+                  {/* By OS */}
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-4">By OS</h3>
+                  <div className="grid grid-cols-3 md:grid-cols-6 gap-4">
+                    {(["iOS", "Android", "Windows", "macOS", "Linux", "Other"] as const).map((os) => (
+                      <div key={os} className="text-center">
+                        <div className="text-xl font-bold text-zinc-700 dark:text-zinc-300">
+                          {timeToAnalysis.byOS[os].count > 0
+                            ? timeToAnalysis.byOS[os].avgSeconds < 60
+                              ? `${timeToAnalysis.byOS[os].avgSeconds}s`
+                              : `${Math.round(timeToAnalysis.byOS[os].avgSeconds / 60)}m`
+                            : "-"}
+                        </div>
+                        <div className="text-xs text-zinc-500 mt-1">{os}</div>
+                        <div className="text-xs text-zinc-400">{timeToAnalysis.byOS[os].count}</div>
+                      </div>
+                    ))}
+                  </div>
                   <div className="mt-4 text-center text-xs text-zinc-400">
                     Time from first visit to first analysis (last 7 days, within 1 hour)
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Conversion Rate Card */}
+            {conversionMetrics && conversionMetrics.overall.visitors > 0 && (
+              <div className="mb-8">
+                <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100 mb-4">
+                  Conversion Rate
+                </h2>
+                <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6">
+                  {/* By Device */}
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-4">By Device</h3>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-6">
+                    {/* Overall */}
+                    <div className="text-center">
+                      <div className="text-3xl font-bold text-zinc-900 dark:text-zinc-100">
+                        {conversionMetrics.overall.rate}%
+                      </div>
+                      <div className="text-xs text-zinc-500 mt-1">Overall</div>
+                      <div className="text-xs text-zinc-400">{conversionMetrics.overall.converted}/{conversionMetrics.overall.visitors}</div>
+                    </div>
+                    {/* Mobile */}
+                    <div className="text-center">
+                      <div className="text-3xl font-bold text-indigo-600 dark:text-indigo-400">
+                        {conversionMetrics.byDevice.mobile.visitors > 0 ? `${conversionMetrics.byDevice.mobile.rate}%` : "-"}
+                      </div>
+                      <div className="text-xs text-zinc-500 mt-1">📱 Mobile</div>
+                      <div className="text-xs text-zinc-400">{conversionMetrics.byDevice.mobile.converted}/{conversionMetrics.byDevice.mobile.visitors}</div>
+                    </div>
+                    {/* Tablet */}
+                    <div className="text-center">
+                      <div className="text-3xl font-bold text-amber-600 dark:text-amber-400">
+                        {conversionMetrics.byDevice.tablet.visitors > 0 ? `${conversionMetrics.byDevice.tablet.rate}%` : "-"}
+                      </div>
+                      <div className="text-xs text-zinc-500 mt-1">📱 Tablet</div>
+                      <div className="text-xs text-zinc-400">{conversionMetrics.byDevice.tablet.converted}/{conversionMetrics.byDevice.tablet.visitors}</div>
+                    </div>
+                    {/* Desktop */}
+                    <div className="text-center">
+                      <div className="text-3xl font-bold text-emerald-600 dark:text-emerald-400">
+                        {conversionMetrics.byDevice.desktop.visitors > 0 ? `${conversionMetrics.byDevice.desktop.rate}%` : "-"}
+                      </div>
+                      <div className="text-xs text-zinc-500 mt-1">💻 Desktop</div>
+                      <div className="text-xs text-zinc-400">{conversionMetrics.byDevice.desktop.converted}/{conversionMetrics.byDevice.desktop.visitors}</div>
+                    </div>
+                  </div>
+                  {/* By OS */}
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-4">By OS</h3>
+                  <div className="grid grid-cols-3 md:grid-cols-6 gap-4">
+                    {(["iOS", "Android", "Windows", "macOS", "Linux", "Other"] as const).map((os) => (
+                      <div key={os} className="text-center">
+                        <div className="text-xl font-bold text-zinc-700 dark:text-zinc-300">
+                          {conversionMetrics.byOS[os].visitors > 0 ? `${conversionMetrics.byOS[os].rate}%` : "-"}
+                        </div>
+                        <div className="text-xs text-zinc-500 mt-1">{os}</div>
+                        <div className="text-xs text-zinc-400">{conversionMetrics.byOS[os].converted}/{conversionMetrics.byOS[os].visitors}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-4 text-center text-xs text-zinc-400">
+                    Visitors who performed at least one analysis (last 7 days)
                   </div>
                 </div>
               </div>
@@ -1571,21 +1682,22 @@ export default function AdminDashboard() {
                         <th className="text-left py-3 px-3 text-zinc-500 font-medium">Time</th>
                         <th className="text-left py-3 px-3 text-zinc-500 font-medium">Page</th>
                         <th className="text-left py-3 px-3 text-zinc-500 font-medium">Device</th>
+                        <th className="text-left py-3 px-3 text-zinc-500 font-medium">OS</th>
+                        <th className="text-left py-3 px-3 text-zinc-500 font-medium">Browser</th>
                         <th className="text-left py-3 px-3 text-zinc-500 font-medium">Country</th>
                         <th className="text-left py-3 px-3 text-zinc-500 font-medium">Referrer</th>
                         <th className="text-left py-3 px-3 text-zinc-500 font-medium">IP</th>
                         <th className="text-left py-3 px-3 text-zinc-500 font-medium">AI</th>
-                        <th className="text-left py-3 px-3 text-zinc-500 font-medium">Bot</th>
                       </tr>
                     </thead>
                     <tbody>
                       {visitorStats.recentVisitors.length === 0 ? (
                         <tr>
-                          <td colSpan={8} className="py-4 text-zinc-500 text-center">No visitors yet</td>
+                          <td colSpan={9} className="py-4 text-zinc-500 text-center">No visitors yet</td>
                         </tr>
                       ) : (
                         visitorStats.recentVisitors.map((v, i) => (
-                          <tr key={i} className={`border-b border-zinc-100 dark:border-zinc-800 last:border-0 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 ${v.isBot ? 'opacity-50' : ''}`}>
+                          <tr key={i} className="border-b border-zinc-100 dark:border-zinc-800 last:border-0 hover:bg-zinc-50 dark:hover:bg-zinc-800/50">
                             <td className="py-2 px-3 text-zinc-500 text-xs whitespace-nowrap">
                               {formatDateTimeEST(v.createdAt)}
                             </td>
@@ -1594,6 +1706,12 @@ export default function AdminDashboard() {
                             </td>
                             <td className="py-2 px-3 text-zinc-600 dark:text-zinc-400 text-xs capitalize">
                               {v.device}
+                            </td>
+                            <td className="py-2 px-3 text-zinc-600 dark:text-zinc-400 text-xs">
+                              {v.os}
+                            </td>
+                            <td className="py-2 px-3 text-zinc-600 dark:text-zinc-400 text-xs">
+                              {v.browser}
                             </td>
                             <td className="py-2 px-3 text-zinc-600 dark:text-zinc-400 text-xs">
                               {v.country || "-"}
@@ -1606,9 +1724,6 @@ export default function AdminDashboard() {
                             </td>
                             <td className="py-2 px-3 text-zinc-500 text-xs">
                               {v.hasLlmAnalysis ? "✓" : "-"}
-                            </td>
-                            <td className="py-2 px-3 text-zinc-500 text-xs">
-                              {v.isBot ? "🤖" : "-"}
                             </td>
                           </tr>
                         ))
