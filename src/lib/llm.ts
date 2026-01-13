@@ -151,13 +151,18 @@ export interface ImageAnalysisResult {
   shareCardSummary?: string;
 }
 
-const IMAGE_ANALYSIS_PROMPT = `You are analyzing a screenshot of a social media post or article. Your task is to:
+const IMAGE_ANALYSIS_PROMPT = `You are analyzing an image for outrage bait and manipulation patterns. This could be:
+- A screenshot of a social media post (Twitter/X, Facebook, Instagram, TikTok, Reddit, etc.)
+- A meme with text overlay
+- A news headline or article screenshot
+- Any image containing text meant to provoke emotional reactions
 
-1. EXTRACT all visible text from the image (post content, username, comments, etc.)
-2. IDENTIFY the platform (Twitter/X, Facebook, Instagram, TikTok, Reddit, Threads, Bluesky, news article, or "unknown")
+Your task is to:
+1. EXTRACT all visible text from the image (post content, meme text, headlines, usernames, comments, etc.)
+2. IDENTIFY the type: social media platform name, "meme", "news", or "unknown"
 3. ANALYZE the content for outrage bait and manipulation patterns
 
-IMPORTANT: If the image is NOT a social media screenshot (e.g., it's just a photo, meme without text, or unrelated image), you MUST still respond with valid JSON. Set extractedText to describe what you see, platform to "not_social_media", score to 0, and reasons explaining this is not analyzable social media content.
+IMPORTANT: If the image has NO readable text or is just a photo without any text overlay, you MUST still respond with valid JSON. Set extractedText to describe what you see, platform to "no_text_content", score to 0, and reasons explaining there is no text to analyze.
 
 Key patterns to detect:
 - **Loaded Language**: Emotionally charged words meant to provoke

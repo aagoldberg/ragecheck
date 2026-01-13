@@ -91,13 +91,13 @@ export async function POST(request: NextRequest): Promise<NextResponse<AnalyzeRe
         );
       }
 
-      // Check if this is not a social media screenshot
-      if (result.platform === "not_social_media") {
+      // Check if the image has no analyzable text content
+      if (result.platform === "not_social_media" || result.platform === "no_text_content") {
         logAnalysis({
           url: "image-upload",
-          sourceDomain: "not_social_media",
+          sourceDomain: result.platform,
           success: false,
-          error: "Image is not a social media screenshot",
+          error: "Image has no text content to analyze",
           ipAddress: ipAddress || undefined,
           userAgent: userAgent || undefined,
           country: country || undefined,
@@ -106,7 +106,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<AnalyzeRe
         return NextResponse.json(
           {
             success: false,
-            error: "This doesn't appear to be a social media screenshot. Please upload a screenshot of a tweet, Facebook post, or other social media content with text to analyze."
+            error: "This image doesn't have text content to analyze. Please upload a screenshot of a social media post, meme with text, or news headline."
           },
           { status: 422 }
         );
