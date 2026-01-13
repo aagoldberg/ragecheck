@@ -724,9 +724,13 @@ async function extractReddit(urlString: string): Promise<ExtractedContent | null
         // Get post text (selftext for text posts)
         let text = post.selftext || "";
 
-        // If it's a link post with no selftext, note that
-        if (!text && post.url) {
-          text = `[Link post to: ${post.url}]`;
+        // If it's a link/image post with no selftext, the TITLE is the content
+        // Many Reddit posts use provocative titles with images - the title itself is analyzable
+        if (!text) {
+          text = `Title: "${title}"`;
+          if (post.url) {
+            text += `\n[Image/link post]`;
+          }
         }
 
         // Add top comments if available
