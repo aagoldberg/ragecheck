@@ -6,15 +6,6 @@ import { getScoreBucket } from "@/lib/share";
 import { SIGNAL_LABELS } from "@/lib/shareCard";
 import { copyShareImageToClipboard } from "@/lib/shareImage";
 import * as tracking from "@/lib/tracking";
-import {
-  computeAsymmetricValue,
-  generateSharecards,
-  adaptAnalysisToInput,
-  AsymmetricValueOutput,
-  SharecardOutput,
-} from "@/lib/asymmetricValue";
-import { AsymmetricValuePanel } from "@/components/AsymmetricValuePanel";
-import { SharecardSelector } from "@/components/SharecardSelector";
 import { detectConversationShape, ConversationShape } from "@/lib/conversationShape";
 
 interface Highlight {
@@ -586,37 +577,6 @@ function HomeContent() {
   const [imageCopied, setImageCopied] = useState(false);
   const [feedbackGiven, setFeedbackGiven] = useState<"up" | "down" | null>(null);
   const [feedbackComment, setFeedbackComment] = useState("");
-
-  // Asymmetric Value computation
-  const asymmetricValueData = useMemo<{ output: AsymmetricValueOutput; sharecards: SharecardOutput } | null>(() => {
-    if (!result?.success || !result.signalBreakdown) return null;
-    try {
-      const input = adaptAnalysisToInput(url, {
-        score: result.score,
-        signalBreakdown: result.signalBreakdown,
-        title: result.title,
-        sourceDomain: result.sourceDomain,
-        textPreview: result.textPreview,
-        highlights: result.highlights,
-        reasons: result.reasons,
-        techniqueExplanations: result.techniqueExplanations,
-        sharingPatterns: result.sharingPatterns,
-      });
-      const output = computeAsymmetricValue(input);
-      const sharecards = generateSharecards(
-        output.forecast,
-        output.heat_vs_evidence,
-        output.verification_checks,
-        output.low_regret_action,
-        input.original_url,
-        input.content_type
-      );
-      return { output, sharecards };
-    } catch (error) {
-      console.error("Failed to compute asymmetric value:", error);
-      return null;
-    }
-  }, [result, url]);
 
   // Conversation shape detection
   const conversationShape = useMemo<ConversationShape | null>(() => {
@@ -1549,23 +1509,6 @@ function HomeContent() {
                       </div>
                     )}
                   </BentoCard>
-
-                  {/* Asymmetric Value Panel */}
-                  {asymmetricValueData && !isDemo && (
-                    <BentoCard title="">
-                      <AsymmetricValuePanel data={asymmetricValueData.output} />
-                    </BentoCard>
-                  )}
-
-                  {/* Share Card Selector */}
-                  {asymmetricValueData && !isDemo && (
-                    <BentoCard title="">
-                      <SharecardSelector
-                        sharecards={asymmetricValueData.sharecards}
-                        resultUrl={getShareUrl()}
-                      />
-                    </BentoCard>
-                  )}
                 </div>
               </div>
 
