@@ -921,7 +921,7 @@ export default function Home() {
                 Is that post <span className="text-transparent bg-clip-text bg-gradient-to-r from-rose-500 to-indigo-600">designed</span> to make you angry?
               </h1>
               <p className="text-xl text-zinc-600 dark:text-zinc-400 mb-10 leading-relaxed max-w-2xl mx-auto">
-                Detect engagement bait in news and social media.
+                See through the outrage. Understand the tactics.
               </p>
             </>
           )}
