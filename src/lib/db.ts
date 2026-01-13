@@ -363,15 +363,15 @@ export async function getDashboardStats(): Promise<DashboardStats> {
   const totalHumans = Number(totalResult.count) - totalBots;
   const botRate = totalResult.count > 0 ? (totalBots / Number(totalResult.count)) * 100 : 0;
 
-  // Recent analyses - include all fields
+  // Recent analyses - include all fields (last 3 days)
   const recentRows = await getDb()`
     SELECT url, source_domain, platform, score, label, llm_enhanced,
            signal_loaded_language, signal_absolutist, signal_threat_panic,
            signal_us_vs_them, signal_engagement_bait,
            success, error, title, created_at, ip_address, user_agent, country, is_bot
     FROM ragecheck_analyses
+    WHERE created_at > NOW() - INTERVAL '3 days'
     ORDER BY created_at DESC
-    LIMIT 100
   `;
   const recentAnalyses = recentRows.map((row) => ({
     url: row.url,
@@ -793,8 +793,8 @@ export async function getVisitorStats(): Promise<VisitorStats> {
     const recentRows = await getDb()`
       SELECT ip_address, user_agent, country, referrer, page_path, created_at, is_bot
       FROM ragecheck_visitors
+      WHERE created_at > NOW() - INTERVAL '3 days'
       ORDER BY created_at DESC
-      LIMIT 100
     `;
 
     const recentVisitors = recentRows.map((row) => ({
