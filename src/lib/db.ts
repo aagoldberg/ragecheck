@@ -1497,3 +1497,95 @@ export async function getViralMetrics(): Promise<ViralMetrics> {
     };
   }
 }
+
+// Time to Analysis metrics
+export interface TimeToAnalysisMetrics {
+  overall: {
+    avgSeconds: number;
+    medianSeconds: number;
+    count: number;
+  };
+  byDevice: {
+    mobile: { avgSeconds: number; medianSeconds: number; count: number };
+    tablet: { avgSeconds: number; medianSeconds: number; count: number };
+    desktop: { avgSeconds: number; medianSeconds: number; count: number };
+  };
+}
+
+export async function getTimeToAnalysisMetrics(): Promise<TimeToAnalysisMetrics> {
+  try {
+    // Get time differences between first visit and first analysis per IP (last 7 days)
+    const results = await getDb()`
+      WITH visitor_first AS (
+        SELECT ip_address, user_agent, MIN(created_at) as first_visit
+        FROM ragecheck_visitors
+        WHERE ip_address IS NOT NULL
+          AND created_at > NOW() - INTERVAL '7 days'
+        GROUP BY ip_address, user_agent
+      ),
+      analysis_first AS (
+        SELECT ip_address, MIN(created_at) as first_analysis
+        FROM ragecheck_analyses
+        WHERE ip_address IS NOT NULL
+          AND success = true
+          AND created_at > NOW() - INTERVAL '7 days'
+        GROUP BY ip_address
+      )
+      SELECT
+        v.user_agent,
+        EXTRACT(EPOCH FROM (a.first_analysis - v.first_visit)) as seconds_to_analysis
+      FROM visitor_first v
+      JOIN analysis_first a ON v.ip_address = a.ip_address
+      WHERE a.first_analysis >= v.first_visit
+        AND a.first_analysis - v.first_visit < INTERVAL '1 hour'
+    `;
+
+    // Categorize by device and calculate stats
+    const mobile: number[] = [];
+    const tablet: number[] = [];
+    const desktop: number[] = [];
+
+    for (const row of results) {
+      const seconds = Number(row.seconds_to_analysis);
+      if (seconds < 0 || seconds > 3600) continue; // Skip invalid values
+
+      const device = getDeviceType(row.user_agent);
+      if (device === "mobile") mobile.push(seconds);
+      else if (device === "tablet") tablet.push(seconds);
+      else desktop.push(seconds);
+    }
+
+    const calcStats = (arr: number[]) => {
+      if (arr.length === 0) return { avgSeconds: 0, medianSeconds: 0, count: 0 };
+      const sorted = [...arr].sort((a, b) => a - b);
+      const avg = arr.reduce((a, b) => a + b, 0) / arr.length;
+      const median = sorted[Math.floor(sorted.length / 2)];
+      return {
+        avgSeconds: Math.round(avg),
+        medianSeconds: Math.round(median),
+        count: arr.length,
+      };
+    };
+
+    const all = [...mobile, ...tablet, ...desktop];
+
+    return {
+      overall: calcStats(all),
+      byDevice: {
+        mobile: calcStats(mobile),
+        tablet: calcStats(tablet),
+        desktop: calcStats(desktop),
+      },
+    };
+  } catch (error) {
+    console.error("Failed to get time-to-analysis metrics:", error);
+    return {
+      overall: { avgSeconds: 0, medianSeconds: 0, count: 0 },
+      byDevice: {
+        mobile: { avgSeconds: 0, medianSeconds: 0, count: 0 },
+        tablet: { avgSeconds: 0, medianSeconds: 0, count: 0 },
+        desktop: { avgSeconds: 0, medianSeconds: 0, count: 0 },
+      },
+    };
+  }
+}

@@ -151,6 +151,19 @@ interface FeedbackStats {
   }[];
 }
 
+interface TimeToAnalysisMetrics {
+  overall: {
+    avgSeconds: number;
+    medianSeconds: number;
+    count: number;
+  };
+  byDevice: {
+    mobile: { avgSeconds: number; medianSeconds: number; count: number };
+    tablet: { avgSeconds: number; medianSeconds: number; count: number };
+    desktop: { avgSeconds: number; medianSeconds: number; count: number };
+  };
+}
+
 interface ApiResponse {
   success?: boolean;
   error?: string;
@@ -159,6 +172,7 @@ interface ApiResponse {
   clearviewVisitorStats?: PageVisitorStats;
   viralMetrics?: ViralMetrics;
   feedbackStats?: FeedbackStats;
+  timeToAnalysis?: TimeToAnalysisMetrics;
   dbAvailable?: boolean;
 }
 
@@ -723,6 +737,7 @@ export default function AdminDashboard() {
   const [clearviewVisitorStats, setClearviewVisitorStats] = useState<PageVisitorStats | null>(null);
   const [viralMetrics, setViralMetrics] = useState<ViralMetrics | null>(null);
   const [feedbackStats, setFeedbackStats] = useState<FeedbackStats | null>(null);
+  const [timeToAnalysis, setTimeToAnalysis] = useState<TimeToAnalysisMetrics | null>(null);
 
   const fetchStats = async (adminKey: string) => {
     setLoading(true);
@@ -744,6 +759,7 @@ export default function AdminDashboard() {
         setClearviewVisitorStats(data.clearviewVisitorStats || null);
         setViralMetrics(data.viralMetrics || null);
         setFeedbackStats(data.feedbackStats || null);
+        setTimeToAnalysis(data.timeToAnalysis || null);
         setAuthenticated(true);
         // Save key to localStorage
         localStorage.setItem("ragecheck-admin-key", adminKey);
@@ -1153,6 +1169,68 @@ export default function AdminDashboard() {
                     </div>
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* Time to Analysis Card */}
+            {timeToAnalysis && timeToAnalysis.overall.count > 0 && (
+              <div className="mb-8">
+                <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100 mb-4">
+                  Time to Analysis by Device
+                </h2>
+                <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                    {/* Overall */}
+                    <div className="text-center">
+                      <div className="text-3xl font-bold text-zinc-900 dark:text-zinc-100">
+                        {timeToAnalysis.overall.avgSeconds < 60
+                          ? `${timeToAnalysis.overall.avgSeconds}s`
+                          : `${Math.round(timeToAnalysis.overall.avgSeconds / 60)}m`}
+                      </div>
+                      <div className="text-xs text-zinc-500 mt-1">Overall Avg</div>
+                      <div className="text-xs text-zinc-400">{timeToAnalysis.overall.count} samples</div>
+                    </div>
+                    {/* Mobile */}
+                    <div className="text-center">
+                      <div className="text-3xl font-bold text-indigo-600 dark:text-indigo-400">
+                        {timeToAnalysis.byDevice.mobile.count > 0
+                          ? timeToAnalysis.byDevice.mobile.avgSeconds < 60
+                            ? `${timeToAnalysis.byDevice.mobile.avgSeconds}s`
+                            : `${Math.round(timeToAnalysis.byDevice.mobile.avgSeconds / 60)}m`
+                          : "-"}
+                      </div>
+                      <div className="text-xs text-zinc-500 mt-1">📱 Mobile</div>
+                      <div className="text-xs text-zinc-400">{timeToAnalysis.byDevice.mobile.count} samples</div>
+                    </div>
+                    {/* Tablet */}
+                    <div className="text-center">
+                      <div className="text-3xl font-bold text-amber-600 dark:text-amber-400">
+                        {timeToAnalysis.byDevice.tablet.count > 0
+                          ? timeToAnalysis.byDevice.tablet.avgSeconds < 60
+                            ? `${timeToAnalysis.byDevice.tablet.avgSeconds}s`
+                            : `${Math.round(timeToAnalysis.byDevice.tablet.avgSeconds / 60)}m`
+                          : "-"}
+                      </div>
+                      <div className="text-xs text-zinc-500 mt-1">📱 Tablet</div>
+                      <div className="text-xs text-zinc-400">{timeToAnalysis.byDevice.tablet.count} samples</div>
+                    </div>
+                    {/* Desktop */}
+                    <div className="text-center">
+                      <div className="text-3xl font-bold text-emerald-600 dark:text-emerald-400">
+                        {timeToAnalysis.byDevice.desktop.count > 0
+                          ? timeToAnalysis.byDevice.desktop.avgSeconds < 60
+                            ? `${timeToAnalysis.byDevice.desktop.avgSeconds}s`
+                            : `${Math.round(timeToAnalysis.byDevice.desktop.avgSeconds / 60)}m`
+                          : "-"}
+                      </div>
+                      <div className="text-xs text-zinc-500 mt-1">💻 Desktop</div>
+                      <div className="text-xs text-zinc-400">{timeToAnalysis.byDevice.desktop.count} samples</div>
+                    </div>
+                  </div>
+                  <div className="mt-4 text-center text-xs text-zinc-400">
+                    Time from first visit to first analysis (last 7 days, within 1 hour)
+                  </div>
+                </div>
               </div>
             )}
 
