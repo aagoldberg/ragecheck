@@ -281,8 +281,9 @@ export interface DashboardStats {
 
 export async function getDashboardStats(): Promise<DashboardStats> {
   // Total counts
+  // Use EST timezone for "today" calculations
   const [totalResult] = await getDb()`SELECT COUNT(*) as count FROM ragecheck_analyses`;
-  const [todayResult] = await getDb()`SELECT COUNT(*) as count FROM ragecheck_analyses WHERE created_at > NOW() - INTERVAL '1 day'`;
+  const [todayResult] = await getDb()`SELECT COUNT(*) as count FROM ragecheck_analyses WHERE created_at >= DATE_TRUNC('day', NOW() AT TIME ZONE 'America/New_York') AT TIME ZONE 'America/New_York'`;
   const [weekResult] = await getDb()`SELECT COUNT(*) as count FROM ragecheck_analyses WHERE created_at > NOW() - INTERVAL '7 days'`;
 
   // Average score
@@ -720,27 +721,30 @@ export async function getArchivedClearviewData(excludeLatestId?: number): Promis
 
 export async function getVisitorStats(): Promise<VisitorStats> {
   try {
+    // Use EST timezone for "today" calculations
+    const estTodayStart = `DATE_TRUNC('day', NOW() AT TIME ZONE 'America/New_York') AT TIME ZONE 'America/New_York'`;
+
     const [totalResult] = await getDb()`SELECT COUNT(*) as count FROM ragecheck_visitors`;
-    const [todayResult] = await getDb()`SELECT COUNT(*) as count FROM ragecheck_visitors WHERE created_at > NOW() - INTERVAL '1 day'`;
+    const [todayResult] = await getDb()`SELECT COUNT(*) as count FROM ragecheck_visitors WHERE created_at >= DATE_TRUNC('day', NOW() AT TIME ZONE 'America/New_York') AT TIME ZONE 'America/New_York'`;
     const [weekResult] = await getDb()`SELECT COUNT(*) as count FROM ragecheck_visitors WHERE created_at > NOW() - INTERVAL '7 days'`;
 
-    // True conversion rate: unique visitors who performed at least one analysis
+    // True conversion rate: unique visitors who performed at least one analysis (today in EST)
     const [uniqueVisitorsToday] = await getDb()`
       SELECT COUNT(DISTINCT ip_address) as count
       FROM ragecheck_visitors
-      WHERE created_at > NOW() - INTERVAL '1 day'
+      WHERE created_at >= DATE_TRUNC('day', NOW() AT TIME ZONE 'America/New_York') AT TIME ZONE 'America/New_York'
         AND ip_address IS NOT NULL
     `;
 
     const [convertedVisitors] = await getDb()`
       SELECT COUNT(DISTINCT v.ip_address) as count
       FROM ragecheck_visitors v
-      WHERE v.created_at > NOW() - INTERVAL '1 day'
+      WHERE v.created_at >= DATE_TRUNC('day', NOW() AT TIME ZONE 'America/New_York') AT TIME ZONE 'America/New_York'
         AND v.ip_address IS NOT NULL
         AND EXISTS (
           SELECT 1 FROM ragecheck_analyses a
           WHERE a.ip_address = v.ip_address
-            AND a.created_at > NOW() - INTERVAL '1 day'
+            AND a.created_at >= DATE_TRUNC('day', NOW() AT TIME ZONE 'America/New_York') AT TIME ZONE 'America/New_York'
         )
     `;
 
@@ -763,20 +767,20 @@ export async function getVisitorStats(): Promise<VisitorStats> {
       isBot: row.is_bot || false,
     }));
 
-    // Time series for last 14 days
+    // Time series for last 14 days (grouped by EST date)
     const visitorTimeSeries = await getDb()`
-      SELECT DATE(created_at) as date, COUNT(*) as count
+      SELECT DATE(created_at AT TIME ZONE 'America/New_York') as date, COUNT(*) as count
       FROM ragecheck_visitors
       WHERE created_at > NOW() - INTERVAL '14 days'
-      GROUP BY DATE(created_at)
+      GROUP BY DATE(created_at AT TIME ZONE 'America/New_York')
       ORDER BY date ASC
     `;
 
     const analysisTimeSeries = await getDb()`
-      SELECT DATE(created_at) as date, COUNT(*) as count
+      SELECT DATE(created_at AT TIME ZONE 'America/New_York') as date, COUNT(*) as count
       FROM ragecheck_analyses
       WHERE created_at > NOW() - INTERVAL '14 days'
-      GROUP BY DATE(created_at)
+      GROUP BY DATE(created_at AT TIME ZONE 'America/New_York')
       ORDER BY date ASC
     `;
 
@@ -906,8 +910,9 @@ export interface PageVisitorStats {
 
 export async function getPageVisitorStats(pagePath: string): Promise<PageVisitorStats> {
   try {
+    // Use EST timezone for "today" calculations
     const [totalResult] = await getDb()`SELECT COUNT(*) as count FROM ragecheck_visitors WHERE page_path = ${pagePath}`;
-    const [todayResult] = await getDb()`SELECT COUNT(*) as count FROM ragecheck_visitors WHERE page_path = ${pagePath} AND created_at > NOW() - INTERVAL '1 day'`;
+    const [todayResult] = await getDb()`SELECT COUNT(*) as count FROM ragecheck_visitors WHERE page_path = ${pagePath} AND created_at >= DATE_TRUNC('day', NOW() AT TIME ZONE 'America/New_York') AT TIME ZONE 'America/New_York'`;
     const [weekResult] = await getDb()`SELECT COUNT(*) as count FROM ragecheck_visitors WHERE page_path = ${pagePath} AND created_at > NOW() - INTERVAL '7 days'`;
 
     // Realtime series - 30 minute buckets for last 24 hours
@@ -941,12 +946,12 @@ export async function getPageVisitorStats(pagePath: string): Promise<PageVisitor
       .sort((a, b) => a[0].localeCompare(b[0]))
       .map(([time, visitors]) => ({ time, visitors }));
 
-    // Daily time series for last 14 days
+    // Daily time series for last 14 days (grouped by EST date)
     const dailyData = await getDb()`
-      SELECT DATE(created_at) as date, COUNT(*) as count
+      SELECT DATE(created_at AT TIME ZONE 'America/New_York') as date, COUNT(*) as count
       FROM ragecheck_visitors
       WHERE page_path = ${pagePath} AND created_at > NOW() - INTERVAL '14 days'
-      GROUP BY DATE(created_at)
+      GROUP BY DATE(created_at AT TIME ZONE 'America/New_York')
       ORDER BY date ASC
     `;
 
@@ -1185,7 +1190,7 @@ export async function getViralMetrics(): Promise<ViralMetrics> {
         FROM ragecheck_visitors
         WHERE ip_address IS NOT NULL
         GROUP BY ip_address
-        HAVING COUNT(DISTINCT DATE(created_at)) >= 2
+        HAVING COUNT(DISTINCT DATE(created_at AT TIME ZONE 'America/New_York')) >= 2
       ) as repeat_users
     `;
 
@@ -1196,10 +1201,10 @@ export async function getViralMetrics(): Promise<ViralMetrics> {
       WHERE ip_address IS NOT NULL
     `;
 
-    // Average visits per user
+    // Average visits per user (by EST date)
     const [avgVisitsResult] = await getDb()`
       SELECT AVG(visit_count) as avg FROM (
-        SELECT ip_address, COUNT(DISTINCT DATE(created_at)) as visit_count
+        SELECT ip_address, COUNT(DISTINCT DATE(created_at AT TIME ZONE 'America/New_York')) as visit_count
         FROM ragecheck_visitors
         WHERE ip_address IS NOT NULL
         GROUP BY ip_address
@@ -1216,14 +1221,15 @@ export async function getViralMetrics(): Promise<ViralMetrics> {
       WHERE ip_address IS NOT NULL
     `;
 
+    // Use EST timezone for "today" calculations
     const [todaySharesResult] = await getDb()`
       SELECT COUNT(*) as count FROM ragecheck_shares
-      WHERE created_at > NOW() - INTERVAL '1 day'
+      WHERE created_at >= DATE_TRUNC('day', NOW() AT TIME ZONE 'America/New_York') AT TIME ZONE 'America/New_York'
     `;
 
     const [todayUniqueSharersResult] = await getDb()`
       SELECT COUNT(DISTINCT ip_address) as count FROM ragecheck_shares
-      WHERE created_at > NOW() - INTERVAL '1 day' AND ip_address IS NOT NULL
+      WHERE created_at >= DATE_TRUNC('day', NOW() AT TIME ZONE 'America/New_York') AT TIME ZONE 'America/New_York' AND ip_address IS NOT NULL
     `;
 
     // Unique users for share rate calculation (unique sharers / unique analyzers)
@@ -1237,19 +1243,19 @@ export async function getViralMetrics(): Promise<ViralMetrics> {
       WHERE created_at > NOW() - INTERVAL '7 days' AND ip_address IS NOT NULL
     `;
 
-    // Traffic baseline comparison (today vs 7-day average)
+    // Traffic baseline comparison (today in EST vs 7-day average)
     const [todayVisitorsResult] = await getDb()`
       SELECT COUNT(*) as count FROM ragecheck_visitors
-      WHERE created_at > NOW() - INTERVAL '1 day'
+      WHERE created_at >= DATE_TRUNC('day', NOW() AT TIME ZONE 'America/New_York') AT TIME ZONE 'America/New_York'
     `;
 
     const [avgDailyVisitorsResult] = await getDb()`
       SELECT AVG(daily_count) as avg FROM (
-        SELECT DATE(created_at) as day, COUNT(*) as daily_count
+        SELECT DATE(created_at AT TIME ZONE 'America/New_York') as day, COUNT(*) as daily_count
         FROM ragecheck_visitors
         WHERE created_at > NOW() - INTERVAL '8 days'
-          AND created_at < NOW() - INTERVAL '1 day'
-        GROUP BY DATE(created_at)
+          AND created_at < DATE_TRUNC('day', NOW() AT TIME ZONE 'America/New_York') AT TIME ZONE 'America/New_York'
+        GROUP BY DATE(created_at AT TIME ZONE 'America/New_York')
       ) as daily_visits
     `;
 
@@ -1307,43 +1313,43 @@ export async function getViralMetrics(): Promise<ViralMetrics> {
     const trafficVsBaseline = todayVisitors / avgDailyVisitors;
     const isSpike = trafficVsBaseline > 3; // 3x normal = spike
 
-    // Get 7-day trends for sparklines
+    // Get 7-day trends for sparklines (grouped by EST date)
     const visitorTrends = await getDb()`
-      SELECT DATE(created_at) as day, COUNT(DISTINCT ip_address) as count
+      SELECT DATE(created_at AT TIME ZONE 'America/New_York') as day, COUNT(DISTINCT ip_address) as count
       FROM ragecheck_visitors
       WHERE created_at > NOW() - INTERVAL '7 days' AND ip_address IS NOT NULL
-      GROUP BY DATE(created_at)
+      GROUP BY DATE(created_at AT TIME ZONE 'America/New_York')
       ORDER BY day ASC
     `;
 
     const shareTrends = await getDb()`
-      SELECT DATE(created_at) as day, COUNT(*) as count
+      SELECT DATE(created_at AT TIME ZONE 'America/New_York') as day, COUNT(*) as count
       FROM ragecheck_shares
       WHERE created_at > NOW() - INTERVAL '7 days'
-      GROUP BY DATE(created_at)
+      GROUP BY DATE(created_at AT TIME ZONE 'America/New_York')
       ORDER BY day ASC
     `;
 
     const analysisTrends = await getDb()`
-      SELECT DATE(created_at) as day, COUNT(*) as count
+      SELECT DATE(created_at AT TIME ZONE 'America/New_York') as day, COUNT(*) as count
       FROM ragecheck_analyses
       WHERE created_at > NOW() - INTERVAL '7 days' AND success = true
-      GROUP BY DATE(created_at)
+      GROUP BY DATE(created_at AT TIME ZONE 'America/New_York')
       ORDER BY day ASC
     `;
 
     // Repeat visitors per day (visitors who had visited before that day)
     const repeatVisitorTrends = await getDb()`
-      SELECT DATE(v.created_at) as day, COUNT(DISTINCT v.ip_address) as count
+      SELECT DATE(v.created_at AT TIME ZONE 'America/New_York') as day, COUNT(DISTINCT v.ip_address) as count
       FROM ragecheck_visitors v
       WHERE v.created_at > NOW() - INTERVAL '7 days'
         AND v.ip_address IS NOT NULL
         AND EXISTS (
           SELECT 1 FROM ragecheck_visitors v2
           WHERE v2.ip_address = v.ip_address
-            AND DATE(v2.created_at) < DATE(v.created_at)
+            AND DATE(v2.created_at AT TIME ZONE 'America/New_York') < DATE(v.created_at AT TIME ZONE 'America/New_York')
         )
-      GROUP BY DATE(v.created_at)
+      GROUP BY DATE(v.created_at AT TIME ZONE 'America/New_York')
       ORDER BY day ASC
     `;
 
