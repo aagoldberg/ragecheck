@@ -1547,13 +1547,20 @@ export default function AdminDashboard() {
                           <td className="py-2 px-3 text-zinc-500 text-xs whitespace-nowrap">
                             {formatDateTimeEST(a.createdAt)}
                           </td>
-                          <td className="py-2 px-3 max-w-[200px] truncate" title={a.title || a.url}>
+                          <td className="py-2 px-3 max-w-[200px]" title={a.title || a.url}>
                             {a.failedImageUrl ? (
-                              <a href={a.failedImageUrl} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline">
-                                {a.sourceDomain || "image"}
+                              <a href={a.failedImageUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2">
+                                <img
+                                  src={a.failedImageUrl}
+                                  alt="Upload"
+                                  className="w-10 h-10 object-cover rounded border border-zinc-200 dark:border-zinc-700"
+                                />
+                                <span className="text-indigo-600 hover:underline text-xs">
+                                  {a.sourceDomain || "image"}
+                                </span>
                               </a>
                             ) : (
-                              <a href={a.url} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline">
+                              <a href={a.url} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline truncate block">
                                 {a.title || a.sourceDomain || a.url}
                               </a>
                             )}
