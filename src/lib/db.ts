@@ -949,14 +949,14 @@ export async function getVisitorStats(): Promise<VisitorStats> {
       .sort((a, b) => a[0].localeCompare(b[0]))
       .map(([date, data]) => ({ date, ...data }));
 
-    // Realtime series - 30 minute buckets for last 3 days (72 hours)
+    // Realtime series - 30 minute buckets for last 3 days (72 hours), excluding bots
     const visitorRealtime = await getDb()`
       SELECT
         date_trunc('hour', created_at) +
         (floor(extract(minute FROM created_at) / 30) * interval '30 minutes') as bucket,
         COUNT(*) as count
       FROM ragecheck_visitors
-      WHERE created_at > NOW() - INTERVAL '72 hours'
+      WHERE is_bot = false AND created_at > NOW() - INTERVAL '72 hours'
       GROUP BY bucket
       ORDER BY bucket ASC
     `;
@@ -967,7 +967,7 @@ export async function getVisitorStats(): Promise<VisitorStats> {
         (floor(extract(minute FROM created_at) / 30) * interval '30 minutes') as bucket,
         COUNT(*) as count
       FROM ragecheck_analyses
-      WHERE created_at > NOW() - INTERVAL '72 hours'
+      WHERE is_bot = false AND created_at > NOW() - INTERVAL '72 hours'
       GROUP BY bucket
       ORDER BY bucket ASC
     `;

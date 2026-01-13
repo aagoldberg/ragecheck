@@ -1384,11 +1384,6 @@ export default function AdminDashboard() {
               <RealtimeChart data={visitorStats.realtimeSeries} />
             )}
 
-            {/* Time Series Chart (daily) */}
-            {visitorStats && visitorStats.timeSeries.length > 0 && (
-              <TimeSeriesChart data={visitorStats.timeSeries} />
-            )}
-
             {/* Viral Metrics Section */}
             {viralMetrics && (
               <div className="mb-8">
@@ -1446,24 +1441,6 @@ export default function AdminDashboard() {
                   />
                 </div>
 
-                {/* Referral Sources */}
-                {viralMetrics.referralSources.length > 0 && (
-                  <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6">
-                    <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-4">
-                      Traffic Sources (Last 7 Days)
-                    </h3>
-                    <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                      {viralMetrics.referralSources.map((source) => (
-                        <div key={source.source} className="text-center">
-                          <div className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">
-                            {source.count}
-                          </div>
-                          <div className="text-xs text-zinc-500">{source.source}</div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
               </div>
             )}
 
@@ -2351,6 +2328,30 @@ export default function AdminDashboard() {
             {/* Users Tab */}
             {activeTab === "users" && (
             <>
+            {/* Time Series Chart (daily) */}
+            {visitorStats && visitorStats.timeSeries.length > 0 && (
+              <TimeSeriesChart data={visitorStats.timeSeries} />
+            )}
+
+            {/* Traffic Sources */}
+            {viralMetrics && viralMetrics.referralSources.length > 0 && (
+              <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 mb-6">
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-4">
+                  Traffic Sources (Last 7 Days)
+                </h3>
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                  {viralMetrics.referralSources.map((source) => (
+                    <div key={source.source} className="text-center">
+                      <div className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">
+                        {source.count}
+                      </div>
+                      <div className="text-xs text-zinc-500">{source.source}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Top Users */}
             <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6">
               <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-4">
