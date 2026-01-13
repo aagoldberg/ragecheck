@@ -2,6 +2,22 @@
 
 import { useState, useEffect, useRef } from "react";
 
+// Helper to format dates in EST timezone
+const formatDateTimeEST = (dateInput: string | Date) => {
+  const d = new Date(dateInput);
+  return d.toLocaleString('en-US', { timeZone: 'America/New_York' });
+};
+
+const formatTimeOnlyEST = (dateInput: string | Date) => {
+  const d = new Date(dateInput);
+  return d.toLocaleTimeString('en-US', { timeZone: 'America/New_York' });
+};
+
+const formatDateOnlyEST = (dateInput: string | Date) => {
+  const d = new Date(dateInput);
+  return d.toLocaleDateString('en-US', { timeZone: 'America/New_York' });
+};
+
 interface DashboardStats {
   totalAnalyses: number;
   todayAnalyses: number;
@@ -558,7 +574,7 @@ function PageTrafficChart({ data, title }: { data: { time: string; visitors: num
 
   const formatTime = (isoString: string) => {
     const d = new Date(isoString);
-    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', timeZone: 'America/New_York' });
   };
 
   return (
@@ -914,10 +930,10 @@ export default function AdminDashboard() {
                       <StatCard
                         title="Last Generated"
                         value={clearviewStats.lastGenerated
-                          ? new Date(clearviewStats.lastGenerated).toLocaleTimeString()
+                          ? formatTimeOnlyEST(clearviewStats.lastGenerated)
                           : "Never"}
                         subtitle={clearviewStats.lastGenerated
-                          ? new Date(clearviewStats.lastGenerated).toLocaleDateString()
+                          ? formatDateOnlyEST(clearviewStats.lastGenerated) + " EST"
                           : undefined}
                       />
                       <StatCard
@@ -1192,7 +1208,7 @@ export default function AdminDashboard() {
                                   })()}
                                 </td>
                                 <td className="py-2 px-3 text-zinc-500 text-xs whitespace-nowrap">
-                                  {new Date(f.createdAt).toLocaleString()}
+                                  {formatDateTimeEST(f.createdAt)}
                                 </td>
                               </tr>
                             ))}
@@ -1259,7 +1275,7 @@ export default function AdminDashboard() {
                                   )}
                                 </td>
                                 <td className="py-3 px-3 text-zinc-500 text-xs whitespace-nowrap">
-                                  {new Date(f.createdAt).toLocaleString()}
+                                  {formatDateTimeEST(f.createdAt)}
                                 </td>
                               </tr>
                             ))
@@ -1465,7 +1481,7 @@ export default function AdminDashboard() {
                               {a.country || "-"}
                             </td>
                             <td className="py-2 px-3 text-zinc-500 text-xs whitespace-nowrap">
-                              {new Date(a.createdAt).toLocaleString()}
+                              {formatDateTimeEST(a.createdAt)}
                             </td>
                           </tr>
                         ))
@@ -1512,7 +1528,7 @@ export default function AdminDashboard() {
                                 {v.referrer || "-"}
                               </td>
                               <td className="py-2 px-3 text-zinc-500 text-xs whitespace-nowrap">
-                                {new Date(v.createdAt).toLocaleString()}
+                                {formatDateTimeEST(v.createdAt)}
                               </td>
                             </tr>
                           ))
