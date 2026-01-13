@@ -376,45 +376,52 @@ function FunnelChart({ steps, period }: { steps: FunnelStep[]; period: string })
         <span className="text-xs text-zinc-400">{period}</span>
       </div>
 
-      <div className="space-y-4">
+      <div className="space-y-1">
         {steps.map((step, i) => {
           const widthPercent = maxCount > 0 ? (step.count / maxCount) * 100 : 0;
           const isFirst = i === 0;
           const prevStep = steps[i - 1];
+          // Calculate step-to-step conversion rate (positive)
+          const stepConversion = prevStep && prevStep.count > 0
+            ? Math.round((step.count / prevStep.count) * 100)
+            : 100;
 
           return (
             <div key={step.name}>
-              {/* Step label and stats */}
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-3">
-                  <span className="w-6 h-6 rounded-full bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 text-xs font-bold flex items-center justify-center">
-                    {i + 1}
-                  </span>
-                  <span className="font-medium text-zinc-900 dark:text-zinc-100">{step.name}</span>
-                </div>
-                <div className="flex items-center gap-4 text-sm">
-                  <span className="font-bold text-zinc-900 dark:text-zinc-100">{step.count.toLocaleString()}</span>
-                  <span className={`font-medium ${isFirst ? 'text-zinc-400' : step.percentage >= 50 ? 'text-emerald-600' : step.percentage >= 20 ? 'text-amber-600' : 'text-rose-600'}`}>
-                    {step.percentage}%
-                  </span>
-                </div>
-              </div>
-
-              {/* Funnel bar */}
-              <div className="relative">
-                <div className="h-10 bg-zinc-100 dark:bg-zinc-800 rounded-lg overflow-hidden">
-                  <div
-                    className="h-full bg-gradient-to-r from-indigo-500 to-indigo-600 rounded-lg transition-all duration-500"
-                    style={{ width: `${Math.max(widthPercent, 2)}%` }}
-                  />
-                </div>
-
-                {/* Drop-off indicator between steps */}
-                {!isFirst && prevStep && step.dropoff > 0 && (
-                  <div className="absolute -top-5 right-0 text-xs text-rose-500 font-medium">
-                    -{step.dropoff}% drop
+              {/* Conversion rate between steps (shown above the bar) */}
+              {!isFirst && prevStep && (
+                <div className="flex items-center justify-center py-2">
+                  <div className="flex items-center gap-2 text-xs">
+                    <div className="w-px h-3 bg-zinc-300 dark:bg-zinc-600" />
+                    <span className={`font-semibold ${stepConversion >= 50 ? 'text-emerald-600' : stepConversion >= 20 ? 'text-amber-600' : 'text-rose-500'}`}>
+                      {stepConversion}% converted
+                    </span>
+                    <div className="w-px h-3 bg-zinc-300 dark:bg-zinc-600" />
                   </div>
-                )}
+                </div>
+              )}
+
+              {/* Step bar with integrated label */}
+              <div className="relative">
+                <div className="h-12 bg-zinc-100 dark:bg-zinc-800 rounded-lg overflow-hidden">
+                  <div
+                    className="h-full bg-gradient-to-r from-indigo-500 to-indigo-600 rounded-lg transition-all duration-500 flex items-center"
+                    style={{ width: `${Math.max(widthPercent, 8)}%` }}
+                  >
+                    {/* Step number inside bar */}
+                    <span className="ml-3 w-6 h-6 rounded-full bg-white/20 text-white text-xs font-bold flex items-center justify-center flex-shrink-0">
+                      {i + 1}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Label and count overlay */}
+                <div className="absolute inset-0 flex items-center justify-between px-4 pointer-events-none">
+                  <span className="font-medium text-white ml-10">{step.name}</span>
+                  <span className="font-bold text-zinc-900 dark:text-zinc-100 bg-white/90 dark:bg-zinc-900/90 px-2 py-0.5 rounded text-sm">
+                    {step.count.toLocaleString()}
+                  </span>
+                </div>
               </div>
             </div>
           );
@@ -427,7 +434,10 @@ function FunnelChart({ steps, period }: { steps: FunnelStep[]; period: string })
           <div className="flex items-center justify-between text-sm">
             <span className="text-zinc-500">Overall Conversion</span>
             <span className={`font-bold ${steps[steps.length - 1].percentage >= 10 ? 'text-emerald-600' : steps[steps.length - 1].percentage >= 5 ? 'text-amber-600' : 'text-rose-600'}`}>
-              {steps[0].count} → {steps[steps.length - 1].count} ({steps[steps.length - 1].percentage}%)
+              {steps[steps.length - 1].percentage}%
+              <span className="font-normal text-zinc-400 ml-2">
+                ({steps[0].count.toLocaleString()} → {steps[steps.length - 1].count.toLocaleString()})
+              </span>
             </span>
           </div>
         </div>
@@ -439,8 +449,39 @@ function FunnelChart({ steps, period }: { steps: FunnelStep[]; period: string })
 function ConversionTrendChart({ data }: { data: ConversionTrendPoint[] }) {
   if (!data || data.length < 2) return null;
 
-  const maxRate = Math.max(...data.map(d => d.rate), 1);
-  const avgRate = data.reduce((acc, d) => acc + d.rate, 0) / data.length;
+  // Calculate chart bounds with padding for better visualization
+  const rates = data.map(d => d.rate);
+  const maxRate = Math.max(...rates);
+  const minRate = Math.min(...rates);
+  const avgRate = rates.reduce((a, b) => a + b, 0) / rates.length;
+
+  // Add 20% padding to the range for better visualization
+  const range = maxRate - minRate || 1;
+  const chartMax = Math.min(100, maxRate + range * 0.2);
+  const chartMin = Math.max(0, minRate - range * 0.2);
+  const chartRange = chartMax - chartMin || 1;
+
+  // SVG dimensions
+  const width = 100;
+  const height = 100;
+  const padding = { top: 10, right: 5, bottom: 20, left: 5 };
+  const chartWidth = width - padding.left - padding.right;
+  const chartHeight = height - padding.top - padding.bottom;
+
+  // Generate line path
+  const points = data.map((point, i) => {
+    const x = padding.left + (i / (data.length - 1)) * chartWidth;
+    const y = padding.top + chartHeight - ((point.rate - chartMin) / chartRange) * chartHeight;
+    return { x, y, ...point };
+  });
+
+  const linePath = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
+
+  // Area path (for fill under line)
+  const areaPath = `${linePath} L ${points[points.length - 1].x} ${padding.top + chartHeight} L ${points[0].x} ${padding.top + chartHeight} Z`;
+
+  // Average line Y position
+  const avgY = padding.top + chartHeight - ((avgRate - chartMin) / chartRange) * chartHeight;
 
   return (
     <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6">
@@ -448,64 +489,100 @@ function ConversionTrendChart({ data }: { data: ConversionTrendPoint[] }) {
         <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
           Conversion Rate Trend
         </h3>
-        <span className="text-xs text-zinc-400">Last 14 days</span>
-      </div>
-
-      {/* Chart */}
-      <div className="relative h-32">
-        {/* Average line */}
-        <div
-          className="absolute w-full border-t border-dashed border-zinc-300 dark:border-zinc-600"
-          style={{ top: `${100 - (avgRate / maxRate) * 100}%` }}
-        >
-          <span className="absolute -top-3 right-0 text-[10px] text-zinc-400">
+        <div className="flex items-center gap-3 text-xs">
+          <span className="text-zinc-400">Last 14 days</span>
+          <span className="font-semibold text-indigo-600 dark:text-indigo-400">
             avg {avgRate.toFixed(1)}%
           </span>
         </div>
+      </div>
 
-        {/* Bars */}
-        <div className="flex items-end justify-between h-full gap-1">
+      {/* SVG Line Chart */}
+      <div className="relative h-40">
+        <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-full" preserveAspectRatio="none">
+          {/* Grid lines */}
+          <line
+            x1={padding.left} y1={avgY}
+            x2={width - padding.right} y2={avgY}
+            stroke="currentColor"
+            strokeDasharray="2,2"
+            className="text-zinc-300 dark:text-zinc-600"
+            strokeWidth="0.5"
+          />
+
+          {/* Area fill */}
+          <path
+            d={areaPath}
+            fill="url(#gradient)"
+            opacity="0.3"
+          />
+
+          {/* Line */}
+          <path
+            d={linePath}
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="text-indigo-500"
+          />
+
+          {/* Data points */}
+          {points.map((point, i) => (
+            <g key={point.date}>
+              <circle
+                cx={point.x}
+                cy={point.y}
+                r="2"
+                fill="currentColor"
+                className={point.rate >= avgRate ? 'text-emerald-500' : 'text-indigo-500'}
+              />
+            </g>
+          ))}
+
+          {/* Gradient definition */}
+          <defs>
+            <linearGradient id="gradient" x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" stopColor="rgb(99, 102, 241)" stopOpacity="0.4" />
+              <stop offset="100%" stopColor="rgb(99, 102, 241)" stopOpacity="0" />
+            </linearGradient>
+          </defs>
+        </svg>
+
+        {/* Hover overlay with tooltips */}
+        <div className="absolute inset-0 flex">
           {data.map((point, i) => {
-            const height = maxRate > 0 ? (point.rate / maxRate) * 100 : 0;
-            const isAboveAvg = point.rate >= avgRate;
             const dateLabel = new Date(point.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-
             return (
-              <div key={point.date} className="flex-1 flex flex-col items-center group relative">
-                {/* Tooltip */}
-                <div className="absolute bottom-full mb-2 hidden group-hover:block z-10">
+              <div key={point.date} className="flex-1 group relative">
+                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block z-10">
                   <div className="bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 text-xs px-2 py-1 rounded shadow-lg whitespace-nowrap">
                     <div className="font-medium">{dateLabel}</div>
                     <div>{point.rate}% ({point.converted}/{point.visitors})</div>
                   </div>
                 </div>
-
-                {/* Bar */}
-                <div
-                  className={`w-full rounded-t transition-all ${isAboveAvg ? 'bg-emerald-500' : 'bg-zinc-300 dark:bg-zinc-600'}`}
-                  style={{ height: `${Math.max(height, 2)}%` }}
-                />
-
-                {/* Date label (show every 2nd) */}
-                {i % 2 === 0 && (
-                  <span className="text-[9px] text-zinc-400 mt-1 truncate w-full text-center">
-                    {new Date(point.date).getDate()}
-                  </span>
-                )}
               </div>
             );
           })}
         </div>
       </div>
 
+      {/* X-axis labels */}
+      <div className="flex justify-between mt-2 text-[10px] text-zinc-400">
+        <span>{new Date(data[0].date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+        <span>{new Date(data[Math.floor(data.length / 2)].date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+        <span>{new Date(data[data.length - 1].date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+      </div>
+
       {/* Legend */}
-      <div className="flex items-center justify-center gap-4 mt-4 text-xs text-zinc-500">
+      <div className="flex items-center justify-center gap-4 mt-3 text-xs text-zinc-500">
         <div className="flex items-center gap-1">
-          <div className="w-3 h-3 rounded bg-emerald-500" />
+          <div className="w-2 h-2 rounded-full bg-emerald-500" />
           <span>Above avg</span>
         </div>
         <div className="flex items-center gap-1">
-          <div className="w-3 h-3 rounded bg-zinc-300 dark:bg-zinc-600" />
+          <div className="w-2 h-2 rounded-full bg-indigo-500" />
           <span>Below avg</span>
         </div>
       </div>
@@ -1415,74 +1492,105 @@ export default function AdminDashboard() {
                   Time to Analysis
                 </h2>
                 <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6">
-                  {/* Distribution Overview */}
-                  <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-4">Distribution (p10 / p50 / p90)</h3>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-6">
-                    {/* Overall */}
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">
-                        {(() => {
-                          const fmt = (s: number) => s < 60 ? `${s}s` : `${Math.round(s / 60)}m`;
-                          const { p10Seconds, medianSeconds, p90Seconds } = timeToAnalysis.overall;
-                          return `${fmt(p10Seconds)} / ${fmt(medianSeconds)} / ${fmt(p90Seconds)}`;
-                        })()}
-                      </div>
-                      <div className="text-xs text-zinc-500 mt-1">Overall</div>
-                      <div className="text-xs text-zinc-400">{timeToAnalysis.overall.count} samples</div>
-                    </div>
-                    {/* Mobile */}
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">
-                        {timeToAnalysis.byDevice.mobile.count > 0 ? (() => {
-                          const fmt = (s: number) => s < 60 ? `${s}s` : `${Math.round(s / 60)}m`;
-                          const { p10Seconds, medianSeconds, p90Seconds } = timeToAnalysis.byDevice.mobile;
-                          return `${fmt(p10Seconds)} / ${fmt(medianSeconds)} / ${fmt(p90Seconds)}`;
-                        })() : "-"}
-                      </div>
-                      <div className="text-xs text-zinc-500 mt-1">📱 Mobile</div>
-                      <div className="text-xs text-zinc-400">{timeToAnalysis.byDevice.mobile.count} samples</div>
-                    </div>
-                    {/* Tablet */}
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-amber-600 dark:text-amber-400">
-                        {timeToAnalysis.byDevice.tablet.count > 0 ? (() => {
-                          const fmt = (s: number) => s < 60 ? `${s}s` : `${Math.round(s / 60)}m`;
-                          const { p10Seconds, medianSeconds, p90Seconds } = timeToAnalysis.byDevice.tablet;
-                          return `${fmt(p10Seconds)} / ${fmt(medianSeconds)} / ${fmt(p90Seconds)}`;
-                        })() : "-"}
-                      </div>
-                      <div className="text-xs text-zinc-500 mt-1">📱 Tablet</div>
-                      <div className="text-xs text-zinc-400">{timeToAnalysis.byDevice.tablet.count} samples</div>
-                    </div>
-                    {/* Desktop */}
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
-                        {timeToAnalysis.byDevice.desktop.count > 0 ? (() => {
-                          const fmt = (s: number) => s < 60 ? `${s}s` : `${Math.round(s / 60)}m`;
-                          const { p10Seconds, medianSeconds, p90Seconds } = timeToAnalysis.byDevice.desktop;
-                          return `${fmt(p10Seconds)} / ${fmt(medianSeconds)} / ${fmt(p90Seconds)}`;
-                        })() : "-"}
-                      </div>
-                      <div className="text-xs text-zinc-500 mt-1">💻 Desktop</div>
-                      <div className="text-xs text-zinc-400">{timeToAnalysis.byDevice.desktop.count} samples</div>
-                    </div>
+                  {/* Overall Distribution with Visual */}
+                  <div className="mb-8">
+                    <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-4">
+                      Distribution
+                    </h3>
+                    {(() => {
+                      const fmt = (s: number) => {
+                        if (s < 60) return `${s}s`;
+                        if (s < 3600) return `${Math.round(s / 60)}m`;
+                        return `${(s / 3600).toFixed(1)}h`;
+                      };
+                      const { p10Seconds, medianSeconds, p90Seconds, count } = timeToAnalysis.overall;
+                      const maxTime = p90Seconds || 1;
+                      const p10Pct = (p10Seconds / maxTime) * 100;
+                      const medianPct = (medianSeconds / maxTime) * 100;
+
+                      return (
+                        <div className="space-y-4">
+                          {/* Visual distribution bar */}
+                          <div className="relative h-8 bg-zinc-100 dark:bg-zinc-800 rounded-lg overflow-hidden">
+                            {/* P10 to P90 range */}
+                            <div
+                              className="absolute h-full bg-indigo-200 dark:bg-indigo-900/50"
+                              style={{ left: `${p10Pct}%`, width: `${100 - p10Pct}%` }}
+                            />
+                            {/* P10 marker */}
+                            <div
+                              className="absolute top-0 bottom-0 w-0.5 bg-indigo-400"
+                              style={{ left: `${p10Pct}%` }}
+                            />
+                            {/* Median marker */}
+                            <div
+                              className="absolute top-0 bottom-0 w-1 bg-indigo-600"
+                              style={{ left: `${medianPct}%` }}
+                            />
+                            {/* P90 marker (at end) */}
+                            <div className="absolute top-0 bottom-0 right-0 w-0.5 bg-indigo-400" />
+                          </div>
+
+                          {/* Labeled values */}
+                          <div className="grid grid-cols-3 gap-4">
+                            <div className="text-center p-3 bg-zinc-50 dark:bg-zinc-800/50 rounded-lg">
+                              <div className="text-xs text-zinc-500 dark:text-zinc-400 mb-1">Fast (p10)</div>
+                              <div className="text-xl font-bold text-emerald-600 dark:text-emerald-400">{fmt(p10Seconds)}</div>
+                            </div>
+                            <div className="text-center p-3 bg-indigo-50 dark:bg-indigo-900/30 rounded-lg border-2 border-indigo-200 dark:border-indigo-800">
+                              <div className="text-xs text-zinc-500 dark:text-zinc-400 mb-1">Median (p50)</div>
+                              <div className="text-xl font-bold text-indigo-600 dark:text-indigo-400">{fmt(medianSeconds)}</div>
+                            </div>
+                            <div className="text-center p-3 bg-zinc-50 dark:bg-zinc-800/50 rounded-lg">
+                              <div className="text-xs text-zinc-500 dark:text-zinc-400 mb-1">Slow (p90)</div>
+                              <div className="text-xl font-bold text-amber-600 dark:text-amber-400">{fmt(p90Seconds)}</div>
+                            </div>
+                          </div>
+                          <div className="text-center text-xs text-zinc-400">{count} samples</div>
+                        </div>
+                      );
+                    })()}
                   </div>
+
+                  {/* By Device - Simplified */}
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-4">
+                    By Device (median)
+                  </h3>
+                  <div className="grid grid-cols-3 gap-4 mb-6">
+                    {([
+                      { key: 'mobile', label: 'Mobile', icon: '📱', data: timeToAnalysis.byDevice.mobile },
+                      { key: 'tablet', label: 'Tablet', icon: '📱', data: timeToAnalysis.byDevice.tablet },
+                      { key: 'desktop', label: 'Desktop', icon: '💻', data: timeToAnalysis.byDevice.desktop },
+                    ] as const).map(({ key, label, icon, data }) => {
+                      const fmt = (s: number) => s < 60 ? `${s}s` : `${Math.round(s / 60)}m`;
+                      return (
+                        <div key={key} className="text-center p-3 bg-zinc-50 dark:bg-zinc-800/50 rounded-lg">
+                          <div className="text-xs text-zinc-500 mb-1">{icon} {label}</div>
+                          <div className="text-lg font-bold text-zinc-900 dark:text-zinc-100">
+                            {data.count > 0 ? fmt(data.medianSeconds) : '-'}
+                          </div>
+                          <div className="text-xs text-zinc-400">{data.count}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
                   {/* By OS */}
                   <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-4">By OS (median)</h3>
-                  <div className="grid grid-cols-3 md:grid-cols-6 gap-4">
-                    {(["iOS", "Android", "Windows", "macOS", "Linux", "Other"] as const).map((os) => (
-                      <div key={os} className="text-center">
-                        <div className="text-xl font-bold text-zinc-700 dark:text-zinc-300">
-                          {timeToAnalysis.byOS[os].count > 0
-                            ? timeToAnalysis.byOS[os].medianSeconds < 60
-                              ? `${timeToAnalysis.byOS[os].medianSeconds}s`
-                              : `${Math.round(timeToAnalysis.byOS[os].medianSeconds / 60)}m`
-                            : "-"}
+                  <div className="grid grid-cols-3 md:grid-cols-6 gap-3">
+                    {(["iOS", "Android", "Windows", "macOS", "Linux", "Other"] as const).map((os) => {
+                      const data = timeToAnalysis.byOS[os];
+                      const fmt = (s: number) => s < 60 ? `${s}s` : `${Math.round(s / 60)}m`;
+                      return (
+                        <div key={os} className="text-center p-2 bg-zinc-50 dark:bg-zinc-800/50 rounded-lg">
+                          <div className="text-lg font-bold text-zinc-700 dark:text-zinc-300">
+                            {data.count > 0 ? fmt(data.medianSeconds) : '-'}
+                          </div>
+                          <div className="text-xs text-zinc-500">{os}</div>
+                          <div className="text-xs text-zinc-400">{data.count}</div>
                         </div>
-                        <div className="text-xs text-zinc-500 mt-1">{os}</div>
-                        <div className="text-xs text-zinc-400">{timeToAnalysis.byOS[os].count}</div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                   <div className="mt-4 text-center text-xs text-zinc-400">
                     Time from first visit to first analysis (last 7 days, within 1 hour)
