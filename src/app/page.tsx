@@ -1027,7 +1027,7 @@ export default function Home() {
                 <span className="w-2 h-8 bg-indigo-500 rounded-full inline-block"></span>
                 Trending Headlines
               </h2>
-              <span className="text-sm text-zinc-400 hidden sm:inline-block">Live from across the spectrum</span>
+              <span className="text-sm text-zinc-400 hidden sm:inline-block">Click any to analyze</span>
             </div>
 
             {/* News Grid */}
