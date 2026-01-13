@@ -229,12 +229,18 @@ WHY IT MATTERS - POLITICAL PSYCHOLOGY RULES:
 }
 
 export async function GET(request: NextRequest) {
-  // Verify this is a legitimate cron request (Vercel adds this header)
+  // Verify this is a legitimate cron request or admin request
   const authHeader = request.headers.get("authorization");
   const cronSecret = process.env.CRON_SECRET;
+  const adminKey = process.env.ADMIN_KEY;
 
-  // In production, verify the cron secret if set
-  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+  // Accept either CRON_SECRET or ADMIN_KEY
+  const providedToken = authHeader?.replace("Bearer ", "");
+  const isAuthorized =
+    (cronSecret && providedToken === cronSecret) ||
+    (adminKey && providedToken === adminKey);
+
+  if (!isAuthorized) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

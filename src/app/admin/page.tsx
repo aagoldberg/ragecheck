@@ -1076,6 +1076,7 @@ export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState<TabType>("overview");
   const [clearviewStats, setClearviewStats] = useState<ClearviewStats | null>(null);
   const [clearviewLoading, setClearviewLoading] = useState(false);
+  const [clearviewRefreshing, setClearviewRefreshing] = useState(false);
   const [clearviewVisitorStats, setClearviewVisitorStats] = useState<PageVisitorStats | null>(null);
   const [viralMetrics, setViralMetrics] = useState<ViralMetrics | null>(null);
   const [feedbackStats, setFeedbackStats] = useState<FeedbackStats | null>(null);
@@ -1145,6 +1146,32 @@ export default function AdminDashboard() {
       console.error("Failed to fetch clearview stats:", err);
     } finally {
       setClearviewLoading(false);
+    }
+  };
+
+  const refreshClearview = async () => {
+    setClearviewRefreshing(true);
+    try {
+      const response = await fetch("/api/clearview/refresh", {
+        headers: {
+          "Authorization": `Bearer ${key}`,
+        },
+      });
+      const data = await response.json();
+
+      if (data.success) {
+        // Refresh the stats after successful regeneration
+        setClearviewStats(null);
+        await fetchClearviewStats();
+        alert(`ClearView refreshed! ${data.storiesCount} stories generated.`);
+      } else {
+        alert(`Refresh failed: ${data.error || "Unknown error"}`);
+      }
+    } catch (err) {
+      console.error("Failed to refresh clearview:", err);
+      alert("Failed to refresh ClearView");
+    } finally {
+      setClearviewRefreshing(false);
     }
   };
 
@@ -1296,6 +1323,33 @@ export default function AdminDashboard() {
                     )}
 
                     {/* Clearview Content Stats */}
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+                        ClearView Content
+                      </h3>
+                      <button
+                        onClick={refreshClearview}
+                        disabled={clearviewRefreshing}
+                        className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-2"
+                      >
+                        {clearviewRefreshing ? (
+                          <>
+                            <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                            </svg>
+                            Refreshing...
+                          </>
+                        ) : (
+                          <>
+                            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                            </svg>
+                            Refresh ClearView
+                          </>
+                        )}
+                      </button>
+                    </div>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
                       <StatCard title="Stories Today" value={clearviewStats.storyCount} />
                       <StatCard title="Total Sources" value={clearviewStats.sourceCount} />
