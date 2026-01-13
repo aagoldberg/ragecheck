@@ -409,7 +409,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
            a.success, a.error, a.title, a.created_at, a.ip_address, a.user_agent, a.country, a.is_bot,
            a.failed_image_url,
            EXISTS (SELECT 1 FROM ragecheck_shares s WHERE s.url = a.url) as shared,
-           (SELECT COUNT(*) FROM ragecheck_analyses a2 WHERE a2.ip_address = a.ip_address AND a.ip_address IS NOT NULL) > 1 as is_repeat_user
+           (SELECT COUNT(DISTINCT DATE(a2.created_at)) FROM ragecheck_analyses a2 WHERE a2.ip_address = a.ip_address AND a.ip_address IS NOT NULL) > 1 as is_repeat_user
     FROM ragecheck_analyses a
     WHERE a.created_at > NOW() - INTERVAL '3 days'
     ORDER BY a.created_at DESC
@@ -888,7 +888,7 @@ export async function getVisitorStats(): Promise<VisitorStats> {
                SELECT 1 FROM ragecheck_analyses a
                WHERE a.ip_address = v.ip_address AND a.llm_enhanced = true
              ) as has_llm_analysis,
-             (SELECT COUNT(*) FROM ragecheck_visitors v2 WHERE v2.ip_address = v.ip_address AND v.ip_address IS NOT NULL) > 1 as is_repeat_user
+             (SELECT COUNT(DISTINCT DATE(v2.created_at)) FROM ragecheck_visitors v2 WHERE v2.ip_address = v.ip_address AND v.ip_address IS NOT NULL) > 1 as is_repeat_user
       FROM ragecheck_visitors v
       WHERE v.created_at > NOW() - INTERVAL '3 days'
       ORDER BY v.created_at DESC
