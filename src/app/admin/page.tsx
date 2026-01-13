@@ -190,6 +190,23 @@ interface ConversionMetrics {
   };
 }
 
+type InsightRow = { name: string; visitors: number; converted: number; rate: number };
+
+interface ConversionInsights {
+  byReferrerType: InsightRow[];
+  byLandingPage: InsightRow[];
+  byCountry: InsightRow[];
+  byHourOfDay: InsightRow[];
+  byDayOfWeek: InsightRow[];
+  summary: {
+    totalVisitors: number;
+    totalConverted: number;
+    overallRate: number;
+    bestPerforming: { factor: string; name: string; rate: number } | null;
+    worstPerforming: { factor: string; name: string; rate: number } | null;
+  };
+}
+
 interface ApiResponse {
   success?: boolean;
   error?: string;
@@ -200,6 +217,7 @@ interface ApiResponse {
   feedbackStats?: FeedbackStats;
   timeToAnalysis?: TimeToAnalysisMetrics;
   conversionMetrics?: ConversionMetrics;
+  conversionInsights?: ConversionInsights;
   dbAvailable?: boolean;
 }
 
@@ -766,6 +784,7 @@ export default function AdminDashboard() {
   const [feedbackStats, setFeedbackStats] = useState<FeedbackStats | null>(null);
   const [timeToAnalysis, setTimeToAnalysis] = useState<TimeToAnalysisMetrics | null>(null);
   const [conversionMetrics, setConversionMetrics] = useState<ConversionMetrics | null>(null);
+  const [conversionInsights, setConversionInsights] = useState<ConversionInsights | null>(null);
 
   const fetchStats = async (adminKey: string) => {
     setLoading(true);
@@ -789,6 +808,7 @@ export default function AdminDashboard() {
         setFeedbackStats(data.feedbackStats || null);
         setTimeToAnalysis(data.timeToAnalysis || null);
         setConversionMetrics(data.conversionMetrics || null);
+        setConversionInsights(data.conversionInsights || null);
         setAuthenticated(true);
         // Save key to localStorage
         localStorage.setItem("ragecheck-admin-key", adminKey);
@@ -1340,6 +1360,151 @@ export default function AdminDashboard() {
                   </div>
                   <div className="mt-4 text-center text-xs text-zinc-400">
                     Visitors who performed at least one analysis (last 7 days)
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Conversion Insights Card */}
+            {conversionInsights && conversionInsights.summary.totalVisitors > 0 && (
+              <div className="mb-8">
+                <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100 mb-4">
+                  Conversion Insights
+                </h2>
+                <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6">
+                  {/* Summary */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                    <div className="text-center p-4 bg-zinc-50 dark:bg-zinc-800 rounded-lg">
+                      <div className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">
+                        {conversionInsights.summary.overallRate}%
+                      </div>
+                      <div className="text-xs text-zinc-500 mt-1">Overall Rate</div>
+                      <div className="text-xs text-zinc-400">{conversionInsights.summary.totalConverted}/{conversionInsights.summary.totalVisitors}</div>
+                    </div>
+                    {conversionInsights.summary.bestPerforming && (
+                      <div className="text-center p-4 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg">
+                        <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
+                          {conversionInsights.summary.bestPerforming.rate}%
+                        </div>
+                        <div className="text-xs text-emerald-600 dark:text-emerald-400 mt-1">Best: {conversionInsights.summary.bestPerforming.name}</div>
+                        <div className="text-xs text-zinc-400">{conversionInsights.summary.bestPerforming.factor}</div>
+                      </div>
+                    )}
+                    {conversionInsights.summary.worstPerforming && (
+                      <div className="text-center p-4 bg-rose-50 dark:bg-rose-900/20 rounded-lg">
+                        <div className="text-2xl font-bold text-rose-600 dark:text-rose-400">
+                          {conversionInsights.summary.worstPerforming.rate}%
+                        </div>
+                        <div className="text-xs text-rose-600 dark:text-rose-400 mt-1">Worst: {conversionInsights.summary.worstPerforming.name}</div>
+                        <div className="text-xs text-zinc-400">{conversionInsights.summary.worstPerforming.factor}</div>
+                      </div>
+                    )}
+                    <div className="text-center p-4 bg-zinc-50 dark:bg-zinc-800 rounded-lg">
+                      <div className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">
+                        {conversionInsights.summary.totalVisitors - conversionInsights.summary.totalConverted}
+                      </div>
+                      <div className="text-xs text-zinc-500 mt-1">Did Not Convert</div>
+                      <div className="text-xs text-zinc-400">last 14 days</div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {/* By Referrer */}
+                    {conversionInsights.byReferrerType.length > 0 && (
+                      <div>
+                        <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-3">By Traffic Source</h3>
+                        <div className="space-y-2">
+                          {conversionInsights.byReferrerType.map((row) => (
+                            <div key={row.name} className="flex items-center justify-between text-sm">
+                              <span className="text-zinc-600 dark:text-zinc-400">{row.name}</span>
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs text-zinc-400">{row.converted}/{row.visitors}</span>
+                                <span className={`font-medium ${row.rate >= conversionInsights.summary.overallRate ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
+                                  {row.rate}%
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* By Landing Page */}
+                    {conversionInsights.byLandingPage.length > 0 && (
+                      <div>
+                        <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-3">By Landing Page</h3>
+                        <div className="space-y-2">
+                          {conversionInsights.byLandingPage.slice(0, 5).map((row) => (
+                            <div key={row.name} className="flex items-center justify-between text-sm">
+                              <span className="text-zinc-600 dark:text-zinc-400 truncate max-w-[120px]" title={row.name}>{row.name}</span>
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs text-zinc-400">{row.converted}/{row.visitors}</span>
+                                <span className={`font-medium ${row.rate >= conversionInsights.summary.overallRate ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
+                                  {row.rate}%
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* By Country */}
+                    {conversionInsights.byCountry.length > 0 && (
+                      <div>
+                        <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-3">By Country</h3>
+                        <div className="space-y-2">
+                          {conversionInsights.byCountry.slice(0, 5).map((row) => (
+                            <div key={row.name} className="flex items-center justify-between text-sm">
+                              <span className="text-zinc-600 dark:text-zinc-400">{row.name}</span>
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs text-zinc-400">{row.converted}/{row.visitors}</span>
+                                <span className={`font-medium ${row.rate >= conversionInsights.summary.overallRate ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
+                                  {row.rate}%
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* By Day of Week */}
+                    {conversionInsights.byDayOfWeek.length > 0 && (
+                      <div>
+                        <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-3">By Day of Week</h3>
+                        <div className="flex gap-2 flex-wrap">
+                          {conversionInsights.byDayOfWeek.map((row) => (
+                            <div key={row.name} className={`text-center px-3 py-2 rounded-lg ${row.rate >= conversionInsights.summary.overallRate ? 'bg-emerald-50 dark:bg-emerald-900/20' : 'bg-zinc-50 dark:bg-zinc-800'}`}>
+                              <div className={`text-sm font-medium ${row.rate >= conversionInsights.summary.overallRate ? 'text-emerald-600 dark:text-emerald-400' : 'text-zinc-600 dark:text-zinc-400'}`}>
+                                {row.rate}%
+                              </div>
+                              <div className="text-xs text-zinc-500">{row.name}</div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* By Hour of Day */}
+                    {conversionInsights.byHourOfDay.length > 0 && (
+                      <div className="md:col-span-2">
+                        <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-3">By Hour (EST)</h3>
+                        <div className="flex gap-1 flex-wrap">
+                          {conversionInsights.byHourOfDay.map((row) => (
+                            <div key={row.name} className={`text-center px-2 py-1 rounded ${row.rate >= conversionInsights.summary.overallRate ? 'bg-emerald-100 dark:bg-emerald-900/30' : 'bg-zinc-100 dark:bg-zinc-800'}`} title={`${row.name}: ${row.rate}% (${row.converted}/${row.visitors})`}>
+                              <div className={`text-xs font-medium ${row.rate >= conversionInsights.summary.overallRate ? 'text-emerald-700 dark:text-emerald-400' : 'text-zinc-500'}`}>
+                                {row.name}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="mt-4 text-center text-xs text-zinc-400">
+                    Conversion analysis based on last 14 days (min 5 visitors per segment)
                   </div>
                 </div>
               </div>

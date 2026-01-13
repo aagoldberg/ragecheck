@@ -1747,3 +1747,189 @@ export async function getConversionMetrics(): Promise<ConversionMetrics> {
     };
   }
 }
+
+// Conversion insights - analyze why visitors don't convert
+type InsightRow = { name: string; visitors: number; converted: number; rate: number };
+
+export interface ConversionInsights {
+  byReferrerType: InsightRow[];
+  byLandingPage: InsightRow[];
+  byCountry: InsightRow[];
+  byHourOfDay: InsightRow[];
+  byDayOfWeek: InsightRow[];
+  summary: {
+    totalVisitors: number;
+    totalConverted: number;
+    overallRate: number;
+    bestPerforming: { factor: string; name: string; rate: number } | null;
+    worstPerforming: { factor: string; name: string; rate: number } | null;
+  };
+}
+
+// Categorize referrer into types
+function categorizeReferrer(referrer: string | null): string {
+  if (!referrer) return "Direct";
+  const r = referrer.toLowerCase();
+  if (r.includes("google") || r.includes("bing") || r.includes("duckduckgo") || r.includes("yahoo")) return "Search";
+  if (r.includes("twitter") || r.includes("x.com") || r.includes("facebook") || r.includes("instagram") || r.includes("linkedin") || r.includes("reddit") || r.includes("threads")) return "Social";
+  if (r.includes("t.co")) return "Twitter/X";
+  if (r.includes("news.ycombinator") || r.includes("hackernews")) return "Hacker News";
+  return "Other";
+}
+
+export async function getConversionInsights(): Promise<ConversionInsights> {
+  try {
+    // Get all visitors with details (last 14 days, exclude bots)
+    const visitors = await getDb()`
+      SELECT
+        v.ip_address,
+        v.referrer,
+        v.page_path,
+        v.country,
+        v.user_agent,
+        v.created_at,
+        EXTRACT(HOUR FROM v.created_at AT TIME ZONE 'America/New_York') as hour_of_day,
+        EXTRACT(DOW FROM v.created_at AT TIME ZONE 'America/New_York') as day_of_week
+      FROM ragecheck_visitors v
+      WHERE v.ip_address IS NOT NULL
+        AND v.created_at > NOW() - INTERVAL '14 days'
+        AND NOT (
+          v.user_agent ILIKE '%bot%' OR
+          v.user_agent ILIKE '%crawler%' OR
+          v.user_agent ILIKE '%spider%' OR
+          v.user_agent ILIKE '%python%' OR
+          v.user_agent ILIKE '%curl%' OR
+          v.user_agent IS NULL
+        )
+    `;
+
+    // Get all IPs that converted
+    const convertedIPs = await getDb()`
+      SELECT DISTINCT ip_address
+      FROM ragecheck_analyses
+      WHERE ip_address IS NOT NULL
+        AND success = true
+        AND created_at > NOW() - INTERVAL '14 days'
+    `;
+
+    const convertedSet = new Set(convertedIPs.map(r => r.ip_address));
+
+    // Aggregate by various dimensions
+    const byReferrerType = new Map<string, { visitors: Set<string>; converted: Set<string> }>();
+    const byLandingPage = new Map<string, { visitors: Set<string>; converted: Set<string> }>();
+    const byCountry = new Map<string, { visitors: Set<string>; converted: Set<string> }>();
+    const byHourOfDay = new Map<number, { visitors: Set<string>; converted: Set<string> }>();
+    const byDayOfWeek = new Map<number, { visitors: Set<string>; converted: Set<string> }>();
+
+    // Initialize hour and day maps
+    for (let h = 0; h < 24; h++) byHourOfDay.set(h, { visitors: new Set(), converted: new Set() });
+    for (let d = 0; d < 7; d++) byDayOfWeek.set(d, { visitors: new Set(), converted: new Set() });
+
+    const allVisitors = new Set<string>();
+    const allConverted = new Set<string>();
+
+    for (const row of visitors) {
+      const ip = row.ip_address;
+      const converted = convertedSet.has(ip);
+
+      allVisitors.add(ip);
+      if (converted) allConverted.add(ip);
+
+      // By referrer type
+      const refType = categorizeReferrer(row.referrer);
+      if (!byReferrerType.has(refType)) byReferrerType.set(refType, { visitors: new Set(), converted: new Set() });
+      byReferrerType.get(refType)!.visitors.add(ip);
+      if (converted) byReferrerType.get(refType)!.converted.add(ip);
+
+      // By landing page
+      const page = row.page_path || "/";
+      if (!byLandingPage.has(page)) byLandingPage.set(page, { visitors: new Set(), converted: new Set() });
+      byLandingPage.get(page)!.visitors.add(ip);
+      if (converted) byLandingPage.get(page)!.converted.add(ip);
+
+      // By country
+      const country = row.country || "Unknown";
+      if (!byCountry.has(country)) byCountry.set(country, { visitors: new Set(), converted: new Set() });
+      byCountry.get(country)!.visitors.add(ip);
+      if (converted) byCountry.get(country)!.converted.add(ip);
+
+      // By hour
+      const hour = Number(row.hour_of_day);
+      byHourOfDay.get(hour)!.visitors.add(ip);
+      if (converted) byHourOfDay.get(hour)!.converted.add(ip);
+
+      // By day of week
+      const dow = Number(row.day_of_week);
+      byDayOfWeek.get(dow)!.visitors.add(ip);
+      if (converted) byDayOfWeek.get(dow)!.converted.add(ip);
+    }
+
+    // Convert maps to sorted arrays
+    const toInsightRows = (map: Map<string | number, { visitors: Set<string>; converted: Set<string> }>, nameTransform?: (k: string | number) => string): InsightRow[] => {
+      return Array.from(map.entries())
+        .map(([key, val]) => ({
+          name: nameTransform ? nameTransform(key) : String(key),
+          visitors: val.visitors.size,
+          converted: val.converted.size,
+          rate: val.visitors.size > 0 ? Math.round((val.converted.size / val.visitors.size) * 1000) / 10 : 0,
+        }))
+        .filter(r => r.visitors >= 5) // Only show with meaningful sample size
+        .sort((a, b) => b.visitors - a.visitors);
+    };
+
+    const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    const hourLabel = (h: number) => {
+      const ampm = h >= 12 ? "pm" : "am";
+      const hour12 = h % 12 || 12;
+      return `${hour12}${ampm}`;
+    };
+
+    const referrerRows = toInsightRows(byReferrerType);
+    const landingRows = toInsightRows(byLandingPage);
+    const countryRows = toInsightRows(byCountry).slice(0, 10); // Top 10 countries
+    const hourRows = toInsightRows(byHourOfDay, (h) => hourLabel(Number(h)));
+    const dayRows = toInsightRows(byDayOfWeek, (d) => dayNames[Number(d)]);
+
+    // Find best and worst performing factors (with min 10 visitors)
+    const allFactors: { factor: string; name: string; rate: number; visitors: number }[] = [
+      ...referrerRows.map(r => ({ factor: "Referrer", name: r.name, rate: r.rate, visitors: r.visitors })),
+      ...landingRows.map(r => ({ factor: "Landing Page", name: r.name, rate: r.rate, visitors: r.visitors })),
+      ...countryRows.map(r => ({ factor: "Country", name: r.name, rate: r.rate, visitors: r.visitors })),
+    ].filter(f => f.visitors >= 10);
+
+    const sorted = allFactors.sort((a, b) => b.rate - a.rate);
+    const best = sorted.length > 0 ? { factor: sorted[0].factor, name: sorted[0].name, rate: sorted[0].rate } : null;
+    const worst = sorted.length > 0 ? { factor: sorted[sorted.length - 1].factor, name: sorted[sorted.length - 1].name, rate: sorted[sorted.length - 1].rate } : null;
+
+    return {
+      byReferrerType: referrerRows,
+      byLandingPage: landingRows,
+      byCountry: countryRows,
+      byHourOfDay: hourRows,
+      byDayOfWeek: dayRows,
+      summary: {
+        totalVisitors: allVisitors.size,
+        totalConverted: allConverted.size,
+        overallRate: allVisitors.size > 0 ? Math.round((allConverted.size / allVisitors.size) * 1000) / 10 : 0,
+        bestPerforming: best,
+        worstPerforming: worst,
+      },
+    };
+  } catch (error) {
+    console.error("Failed to get conversion insights:", error);
+    return {
+      byReferrerType: [],
+      byLandingPage: [],
+      byCountry: [],
+      byHourOfDay: [],
+      byDayOfWeek: [],
+      summary: {
+        totalVisitors: 0,
+        totalConverted: 0,
+        overallRate: 0,
+        bestPerforming: null,
+        worstPerforming: null,
+      },
+    };
+  }
+}
