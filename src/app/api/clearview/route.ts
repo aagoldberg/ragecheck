@@ -150,6 +150,17 @@ interface StoryCluster {
     };
     bottomLine: string; // One sentence explaining the real fight
   };
+  // Deeper analysis - what's really going on
+  deeperAnalysis?: {
+    unstatedConcerns: {
+      left: string[]; // Concerns driving the left that aren't openly discussed
+      right: string[]; // Concerns driving the right that aren't openly discussed
+    };
+    economicDimension?: string; // Economic anxieties/interests at play
+    culturalDimension?: string; // Cultural/identity concerns beneath the surface
+    politicalGame: string; // How politicians/media exploit this for tribal gain
+    whatGetsIgnored?: string; // Solutions or nuances that don't fit the narrative
+  };
 }
 
 interface ArchivedBriefing {
@@ -289,6 +300,16 @@ Respond with this exact JSON structure:
           "emotionalAppeal": "What emotion this activates"
         },
         "bottomLine": "One sentence explaining what this fight is really about at its core"
+      },
+      "deeperAnalysis": {
+        "unstatedConcerns": {
+          "left": ["Concerns driving the left that aren't openly discussed - the quiet parts"],
+          "right": ["Concerns driving the right that aren't openly discussed - the quiet parts"]
+        },
+        "economicDimension": "Economic anxieties and interests at play that don't fit neatly into the political framing",
+        "culturalDimension": "Cultural/identity concerns beneath the surface - what people feel but won't say",
+        "politicalGame": "How politicians and media are exploiting this issue for tribal gain - be honest and specific",
+        "whatGetsIgnored": "Nuances, solutions, or common ground that gets ignored because it doesn't fit the narrative"
       }
     }
   ]
@@ -336,7 +357,18 @@ WHY IT MATTERS - POLITICAL PSYCHOLOGY RULES:
   - "mobilizing" = They're rallying their base, making this a tribal identity issue
 - emotionalAppeal should identify the primary emotion being activated (fear, anger, hope, pride, disgust, moral outrage, anxiety, righteous indignation)
 - bottomLine should cut through the noise and state what this fight is REALLY about in one honest sentence
-- Be empathetic to both sides - help readers understand WHY reasonable people disagree, not just THAT they disagree`;
+- Be empathetic to both sides - help readers understand WHY reasonable people disagree, not just THAT they disagree
+
+DEEPER ANALYSIS - THE REAL GAME:
+- REQUIRED: Every story MUST include the deeperAnalysis object
+- unstatedConcerns: What's REALLY driving each side that they won't say openly?
+  - Left example: "Fear that enforcement is selectively racist" or "Worry that cruelty is the point"
+  - Right example: "Anxiety about cultural/demographic change" or "Feeling that elites dismiss their concerns"
+- economicDimension: What economic interests or anxieties are at play? Who gains, who loses economically?
+- culturalDimension: What identity/cultural anxieties exist beneath the policy debate? Be honest about what people feel but won't say
+- politicalGame: Be BLUNT about how politicians and media exploit this issue. Who benefits from keeping the fight going? Why doesn't it get solved?
+- whatGetsIgnored: What nuance, common ground, or practical solutions get ignored because they don't fit the tribal narrative?
+- Write this section like you're being brutally honest with a friend about how the game really works`;
 
   const response = await client.messages.create({
     model: "claude-sonnet-4-20250514",

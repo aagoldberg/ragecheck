@@ -51,6 +51,17 @@ interface WhyItMatters {
   bottomLine: string;
 }
 
+interface DeeperAnalysis {
+  unstatedConcerns: {
+    left: string[];
+    right: string[];
+  };
+  economicDimension?: string;
+  culturalDimension?: string;
+  politicalGame: string;
+  whatGetsIgnored?: string;
+}
+
 interface StoryCluster {
   id: string;
   topic: string;
@@ -65,6 +76,7 @@ interface StoryCluster {
   commonGround?: string[];
   factualDisputes?: FactualDispute[];
   whyItMatters?: WhyItMatters;
+  deeperAnalysis?: DeeperAnalysis;
 }
 
 interface ArchivedBriefing {
@@ -301,9 +313,95 @@ function WhyItMattersBox({ whyItMatters }: { whyItMatters?: WhyItMatters }) {
   );
 }
 
+function DeeperAnalysisBox({ deeperAnalysis }: { deeperAnalysis?: DeeperAnalysis }) {
+  if (!deeperAnalysis) return null;
+
+  return (
+    <div className="p-5 bg-gradient-to-br from-orange-50/50 to-amber-50/30 dark:from-orange-950/20 dark:to-amber-950/10 rounded-xl border border-orange-200/50 dark:border-orange-900/30">
+      <h3 className="text-[10px] font-bold uppercase tracking-widest text-orange-600 dark:text-orange-400 mb-4 flex items-center gap-2">
+        <span className="w-1.5 h-1.5 rounded-full bg-orange-500" />
+        The Deeper Game
+      </h3>
+
+      {/* Political Game - The Main Event */}
+      <div className="mb-5 p-4 bg-white/80 dark:bg-zinc-900/80 rounded-lg border border-orange-200/50 dark:border-orange-800/30">
+        <p className="text-sm text-zinc-700 dark:text-zinc-300 leading-relaxed">
+          <span className="font-bold text-orange-600 dark:text-orange-400">How it&apos;s being exploited:</span> {deeperAnalysis.politicalGame}
+        </p>
+      </div>
+
+      {/* Unstated Concerns - Two Columns */}
+      <div className="grid md:grid-cols-2 gap-4 mb-4">
+        {/* Left Unstated */}
+        <div className="space-y-2">
+          <h4 className="text-[10px] font-bold uppercase tracking-widest text-blue-600 dark:text-blue-400">
+            What the Left Won&apos;t Say
+          </h4>
+          <ul className="space-y-1.5">
+            {deeperAnalysis.unstatedConcerns.left.map((concern, i) => (
+              <li key={i} className="flex items-start gap-2 text-sm text-zinc-600 dark:text-zinc-400">
+                <span className="text-blue-400 mt-1">•</span>
+                <span>{concern}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        {/* Right Unstated */}
+        <div className="space-y-2">
+          <h4 className="text-[10px] font-bold uppercase tracking-widest text-rose-600 dark:text-rose-400">
+            What the Right Won&apos;t Say
+          </h4>
+          <ul className="space-y-1.5">
+            {deeperAnalysis.unstatedConcerns.right.map((concern, i) => (
+              <li key={i} className="flex items-start gap-2 text-sm text-zinc-600 dark:text-zinc-400">
+                <span className="text-rose-400 mt-1">•</span>
+                <span>{concern}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+
+      {/* Economic & Cultural Dimensions */}
+      <div className="space-y-3">
+        {deeperAnalysis.economicDimension && (
+          <div className="flex items-start gap-2">
+            <span className="text-emerald-500 text-sm mt-0.5">$</span>
+            <div>
+              <span className="text-[10px] font-bold text-zinc-400 uppercase">Economic Reality:</span>
+              <p className="text-sm text-zinc-600 dark:text-zinc-400">{deeperAnalysis.economicDimension}</p>
+            </div>
+          </div>
+        )}
+
+        {deeperAnalysis.culturalDimension && (
+          <div className="flex items-start gap-2">
+            <span className="text-purple-500 text-sm mt-0.5">◈</span>
+            <div>
+              <span className="text-[10px] font-bold text-zinc-400 uppercase">Cultural Undercurrent:</span>
+              <p className="text-sm text-zinc-600 dark:text-zinc-400">{deeperAnalysis.culturalDimension}</p>
+            </div>
+          </div>
+        )}
+
+        {deeperAnalysis.whatGetsIgnored && (
+          <div className="flex items-start gap-2">
+            <span className="text-zinc-400 text-sm mt-0.5">⊘</span>
+            <div>
+              <span className="text-[10px] font-bold text-zinc-400 uppercase">What Gets Ignored:</span>
+              <p className="text-sm text-zinc-600 dark:text-zinc-400">{deeperAnalysis.whatGetsIgnored}</p>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function StoryCard({ story }: { story: StoryCluster }) {
   const [expanded, setExpanded] = useState(false);
-  
+
   const leftPerspective = story.perspectives.find(p => p.lean.toLowerCase().includes("left"));
   const rightPerspective = story.perspectives.find(p => p.lean.toLowerCase().includes("right"));
 
@@ -360,6 +458,8 @@ function StoryCard({ story }: { story: StoryCluster }) {
         <ExpertConsensusBox consensus={story.expertConsensus} />
 
         <WhyItMattersBox whyItMatters={story.whyItMatters} />
+
+        <DeeperAnalysisBox deeperAnalysis={story.deeperAnalysis} />
       </div>
 
       {/* Expand Bar */}
