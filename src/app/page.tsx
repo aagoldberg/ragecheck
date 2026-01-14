@@ -1132,7 +1132,8 @@ function HomeContent() {
                   {/* Surprise Me button */}
                   <button
                     type="button"
-                    onClick={() => {
+                    onClick={(e) => {
+                      e.preventDefault();
                       const randomExample = CURATED_EXAMPLES[Math.floor(Math.random() * CURATED_EXAMPLES.length)];
                       setUrl(randomExample.url);
                       analyze(randomExample.url);
