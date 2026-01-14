@@ -257,6 +257,25 @@ export async function analyzeImageWithVision(
       return { success: false, error: "Unexpected response format from AI" };
     }
 
+    // Check if model declined to analyze (content policy)
+    const responseText = content.text.toLowerCase();
+    if (
+      responseText.includes("i cannot") ||
+      responseText.includes("i can't") ||
+      responseText.includes("i'm unable") ||
+      responseText.includes("i am unable") ||
+      responseText.includes("not able to analyze") ||
+      responseText.includes("cannot process") ||
+      responseText.includes("inappropriate") ||
+      (responseText.includes("sorry") && !responseText.includes("{"))
+    ) {
+      console.log("Model declined to analyze content:", content.text.substring(0, 200));
+      return {
+        success: false,
+        error: "This content contains material that cannot be analyzed. Try a different image."
+      };
+    }
+
     // Parse JSON from response
     const jsonMatch = content.text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
@@ -301,6 +320,23 @@ export async function analyzeImageWithVision(
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "Unknown error";
     console.error("Image analysis failed:", errorMessage, error);
+
+    // Check for content policy errors from the API
+    const lowerError = errorMessage.toLowerCase();
+    if (
+      lowerError.includes("content") ||
+      lowerError.includes("policy") ||
+      lowerError.includes("safety") ||
+      lowerError.includes("harmful") ||
+      lowerError.includes("inappropriate") ||
+      lowerError.includes("violat")
+    ) {
+      return {
+        success: false,
+        error: "This content contains material that cannot be analyzed. Try a different image."
+      };
+    }
+
     return { success: false, error: `Analysis failed: ${errorMessage}` };
   }
 }
