@@ -1331,8 +1331,8 @@ function HomeContent() {
                         </h4>
                         <div className="space-y-3">
                           {result.techniqueExplanations.map((technique, i) => (
-                            <div key={i} className="flex gap-3">
-                              <div className="mt-1 w-1.5 h-1.5 rounded-full bg-rose-400 flex-shrink-0" />
+                            <div key={i} className="flex gap-3 items-start">
+                              <div className="mt-1.5 w-1.5 h-1.5 rounded-full bg-zinc-400 dark:bg-zinc-500 flex-shrink-0" />
                               <p className="text-sm text-zinc-600 dark:text-zinc-400 leading-snug">{technique}</p>
                             </div>
                           ))}
@@ -1348,9 +1348,7 @@ function HomeContent() {
                         <div className="space-y-3">
                           {result.sharingPatterns.map((pattern, i) => (
                             <div key={i} className="flex gap-3 items-start">
-                              <span className="flex-shrink-0 w-5 h-5 rounded-full bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center text-indigo-600 dark:text-indigo-400 text-[10px] font-bold">
-                                {i + 1}
-                              </span>
+                              <div className="mt-1.5 w-1.5 h-1.5 rounded-full bg-zinc-400 dark:bg-zinc-500 flex-shrink-0" />
                               <p className="text-sm text-zinc-600 dark:text-zinc-400 leading-snug">{pattern}</p>
                             </div>
                           ))}
@@ -1364,9 +1362,6 @@ function HomeContent() {
                         <div className="space-y-3">
                           <p className="text-base font-semibold text-zinc-900 dark:text-zinc-100">
                             {conversationShape.displayLabel}
-                          </p>
-                          <p className="text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed">
-                            {conversationShape.explanation}
                           </p>
                           {conversationShape.microSignals.length > 0 && (
                             <div className="mt-3 space-y-1.5">
