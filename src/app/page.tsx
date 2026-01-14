@@ -1171,7 +1171,7 @@ function HomeContent() {
 
         {/* Live Headlines Section */}
         {(!result || isDemo) && (
-          <div className="mt-24 max-w-6xl mx-auto animate-in fade-in slide-in-from-bottom-8 duration-700">
+          <div className="mt-10 sm:mt-16 max-w-6xl mx-auto animate-in fade-in slide-in-from-bottom-8 duration-700">
             <div className="flex items-center justify-between mb-8">
               <h2 className="text-xl font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
                 <span className="w-2 h-8 bg-indigo-500 rounded-full inline-block"></span>
