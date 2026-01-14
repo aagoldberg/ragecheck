@@ -1358,11 +1358,11 @@ function HomeContent() {
                       </div>
                     )}
 
-                    {/* How This Usually Plays Out */}
+                    {/* What Follows */}
                     {conversationShape && (
                       <div className="mt-8 pt-6 border-t border-zinc-100 dark:border-zinc-800 w-full text-left">
                         <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-4">
-                          How This Usually Plays Out
+                          What Follows
                         </h4>
                         <div className="space-y-3">
                           <p className="text-base font-semibold text-zinc-900 dark:text-zinc-100">

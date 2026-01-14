@@ -23,7 +23,7 @@ export default function Methodology() {
           How RageCheck detects manipulative patterns in content.
         </p>
         <p className="text-sm text-zinc-500 dark:text-zinc-500 mb-12">
-          If you're seeing the "Techniques Detected," "Viral Triggers," or "How This Usually Plays Out" sections in a report, this page explains the model behind them.
+          If you're seeing the "Techniques Detected," "Viral Triggers," or "What Follows" sections in a report, this page explains the model behind them.
         </p>
 
         {/* Overview */}
@@ -77,7 +77,7 @@ export default function Methodology() {
             </div>
             <div className="p-4 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg">
               <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-                <span className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 sm:min-w-[180px]">How This Usually Plays Out</span>
+                <span className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 sm:min-w-[180px]">What Follows</span>
                 <span className="text-zinc-400 hidden sm:inline">→</span>
                 <span className="text-sm text-zinc-600 dark:text-zinc-400"><strong>Impact:</strong> Combined signal read predicting likely reaction patterns</span>
               </div>
