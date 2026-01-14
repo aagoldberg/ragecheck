@@ -88,7 +88,7 @@ Respond with this exact JSON structure:
   "contextNotes": "<optional: note if rule-based score was misleading due to context>",
   "sharingPatterns": [<2-3 reasons why people share this. Use plain everyday language a teenager would understand. NO jargon. e.g. "Confirms what many already suspect about X", "Makes readers feel part of a group who 'gets it'", "The outrage feels satisfying to pass along">],
   "techniqueExplanations": [<2-3 things to notice about how it's written. Use plain everyday words - NO academic labels like "Framing" or "Rhetoric". Just describe what's happening. e.g. "Plays on fear: Makes the threat feel urgent so you react before thinking", "Loaded words: Uses emotional language to make ordinary things seem worse", "Quotes without context: Cherry-picks what someone said to change the meaning">],
-  "shareCardSummary": "<ONE simple 8-12 word sentence an 8th grader would understand. What's the main thing to know? e.g. 'Tries to make you angry before you think' or 'Pretty straightforward, not trying to push buttons'>"
+  "shareCardSummary": "<ONE simple 8-12 word sentence about the MANIPULATION LEVEL, not the article topic. Is it trying to push your buttons or not? e.g. 'Tries to make you angry before you think' or 'Pretty straightforward, not pushing buttons'>"
 }`;
 
   try {
@@ -189,7 +189,7 @@ Respond with this exact JSON structure:
   "highlights": [{"text": "<problematic phrase>", "category": "<signal category>"}],
   "sharingPatterns": [<2-3 reasons why people share this. Plain everyday language, NO jargon>],
   "techniqueExplanations": [<2-3 things to notice about how it's written. Plain words, NO academic labels>],
-  "shareCardSummary": "<ONE simple 8-12 word sentence an 8th grader would understand. What's the main thing to know?>"
+  "shareCardSummary": "<ONE simple 8-12 word sentence about the MANIPULATION LEVEL, not the content topic. Is it pushing buttons or not?>"
 }`;
 
 export async function analyzeImageWithVision(
