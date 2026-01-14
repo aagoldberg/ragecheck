@@ -335,6 +335,7 @@ export interface DashboardStats {
     isBot: boolean;
     device: "mobile" | "tablet" | "desktop";
     shared: boolean;
+    shareType: string | null;
     failedImageUrl: string | null;
     isRepeatUser: boolean;
   }[];
@@ -430,7 +431,8 @@ export async function getDashboardStats(): Promise<DashboardStats> {
            a.signal_us_vs_them, a.signal_engagement_bait,
            a.success, a.error, a.title, a.created_at, a.ip_address, a.user_agent, a.country, a.is_bot,
            a.failed_image_url,
-           EXISTS (SELECT 1 FROM ragecheck_shares s WHERE s.url = a.url) as shared,
+           EXISTS (SELECT 1 FROM ragecheck_shares s WHERE s.url = a.url AND s.share_type NOT LIKE '%_clicked') as shared,
+           (SELECT s.share_type FROM ragecheck_shares s WHERE s.url = a.url AND s.share_type NOT LIKE '%_clicked' ORDER BY s.created_at DESC LIMIT 1) as share_type,
            (SELECT COUNT(DISTINCT DATE(a2.created_at)) FROM ragecheck_analyses a2 WHERE a2.ip_address = a.ip_address AND a.ip_address IS NOT NULL) > 1 as is_repeat_user
     FROM ragecheck_analyses a
     WHERE a.created_at > NOW() - INTERVAL '3 days'
@@ -459,6 +461,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     isBot: row.is_bot || false,
     device: getDeviceType(row.user_agent),
     shared: row.shared || false,
+    shareType: row.share_type || null,
     failedImageUrl: row.failed_image_url || null,
     isRepeatUser: row.is_repeat_user || false,
   }));
@@ -2561,6 +2564,14 @@ export interface ShareMetrics {
     power: number; // shared 10+ times
     total: number;
   };
+  // Individual sharer details
+  sharerDetails: {
+    ipMasked: string; // partially masked IP for privacy
+    shareCount: number;
+    segment: 'one-time' | 'occasional' | 'frequent' | 'power';
+    lastShareAt: string;
+    firstShareAt: string;
+  }[];
   // Score distribution of shared content
   scoreDistribution: {
     low: number; // 0-33
@@ -2699,6 +2710,47 @@ export async function getShareMetrics(): Promise<ShareMetrics> {
       total: Number(seg.total) || 0,
     };
 
+    // Individual sharer details (excluding click events)
+    const sharerDetailsData = await getDb()`
+      SELECT
+        ip_address,
+        COUNT(*) as share_count,
+        MAX(created_at) as last_share_at,
+        MIN(created_at) as first_share_at
+      FROM ragecheck_shares
+      WHERE ip_address IS NOT NULL AND share_type NOT LIKE '%_clicked'
+      GROUP BY ip_address
+      ORDER BY share_count DESC
+      LIMIT 50
+    `;
+
+    const sharerDetails = sharerDetailsData.map(row => {
+      const shareCount = Number(row.share_count);
+      let segment: 'one-time' | 'occasional' | 'frequent' | 'power' = 'one-time';
+      if (shareCount > 10) segment = 'power';
+      else if (shareCount >= 4) segment = 'frequent';
+      else if (shareCount >= 2) segment = 'occasional';
+
+      // Mask IP for privacy (show first two octets, mask rest)
+      const ip = String(row.ip_address || '');
+      const parts = ip.split('.');
+      const ipMasked = parts.length === 4
+        ? `${parts[0]}.${parts[1]}.***.***`
+        : ip.substring(0, 8) + '***';
+
+      return {
+        ipMasked,
+        shareCount,
+        segment,
+        lastShareAt: row.last_share_at instanceof Date
+          ? row.last_share_at.toISOString()
+          : String(row.last_share_at || ''),
+        firstShareAt: row.first_share_at instanceof Date
+          ? row.first_share_at.toISOString()
+          : String(row.first_share_at || ''),
+      };
+    });
+
     // Score distribution of shared content (excluding click events)
     const scoreDistData = await getDb()`
       SELECT
@@ -2760,6 +2812,7 @@ export async function getShareMetrics(): Promise<ShareMetrics> {
       shareTypes,
       topSharedContent,
       sharerSegmentation,
+      sharerDetails,
       scoreDistribution,
       dailyTrend,
       kFactor: {
@@ -2783,6 +2836,7 @@ export async function getShareMetrics(): Promise<ShareMetrics> {
       shareTypes: [],
       topSharedContent: [],
       sharerSegmentation: { oneTime: 0, occasional: 0, frequent: 0, power: 0, total: 0 },
+      sharerDetails: [],
       scoreDistribution: { low: 0, medium: 0, high: 0, unknown: 0 },
       dailyTrend: [],
       kFactor: { shareRate: 0, avgSharesPerSharer: 0, estimatedConversion: 0, kFactorValue: 0 },

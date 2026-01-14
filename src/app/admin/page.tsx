@@ -18,6 +18,62 @@ const formatDateOnlyEST = (dateInput: string | Date) => {
   return d.toLocaleDateString('en-US', { timeZone: 'America/New_York' });
 };
 
+// Format share type into a readable short label
+const formatShareType = (shareType: string): string => {
+  const typeMap: Record<string, string> = {
+    'share_image_success': 'Image',
+    'copy_link': 'Link',
+    'Copy Link': 'Link',
+    'Share X': 'X',
+    'Share Bluesky': 'Bsky',
+    'Download Image': 'Download',
+    'Copy Image': 'Copy Img',
+    'Web Share': 'Web',
+    'native': 'Native',
+  };
+  return typeMap[shareType] || shareType.replace(/_/g, ' ').replace(/success$/i, '').trim();
+};
+
+// Share type descriptions for the Shares tab
+const SHARE_TYPE_INFO: Record<string, { label: string; description: string }> = {
+  'share_image_success': {
+    label: 'Share Image',
+    description: 'User copied the share card image to clipboard to paste elsewhere',
+  },
+  'copy_link': {
+    label: 'Copy Link',
+    description: 'User copied the shareable URL to their clipboard',
+  },
+  'Copy Link': {
+    label: 'Copy Link',
+    description: 'User copied the shareable URL to their clipboard',
+  },
+  'Share X': {
+    label: 'Share to X',
+    description: 'User clicked to share on X/Twitter (opens X intent)',
+  },
+  'Share Bluesky': {
+    label: 'Share to Bluesky',
+    description: 'User clicked to share on Bluesky (opens Bluesky intent)',
+  },
+  'Download Image': {
+    label: 'Download Image',
+    description: 'User downloaded the share card image as a file',
+  },
+  'Copy Image': {
+    label: 'Copy Image',
+    description: 'User copied the share card image to clipboard',
+  },
+  'Web Share': {
+    label: 'Web Share',
+    description: 'User used the native browser share menu (mobile)',
+  },
+  'native': {
+    label: 'Native Share',
+    description: 'User used the native OS share dialog',
+  },
+};
+
 interface DashboardStats {
   totalAnalyses: number;
   todayAnalyses: number;
@@ -63,6 +119,7 @@ interface DashboardStats {
     isBot: boolean;
     device: "mobile" | "tablet" | "desktop";
     shared: boolean;
+    shareType: string | null;
     failedImageUrl: string | null;
     isRepeatUser: boolean;
   }[];
@@ -308,6 +365,13 @@ interface ShareMetrics {
     power: number;
     total: number;
   };
+  sharerDetails: {
+    ipMasked: string;
+    shareCount: number;
+    segment: 'one-time' | 'occasional' | 'frequent' | 'power';
+    lastShareAt: string;
+    firstShareAt: string;
+  }[];
   scoreDistribution: {
     low: number;
     medium: number;
@@ -368,15 +432,18 @@ function StatCard({ title, value, subtitle, icon, accent = "indigo", tooltip }: 
   }, ["", "", ""]);
 
   return (
-    <div className="relative overflow-hidden bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-5 hover:shadow-lg transition-shadow group">
-      <div className={`absolute top-0 left-0 w-1 h-full bg-gradient-to-b ${gradient}`}></div>
+    <div className="relative bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-5 hover:shadow-lg transition-shadow group">
+      <div className={`absolute top-0 left-0 w-1 h-full bg-gradient-to-b ${gradient} rounded-l-xl`}></div>
       <div className="flex items-start justify-between">
         <div>
           <h3 className="text-[11px] font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 mb-1 flex items-center gap-1">
             {title}
             {tooltip && (
               <button
-                onClick={() => setShowTooltip(!showTooltip)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowTooltip(!showTooltip);
+                }}
                 className="p-0.5 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
               >
                 <svg className="w-3.5 h-3.5 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -394,18 +461,21 @@ function StatCard({ title, value, subtitle, icon, accent = "indigo", tooltip }: 
           </div>
         )}
       </div>
-      {/* Tooltip popup */}
+      {/* Tooltip popup - shows below the card */}
       {tooltip && showTooltip && (
-        <div className="absolute top-full left-0 right-0 mt-2 p-3 bg-zinc-800 dark:bg-zinc-700 text-white text-xs rounded-lg shadow-lg z-50">
+        <div
+          className="absolute left-0 right-0 mt-2 p-3 bg-zinc-800 dark:bg-zinc-700 text-white text-xs rounded-lg shadow-xl z-[100] leading-relaxed"
+          style={{ top: '100%' }}
+        >
           <button
             onClick={() => setShowTooltip(false)}
-            className="absolute top-1 right-1 p-1 hover:bg-zinc-700 dark:hover:bg-zinc-600 rounded"
+            className="absolute top-2 right-2 p-1 hover:bg-zinc-700 dark:hover:bg-zinc-600 rounded"
           >
             <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
-          {tooltip}
+          <div className="pr-6">{tooltip}</div>
         </div>
       )}
     </div>
@@ -1877,8 +1947,10 @@ export default function AdminDashboard() {
                             {a.llmEnhanced ? "✓" : "-"}
                           </td>
                           <td className="py-2 px-3 text-xs">
-                            {a.shared ? (
-                              <span className="text-emerald-600">✓</span>
+                            {a.shareType ? (
+                              <span className="text-emerald-600" title={a.shareType}>
+                                {formatShareType(a.shareType)}
+                              </span>
                             ) : (
                               <span className="text-zinc-400">-</span>
                             )}
@@ -2632,31 +2704,41 @@ export default function AdminDashboard() {
                   <div className="bg-white dark:bg-zinc-900 p-6 rounded-xl border border-zinc-200 dark:border-zinc-800">
                     <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 mb-4">How People Share</h3>
                     {shareMetrics.shareTypes.length > 0 ? (
-                      <div className="space-y-3">
+                      <div className="space-y-4">
                         {shareMetrics.shareTypes.map((type) => {
                           const colors: Record<string, string> = {
                             copy_link: "bg-blue-500",
-                            twitter: "bg-sky-500",
-                            facebook: "bg-indigo-500",
-                            linkedin: "bg-blue-700",
-                            native: "bg-emerald-500",
-                            share_button: "bg-purple-500",
-                            other: "bg-zinc-400",
+                            'Copy Link': "bg-blue-500",
+                            share_image_success: "bg-emerald-500",
+                            'Share X': "bg-sky-500",
+                            'Share Bluesky': "bg-blue-600",
+                            'Download Image': "bg-purple-500",
+                            'Copy Image': "bg-indigo-500",
+                            'Web Share': "bg-amber-500",
+                            native: "bg-teal-500",
                           };
+                          const info = SHARE_TYPE_INFO[type.type];
                           return (
-                            <div key={type.type} className="flex items-center gap-3">
-                              <div className="w-24 text-sm text-zinc-600 dark:text-zinc-400 capitalize">
-                                {type.type.replace("_", " ")}
+                            <div key={type.type} className="space-y-1">
+                              <div className="flex items-center gap-3">
+                                <div className="w-28 text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                                  {info?.label || formatShareType(type.type)}
+                                </div>
+                                <div className="flex-1 h-5 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+                                  <div
+                                    className={`h-full ${colors[type.type] || "bg-zinc-400"} rounded-full transition-all`}
+                                    style={{ width: `${type.percentage}%` }}
+                                  />
+                                </div>
+                                <div className="w-20 text-right text-sm text-zinc-600 dark:text-zinc-400">
+                                  {type.count} ({type.percentage}%)
+                                </div>
                               </div>
-                              <div className="flex-1 h-6 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
-                                <div
-                                  className={`h-full ${colors[type.type] || "bg-zinc-400"} rounded-full transition-all`}
-                                  style={{ width: `${type.percentage}%` }}
-                                />
-                              </div>
-                              <div className="w-16 text-right text-sm text-zinc-600 dark:text-zinc-400">
-                                {type.count} ({type.percentage}%)
-                              </div>
+                              {info?.description && (
+                                <p className="text-xs text-zinc-500 dark:text-zinc-500 ml-0 pl-0">
+                                  {info.description}
+                                </p>
+                              )}
                             </div>
                           );
                         })}
@@ -2731,6 +2813,53 @@ export default function AdminDashboard() {
                     <p className="mt-4 text-sm text-emerald-600 dark:text-emerald-400">
                       You have {shareMetrics.sharerSegmentation.power} power sharer{shareMetrics.sharerSegmentation.power !== 1 ? "s" : ""} - these are your viral champions!
                     </p>
+                  )}
+
+                  {/* Individual Sharer Table */}
+                  {shareMetrics.sharerDetails && shareMetrics.sharerDetails.length > 0 && (
+                    <div className="mt-6">
+                      <h4 className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 mb-3 uppercase tracking-wide">Individual Sharers</h4>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="border-b border-zinc-200 dark:border-zinc-700">
+                              <th className="text-left py-2 px-3 text-zinc-500 dark:text-zinc-400 font-medium">User (IP)</th>
+                              <th className="text-center py-2 px-3 text-zinc-500 dark:text-zinc-400 font-medium">Shares</th>
+                              <th className="text-center py-2 px-3 text-zinc-500 dark:text-zinc-400 font-medium">Segment</th>
+                              <th className="text-right py-2 px-3 text-zinc-500 dark:text-zinc-400 font-medium">First Share</th>
+                              <th className="text-right py-2 px-3 text-zinc-500 dark:text-zinc-400 font-medium">Last Share</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {shareMetrics.sharerDetails.map((sharer, idx) => (
+                              <tr key={idx} className="border-b border-zinc-100 dark:border-zinc-800">
+                                <td className="py-2 px-3 font-mono text-xs text-zinc-600 dark:text-zinc-400">{sharer.ipMasked}</td>
+                                <td className="py-2 px-3 text-center font-semibold text-zinc-900 dark:text-zinc-100">{sharer.shareCount}</td>
+                                <td className="py-2 px-3 text-center">
+                                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                    sharer.segment === 'power'
+                                      ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300'
+                                      : sharer.segment === 'frequent'
+                                        ? 'bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300'
+                                        : sharer.segment === 'occasional'
+                                          ? 'bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300'
+                                          : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400'
+                                  }`}>
+                                    {sharer.segment}
+                                  </span>
+                                </td>
+                                <td className="py-2 px-3 text-right text-xs text-zinc-500 dark:text-zinc-400">
+                                  {new Date(sharer.firstShareAt).toLocaleDateString()}
+                                </td>
+                                <td className="py-2 px-3 text-right text-xs text-zinc-500 dark:text-zinc-400">
+                                  {new Date(sharer.lastShareAt).toLocaleDateString()}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
                   )}
                 </div>
 
