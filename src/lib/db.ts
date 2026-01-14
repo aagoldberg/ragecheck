@@ -187,6 +187,10 @@ export async function initDB() {
     await getDb()`ALTER TABLE ragecheck_analyses ADD COLUMN IF NOT EXISTS technique_explanations JSONB`;
     await getDb()`ALTER TABLE ragecheck_analyses ADD COLUMN IF NOT EXISTS share_card_summary TEXT`;
     await getDb()`ALTER TABLE ragecheck_analyses ADD COLUMN IF NOT EXISTS failed_image_url TEXT`;
+    // Content categorization columns
+    await getDb()`ALTER TABLE ragecheck_analyses ADD COLUMN IF NOT EXISTS topic TEXT`;
+    await getDb()`ALTER TABLE ragecheck_analyses ADD COLUMN IF NOT EXISTS content_type TEXT`;
+    await getDb()`ALTER TABLE ragecheck_analyses ADD COLUMN IF NOT EXISTS source_type TEXT`;
   } catch {
     // Columns may already exist
   }
@@ -222,6 +226,10 @@ export interface AnalysisLog {
   techniqueExplanations?: string[];
   shareCardSummary?: string;
   failedImageUrl?: string;
+  // Content categorization
+  topic?: string;
+  contentType?: string;
+  sourceType?: string;
 }
 
 function detectPlatform(domain: string): string {
@@ -253,7 +261,8 @@ export async function logAnalysis(data: AnalysisLog) {
           signal_us_vs_them, signal_engagement_bait, success, error,
           ip_address, user_agent, country, is_bot,
           title, reasons, highlights, context_notes, text_preview,
-          sharing_patterns, technique_explanations, share_card_summary, failed_image_url
+          sharing_patterns, technique_explanations, share_card_summary, failed_image_url,
+          topic, content_type, source_type
         ) VALUES (
           ${data.url},
           ${data.sourceDomain || null},
@@ -280,7 +289,10 @@ export async function logAnalysis(data: AnalysisLog) {
           ${data.sharingPatterns ? JSON.stringify(data.sharingPatterns) : null},
           ${data.techniqueExplanations ? JSON.stringify(data.techniqueExplanations) : null},
           ${data.shareCardSummary || null},
-          ${data.failedImageUrl || null}
+          ${data.failedImageUrl || null},
+          ${data.topic || null},
+          ${data.contentType || null},
+          ${data.sourceType || null}
         )
       `;
     });
@@ -2592,6 +2604,236 @@ export interface ShareMetrics {
     estimatedConversion: number; // estimated conversion from shares
     kFactorValue: number; // shareRate * conversion
   };
+}
+
+// Content Insights for understanding what users analyze and share
+export interface ContentInsights {
+  // Topic distribution
+  topicDistribution: {
+    topic: string;
+    count: number;
+    percentage: number;
+    avgScore: number;
+    shareCount: number;
+  }[];
+  // Top domains analyzed
+  topDomains: {
+    domain: string;
+    count: number;
+    avgScore: number;
+    shareCount: number;
+  }[];
+  // Content type distribution
+  contentTypeDistribution: {
+    contentType: string;
+    count: number;
+    percentage: number;
+    avgScore: number;
+  }[];
+  // Source type distribution
+  sourceTypeDistribution: {
+    sourceType: string;
+    count: number;
+    percentage: number;
+    avgScore: number;
+  }[];
+  // High-rage topics (topics with highest avg scores)
+  highRageTopics: {
+    topic: string;
+    avgScore: number;
+    count: number;
+  }[];
+  // Most shared topics
+  mostSharedTopics: {
+    topic: string;
+    shareCount: number;
+    shareRate: number;
+    analyzeCount: number;
+  }[];
+}
+
+export async function getContentInsights(): Promise<ContentInsights> {
+  try {
+    // Admin IPs to exclude
+    const adminIPs = (process.env.ADMIN_IPS || '').split(',').map(ip => ip.trim()).filter(Boolean);
+    const hasAdminExclusion = adminIPs.length > 0;
+
+    // Topic distribution with avg score and share count
+    const topicData = hasAdminExclusion
+      ? await getDb()`
+          SELECT
+            a.topic,
+            COUNT(*) as count,
+            ROUND(AVG(a.score)) as avg_score,
+            COUNT(DISTINCT s.id) as share_count
+          FROM ragecheck_analyses a
+          LEFT JOIN ragecheck_shares s ON a.url = s.url AND s.share_type NOT LIKE '%_clicked'
+          WHERE a.is_bot = false AND a.success = true AND a.topic IS NOT NULL
+            AND (a.ip_address IS NULL OR a.ip_address NOT IN ${adminIPs})
+          GROUP BY a.topic
+          ORDER BY count DESC
+        `
+      : await getDb()`
+          SELECT
+            a.topic,
+            COUNT(*) as count,
+            ROUND(AVG(a.score)) as avg_score,
+            COUNT(DISTINCT s.id) as share_count
+          FROM ragecheck_analyses a
+          LEFT JOIN ragecheck_shares s ON a.url = s.url AND s.share_type NOT LIKE '%_clicked'
+          WHERE a.is_bot = false AND a.success = true AND a.topic IS NOT NULL
+          GROUP BY a.topic
+          ORDER BY count DESC
+        `;
+
+    const totalWithTopic = topicData.reduce((sum, row) => sum + Number(row.count), 0);
+    const topicDistribution = topicData.map(row => ({
+      topic: String(row.topic),
+      count: Number(row.count),
+      percentage: totalWithTopic > 0 ? Math.round((Number(row.count) / totalWithTopic) * 1000) / 10 : 0,
+      avgScore: Number(row.avg_score) || 0,
+      shareCount: Number(row.share_count) || 0,
+    }));
+
+    // Top domains analyzed
+    const domainData = hasAdminExclusion
+      ? await getDb()`
+          SELECT
+            a.source_domain as domain,
+            COUNT(*) as count,
+            ROUND(AVG(a.score)) as avg_score,
+            COUNT(DISTINCT s.id) as share_count
+          FROM ragecheck_analyses a
+          LEFT JOIN ragecheck_shares s ON a.url = s.url AND s.share_type NOT LIKE '%_clicked'
+          WHERE a.is_bot = false AND a.success = true AND a.source_domain IS NOT NULL
+            AND (a.ip_address IS NULL OR a.ip_address NOT IN ${adminIPs})
+          GROUP BY a.source_domain
+          ORDER BY count DESC
+          LIMIT 20
+        `
+      : await getDb()`
+          SELECT
+            a.source_domain as domain,
+            COUNT(*) as count,
+            ROUND(AVG(a.score)) as avg_score,
+            COUNT(DISTINCT s.id) as share_count
+          FROM ragecheck_analyses a
+          LEFT JOIN ragecheck_shares s ON a.url = s.url AND s.share_type NOT LIKE '%_clicked'
+          WHERE a.is_bot = false AND a.success = true AND a.source_domain IS NOT NULL
+          GROUP BY a.source_domain
+          ORDER BY count DESC
+          LIMIT 20
+        `;
+
+    const topDomains = domainData.map(row => ({
+      domain: String(row.domain),
+      count: Number(row.count),
+      avgScore: Number(row.avg_score) || 0,
+      shareCount: Number(row.share_count) || 0,
+    }));
+
+    // Content type distribution
+    const contentTypeData = hasAdminExclusion
+      ? await getDb()`
+          SELECT
+            content_type,
+            COUNT(*) as count,
+            ROUND(AVG(score)) as avg_score
+          FROM ragecheck_analyses
+          WHERE is_bot = false AND success = true AND content_type IS NOT NULL
+            AND (ip_address IS NULL OR ip_address NOT IN ${adminIPs})
+          GROUP BY content_type
+          ORDER BY count DESC
+        `
+      : await getDb()`
+          SELECT
+            content_type,
+            COUNT(*) as count,
+            ROUND(AVG(score)) as avg_score
+          FROM ragecheck_analyses
+          WHERE is_bot = false AND success = true AND content_type IS NOT NULL
+          GROUP BY content_type
+          ORDER BY count DESC
+        `;
+
+    const totalWithContentType = contentTypeData.reduce((sum, row) => sum + Number(row.count), 0);
+    const contentTypeDistribution = contentTypeData.map(row => ({
+      contentType: String(row.content_type),
+      count: Number(row.count),
+      percentage: totalWithContentType > 0 ? Math.round((Number(row.count) / totalWithContentType) * 1000) / 10 : 0,
+      avgScore: Number(row.avg_score) || 0,
+    }));
+
+    // Source type distribution
+    const sourceTypeData = hasAdminExclusion
+      ? await getDb()`
+          SELECT
+            source_type,
+            COUNT(*) as count,
+            ROUND(AVG(score)) as avg_score
+          FROM ragecheck_analyses
+          WHERE is_bot = false AND success = true AND source_type IS NOT NULL
+            AND (ip_address IS NULL OR ip_address NOT IN ${adminIPs})
+          GROUP BY source_type
+          ORDER BY count DESC
+        `
+      : await getDb()`
+          SELECT
+            source_type,
+            COUNT(*) as count,
+            ROUND(AVG(score)) as avg_score
+          FROM ragecheck_analyses
+          WHERE is_bot = false AND success = true AND source_type IS NOT NULL
+          GROUP BY source_type
+          ORDER BY count DESC
+        `;
+
+    const totalWithSourceType = sourceTypeData.reduce((sum, row) => sum + Number(row.count), 0);
+    const sourceTypeDistribution = sourceTypeData.map(row => ({
+      sourceType: String(row.source_type),
+      count: Number(row.count),
+      percentage: totalWithSourceType > 0 ? Math.round((Number(row.count) / totalWithSourceType) * 1000) / 10 : 0,
+      avgScore: Number(row.avg_score) || 0,
+    }));
+
+    // High-rage topics (sorted by avg score)
+    const highRageTopics = [...topicDistribution]
+      .filter(t => t.count >= 3) // Only topics with enough data
+      .sort((a, b) => b.avgScore - a.avgScore)
+      .slice(0, 5)
+      .map(t => ({ topic: t.topic, avgScore: t.avgScore, count: t.count }));
+
+    // Most shared topics (by share rate)
+    const mostSharedTopics = [...topicDistribution]
+      .filter(t => t.count >= 3)
+      .map(t => ({
+        topic: t.topic,
+        shareCount: t.shareCount,
+        shareRate: t.count > 0 ? Math.round((t.shareCount / t.count) * 1000) / 10 : 0,
+        analyzeCount: t.count,
+      }))
+      .sort((a, b) => b.shareRate - a.shareRate)
+      .slice(0, 5);
+
+    return {
+      topicDistribution,
+      topDomains,
+      contentTypeDistribution,
+      sourceTypeDistribution,
+      highRageTopics,
+      mostSharedTopics,
+    };
+  } catch (error) {
+    console.error("Failed to get content insights:", error);
+    return {
+      topicDistribution: [],
+      topDomains: [],
+      contentTypeDistribution: [],
+      sourceTypeDistribution: [],
+      highRageTopics: [],
+      mostSharedTopics: [],
+    };
+  }
 }
 
 export async function getShareMetrics(): Promise<ShareMetrics> {

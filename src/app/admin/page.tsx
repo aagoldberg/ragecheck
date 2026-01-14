@@ -391,6 +391,45 @@ interface ShareMetrics {
   };
 }
 
+interface ContentInsights {
+  topicDistribution: {
+    topic: string;
+    count: number;
+    percentage: number;
+    avgScore: number;
+    shareCount: number;
+  }[];
+  topDomains: {
+    domain: string;
+    count: number;
+    avgScore: number;
+    shareCount: number;
+  }[];
+  contentTypeDistribution: {
+    contentType: string;
+    count: number;
+    percentage: number;
+    avgScore: number;
+  }[];
+  sourceTypeDistribution: {
+    sourceType: string;
+    count: number;
+    percentage: number;
+    avgScore: number;
+  }[];
+  highRageTopics: {
+    topic: string;
+    avgScore: number;
+    count: number;
+  }[];
+  mostSharedTopics: {
+    topic: string;
+    shareCount: number;
+    shareRate: number;
+    analyzeCount: number;
+  }[];
+}
+
 interface ApiResponse {
   success?: boolean;
   error?: string;
@@ -405,6 +444,7 @@ interface ApiResponse {
   funnelMetrics?: FunnelMetrics;
   retentionMetrics?: RetentionMetrics;
   shareMetrics?: ShareMetrics;
+  contentInsights?: ContentInsights;
   dbAvailable?: boolean;
 }
 
@@ -1385,6 +1425,7 @@ export default function AdminDashboard() {
   const [funnelMetrics, setFunnelMetrics] = useState<FunnelMetrics | null>(null);
   const [retentionMetrics, setRetentionMetrics] = useState<RetentionMetrics | null>(null);
   const [shareMetrics, setShareMetrics] = useState<ShareMetrics | null>(null);
+  const [contentInsights, setContentInsights] = useState<ContentInsights | null>(null);
 
   const fetchStats = async (adminKey: string) => {
     setLoading(true);
@@ -1412,6 +1453,7 @@ export default function AdminDashboard() {
         setFunnelMetrics(data.funnelMetrics || null);
         setRetentionMetrics(data.retentionMetrics || null);
         setShareMetrics(data.shareMetrics || null);
+        setContentInsights(data.contentInsights || null);
         setAuthenticated(true);
         // Save key to localStorage
         localStorage.setItem("ragecheck-admin-key", adminKey);
@@ -2945,6 +2987,254 @@ export default function AdminDashboard() {
             {activeTab === "shares" && !shareMetrics && (
               <div className="text-center py-12 text-zinc-500">
                 No share metrics available
+              </div>
+            )}
+
+            {/* Content Tab */}
+            {activeTab === "content" && contentInsights && (
+              <div className="space-y-6">
+                <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100 mb-4">
+                  Content Insights
+                </h2>
+                <p className="text-sm text-zinc-500 mb-6">
+                  Understand what content users analyze and share. Topic/content categorization is extracted by AI during analysis.
+                </p>
+
+                {/* Quick Stats */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <StatCard
+                    title="Topics Tracked"
+                    value={contentInsights.topicDistribution.length}
+                    subtitle="unique topics detected"
+                    tooltip="Number of distinct topics identified by AI during content analysis"
+                  />
+                  <StatCard
+                    title="Top Topic"
+                    value={contentInsights.topicDistribution[0]?.topic || "N/A"}
+                    subtitle={`${contentInsights.topicDistribution[0]?.count || 0} analyses`}
+                    tooltip="Most frequently analyzed topic"
+                  />
+                  <StatCard
+                    title="Highest Rage Topic"
+                    value={contentInsights.highRageTopics[0]?.topic || "N/A"}
+                    subtitle={`avg score: ${contentInsights.highRageTopics[0]?.avgScore || 0}`}
+                    accent="rose"
+                    tooltip="Topic with highest average rage score"
+                  />
+                  <StatCard
+                    title="Most Shared Topic"
+                    value={contentInsights.mostSharedTopics[0]?.topic || "N/A"}
+                    subtitle={`${contentInsights.mostSharedTopics[0]?.shareRate || 0}% share rate`}
+                    accent="emerald"
+                    tooltip="Topic with highest share rate (shares / analyses)"
+                  />
+                </div>
+
+                {/* Topic Distribution */}
+                {contentInsights.topicDistribution.length > 0 && (
+                  <div className="bg-white dark:bg-zinc-900 p-6 rounded-xl border border-zinc-200 dark:border-zinc-800">
+                    <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 mb-4">Topic Distribution</h3>
+                    <div className="space-y-3">
+                      {contentInsights.topicDistribution.map((topic, idx) => (
+                        <div key={idx} className="flex items-center gap-4">
+                          <div className="w-32 text-sm font-medium text-zinc-700 dark:text-zinc-300 truncate">
+                            {topic.topic.replace(/_/g, ' ')}
+                          </div>
+                          <div className="flex-1">
+                            <div className="h-6 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden relative">
+                              <div
+                                className="h-full bg-indigo-500 rounded-full transition-all"
+                                style={{ width: `${topic.percentage}%` }}
+                              />
+                              <span className="absolute inset-0 flex items-center justify-center text-xs font-medium text-zinc-700 dark:text-zinc-300">
+                                {topic.count} ({topic.percentage}%)
+                              </span>
+                            </div>
+                          </div>
+                          <div className="w-20 text-right text-xs text-zinc-500">
+                            avg: {topic.avgScore}
+                          </div>
+                          <div className="w-16 text-right text-xs text-emerald-600 dark:text-emerald-400">
+                            {topic.shareCount} shares
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Two-column layout: Content Type + Source Type */}
+                <div className="grid md:grid-cols-2 gap-6">
+                  {/* Content Type Distribution */}
+                  {contentInsights.contentTypeDistribution.length > 0 && (
+                    <div className="bg-white dark:bg-zinc-900 p-6 rounded-xl border border-zinc-200 dark:border-zinc-800">
+                      <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 mb-4">Content Type</h3>
+                      <div className="space-y-2">
+                        {contentInsights.contentTypeDistribution.map((ct, idx) => (
+                          <div key={idx} className="flex items-center justify-between py-2 border-b border-zinc-100 dark:border-zinc-800 last:border-0">
+                            <span className="text-sm text-zinc-700 dark:text-zinc-300">
+                              {ct.contentType.replace(/_/g, ' ')}
+                            </span>
+                            <div className="flex items-center gap-3">
+                              <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                                {ct.count}
+                              </span>
+                              <span className="text-xs text-zinc-500">
+                                ({ct.percentage}%)
+                              </span>
+                              <span className={`text-xs px-2 py-0.5 rounded-full ${
+                                ct.avgScore >= 67 ? 'bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300' :
+                                ct.avgScore >= 34 ? 'bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300' :
+                                'bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300'
+                              }`}>
+                                avg: {ct.avgScore}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Source Type Distribution */}
+                  {contentInsights.sourceTypeDistribution.length > 0 && (
+                    <div className="bg-white dark:bg-zinc-900 p-6 rounded-xl border border-zinc-200 dark:border-zinc-800">
+                      <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 mb-4">Source Type</h3>
+                      <div className="space-y-2">
+                        {contentInsights.sourceTypeDistribution.map((st, idx) => (
+                          <div key={idx} className="flex items-center justify-between py-2 border-b border-zinc-100 dark:border-zinc-800 last:border-0">
+                            <span className="text-sm text-zinc-700 dark:text-zinc-300">
+                              {st.sourceType.replace(/_/g, ' ')}
+                            </span>
+                            <div className="flex items-center gap-3">
+                              <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                                {st.count}
+                              </span>
+                              <span className="text-xs text-zinc-500">
+                                ({st.percentage}%)
+                              </span>
+                              <span className={`text-xs px-2 py-0.5 rounded-full ${
+                                st.avgScore >= 67 ? 'bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300' :
+                                st.avgScore >= 34 ? 'bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300' :
+                                'bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300'
+                              }`}>
+                                avg: {st.avgScore}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Top Domains */}
+                {contentInsights.topDomains.length > 0 && (
+                  <div className="bg-white dark:bg-zinc-900 p-6 rounded-xl border border-zinc-200 dark:border-zinc-800">
+                    <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 mb-4">Top Analyzed Domains</h3>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b border-zinc-200 dark:border-zinc-700">
+                            <th className="text-left py-2 px-3 text-zinc-500 dark:text-zinc-400 font-medium">Domain</th>
+                            <th className="text-right py-2 px-3 text-zinc-500 dark:text-zinc-400 font-medium">Analyses</th>
+                            <th className="text-right py-2 px-3 text-zinc-500 dark:text-zinc-400 font-medium">Avg Score</th>
+                            <th className="text-right py-2 px-3 text-zinc-500 dark:text-zinc-400 font-medium">Shares</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {contentInsights.topDomains.slice(0, 15).map((domain, idx) => (
+                            <tr key={idx} className="border-b border-zinc-100 dark:border-zinc-800">
+                              <td className="py-2 px-3 text-zinc-700 dark:text-zinc-300">{domain.domain}</td>
+                              <td className="py-2 px-3 text-right text-zinc-900 dark:text-zinc-100 font-medium">{domain.count}</td>
+                              <td className="py-2 px-3 text-right">
+                                <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                                  domain.avgScore >= 67 ? 'bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300' :
+                                  domain.avgScore >= 34 ? 'bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300' :
+                                  'bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300'
+                                }`}>
+                                  {domain.avgScore}
+                                </span>
+                              </td>
+                              <td className="py-2 px-3 text-right text-emerald-600 dark:text-emerald-400">{domain.shareCount}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {/* Insights cards */}
+                <div className="grid md:grid-cols-2 gap-6">
+                  {/* High Rage Topics */}
+                  {contentInsights.highRageTopics.length > 0 && (
+                    <div className="bg-white dark:bg-zinc-900 p-6 rounded-xl border border-rose-200 dark:border-rose-800">
+                      <h3 className="text-sm font-semibold text-rose-700 dark:text-rose-300 mb-4 flex items-center gap-2">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z" />
+                        </svg>
+                        Highest Rage Topics
+                      </h3>
+                      <div className="space-y-3">
+                        {contentInsights.highRageTopics.map((topic, idx) => (
+                          <div key={idx} className="flex items-center justify-between">
+                            <span className="text-sm text-zinc-700 dark:text-zinc-300">
+                              {topic.topic.replace(/_/g, ' ')}
+                            </span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-zinc-500">{topic.count} analyses</span>
+                              <span className="px-2 py-0.5 bg-rose-100 dark:bg-rose-950 text-rose-700 dark:text-rose-300 text-xs font-medium rounded-full">
+                                {topic.avgScore} avg
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Most Shared Topics */}
+                  {contentInsights.mostSharedTopics.length > 0 && (
+                    <div className="bg-white dark:bg-zinc-900 p-6 rounded-xl border border-emerald-200 dark:border-emerald-800">
+                      <h3 className="text-sm font-semibold text-emerald-700 dark:text-emerald-300 mb-4 flex items-center gap-2">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                        </svg>
+                        Most Shared Topics
+                      </h3>
+                      <div className="space-y-3">
+                        {contentInsights.mostSharedTopics.map((topic, idx) => (
+                          <div key={idx} className="flex items-center justify-between">
+                            <span className="text-sm text-zinc-700 dark:text-zinc-300">
+                              {topic.topic.replace(/_/g, ' ')}
+                            </span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-zinc-500">{topic.shareCount} / {topic.analyzeCount}</span>
+                              <span className="px-2 py-0.5 bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 text-xs font-medium rounded-full">
+                                {topic.shareRate}% rate
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Empty state note */}
+                {contentInsights.topicDistribution.length === 0 && (
+                  <div className="text-center py-12 bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800">
+                    <p className="text-zinc-500 mb-2">No content categorization data yet</p>
+                    <p className="text-sm text-zinc-400">Topic/content data will appear after users analyze content with LLM enhancement enabled</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {activeTab === "content" && !contentInsights && (
+              <div className="text-center py-12 text-zinc-500">
+                No content insights available
               </div>
             )}
 

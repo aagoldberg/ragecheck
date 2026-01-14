@@ -231,6 +231,9 @@ export async function POST(request: NextRequest): Promise<NextResponse<AnalyzeRe
     let sharingPatterns: string[] | undefined;
     let techniqueExplanations: string[] | undefined;
     let shareCardSummary: string | undefined;
+    let topic: string | undefined;
+    let contentType: string | undefined;
+    let sourceType: string | undefined;
 
     if (isLLMAvailable()) {
       const llmResult = await enhanceWithLLM({
@@ -248,6 +251,9 @@ export async function POST(request: NextRequest): Promise<NextResponse<AnalyzeRe
         sharingPatterns = llmResult.sharingPatterns;
         techniqueExplanations = llmResult.techniqueExplanations;
         shareCardSummary = llmResult.shareCardSummary;
+        topic = llmResult.topic;
+        contentType = llmResult.contentType;
+        sourceType = llmResult.sourceType;
         llmEnhanced = true;
       }
     }
@@ -274,6 +280,9 @@ export async function POST(request: NextRequest): Promise<NextResponse<AnalyzeRe
       sharingPatterns,
       techniqueExplanations,
       shareCardSummary,
+      topic,
+      contentType,
+      sourceType,
     });
 
     return NextResponse.json({

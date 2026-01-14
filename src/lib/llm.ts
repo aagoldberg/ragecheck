@@ -12,6 +12,10 @@ export interface LLMAnalysis {
   sharingPatterns?: string[];
   techniqueExplanations?: string[];
   shareCardSummary?: string;
+  // Content categorization
+  topic?: string;
+  contentType?: string;
+  sourceType?: string;
 }
 
 const SYSTEM_PROMPT = `You are an expert at detecting outrage bait and manipulative framing in media. Your job is to analyze text and identify patterns designed to provoke emotional reactions rather than inform.
@@ -87,7 +91,10 @@ Respond with this exact JSON structure:
   "reasons": [<3-5 concise bullet points explaining the score>],
   "contextNotes": "<optional: note if rule-based score was misleading due to context>",
   "sharingPatterns": [<2-3 reasons why people share this. Use plain everyday language a teenager would understand. NO jargon. e.g. "Confirms what many already suspect about X", "Makes readers feel part of a group who 'gets it'", "The outrage feels satisfying to pass along">],
-  "techniqueExplanations": [<2-3 things to notice about how it's written. Use plain everyday words - NO academic labels like "Framing" or "Rhetoric". Just describe what's happening. e.g. "Plays on fear: Makes the threat feel urgent so you react before thinking", "Loaded words: Uses emotional language to make ordinary things seem worse", "Quotes without context: Cherry-picks what someone said to change the meaning">]
+  "techniqueExplanations": [<2-3 things to notice about how it's written. Use plain everyday words - NO academic labels like "Framing" or "Rhetoric". Just describe what's happening. e.g. "Plays on fear: Makes the threat feel urgent so you react before thinking", "Loaded words: Uses emotional language to make ordinary things seem worse", "Quotes without context: Cherry-picks what someone said to change the meaning">],
+  "topic": "<primary topic: politics, health, technology, business, entertainment, sports, science, crime, culture_wars, environment, education, other>",
+  "contentType": "<content format: news_article, opinion, social_post, blog, press_release, satire, academic, other>",
+  "sourceType": "<source category: mainstream_news, tabloid, partisan_outlet, independent_blog, social_media, wire_service, government, corporate, other>"
 }`;
 
   try {
@@ -124,6 +131,9 @@ Respond with this exact JSON structure:
       sharingPatterns: parsed.sharingPatterns || [],
       techniqueExplanations: parsed.techniqueExplanations || [],
       shareCardSummary: parsed.shareCardSummary,
+      topic: parsed.topic || undefined,
+      contentType: parsed.contentType || undefined,
+      sourceType: parsed.sourceType || undefined,
     };
   } catch (error) {
     console.error("LLM analysis failed:", error);
