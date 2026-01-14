@@ -595,10 +595,26 @@ function HomeContent() {
   const [errorReported, setErrorReported] = useState(false);
 
   useEffect(() => {
+    // Extract UTM params from URL for acquisition tracking
+    const urlParams = new URLSearchParams(window.location.search);
+    const utmSource = urlParams.get("utm_source");
+    const utmMedium = urlParams.get("utm_medium");
+    const utmCampaign = urlParams.get("utm_campaign");
+    const utmContent = urlParams.get("utm_content");
+    const utmTerm = urlParams.get("utm_term");
+
     fetch("/api/visit", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ referrer: document.referrer || null }),
+      body: JSON.stringify({
+        referrer: document.referrer || null,
+        pagePath: window.location.pathname,
+        utmSource,
+        utmMedium,
+        utmCampaign,
+        utmContent,
+        utmTerm,
+      }),
     }).catch(() => {});
 
     fetch("/api/headlines")

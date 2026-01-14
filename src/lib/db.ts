@@ -177,6 +177,12 @@ export async function initDB() {
     await getDb()`ALTER TABLE ragecheck_analyses ADD COLUMN IF NOT EXISTS is_bot BOOLEAN DEFAULT FALSE`;
     await getDb()`ALTER TABLE ragecheck_visitors ADD COLUMN IF NOT EXISTS is_bot BOOLEAN DEFAULT FALSE`;
     await getDb()`ALTER TABLE ragecheck_visitors ADD COLUMN IF NOT EXISTS page_path TEXT`;
+    // UTM tracking columns for acquisition analysis
+    await getDb()`ALTER TABLE ragecheck_visitors ADD COLUMN IF NOT EXISTS utm_source TEXT`;
+    await getDb()`ALTER TABLE ragecheck_visitors ADD COLUMN IF NOT EXISTS utm_medium TEXT`;
+    await getDb()`ALTER TABLE ragecheck_visitors ADD COLUMN IF NOT EXISTS utm_campaign TEXT`;
+    await getDb()`ALTER TABLE ragecheck_visitors ADD COLUMN IF NOT EXISTS utm_content TEXT`;
+    await getDb()`ALTER TABLE ragecheck_visitors ADD COLUMN IF NOT EXISTS utm_term TEXT`;
     // Add columns for full analysis caching
     await getDb()`ALTER TABLE ragecheck_analyses ADD COLUMN IF NOT EXISTS title TEXT`;
     await getDb()`ALTER TABLE ragecheck_analyses ADD COLUMN IF NOT EXISTS reasons JSONB`;
@@ -772,6 +778,12 @@ export interface VisitorLog {
   country?: string;
   referrer?: string;
   pagePath?: string;
+  // UTM parameters for acquisition tracking
+  utmSource?: string;
+  utmMedium?: string;
+  utmCampaign?: string;
+  utmContent?: string;
+  utmTerm?: string;
 }
 
 export async function logVisitor(data: VisitorLog) {
@@ -779,8 +791,23 @@ export async function logVisitor(data: VisitorLog) {
     const isBotUser = isBot(data.userAgent);
     await withRetry(async () => {
       await getDb()`
-        INSERT INTO ragecheck_visitors (ip_address, user_agent, country, referrer, is_bot, page_path)
-        VALUES (${data.ipAddress || null}, ${data.userAgent || null}, ${data.country || null}, ${data.referrer || null}, ${isBotUser}, ${data.pagePath || null})
+        INSERT INTO ragecheck_visitors (
+          ip_address, user_agent, country, referrer, is_bot, page_path,
+          utm_source, utm_medium, utm_campaign, utm_content, utm_term
+        )
+        VALUES (
+          ${data.ipAddress || null},
+          ${data.userAgent || null},
+          ${data.country || null},
+          ${data.referrer || null},
+          ${isBotUser},
+          ${data.pagePath || null},
+          ${data.utmSource || null},
+          ${data.utmMedium || null},
+          ${data.utmCampaign || null},
+          ${data.utmContent || null},
+          ${data.utmTerm || null}
+        )
       `;
     });
   } catch (error) {
@@ -2650,6 +2677,261 @@ export interface ContentInsights {
     shareRate: number;
     analyzeCount: number;
   }[];
+}
+
+// Acquisition metrics for understanding traffic sources
+export interface AcquisitionMetrics {
+  // Traffic by source
+  sourceBreakdown: {
+    source: string;
+    visitors: number;
+    percentage: number;
+    conversions: number;
+    conversionRate: number;
+  }[];
+  // Traffic by medium
+  mediumBreakdown: {
+    medium: string;
+    visitors: number;
+    percentage: number;
+  }[];
+  // Top campaigns
+  topCampaigns: {
+    campaign: string;
+    source: string;
+    visitors: number;
+    conversions: number;
+  }[];
+  // Referrer breakdown (non-UTM)
+  referrerBreakdown: {
+    referrer: string;
+    visitors: number;
+    percentage: number;
+  }[];
+  // Summary stats
+  summary: {
+    totalWithUtm: number;
+    totalWithReferrer: number;
+    totalDirect: number;
+    topSource: string;
+    topMedium: string;
+  };
+}
+
+export async function getAcquisitionMetrics(): Promise<AcquisitionMetrics> {
+  try {
+    // Admin IPs to exclude
+    const adminIPs = (process.env.ADMIN_IPS || '').split(',').map(ip => ip.trim()).filter(Boolean);
+    const hasAdminExclusion = adminIPs.length > 0;
+
+    // Get visitors with UTM source breakdown
+    const sourceData = hasAdminExclusion
+      ? await getDb()`
+          SELECT
+            COALESCE(utm_source, 'direct') as source,
+            COUNT(*) as visitors,
+            COUNT(DISTINCT CASE WHEN ip_address IN (
+              SELECT DISTINCT ip_address FROM ragecheck_analyses WHERE is_bot = false AND success = true
+            ) THEN ip_address END) as conversions
+          FROM ragecheck_visitors
+          WHERE is_bot = false
+            AND (ip_address IS NULL OR ip_address NOT IN ${adminIPs})
+          GROUP BY COALESCE(utm_source, 'direct')
+          ORDER BY visitors DESC
+          LIMIT 15
+        `
+      : await getDb()`
+          SELECT
+            COALESCE(utm_source, 'direct') as source,
+            COUNT(*) as visitors,
+            COUNT(DISTINCT CASE WHEN ip_address IN (
+              SELECT DISTINCT ip_address FROM ragecheck_analyses WHERE is_bot = false AND success = true
+            ) THEN ip_address END) as conversions
+          FROM ragecheck_visitors
+          WHERE is_bot = false
+          GROUP BY COALESCE(utm_source, 'direct')
+          ORDER BY visitors DESC
+          LIMIT 15
+        `;
+
+    const totalVisitors = sourceData.reduce((sum, row) => sum + Number(row.visitors), 0);
+    const sourceBreakdown = sourceData.map(row => ({
+      source: String(row.source),
+      visitors: Number(row.visitors),
+      percentage: totalVisitors > 0 ? Math.round((Number(row.visitors) / totalVisitors) * 1000) / 10 : 0,
+      conversions: Number(row.conversions) || 0,
+      conversionRate: Number(row.visitors) > 0 ? Math.round((Number(row.conversions) / Number(row.visitors)) * 1000) / 10 : 0,
+    }));
+
+    // Medium breakdown
+    const mediumData = hasAdminExclusion
+      ? await getDb()`
+          SELECT
+            COALESCE(utm_medium, 'none') as medium,
+            COUNT(*) as visitors
+          FROM ragecheck_visitors
+          WHERE is_bot = false
+            AND (ip_address IS NULL OR ip_address NOT IN ${adminIPs})
+          GROUP BY COALESCE(utm_medium, 'none')
+          ORDER BY visitors DESC
+          LIMIT 10
+        `
+      : await getDb()`
+          SELECT
+            COALESCE(utm_medium, 'none') as medium,
+            COUNT(*) as visitors
+          FROM ragecheck_visitors
+          WHERE is_bot = false
+          GROUP BY COALESCE(utm_medium, 'none')
+          ORDER BY visitors DESC
+          LIMIT 10
+        `;
+
+    const mediumBreakdown = mediumData.map(row => ({
+      medium: String(row.medium),
+      visitors: Number(row.visitors),
+      percentage: totalVisitors > 0 ? Math.round((Number(row.visitors) / totalVisitors) * 1000) / 10 : 0,
+    }));
+
+    // Top campaigns
+    const campaignData = hasAdminExclusion
+      ? await getDb()`
+          SELECT
+            utm_campaign as campaign,
+            utm_source as source,
+            COUNT(*) as visitors,
+            COUNT(DISTINCT CASE WHEN ip_address IN (
+              SELECT DISTINCT ip_address FROM ragecheck_analyses WHERE is_bot = false AND success = true
+            ) THEN ip_address END) as conversions
+          FROM ragecheck_visitors
+          WHERE is_bot = false AND utm_campaign IS NOT NULL
+            AND (ip_address IS NULL OR ip_address NOT IN ${adminIPs})
+          GROUP BY utm_campaign, utm_source
+          ORDER BY visitors DESC
+          LIMIT 10
+        `
+      : await getDb()`
+          SELECT
+            utm_campaign as campaign,
+            utm_source as source,
+            COUNT(*) as visitors,
+            COUNT(DISTINCT CASE WHEN ip_address IN (
+              SELECT DISTINCT ip_address FROM ragecheck_analyses WHERE is_bot = false AND success = true
+            ) THEN ip_address END) as conversions
+          FROM ragecheck_visitors
+          WHERE is_bot = false AND utm_campaign IS NOT NULL
+          GROUP BY utm_campaign, utm_source
+          ORDER BY visitors DESC
+          LIMIT 10
+        `;
+
+    const topCampaigns = campaignData.map(row => ({
+      campaign: String(row.campaign),
+      source: String(row.source || 'unknown'),
+      visitors: Number(row.visitors),
+      conversions: Number(row.conversions) || 0,
+    }));
+
+    // Referrer breakdown (for visitors without UTM)
+    const referrerData = hasAdminExclusion
+      ? await getDb()`
+          SELECT
+            CASE
+              WHEN referrer IS NULL THEN 'direct'
+              WHEN referrer LIKE '%google%' THEN 'google'
+              WHEN referrer LIKE '%facebook%' OR referrer LIKE '%fb.%' THEN 'facebook'
+              WHEN referrer LIKE '%twitter%' OR referrer LIKE '%t.co%' THEN 'twitter/x'
+              WHEN referrer LIKE '%linkedin%' THEN 'linkedin'
+              WHEN referrer LIKE '%reddit%' THEN 'reddit'
+              WHEN referrer LIKE '%bing%' THEN 'bing'
+              WHEN referrer LIKE '%duckduckgo%' THEN 'duckduckgo'
+              ELSE SUBSTRING(referrer FROM 'https?://([^/]+)')
+            END as referrer,
+            COUNT(*) as visitors
+          FROM ragecheck_visitors
+          WHERE is_bot = false AND utm_source IS NULL
+            AND (ip_address IS NULL OR ip_address NOT IN ${adminIPs})
+          GROUP BY 1
+          ORDER BY visitors DESC
+          LIMIT 15
+        `
+      : await getDb()`
+          SELECT
+            CASE
+              WHEN referrer IS NULL THEN 'direct'
+              WHEN referrer LIKE '%google%' THEN 'google'
+              WHEN referrer LIKE '%facebook%' OR referrer LIKE '%fb.%' THEN 'facebook'
+              WHEN referrer LIKE '%twitter%' OR referrer LIKE '%t.co%' THEN 'twitter/x'
+              WHEN referrer LIKE '%linkedin%' THEN 'linkedin'
+              WHEN referrer LIKE '%reddit%' THEN 'reddit'
+              WHEN referrer LIKE '%bing%' THEN 'bing'
+              WHEN referrer LIKE '%duckduckgo%' THEN 'duckduckgo'
+              ELSE SUBSTRING(referrer FROM 'https?://([^/]+)')
+            END as referrer,
+            COUNT(*) as visitors
+          FROM ragecheck_visitors
+          WHERE is_bot = false AND utm_source IS NULL
+          GROUP BY 1
+          ORDER BY visitors DESC
+          LIMIT 15
+        `;
+
+    const referrerTotal = referrerData.reduce((sum, row) => sum + Number(row.visitors), 0);
+    const referrerBreakdown = referrerData.map(row => ({
+      referrer: String(row.referrer || 'direct'),
+      visitors: Number(row.visitors),
+      percentage: referrerTotal > 0 ? Math.round((Number(row.visitors) / referrerTotal) * 1000) / 10 : 0,
+    }));
+
+    // Summary counts
+    const [summaryData] = hasAdminExclusion
+      ? await getDb()`
+          SELECT
+            COUNT(*) FILTER (WHERE utm_source IS NOT NULL) as with_utm,
+            COUNT(*) FILTER (WHERE utm_source IS NULL AND referrer IS NOT NULL) as with_referrer,
+            COUNT(*) FILTER (WHERE utm_source IS NULL AND referrer IS NULL) as direct
+          FROM ragecheck_visitors
+          WHERE is_bot = false
+            AND (ip_address IS NULL OR ip_address NOT IN ${adminIPs})
+        `
+      : await getDb()`
+          SELECT
+            COUNT(*) FILTER (WHERE utm_source IS NOT NULL) as with_utm,
+            COUNT(*) FILTER (WHERE utm_source IS NULL AND referrer IS NOT NULL) as with_referrer,
+            COUNT(*) FILTER (WHERE utm_source IS NULL AND referrer IS NULL) as direct
+          FROM ragecheck_visitors
+          WHERE is_bot = false
+        `;
+
+    return {
+      sourceBreakdown,
+      mediumBreakdown,
+      topCampaigns,
+      referrerBreakdown,
+      summary: {
+        totalWithUtm: Number(summaryData?.with_utm) || 0,
+        totalWithReferrer: Number(summaryData?.with_referrer) || 0,
+        totalDirect: Number(summaryData?.direct) || 0,
+        topSource: sourceBreakdown[0]?.source || 'none',
+        topMedium: mediumBreakdown[0]?.medium || 'none',
+      },
+    };
+  } catch (error) {
+    console.error("Failed to get acquisition metrics:", error);
+    return {
+      sourceBreakdown: [],
+      mediumBreakdown: [],
+      topCampaigns: [],
+      referrerBreakdown: [],
+      summary: {
+        totalWithUtm: 0,
+        totalWithReferrer: 0,
+        totalDirect: 0,
+        topSource: 'none',
+        topMedium: 'none',
+      },
+    };
+  }
 }
 
 export async function getContentInsights(): Promise<ContentInsights> {

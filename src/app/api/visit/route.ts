@@ -10,20 +10,46 @@ export async function POST(request: NextRequest) {
 
     await initDB();
 
-    // Get referrer and page path from request body
+    // Get referrer, page path, and UTM params from request body
     let referrer: string | null = null;
     let pagePath: string | null = null;
+    let utmSource: string | null = null;
+    let utmMedium: string | null = null;
+    let utmCampaign: string | null = null;
+    let utmContent: string | null = null;
+    let utmTerm: string | null = null;
+
     try {
       const body = await request.json();
       if (body.referrer && typeof body.referrer === "string") {
         // Only store external referrers (filter out own domain)
-        const refUrl = new URL(body.referrer);
-        if (!refUrl.hostname.includes("ragecheck")) {
-          referrer = body.referrer;
+        try {
+          const refUrl = new URL(body.referrer);
+          if (!refUrl.hostname.includes("ragecheck")) {
+            referrer = body.referrer;
+          }
+        } catch {
+          // Invalid URL, skip
         }
       }
       if (body.pagePath && typeof body.pagePath === "string") {
         pagePath = body.pagePath;
+      }
+      // Extract UTM parameters
+      if (body.utmSource && typeof body.utmSource === "string") {
+        utmSource = body.utmSource;
+      }
+      if (body.utmMedium && typeof body.utmMedium === "string") {
+        utmMedium = body.utmMedium;
+      }
+      if (body.utmCampaign && typeof body.utmCampaign === "string") {
+        utmCampaign = body.utmCampaign;
+      }
+      if (body.utmContent && typeof body.utmContent === "string") {
+        utmContent = body.utmContent;
+      }
+      if (body.utmTerm && typeof body.utmTerm === "string") {
+        utmTerm = body.utmTerm;
       }
     } catch {
       // No body or invalid JSON - that's fine
@@ -42,6 +68,11 @@ export async function POST(request: NextRequest) {
       country: country || undefined,
       referrer: referrer || undefined,
       pagePath: pagePath || undefined,
+      utmSource: utmSource || undefined,
+      utmMedium: utmMedium || undefined,
+      utmCampaign: utmCampaign || undefined,
+      utmContent: utmContent || undefined,
+      utmTerm: utmTerm || undefined,
     });
 
     return NextResponse.json({ success: true });

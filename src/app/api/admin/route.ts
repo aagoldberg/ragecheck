@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { initDB, getDashboardStats, getVisitorStats, getPageVisitorStats, getViralMetrics, isDBAvailable, invalidateIncompleteCache, recomputeBotFlags, getFeedbackStats, initFeedbackTable, getTimeToAnalysisMetrics, getConversionMetrics, getConversionInsights, getFunnelMetrics, getRetentionMetrics, getShareMetrics, getContentInsights } from "@/lib/db";
+import { initDB, getDashboardStats, getVisitorStats, getPageVisitorStats, getViralMetrics, isDBAvailable, invalidateIncompleteCache, recomputeBotFlags, getFeedbackStats, initFeedbackTable, getTimeToAnalysisMetrics, getConversionMetrics, getConversionInsights, getFunnelMetrics, getRetentionMetrics, getShareMetrics, getContentInsights, getAcquisitionMetrics } from "@/lib/db";
 
 export async function GET(request: NextRequest) {
   // Simple password protection via query param
@@ -40,6 +40,7 @@ export async function GET(request: NextRequest) {
     const retentionMetrics = await getRetentionMetrics();
     const shareMetrics = await getShareMetrics();
     const contentInsights = await getContentInsights();
+    const acquisitionMetrics = await getAcquisitionMetrics();
 
     return NextResponse.json({
       success: true,
@@ -56,6 +57,7 @@ export async function GET(request: NextRequest) {
       retentionMetrics,
       shareMetrics,
       contentInsights,
+      acquisitionMetrics,
     });
   } catch (error) {
     console.error("Admin API error:", error);

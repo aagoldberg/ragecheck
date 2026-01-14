@@ -430,6 +430,39 @@ interface ContentInsights {
   }[];
 }
 
+interface AcquisitionMetrics {
+  sourceBreakdown: {
+    source: string;
+    visitors: number;
+    percentage: number;
+    conversions: number;
+    conversionRate: number;
+  }[];
+  mediumBreakdown: {
+    medium: string;
+    visitors: number;
+    percentage: number;
+  }[];
+  topCampaigns: {
+    campaign: string;
+    source: string;
+    visitors: number;
+    conversions: number;
+  }[];
+  referrerBreakdown: {
+    referrer: string;
+    visitors: number;
+    percentage: number;
+  }[];
+  summary: {
+    totalWithUtm: number;
+    totalWithReferrer: number;
+    totalDirect: number;
+    topSource: string;
+    topMedium: string;
+  };
+}
+
 interface ApiResponse {
   success?: boolean;
   error?: string;
@@ -445,6 +478,7 @@ interface ApiResponse {
   retentionMetrics?: RetentionMetrics;
   shareMetrics?: ShareMetrics;
   contentInsights?: ContentInsights;
+  acquisitionMetrics?: AcquisitionMetrics;
   dbAvailable?: boolean;
 }
 
@@ -1426,6 +1460,7 @@ export default function AdminDashboard() {
   const [retentionMetrics, setRetentionMetrics] = useState<RetentionMetrics | null>(null);
   const [shareMetrics, setShareMetrics] = useState<ShareMetrics | null>(null);
   const [contentInsights, setContentInsights] = useState<ContentInsights | null>(null);
+  const [acquisitionMetrics, setAcquisitionMetrics] = useState<AcquisitionMetrics | null>(null);
 
   const fetchStats = async (adminKey: string) => {
     setLoading(true);
@@ -1454,6 +1489,7 @@ export default function AdminDashboard() {
         setRetentionMetrics(data.retentionMetrics || null);
         setShareMetrics(data.shareMetrics || null);
         setContentInsights(data.contentInsights || null);
+        setAcquisitionMetrics(data.acquisitionMetrics || null);
         setAuthenticated(true);
         // Save key to localStorage
         localStorage.setItem("ragecheck-admin-key", adminKey);
@@ -3627,6 +3663,127 @@ export default function AdminDashboard() {
                 </table>
               </div>
             </div>
+
+            {/* Acquisition Metrics */}
+            {acquisitionMetrics && (
+              <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 mt-6">
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-4">
+                  Acquisition (UTM Tracking)
+                </h3>
+
+                {/* Summary Stats */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">{acquisitionMetrics.summary.totalWithUtm}</div>
+                    <div className="text-xs text-zinc-500">With UTM</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">{acquisitionMetrics.summary.totalWithReferrer}</div>
+                    <div className="text-xs text-zinc-500">With Referrer</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">{acquisitionMetrics.summary.totalDirect}</div>
+                    <div className="text-xs text-zinc-500">Direct</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">{acquisitionMetrics.summary.topSource || "-"}</div>
+                    <div className="text-xs text-zinc-500">Top Source</div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* UTM Sources */}
+                  {acquisitionMetrics.sourceBreakdown.length > 0 && (
+                    <div>
+                      <h4 className="text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-3">By Source</h4>
+                      <div className="space-y-2">
+                        {acquisitionMetrics.sourceBreakdown.map((s, i) => (
+                          <div key={i} className="flex justify-between items-center">
+                            <span className="text-sm text-zinc-600 dark:text-zinc-400">{s.source || "(direct)"}</span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-zinc-400">{s.percentage.toFixed(0)}%</span>
+                              <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">{s.visitors}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* UTM Mediums */}
+                  {acquisitionMetrics.mediumBreakdown.length > 0 && (
+                    <div>
+                      <h4 className="text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-3">By Medium</h4>
+                      <div className="space-y-2">
+                        {acquisitionMetrics.mediumBreakdown.map((m, i) => (
+                          <div key={i} className="flex justify-between items-center">
+                            <span className="text-sm text-zinc-600 dark:text-zinc-400">{m.medium || "(none)"}</span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-zinc-400">{m.percentage.toFixed(0)}%</span>
+                              <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">{m.visitors}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Campaigns */}
+                {acquisitionMetrics.topCampaigns.length > 0 && (
+                  <div className="mt-6">
+                    <h4 className="text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-3">Top Campaigns</h4>
+                    <div className="overflow-x-auto border border-zinc-100 dark:border-zinc-800 rounded-lg">
+                      <table className="w-full text-sm">
+                        <thead className="bg-zinc-50 dark:bg-zinc-800">
+                          <tr className="border-b border-zinc-200 dark:border-zinc-700">
+                            <th className="text-left py-2 px-3 text-zinc-500 font-medium">Campaign</th>
+                            <th className="text-left py-2 px-3 text-zinc-500 font-medium">Source</th>
+                            <th className="text-right py-2 px-3 text-zinc-500 font-medium">Visitors</th>
+                            <th className="text-right py-2 px-3 text-zinc-500 font-medium">Conversions</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {acquisitionMetrics.topCampaigns.map((c, i) => (
+                            <tr key={i} className="border-b border-zinc-100 dark:border-zinc-800 last:border-0">
+                              <td className="py-2 px-3 text-zinc-900 dark:text-zinc-100 font-medium">{c.campaign}</td>
+                              <td className="py-2 px-3 text-zinc-600 dark:text-zinc-400">{c.source || "-"}</td>
+                              <td className="py-2 px-3 text-right text-zinc-900 dark:text-zinc-100">{c.visitors}</td>
+                              <td className="py-2 px-3 text-right text-emerald-600 dark:text-emerald-400">{c.conversions}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {/* Referrers */}
+                {acquisitionMetrics.referrerBreakdown.length > 0 && (
+                  <div className="mt-6">
+                    <h4 className="text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-3">Top Referrers</h4>
+                    <div className="space-y-2">
+                      {acquisitionMetrics.referrerBreakdown.slice(0, 10).map((r, i) => (
+                        <div key={i} className="flex justify-between items-center">
+                          <span className="text-sm text-zinc-600 dark:text-zinc-400 truncate max-w-[80%]" title={r.referrer || "(direct)"}>
+                            {r.referrer || "(direct)"}
+                          </span>
+                          <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">{r.visitors}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {acquisitionMetrics.sourceBreakdown.length === 0 &&
+                 acquisitionMetrics.mediumBreakdown.length === 0 &&
+                 acquisitionMetrics.topCampaigns.length === 0 && (
+                  <p className="text-sm text-zinc-500 text-center py-4">
+                    No UTM data yet. Add ?utm_source=... to your links to track campaigns.
+                  </p>
+                )}
+              </div>
+            )}
             </>
             )}
           </>
