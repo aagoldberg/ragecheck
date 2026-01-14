@@ -1024,15 +1024,50 @@ function HomeContent() {
             {!imagePreview && (
               <div className="relative group">
                 <div className="absolute -inset-1 bg-gradient-to-r from-rose-500 to-indigo-600 rounded-2xl blur opacity-20 group-focus-within:opacity-40 transition duration-1000"></div>
-                <div className="relative flex items-center bg-white dark:bg-zinc-900 rounded-2xl shadow-xl transition-shadow ring-1 ring-zinc-200 dark:ring-zinc-800 group-focus-within:ring-zinc-300 dark:group-focus-within:ring-zinc-700">
-                  <input type="url" value={url} onChange={(e) => setUrl(e.target.value)} onFocus={() => tracking.trackSearchFocus()} placeholder="Paste a URL or screenshot..." className="flex-1 w-full pl-6 pr-4 py-5 bg-transparent border-0 focus:ring-0 text-lg text-zinc-900 dark:text-zinc-100 placeholder-zinc-400" required />
-                  <div className="pr-3 flex items-center gap-3">
-                    <label htmlFor="image-upload" className="p-2.5 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 cursor-pointer transition-colors bg-zinc-50 dark:bg-zinc-800 rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-700" title="Upload screenshot">
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-                      <input id="image-upload" type="file" accept="image/jpeg,image/png,image/gif,image/webp" onChange={handleImageSelect} className="hidden" />
+                <div className="relative flex flex-col sm:flex-row items-center bg-white dark:bg-zinc-900 rounded-2xl shadow-xl transition-shadow ring-1 ring-zinc-200 dark:ring-zinc-800 group-focus-within:ring-zinc-300 dark:group-focus-within:ring-zinc-700 p-2 sm:p-0">
+                  <input
+                    type="url"
+                    value={url}
+                    onChange={(e) => setUrl(e.target.value)}
+                    placeholder="Paste URL (article, tweet, bsky)..."
+                    className="flex-1 w-full pl-4 sm:pl-6 pr-4 py-4 sm:py-5 bg-transparent border-0 focus:ring-0 text-base sm:text-lg text-zinc-900 dark:text-zinc-100 placeholder-zinc-400"
+                    required
+                  />
+                  <div className="w-full sm:w-auto flex items-center gap-3 sm:pr-3 px-2 sm:px-0 pb-2 sm:pb-0">
+                    <label
+                      htmlFor="image-upload"
+                      className="p-3 sm:p-2.5 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 cursor-pointer transition-colors bg-zinc-100 sm:bg-zinc-50 dark:bg-zinc-800 rounded-xl hover:bg-zinc-200 dark:hover:bg-zinc-700 flex-shrink-0"
+                      title="Upload screenshot"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                      <input
+                        id="image-upload"
+                        type="file"
+                        accept="image/jpeg,image/png,image/gif,image/webp"
+                        onChange={handleImageSelect}
+                        className="hidden"
+                      />
                     </label>
-                    <button type="submit" disabled={loading || !url.trim()} className="px-6 py-3 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 rounded-xl text-base font-bold hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-all shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed min-w-[120px]">
-                      {loading ? <svg className="animate-spin h-4 w-4 mx-auto" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" /></svg> : "Analyze"}
+                    <button
+                      type="submit"
+                      disabled={loading || !url.trim()}
+                      className="flex-1 sm:flex-none px-6 py-3 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 rounded-xl text-base font-bold hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-all shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none min-w-[120px]"
+                    >
+                      {loading ? (
+                        <span className="flex items-center justify-center gap-2">
+                          <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                          </svg>
+                        </span>
+                      ) : (
+                        <div className="flex flex-col leading-none items-center sm:items-start">
+                          <span>Analyze</span>
+                          <span className="text-[10px] opacity-60 font-medium mt-0.5">~5s</span>
+                        </div>
+                      )}
                     </button>
                   </div>
                 </div>
