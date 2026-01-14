@@ -22,12 +22,12 @@ export interface ConversationShape {
 
 // Canonical labels with their display text
 const SHAPE_LABELS: Record<ConversationShapeLabel, string> = {
-  splits_sides: "This splits people into sides",
-  invites_pileon: "This invites a pile-on",
-  endless_arguing: "This turns into endless arguing",
-  rewards_stance: "This rewards taking a strong stance",
-  spreads_burns: "This spreads fast, then burns out",
-  stays_informational: "This stays mostly informational",
+  splits_sides: "Conversations split into sides",
+  invites_pileon: "Conversations turn into pile-ons",
+  endless_arguing: "Conversations turn into endless arguing",
+  rewards_stance: "Conversations reward strong stances",
+  spreads_burns: "Spreads fast, then burns out",
+  stays_informational: "Conversations stay mostly informational",
 };
 
 const SHAPE_EXPLANATIONS: Record<ConversationShapeLabel, string> = {
