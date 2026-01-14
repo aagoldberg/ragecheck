@@ -2585,27 +2585,34 @@ export interface ShareMetrics {
 
 export async function getShareMetrics(): Promise<ShareMetrics> {
   try {
-    // Total shares
+    // Filter out click events - only count completed shares
+    // Click events end with "_clicked", actual shares are things like "share_image_success", "copy_link", etc.
+    const COMPLETED_SHARE_FILTER = `share_type NOT LIKE '%_clicked'`;
+
+    // Total shares (excluding click events)
     const [totalSharesResult] = await getDb()`
       SELECT COUNT(*) as count FROM ragecheck_shares
+      WHERE share_type NOT LIKE '%_clicked'
     `;
 
-    // Unique sharers
+    // Unique sharers (excluding click events)
     const [uniqueSharersResult] = await getDb()`
       SELECT COUNT(DISTINCT ip_address) as count FROM ragecheck_shares
-      WHERE ip_address IS NOT NULL
+      WHERE ip_address IS NOT NULL AND share_type NOT LIKE '%_clicked'
     `;
 
-    // Today's shares
+    // Today's shares (excluding click events)
     const [todaySharesResult] = await getDb()`
       SELECT COUNT(*) as count FROM ragecheck_shares
       WHERE created_at >= DATE_TRUNC('day', NOW() AT TIME ZONE 'America/New_York') AT TIME ZONE 'America/New_York'
+        AND share_type NOT LIKE '%_clicked'
     `;
 
-    // This week's shares
+    // This week's shares (excluding click events)
     const [weekSharesResult] = await getDb()`
       SELECT COUNT(*) as count FROM ragecheck_shares
       WHERE created_at > NOW() - INTERVAL '7 days'
+        AND share_type NOT LIKE '%_clicked'
     `;
 
     // Unique analyzers (for share rate calculation)
@@ -2622,10 +2629,11 @@ export async function getShareMetrics(): Promise<ShareMetrics> {
     const shareRate = Math.round((uniqueSharers / uniqueAnalyzers) * 1000) / 10;
     const avgSharesPerSharer = uniqueSharers > 0 ? Math.round((totalShares / uniqueSharers) * 10) / 10 : 0;
 
-    // Share type breakdown
+    // Share type breakdown (excluding click events)
     const shareTypeData = await getDb()`
       SELECT share_type, COUNT(*) as count
       FROM ragecheck_shares
+      WHERE share_type NOT LIKE '%_clicked'
       GROUP BY share_type
       ORDER BY count DESC
     `;
@@ -2636,14 +2644,14 @@ export async function getShareMetrics(): Promise<ShareMetrics> {
       percentage: totalShares > 0 ? Math.round((Number(row.count) / totalShares) * 1000) / 10 : 0,
     }));
 
-    // Top shared content
+    // Top shared content (excluding click events)
     const topSharedData = await getDb()`
       SELECT
         url,
         COUNT(*) as share_count,
         COUNT(DISTINCT ip_address) as unique_sharers
       FROM ragecheck_shares
-      WHERE url IS NOT NULL
+      WHERE url IS NOT NULL AND share_type NOT LIKE '%_clicked'
       GROUP BY url
       ORDER BY share_count DESC
       LIMIT 10
@@ -2665,12 +2673,12 @@ export async function getShareMetrics(): Promise<ShareMetrics> {
       };
     });
 
-    // Sharer segmentation
+    // Sharer segmentation (excluding click events)
     const segmentationData = await getDb()`
       WITH sharer_counts AS (
         SELECT ip_address, COUNT(*) as share_count
         FROM ragecheck_shares
-        WHERE ip_address IS NOT NULL
+        WHERE ip_address IS NOT NULL AND share_type NOT LIKE '%_clicked'
         GROUP BY ip_address
       )
       SELECT
@@ -2691,7 +2699,7 @@ export async function getShareMetrics(): Promise<ShareMetrics> {
       total: Number(seg.total) || 0,
     };
 
-    // Score distribution of shared content
+    // Score distribution of shared content (excluding click events)
     const scoreDistData = await getDb()`
       SELECT
         SUM(CASE WHEN score IS NOT NULL AND score <= 33 THEN 1 ELSE 0 END) as low,
@@ -2699,6 +2707,7 @@ export async function getShareMetrics(): Promise<ShareMetrics> {
         SUM(CASE WHEN score IS NOT NULL AND score >= 67 THEN 1 ELSE 0 END) as high,
         SUM(CASE WHEN score IS NULL THEN 1 ELSE 0 END) as unknown
       FROM ragecheck_shares
+      WHERE share_type NOT LIKE '%_clicked'
     `;
 
     const scoreDist = scoreDistData[0] || {};
@@ -2709,7 +2718,7 @@ export async function getShareMetrics(): Promise<ShareMetrics> {
       unknown: Number(scoreDist.unknown) || 0,
     };
 
-    // Daily trend (last 14 days)
+    // Daily trend (last 14 days, excluding click events)
     const trendData = await getDb()`
       SELECT
         DATE(created_at AT TIME ZONE 'America/New_York') as day,
@@ -2717,6 +2726,7 @@ export async function getShareMetrics(): Promise<ShareMetrics> {
         COUNT(DISTINCT ip_address) as unique_sharers
       FROM ragecheck_shares
       WHERE created_at > NOW() - INTERVAL '14 days'
+        AND share_type NOT LIKE '%_clicked'
       GROUP BY DATE(created_at AT TIME ZONE 'America/New_York')
       ORDER BY day ASC
     `;

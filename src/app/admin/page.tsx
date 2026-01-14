@@ -2742,18 +2742,24 @@ export default function AdminDashboard() {
                       <table className="w-full text-sm">
                         <thead>
                           <tr className="border-b border-zinc-200 dark:border-zinc-700">
-                            <th className="text-left py-2 px-3 text-zinc-500 dark:text-zinc-400 font-medium">Domain</th>
+                            <th className="text-left py-2 px-3 text-zinc-500 dark:text-zinc-400 font-medium">URL</th>
                             <th className="text-right py-2 px-3 text-zinc-500 dark:text-zinc-400 font-medium">Shares</th>
-                            <th className="text-right py-2 px-3 text-zinc-500 dark:text-zinc-400 font-medium">Unique Sharers</th>
+                            <th className="text-right py-2 px-3 text-zinc-500 dark:text-zinc-400 font-medium">Unique</th>
                           </tr>
                         </thead>
                         <tbody>
                           {shareMetrics.topSharedContent.slice(0, 10).map((item, idx) => (
                             <tr key={idx} className="border-b border-zinc-100 dark:border-zinc-800">
                               <td className="py-2 px-3">
-                                <div className="text-zinc-700 dark:text-zinc-300 truncate max-w-xs" title={item.url}>
-                                  {item.domain}
-                                </div>
+                                <a
+                                  href={item.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-indigo-600 dark:text-indigo-400 hover:underline block truncate max-w-lg"
+                                  title={item.url}
+                                >
+                                  {item.url.length > 70 ? item.url.substring(0, 70) + "..." : item.url}
+                                </a>
                               </td>
                               <td className="py-2 px-3 text-right text-zinc-700 dark:text-zinc-300">{item.shareCount}</td>
                               <td className="py-2 px-3 text-right text-zinc-700 dark:text-zinc-300">{item.uniqueSharers}</td>
