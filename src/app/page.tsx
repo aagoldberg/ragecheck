@@ -1324,6 +1324,15 @@ function HomeContent() {
                        </div>
                     </div>
 
+                    {/* Summary */}
+                    {result.shareCardSummary && (
+                      <div className="mt-8 pt-6 border-t border-zinc-100 dark:border-zinc-800 w-full text-left">
+                        <p className="text-base text-zinc-700 dark:text-zinc-300 leading-relaxed">
+                          {result.shareCardSummary}
+                        </p>
+                      </div>
+                    )}
+
                     {result.llmEnhanced && result.techniqueExplanations && result.techniqueExplanations.length > 0 && (
                       <div className="mt-8 pt-6 border-t border-zinc-100 dark:border-zinc-800 w-full text-left">
                         <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-4">
