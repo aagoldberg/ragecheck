@@ -6,7 +6,6 @@ import { getScoreBucket } from "@/lib/share";
 import { SIGNAL_LABELS } from "@/lib/shareCard";
 import { copyShareImageToClipboard } from "@/lib/shareImage";
 import * as tracking from "@/lib/tracking";
-import { detectConversationShape, ConversationShape } from "@/lib/conversationShape";
 
 interface Highlight {
   start: number;
@@ -577,17 +576,6 @@ function HomeContent() {
   const [imageCopied, setImageCopied] = useState(false);
   const [feedbackGiven, setFeedbackGiven] = useState<"up" | "down" | null>(null);
   const [feedbackComment, setFeedbackComment] = useState("");
-
-  // Conversation shape detection
-  const conversationShape = useMemo<ConversationShape | null>(() => {
-    if (!result?.success || !result.signalBreakdown) return null;
-    return detectConversationShape({
-      signalBreakdown: result.signalBreakdown,
-      techniqueExplanations: result.techniqueExplanations,
-      sharingPatterns: result.sharingPatterns,
-      score: result.score,
-    });
-  }, [result]);
 
   const [showFeedbackForm, setShowFeedbackForm] = useState(false);
   const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
@@ -1358,32 +1346,6 @@ function HomeContent() {
                       </div>
                     )}
 
-                    {/* What Follows */}
-                    {conversationShape && (
-                      <div className="mt-8 pt-6 border-t border-zinc-100 dark:border-zinc-800 w-full text-left">
-                        <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-4">
-                          What Follows
-                        </h4>
-                        <div className="space-y-3">
-                          <p className="text-base font-semibold text-zinc-900 dark:text-zinc-100">
-                            {conversationShape.displayLabel}
-                          </p>
-                          <p className="text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed">
-                            {conversationShape.explanation}
-                          </p>
-                          {conversationShape.microSignals.length > 0 && (
-                            <div className="mt-3 space-y-1.5">
-                              {conversationShape.microSignals.map((signal, i) => (
-                                <div key={i} className="flex items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400">
-                                  <span className="w-1 h-1 rounded-full bg-zinc-400 dark:bg-zinc-500" />
-                                  <span>{signal}</span>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
                   </div>
                 </BentoCard>
 
