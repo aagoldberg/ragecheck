@@ -575,6 +575,7 @@ function HomeContent() {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageError, setImageError] = useState<string | null>(null);
   const [imageCopied, setImageCopied] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [feedbackGiven, setFeedbackGiven] = useState<"up" | "down" | null>(null);
   const [feedbackComment, setFeedbackComment] = useState("");
 
@@ -955,12 +956,39 @@ function HomeContent() {
             <div className="w-6 h-6 bg-zinc-900 dark:bg-zinc-100 rounded-lg shadow-sm" />
             <span className="font-bold text-lg tracking-tight">RageCheck</span>
           </div>
-          <div className="flex gap-6 text-sm font-medium text-zinc-500">
+          {/* Desktop nav */}
+          <div className="hidden sm:flex gap-6 text-sm font-medium text-zinc-500">
             <a href="/clearview" className="hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors">Clearview</a>
             <a href="/methodology" className="hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors">Methodology</a>
             <a href="/about" className="hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors">About</a>
           </div>
+          {/* Mobile menu button */}
+          <button
+            onClick={() => setMenuOpen(!menuOpen)}
+            className="sm:hidden p-2 text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors"
+            aria-label="Menu"
+          >
+            {menuOpen ? (
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            ) : (
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            )}
+          </button>
         </div>
+        {/* Mobile dropdown */}
+        {menuOpen && (
+          <div className="sm:hidden border-t border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900">
+            <div className="px-4 py-3 space-y-1">
+              <a href="/clearview" className="block py-2 text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors">Clearview</a>
+              <a href="/methodology" className="block py-2 text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors">Methodology</a>
+              <a href="/about" className="block py-2 text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors">About</a>
+            </div>
+          </div>
+        )}
       </nav>
 
       <div className={`flex-1 max-w-6xl mx-auto px-4 ${result && !isDemo ? 'py-6 lg:py-8' : 'py-6 sm:py-12 lg:py-24'}`}>
@@ -1023,26 +1051,8 @@ function HomeContent() {
 
             {!imagePreview && (
               <>
-                {/* Mobile: Two prominent options */}
+                {/* Mobile: Two options - URL first, screenshot second */}
                 <div className="sm:hidden space-y-3">
-                  {/* Screenshot button - primary on mobile */}
-                  <label
-                    htmlFor="image-upload-mobile"
-                    className="flex items-center justify-center gap-3 w-full px-6 py-4 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 rounded-2xl font-bold text-base cursor-pointer hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-all shadow-lg active:scale-[0.98]"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
-                    Upload Screenshot
-                    <input
-                      id="image-upload-mobile"
-                      type="file"
-                      accept="image/jpeg,image/png,image/gif,image/webp"
-                      onChange={handleImageSelect}
-                      className="hidden"
-                    />
-                  </label>
-
                   {/* URL input with paste button and submit */}
                   <div className="relative">
                     <button
@@ -1084,6 +1094,24 @@ function HomeContent() {
                       ) : "Go"}
                     </button>
                   </div>
+
+                  {/* Screenshot button - secondary */}
+                  <label
+                    htmlFor="image-upload-mobile"
+                    className="flex items-center justify-center gap-2 w-full px-6 py-3 bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 rounded-xl font-medium text-sm cursor-pointer hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-all active:scale-[0.98]"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    Or upload a screenshot
+                    <input
+                      id="image-upload-mobile"
+                      type="file"
+                      accept="image/jpeg,image/png,image/gif,image/webp"
+                      onChange={handleImageSelect}
+                      className="hidden"
+                    />
+                  </label>
                 </div>
 
                 {/* Desktop: Original inline design */}
@@ -1138,19 +1166,6 @@ function HomeContent() {
               </>
             )}
 
-            {!imagePreview && (!result || isDemo) && (
-              <div className="mt-6 space-y-3">
-                <div className="flex flex-wrap items-center justify-center gap-2 text-sm text-zinc-500">
-                  <span>Try an example:</span>
-                  <button type="button" onClick={() => tryExample("news")} className="px-3 py-1 rounded-full bg-zinc-100 dark:bg-zinc-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors font-medium text-xs">News Article</button>
-                  <button type="button" onClick={() => tryExample("tweet")} className="px-3 py-1 rounded-full bg-zinc-100 dark:bg-zinc-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors font-medium text-xs">Viral Tweet</button>
-                  <button type="button" onClick={() => tryExample("bluesky")} className="px-3 py-1 rounded-full bg-zinc-100 dark:bg-zinc-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors font-medium text-xs">Bluesky Post</button>
-                </div>
-                <p className="text-xs text-zinc-400 text-center hidden sm:block">
-                  Or paste a screenshot (⌘V) or drag & drop an image
-                </p>
-              </div>
-            )}
           </form>
         </div>
 
