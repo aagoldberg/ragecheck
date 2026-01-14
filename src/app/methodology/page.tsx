@@ -65,14 +65,14 @@ export default function Methodology() {
               <div className="flex flex-col sm:flex-row sm:items-center gap-2">
                 <span className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 sm:min-w-[180px]">Techniques Detected</span>
                 <span className="text-zinc-400 hidden sm:inline">→</span>
-                <span className="text-sm text-zinc-600 dark:text-zinc-400"><strong>Construction:</strong> Emotional Arousal, Moral Condemnation, Oversimplification</span>
+                <span className="text-sm text-zinc-600 dark:text-zinc-400"><strong>Construction:</strong> Emotional Heat, Moral Outrage, Black & White Thinking</span>
               </div>
             </div>
             <div className="p-4 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg">
               <div className="flex flex-col sm:flex-row sm:items-center gap-2">
                 <span className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 sm:min-w-[180px]">Viral Triggers</span>
                 <span className="text-zinc-400 hidden sm:inline">→</span>
-                <span className="text-sm text-zinc-600 dark:text-zinc-400"><strong>Transmission:</strong> Call-to-Conflict, Enemy Construction</span>
+                <span className="text-sm text-zinc-600 dark:text-zinc-400"><strong>Transmission:</strong> Fight-Picking, Us vs Them</span>
               </div>
             </div>
             <div className="p-4 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg">
@@ -95,7 +95,7 @@ export default function Methodology() {
 
           <div className="space-y-6">
             <div className="p-6 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl">
-              <h3 className="font-bold text-lg mb-2 text-rose-600 dark:text-rose-400">Emotional Arousal</h3>
+              <h3 className="font-bold text-lg mb-2 text-rose-600 dark:text-rose-400">Emotional Heat</h3>
               <p className="text-zinc-600 dark:text-zinc-400 leading-relaxed mb-3">
                 Language designed to activate strong emotional responses—fear, anger, disgust, or outrage—rather than inform.
               </p>
@@ -106,7 +106,7 @@ export default function Methodology() {
             </div>
 
             <div className="p-6 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl">
-              <h3 className="font-bold text-lg mb-2 text-indigo-600 dark:text-indigo-400">Enemy Construction</h3>
+              <h3 className="font-bold text-lg mb-2 text-indigo-600 dark:text-indigo-400">Us vs Them</h3>
               <p className="text-zinc-600 dark:text-zinc-400 leading-relaxed mb-3">
                 Framing that constructs an adversary—dehumanizing groups, attributing malicious intent,
                 or creating artificial us-vs-them divisions.
@@ -118,7 +118,7 @@ export default function Methodology() {
             </div>
 
             <div className="p-6 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl">
-              <h3 className="font-bold text-lg mb-2 text-orange-600 dark:text-orange-400">Moral Condemnation</h3>
+              <h3 className="font-bold text-lg mb-2 text-orange-600 dark:text-orange-400">Moral Outrage</h3>
               <p className="text-zinc-600 dark:text-zinc-400 leading-relaxed mb-3">
                 Appeals to moral outrage, purity rhetoric, and righteous indignation that frame issues
                 as battles between good and evil.
@@ -130,7 +130,7 @@ export default function Methodology() {
             </div>
 
             <div className="p-6 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl">
-              <h3 className="font-bold text-lg mb-2 text-blue-600 dark:text-blue-400">Oversimplification</h3>
+              <h3 className="font-bold text-lg mb-2 text-blue-600 dark:text-blue-400">Black & White Thinking</h3>
               <p className="text-zinc-600 dark:text-zinc-400 leading-relaxed mb-3">
                 Black-and-white framing that eliminates nuance, presents false dichotomies, or reduces
                 complex issues to simple narratives.
@@ -142,7 +142,7 @@ export default function Methodology() {
             </div>
 
             <div className="p-6 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl">
-              <h3 className="font-bold text-lg mb-2 text-amber-600 dark:text-amber-400">Call-to-Conflict</h3>
+              <h3 className="font-bold text-lg mb-2 text-amber-600 dark:text-amber-400">Fight-Picking</h3>
               <p className="text-zinc-600 dark:text-zinc-400 leading-relaxed mb-3">
                 Direct provocations, engagement bait, and language designed to mobilize action or
                 spread content virally.
@@ -243,11 +243,11 @@ export default function Methodology() {
             propaganda studies, and affective computing:
           </p>
           <ul className="list-disc list-inside text-zinc-600 dark:text-zinc-400 space-y-2 ml-4">
-            <li><strong>Emotional Arousal</strong> — Based on dimensional models of emotion (Russell, 1980) and research on emotional contagion in social media (Kramer et al., 2014)</li>
-            <li><strong>Enemy Construction</strong> — Draws from intergroup conflict theory (Tajfel & Turner, 1979) and research on dehumanization (Haslam, 2006)</li>
-            <li><strong>Moral Condemnation</strong> — Informed by moral foundations theory (Haidt & Graham, 2007) and research on moral outrage online (Crockett, 2017)</li>
-            <li><strong>Oversimplification</strong> — Based on research on cognitive biases and the appeal of simple narratives (Kahneman, 2011)</li>
-            <li><strong>Call-to-Conflict</strong> — Draws from propaganda analysis frameworks (Ellul, 1965) and research on viral content dynamics (Berger & Milkman, 2012)</li>
+            <li><strong>Emotional Heat</strong> — Based on dimensional models of emotion (Russell, 1980) and research on emotional contagion in social media (Kramer et al., 2014)</li>
+            <li><strong>Us vs Them</strong> — Draws from intergroup conflict theory (Tajfel & Turner, 1979) and research on dehumanization (Haslam, 2006)</li>
+            <li><strong>Moral Outrage</strong> — Informed by moral foundations theory (Haidt & Graham, 2007) and research on moral outrage online (Crockett, 2017)</li>
+            <li><strong>Black & White Thinking</strong> — Based on research on cognitive biases and the appeal of simple narratives (Kahneman, 2011)</li>
+            <li><strong>Fight-Picking</strong> — Draws from propaganda analysis frameworks (Ellul, 1965) and research on viral content dynamics (Berger & Milkman, 2012)</li>
           </ul>
         </section>
 

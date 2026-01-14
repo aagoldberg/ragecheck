@@ -52,11 +52,11 @@ const CATEGORY_DESCRIPTIONS: Record<SignalCategory, string> = {
 
 // Canonical signal labels for UI display
 export const SIGNAL_LABELS: Record<SignalCategory, string> = {
-  arousal: "Emotional Arousal",
-  enemy_construction: "Enemy Construction",
-  moral_condemnation: "Moral Condemnation",
-  simplification: "Oversimplification",
-  call_to_conflict: "Call-to-Conflict",
+  arousal: "Emotional Heat",
+  enemy_construction: "Us vs Them",
+  moral_condemnation: "Moral Outrage",
+  simplification: "Black & White Thinking",
+  call_to_conflict: "Fight-Picking",
 };
 
 /**

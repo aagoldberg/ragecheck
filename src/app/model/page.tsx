@@ -32,11 +32,11 @@ interface AnalysisResult {
 
 // Bar display configuration
 const BAR_CONFIG = {
-  arousal: { label: "Arousal", color: "bg-red-500", description: "Emotional intensity & urgency" },
-  enemy_construction: { label: "Enemy Construction", color: "bg-orange-500", description: "Othering & dehumanization" },
-  moral_condemnation: { label: "Moral Condemnation", color: "bg-purple-500", description: "Moral outrage & purity" },
-  simplification: { label: "Simplification", color: "bg-yellow-500", description: "Black-and-white thinking" },
-  call_to_conflict: { label: "Call to Conflict", color: "bg-pink-500", description: "Engagement bait & provocation" },
+  arousal: { label: "Emotional Heat", color: "bg-red-500", description: "Emotional intensity & urgency" },
+  enemy_construction: { label: "Us vs Them", color: "bg-orange-500", description: "Othering & dehumanization" },
+  moral_condemnation: { label: "Moral Outrage", color: "bg-purple-500", description: "Moral outrage & purity" },
+  simplification: { label: "Black & White Thinking", color: "bg-yellow-500", description: "Black-and-white thinking" },
+  call_to_conflict: { label: "Fight-Picking", color: "bg-pink-500", description: "Engagement bait & provocation" },
 };
 
 function ScoreGauge({ score, label }: { score: number; label: string }) {
@@ -391,11 +391,11 @@ export default function ModelPage() {
                 No single word triggers a high score—patterns must combine.
               </p>
               <ul className="space-y-1">
-                <li><strong>Arousal:</strong> Emotional intensity, urgency, punctuation</li>
-                <li><strong>Enemy Construction:</strong> Othering, dehumanization, scapegoating</li>
-                <li><strong>Moral Condemnation:</strong> Moral judgment, purity rhetoric</li>
-                <li><strong>Simplification:</strong> Absolutism, false dilemmas</li>
-                <li><strong>Call to Conflict:</strong> Engagement bait, provocation</li>
+                <li><strong>Emotional Heat:</strong> Emotional intensity, urgency, punctuation</li>
+                <li><strong>Us vs Them:</strong> Othering, dehumanization, scapegoating</li>
+                <li><strong>Moral Outrage:</strong> Moral judgment, purity rhetoric</li>
+                <li><strong>Black & White Thinking:</strong> Absolutism, false dilemmas</li>
+                <li><strong>Fight-Picking:</strong> Engagement bait, provocation</li>
               </ul>
             </div>
             <div>

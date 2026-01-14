@@ -535,7 +535,7 @@ function MicroDemoCard() {
               <div className="flex-1 space-y-2.5">
                  <div className="space-y-1">
                     <div className="flex justify-between text-[9px] uppercase font-bold text-zinc-500 tracking-wider">
-                       <span>Enemy Construction</span>
+                       <span>Us vs Them</span>
                        <span>85%</span>
                     </div>
                     <div className="h-1.5 bg-zinc-200 dark:bg-zinc-700 rounded-full overflow-hidden">
@@ -544,7 +544,7 @@ function MicroDemoCard() {
                  </div>
                  <div className="space-y-1">
                     <div className="flex justify-between text-[9px] uppercase font-bold text-zinc-500 tracking-wider">
-                       <span>Emotional Arousal</span>
+                       <span>Emotional Heat</span>
                        <span>72%</span>
                     </div>
                     <div className="h-1.5 bg-zinc-200 dark:bg-zinc-700 rounded-full overflow-hidden">

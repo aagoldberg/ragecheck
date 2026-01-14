@@ -70,11 +70,11 @@ export async function GET() {
             borderTop: "2px solid #f4f4f5"
           }}>
             {[
-              { label: "Emotional Arousal", color: "#f43f5e", bg: "#fff1f2" }, // rose
-              { label: "Enemy Construction", color: "#6366f1", bg: "#eef2ff" }, // indigo
-              { label: "Moral Condemnation", color: "#f97316", bg: "#fff7ed" }, // orange/amber
-              { label: "Oversimplification", color: "#3b82f6", bg: "#eff6ff" }, // blue
-              { label: "Call-to-Conflict", color: "#f59e0b", bg: "#fffbeb" }, // amber
+              { label: "Emotional Heat", color: "#f43f5e", bg: "#fff1f2" }, // rose
+              { label: "Us vs Them", color: "#6366f1", bg: "#eef2ff" }, // indigo
+              { label: "Moral Outrage", color: "#f97316", bg: "#fff7ed" }, // orange/amber
+              { label: "Black & White Thinking", color: "#3b82f6", bg: "#eff6ff" }, // blue
+              { label: "Fight-Picking", color: "#f59e0b", bg: "#fffbeb" }, // amber
             ].map((signal) => (
               <div
                 key={signal.label}
