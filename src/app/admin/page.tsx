@@ -281,6 +281,52 @@ interface RetentionMetrics {
   };
 }
 
+interface ShareMetrics {
+  overview: {
+    totalShares: number;
+    uniqueSharers: number;
+    shareRate: number;
+    todayShares: number;
+    weekShares: number;
+    avgSharesPerSharer: number;
+  };
+  shareTypes: {
+    type: string;
+    count: number;
+    percentage: number;
+  }[];
+  topSharedContent: {
+    url: string;
+    domain: string;
+    shareCount: number;
+    uniqueSharers: number;
+  }[];
+  sharerSegmentation: {
+    oneTime: number;
+    occasional: number;
+    frequent: number;
+    power: number;
+    total: number;
+  };
+  scoreDistribution: {
+    low: number;
+    medium: number;
+    high: number;
+    unknown: number;
+  };
+  dailyTrend: {
+    date: string;
+    shares: number;
+    uniqueSharers: number;
+  }[];
+  kFactor: {
+    shareRate: number;
+    avgSharesPerSharer: number;
+    estimatedConversion: number;
+    kFactorValue: number;
+  };
+}
+
 interface ApiResponse {
   success?: boolean;
   error?: string;
@@ -294,6 +340,7 @@ interface ApiResponse {
   conversionInsights?: ConversionInsights;
   funnelMetrics?: FunnelMetrics;
   retentionMetrics?: RetentionMetrics;
+  shareMetrics?: ShareMetrics;
   dbAvailable?: boolean;
 }
 
@@ -305,6 +352,7 @@ function StatCard({ title, value, subtitle, icon, accent = "indigo", tooltip }: 
   accent?: "indigo" | "emerald" | "amber" | "rose" | "purple";
   tooltip?: string;
 }) {
+  const [showTooltip, setShowTooltip] = useState(false);
   const accentColors = {
     indigo: "from-indigo-500 to-indigo-600 text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/50",
     emerald: "from-emerald-500 to-emerald-600 text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50",
@@ -320,16 +368,21 @@ function StatCard({ title, value, subtitle, icon, accent = "indigo", tooltip }: 
   }, ["", "", ""]);
 
   return (
-    <div className="relative overflow-hidden bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-5 hover:shadow-lg transition-shadow group" title={tooltip}>
+    <div className="relative overflow-hidden bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-5 hover:shadow-lg transition-shadow group">
       <div className={`absolute top-0 left-0 w-1 h-full bg-gradient-to-b ${gradient}`}></div>
       <div className="flex items-start justify-between">
         <div>
           <h3 className="text-[11px] font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 mb-1 flex items-center gap-1">
             {title}
             {tooltip && (
-              <svg className="w-3 h-3 text-zinc-300 dark:text-zinc-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
+              <button
+                onClick={() => setShowTooltip(!showTooltip)}
+                className="p-0.5 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+              >
+                <svg className="w-3.5 h-3.5 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </button>
             )}
           </h3>
           <p className={`text-3xl font-bold ${textColor}`}>{value}</p>
@@ -341,6 +394,20 @@ function StatCard({ title, value, subtitle, icon, accent = "indigo", tooltip }: 
           </div>
         )}
       </div>
+      {/* Tooltip popup */}
+      {tooltip && showTooltip && (
+        <div className="absolute top-full left-0 right-0 mt-2 p-3 bg-zinc-800 dark:bg-zinc-700 text-white text-xs rounded-lg shadow-lg z-50">
+          <button
+            onClick={() => setShowTooltip(false)}
+            className="absolute top-1 right-1 p-1 hover:bg-zinc-700 dark:hover:bg-zinc-600 rounded"
+          >
+            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+          {tooltip}
+        </div>
+      )}
     </div>
   );
 }
@@ -1215,7 +1282,7 @@ function PageDailyChart({ data, title }: { data: { date: string; visitors: numbe
   );
 }
 
-type TabType = "overview" | "users" | "conversions" | "retention" | "feedback" | "content" | "clearview";
+type TabType = "overview" | "users" | "conversions" | "retention" | "shares" | "feedback" | "content" | "clearview";
 
 interface ClearviewStats {
   lastGenerated: string | null;
@@ -1247,6 +1314,7 @@ export default function AdminDashboard() {
   const [conversionInsights, setConversionInsights] = useState<ConversionInsights | null>(null);
   const [funnelMetrics, setFunnelMetrics] = useState<FunnelMetrics | null>(null);
   const [retentionMetrics, setRetentionMetrics] = useState<RetentionMetrics | null>(null);
+  const [shareMetrics, setShareMetrics] = useState<ShareMetrics | null>(null);
 
   const fetchStats = async (adminKey: string) => {
     setLoading(true);
@@ -1273,6 +1341,7 @@ export default function AdminDashboard() {
         setConversionInsights(data.conversionInsights || null);
         setFunnelMetrics(data.funnelMetrics || null);
         setRetentionMetrics(data.retentionMetrics || null);
+        setShareMetrics(data.shareMetrics || null);
         setAuthenticated(true);
         // Save key to localStorage
         localStorage.setItem("ragecheck-admin-key", adminKey);
@@ -1434,7 +1503,7 @@ export default function AdminDashboard() {
         {/* Tabs */}
         <div className="max-w-7xl mx-auto px-4">
           <div className="flex gap-6 -mb-px">
-            {(["overview", "users", "conversions", "retention", "feedback", "content", "clearview"] as const).map((tab) => (
+            {(["overview", "users", "conversions", "retention", "shares", "feedback", "content", "clearview"] as const).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
@@ -2509,6 +2578,238 @@ export default function AdminDashboard() {
                     <div><strong>Return Rate:</strong> 20%+ is strong for tools</div>
                   </div>
                 </div>
+              </div>
+            )}
+
+            {/* Shares Tab */}
+            {activeTab === "shares" && shareMetrics && (
+              <div className="space-y-8">
+                {/* Overview Stats */}
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                  <StatCard
+                    title="Total Shares"
+                    value={shareMetrics.overview.totalShares}
+                    subtitle={`${shareMetrics.overview.todayShares} today`}
+                    tooltip="Total number of share button clicks across all time"
+                  />
+                  <StatCard
+                    title="Unique Sharers"
+                    value={shareMetrics.overview.uniqueSharers}
+                    subtitle={`${shareMetrics.overview.weekShares} this week`}
+                    tooltip="Number of distinct users who have shared at least once"
+                  />
+                  <StatCard
+                    title="Share Rate"
+                    value={`${shareMetrics.overview.shareRate}%`}
+                    subtitle="of analyzers share"
+                    tooltip="Percentage of users who analyzed content and then shared it. Higher = more viral potential."
+                    accent="emerald"
+                  />
+                  <StatCard
+                    title="Shares/Sharer"
+                    value={shareMetrics.overview.avgSharesPerSharer}
+                    subtitle="avg per user"
+                    tooltip="Average number of times each sharer shares. Higher = power users are engaged."
+                  />
+                  <StatCard
+                    title="K-Factor"
+                    value={shareMetrics.kFactor.kFactorValue}
+                    subtitle={shareMetrics.kFactor.kFactorValue >= 1 ? "Viral!" : "Sub-viral"}
+                    accent={shareMetrics.kFactor.kFactorValue >= 1 ? "emerald" : "amber"}
+                    tooltip="Viral coefficient: (share rate) × (conversion from shares). K > 1 means viral growth where each user brings in more than 1 new user."
+                  />
+                  <StatCard
+                    title="Est. Conversion"
+                    value={`${shareMetrics.kFactor.estimatedConversion}%`}
+                    subtitle="from shares"
+                    tooltip="Estimated percentage of share recipients who visit the site. Based on referral traffic patterns."
+                  />
+                </div>
+
+                {/* Share Method & Score Distribution Row */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* How People Share */}
+                  <div className="bg-white dark:bg-zinc-900 p-6 rounded-xl border border-zinc-200 dark:border-zinc-800">
+                    <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 mb-4">How People Share</h3>
+                    {shareMetrics.shareTypes.length > 0 ? (
+                      <div className="space-y-3">
+                        {shareMetrics.shareTypes.map((type) => {
+                          const colors: Record<string, string> = {
+                            copy_link: "bg-blue-500",
+                            twitter: "bg-sky-500",
+                            facebook: "bg-indigo-500",
+                            linkedin: "bg-blue-700",
+                            native: "bg-emerald-500",
+                            share_button: "bg-purple-500",
+                            other: "bg-zinc-400",
+                          };
+                          return (
+                            <div key={type.type} className="flex items-center gap-3">
+                              <div className="w-24 text-sm text-zinc-600 dark:text-zinc-400 capitalize">
+                                {type.type.replace("_", " ")}
+                              </div>
+                              <div className="flex-1 h-6 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+                                <div
+                                  className={`h-full ${colors[type.type] || "bg-zinc-400"} rounded-full transition-all`}
+                                  style={{ width: `${type.percentage}%` }}
+                                />
+                              </div>
+                              <div className="w-16 text-right text-sm text-zinc-600 dark:text-zinc-400">
+                                {type.count} ({type.percentage}%)
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <p className="text-center text-zinc-500 py-4">No share data yet</p>
+                    )}
+                  </div>
+
+                  {/* What Content Gets Shared */}
+                  <div className="bg-white dark:bg-zinc-900 p-6 rounded-xl border border-zinc-200 dark:border-zinc-800">
+                    <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 mb-4">Score Distribution of Shared Content</h3>
+                    <div className="space-y-3">
+                      {[
+                        { label: "Low (0-33)", value: shareMetrics.scoreDistribution.low, color: "bg-emerald-500" },
+                        { label: "Medium (34-66)", value: shareMetrics.scoreDistribution.medium, color: "bg-amber-500" },
+                        { label: "High (67-100)", value: shareMetrics.scoreDistribution.high, color: "bg-rose-500" },
+                        { label: "Unknown", value: shareMetrics.scoreDistribution.unknown, color: "bg-zinc-400" },
+                      ].map((item) => {
+                        const total = shareMetrics.scoreDistribution.low + shareMetrics.scoreDistribution.medium + shareMetrics.scoreDistribution.high + shareMetrics.scoreDistribution.unknown;
+                        const pct = total > 0 ? (item.value / total) * 100 : 0;
+                        return (
+                          <div key={item.label} className="flex items-center gap-3">
+                            <div className="w-28 text-sm text-zinc-600 dark:text-zinc-400">{item.label}</div>
+                            <div className="flex-1 h-6 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+                              <div
+                                className={`h-full ${item.color} rounded-full transition-all`}
+                                style={{ width: `${pct}%` }}
+                              />
+                            </div>
+                            <div className="w-20 text-right text-sm text-zinc-600 dark:text-zinc-400">
+                              {item.value} ({pct.toFixed(1)}%)
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <p className="mt-4 text-xs text-zinc-500">
+                      {shareMetrics.scoreDistribution.high > shareMetrics.scoreDistribution.low
+                        ? "Users share high-rage content more often - outrage drives sharing"
+                        : "Users share across all score ranges"}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Sharer Segmentation */}
+                <div className="bg-white dark:bg-zinc-900 p-6 rounded-xl border border-zinc-200 dark:border-zinc-800">
+                  <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 mb-4">Sharer Segmentation</h3>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="text-center p-4 bg-zinc-50 dark:bg-zinc-800/50 rounded-lg">
+                      <div className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">{shareMetrics.sharerSegmentation.oneTime}</div>
+                      <div className="text-sm text-zinc-500">One-time</div>
+                      <div className="text-xs text-zinc-400">shared once</div>
+                    </div>
+                    <div className="text-center p-4 bg-blue-50 dark:bg-blue-950/30 rounded-lg">
+                      <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{shareMetrics.sharerSegmentation.occasional}</div>
+                      <div className="text-sm text-zinc-500">Occasional</div>
+                      <div className="text-xs text-zinc-400">2-3 shares</div>
+                    </div>
+                    <div className="text-center p-4 bg-indigo-50 dark:bg-indigo-950/30 rounded-lg">
+                      <div className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">{shareMetrics.sharerSegmentation.frequent}</div>
+                      <div className="text-sm text-zinc-500">Frequent</div>
+                      <div className="text-xs text-zinc-400">4-10 shares</div>
+                    </div>
+                    <div className="text-center p-4 bg-emerald-50 dark:bg-emerald-950/30 rounded-lg">
+                      <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{shareMetrics.sharerSegmentation.power}</div>
+                      <div className="text-sm text-zinc-500">Power</div>
+                      <div className="text-xs text-zinc-400">10+ shares</div>
+                    </div>
+                  </div>
+                  {shareMetrics.sharerSegmentation.power > 0 && (
+                    <p className="mt-4 text-sm text-emerald-600 dark:text-emerald-400">
+                      You have {shareMetrics.sharerSegmentation.power} power sharer{shareMetrics.sharerSegmentation.power !== 1 ? "s" : ""} - these are your viral champions!
+                    </p>
+                  )}
+                </div>
+
+                {/* Top Shared Content */}
+                {shareMetrics.topSharedContent.length > 0 && (
+                  <div className="bg-white dark:bg-zinc-900 p-6 rounded-xl border border-zinc-200 dark:border-zinc-800">
+                    <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 mb-4">Top Shared URLs</h3>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b border-zinc-200 dark:border-zinc-700">
+                            <th className="text-left py-2 px-3 text-zinc-500 dark:text-zinc-400 font-medium">Domain</th>
+                            <th className="text-right py-2 px-3 text-zinc-500 dark:text-zinc-400 font-medium">Shares</th>
+                            <th className="text-right py-2 px-3 text-zinc-500 dark:text-zinc-400 font-medium">Unique Sharers</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {shareMetrics.topSharedContent.slice(0, 10).map((item, idx) => (
+                            <tr key={idx} className="border-b border-zinc-100 dark:border-zinc-800">
+                              <td className="py-2 px-3">
+                                <div className="text-zinc-700 dark:text-zinc-300 truncate max-w-xs" title={item.url}>
+                                  {item.domain}
+                                </div>
+                              </td>
+                              <td className="py-2 px-3 text-right text-zinc-700 dark:text-zinc-300">{item.shareCount}</td>
+                              <td className="py-2 px-3 text-right text-zinc-700 dark:text-zinc-300">{item.uniqueSharers}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {/* Share Trends Chart */}
+                {shareMetrics.dailyTrend.length > 0 && (
+                  <div className="bg-white dark:bg-zinc-900 p-6 rounded-xl border border-zinc-200 dark:border-zinc-800">
+                    <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 mb-4">Daily Share Trend (14 days)</h3>
+                    <div className="flex items-end gap-1 h-32">
+                      {shareMetrics.dailyTrend.map((day, idx) => {
+                        const maxShares = Math.max(...shareMetrics.dailyTrend.map(d => d.shares), 1);
+                        const height = (day.shares / maxShares) * 100;
+                        return (
+                          <div key={idx} className="flex-1 flex flex-col items-center group">
+                            <div className="relative w-full flex flex-col items-center">
+                              <div
+                                className="w-full bg-indigo-500 rounded-t transition-all group-hover:bg-indigo-600"
+                                style={{ height: `${height}%`, minHeight: day.shares > 0 ? '4px' : '1px' }}
+                                title={`${day.date}: ${day.shares} shares`}
+                              />
+                            </div>
+                            {idx % 2 === 0 && (
+                              <span className="text-[10px] text-zinc-400 mt-1 rotate-45 origin-left">
+                                {day.date.slice(5)}
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Benchmarks */}
+                <div className="bg-zinc-50 dark:bg-zinc-900/50 p-4 rounded-lg border border-zinc-200 dark:border-zinc-800">
+                  <h4 className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mb-2">Industry Benchmarks</h4>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs text-zinc-600 dark:text-zinc-400">
+                    <div><strong>Share Rate:</strong> 5-15% typical, 20%+ viral</div>
+                    <div><strong>K-Factor:</strong> &lt;1 sub-viral, &gt;1 viral growth</div>
+                    <div><strong>Power Sharers:</strong> Top 10% drive 80% of shares</div>
+                    <div><strong>Conversion:</strong> 10-30% from shared links</div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {activeTab === "shares" && !shareMetrics && (
+              <div className="text-center py-12 text-zinc-500">
+                No share metrics available
               </div>
             )}
 

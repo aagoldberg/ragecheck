@@ -160,6 +160,15 @@ export async function initDB() {
     )
   `;
 
+  // Add additional columns to shares table for enhanced tracking
+  try {
+    await getDb()`ALTER TABLE ragecheck_shares ADD COLUMN IF NOT EXISTS score INTEGER`;
+    await getDb()`ALTER TABLE ragecheck_shares ADD COLUMN IF NOT EXISTS platform TEXT`;
+    await getDb()`ALTER TABLE ragecheck_shares ADD COLUMN IF NOT EXISTS user_agent TEXT`;
+  } catch {
+    // Columns may already exist
+  }
+
   // Add columns if they don't exist (for existing tables)
   try {
     await getDb()`ALTER TABLE ragecheck_analyses ADD COLUMN IF NOT EXISTS ip_address TEXT`;
@@ -1479,22 +1488,37 @@ export async function getPageVisitorStats(pagePath: string): Promise<PageVisitor
 
 export interface ShareLog {
   url: string;
-  shareType: "copy_link" | "share_button" | "twitter" | "facebook" | "other";
+  shareType: "copy_link" | "share_button" | "twitter" | "facebook" | "linkedin" | "native" | "other";
   ipAddress?: string;
   referrerCode?: string;
+  score?: number;
+  platform?: string;
+  userAgent?: string;
 }
 
 export async function logShare(data: ShareLog) {
   try {
+    // Detect platform from user agent if not provided
+    const platform = data.platform || (data.userAgent ? detectSharePlatform(data.userAgent) : null);
+
     await withRetry(async () => {
       await getDb()`
-        INSERT INTO ragecheck_shares (url, share_type, ip_address, referrer_code)
-        VALUES (${data.url}, ${data.shareType}, ${data.ipAddress || null}, ${data.referrerCode || null})
+        INSERT INTO ragecheck_shares (url, share_type, ip_address, referrer_code, score, platform, user_agent)
+        VALUES (${data.url}, ${data.shareType}, ${data.ipAddress || null}, ${data.referrerCode || null}, ${data.score || null}, ${platform}, ${data.userAgent || null})
       `;
     });
   } catch (error) {
     console.error("Failed to log share:", error);
   }
+}
+
+function detectSharePlatform(userAgent: string): string {
+  const ua = userAgent.toLowerCase();
+  if (ua.includes("twitter") || ua.includes("x.com")) return "twitter";
+  if (ua.includes("facebook") || ua.includes("fb")) return "facebook";
+  if (ua.includes("linkedin")) return "linkedin";
+  if (ua.includes("reddit")) return "reddit";
+  return "unknown";
 }
 
 export interface ViralMetrics {
@@ -2498,6 +2522,260 @@ export async function getFunnelMetrics(): Promise<FunnelMetrics> {
       steps: [],
       trend: [],
       period: "Last 7 days",
+    };
+  }
+}
+
+// ============================================
+// SHARE METRICS (Dedicated Tab)
+// ============================================
+
+export interface ShareMetrics {
+  // Overview stats
+  overview: {
+    totalShares: number;
+    uniqueSharers: number;
+    shareRate: number; // % of analyzers who share
+    todayShares: number;
+    weekShares: number;
+    avgSharesPerSharer: number;
+  };
+  // Share type breakdown (how people share)
+  shareTypes: {
+    type: string;
+    count: number;
+    percentage: number;
+  }[];
+  // Top shared content (which URLs get shared most)
+  topSharedContent: {
+    url: string;
+    domain: string;
+    shareCount: number;
+    uniqueSharers: number;
+  }[];
+  // Sharer segmentation (power sharers vs casual)
+  sharerSegmentation: {
+    oneTime: number; // shared once
+    occasional: number; // shared 2-3 times
+    frequent: number; // shared 4-10 times
+    power: number; // shared 10+ times
+    total: number;
+  };
+  // Score distribution of shared content
+  scoreDistribution: {
+    low: number; // 0-33
+    medium: number; // 34-66
+    high: number; // 67-100
+    unknown: number; // no score
+  };
+  // Daily trends
+  dailyTrend: {
+    date: string;
+    shares: number;
+    uniqueSharers: number;
+  }[];
+  // K-factor components
+  kFactor: {
+    shareRate: number; // % of users who share
+    avgSharesPerSharer: number;
+    estimatedConversion: number; // estimated conversion from shares
+    kFactorValue: number; // shareRate * conversion
+  };
+}
+
+export async function getShareMetrics(): Promise<ShareMetrics> {
+  try {
+    // Total shares
+    const [totalSharesResult] = await getDb()`
+      SELECT COUNT(*) as count FROM ragecheck_shares
+    `;
+
+    // Unique sharers
+    const [uniqueSharersResult] = await getDb()`
+      SELECT COUNT(DISTINCT ip_address) as count FROM ragecheck_shares
+      WHERE ip_address IS NOT NULL
+    `;
+
+    // Today's shares
+    const [todaySharesResult] = await getDb()`
+      SELECT COUNT(*) as count FROM ragecheck_shares
+      WHERE created_at >= DATE_TRUNC('day', NOW() AT TIME ZONE 'America/New_York') AT TIME ZONE 'America/New_York'
+    `;
+
+    // This week's shares
+    const [weekSharesResult] = await getDb()`
+      SELECT COUNT(*) as count FROM ragecheck_shares
+      WHERE created_at > NOW() - INTERVAL '7 days'
+    `;
+
+    // Unique analyzers (for share rate calculation)
+    const [uniqueAnalyzersResult] = await getDb()`
+      SELECT COUNT(DISTINCT ip_address) as count FROM ragecheck_analyses
+      WHERE is_bot = false AND success = true AND ip_address IS NOT NULL
+    `;
+
+    const totalShares = Number(totalSharesResult?.count) || 0;
+    const uniqueSharers = Number(uniqueSharersResult?.count) || 0;
+    const todayShares = Number(todaySharesResult?.count) || 0;
+    const weekShares = Number(weekSharesResult?.count) || 0;
+    const uniqueAnalyzers = Number(uniqueAnalyzersResult?.count) || 1;
+    const shareRate = Math.round((uniqueSharers / uniqueAnalyzers) * 1000) / 10;
+    const avgSharesPerSharer = uniqueSharers > 0 ? Math.round((totalShares / uniqueSharers) * 10) / 10 : 0;
+
+    // Share type breakdown
+    const shareTypeData = await getDb()`
+      SELECT share_type, COUNT(*) as count
+      FROM ragecheck_shares
+      GROUP BY share_type
+      ORDER BY count DESC
+    `;
+
+    const shareTypes = shareTypeData.map(row => ({
+      type: String(row.share_type || "unknown"),
+      count: Number(row.count),
+      percentage: totalShares > 0 ? Math.round((Number(row.count) / totalShares) * 1000) / 10 : 0,
+    }));
+
+    // Top shared content
+    const topSharedData = await getDb()`
+      SELECT
+        url,
+        COUNT(*) as share_count,
+        COUNT(DISTINCT ip_address) as unique_sharers
+      FROM ragecheck_shares
+      WHERE url IS NOT NULL
+      GROUP BY url
+      ORDER BY share_count DESC
+      LIMIT 10
+    `;
+
+    const topSharedContent = topSharedData.map(row => {
+      let domain = "unknown";
+      try {
+        const urlObj = new URL(String(row.url));
+        domain = urlObj.hostname.replace("www.", "");
+      } catch {
+        domain = "unknown";
+      }
+      return {
+        url: String(row.url),
+        domain,
+        shareCount: Number(row.share_count),
+        uniqueSharers: Number(row.unique_sharers),
+      };
+    });
+
+    // Sharer segmentation
+    const segmentationData = await getDb()`
+      WITH sharer_counts AS (
+        SELECT ip_address, COUNT(*) as share_count
+        FROM ragecheck_shares
+        WHERE ip_address IS NOT NULL
+        GROUP BY ip_address
+      )
+      SELECT
+        SUM(CASE WHEN share_count = 1 THEN 1 ELSE 0 END) as one_time,
+        SUM(CASE WHEN share_count BETWEEN 2 AND 3 THEN 1 ELSE 0 END) as occasional,
+        SUM(CASE WHEN share_count BETWEEN 4 AND 10 THEN 1 ELSE 0 END) as frequent,
+        SUM(CASE WHEN share_count > 10 THEN 1 ELSE 0 END) as power,
+        COUNT(*) as total
+      FROM sharer_counts
+    `;
+
+    const seg = segmentationData[0] || {};
+    const sharerSegmentation = {
+      oneTime: Number(seg.one_time) || 0,
+      occasional: Number(seg.occasional) || 0,
+      frequent: Number(seg.frequent) || 0,
+      power: Number(seg.power) || 0,
+      total: Number(seg.total) || 0,
+    };
+
+    // Score distribution of shared content
+    const scoreDistData = await getDb()`
+      SELECT
+        SUM(CASE WHEN score IS NOT NULL AND score <= 33 THEN 1 ELSE 0 END) as low,
+        SUM(CASE WHEN score IS NOT NULL AND score BETWEEN 34 AND 66 THEN 1 ELSE 0 END) as medium,
+        SUM(CASE WHEN score IS NOT NULL AND score >= 67 THEN 1 ELSE 0 END) as high,
+        SUM(CASE WHEN score IS NULL THEN 1 ELSE 0 END) as unknown
+      FROM ragecheck_shares
+    `;
+
+    const scoreDist = scoreDistData[0] || {};
+    const scoreDistribution = {
+      low: Number(scoreDist.low) || 0,
+      medium: Number(scoreDist.medium) || 0,
+      high: Number(scoreDist.high) || 0,
+      unknown: Number(scoreDist.unknown) || 0,
+    };
+
+    // Daily trend (last 14 days)
+    const trendData = await getDb()`
+      SELECT
+        DATE(created_at AT TIME ZONE 'America/New_York') as day,
+        COUNT(*) as shares,
+        COUNT(DISTINCT ip_address) as unique_sharers
+      FROM ragecheck_shares
+      WHERE created_at > NOW() - INTERVAL '14 days'
+      GROUP BY DATE(created_at AT TIME ZONE 'America/New_York')
+      ORDER BY day ASC
+    `;
+
+    const dailyTrend = trendData.map(row => ({
+      date: row.day instanceof Date
+        ? row.day.toISOString().split('T')[0]
+        : String(row.day).split('T')[0],
+      shares: Number(row.shares),
+      uniqueSharers: Number(row.unique_sharers),
+    }));
+
+    // K-factor estimation
+    const [referralVisitsResult] = await getDb()`
+      SELECT COUNT(*) as count FROM ragecheck_visitors
+      WHERE is_bot = false AND (referrer LIKE '%ragecheck%' OR referrer LIKE '%share%')
+    `;
+    const referralVisits = Number(referralVisitsResult?.count) || 0;
+    const estimatedConversion = totalShares > 0 ? Math.min(referralVisits / totalShares, 1) : 0;
+    const kFactorValue = Math.round((shareRate / 100) * estimatedConversion * 1000) / 1000;
+
+    return {
+      overview: {
+        totalShares,
+        uniqueSharers,
+        shareRate,
+        todayShares,
+        weekShares,
+        avgSharesPerSharer,
+      },
+      shareTypes,
+      topSharedContent,
+      sharerSegmentation,
+      scoreDistribution,
+      dailyTrend,
+      kFactor: {
+        shareRate,
+        avgSharesPerSharer,
+        estimatedConversion: Math.round(estimatedConversion * 1000) / 10,
+        kFactorValue,
+      },
+    };
+  } catch (error) {
+    console.error("Failed to get share metrics:", error);
+    return {
+      overview: {
+        totalShares: 0,
+        uniqueSharers: 0,
+        shareRate: 0,
+        todayShares: 0,
+        weekShares: 0,
+        avgSharesPerSharer: 0,
+      },
+      shareTypes: [],
+      topSharedContent: [],
+      sharerSegmentation: { oneTime: 0, occasional: 0, frequent: 0, power: 0, total: 0 },
+      scoreDistribution: { low: 0, medium: 0, high: 0, unknown: 0 },
+      dailyTrend: [],
+      kFactor: { shareRate: 0, avgSharesPerSharer: 0, estimatedConversion: 0, kFactorValue: 0 },
     };
   }
 }
