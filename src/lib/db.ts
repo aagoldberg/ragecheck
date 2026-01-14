@@ -1173,6 +1173,207 @@ export async function getVisitorStats(): Promise<VisitorStats> {
   }
 }
 
+// Retention Metrics
+export interface RetentionMetrics {
+  // Cohort retention: for each cohort (users who first visited on a given day), what % returned
+  cohortRetention: {
+    cohortDate: string;
+    cohortSize: number;
+    d1: number; // % returned day 1
+    d7: number; // % returned by day 7
+    d14: number; // % returned by day 14
+    d30: number; // % returned by day 30
+  }[];
+  // Rolling return rate: of users first seen 7+ days ago, what % have visited 2+ times
+  rollingReturnRate: {
+    windowDays: number;
+    eligibleUsers: number;
+    returnedUsers: number;
+    rate: number;
+  };
+  // DAU/WAU/MAU stickiness
+  stickiness: {
+    dau: number;
+    wau: number;
+    mau: number;
+    dauWauRatio: number;
+    dauMauRatio: number;
+  };
+  // Frequency distribution
+  frequencyDistribution: {
+    visits1: number;
+    visits2to3: number;
+    visits4to10: number;
+    visits10plus: number;
+    total: number;
+  };
+}
+
+export async function getRetentionMetrics(): Promise<RetentionMetrics> {
+  try {
+    // Cohort retention for last 14 days (need enough time to measure retention)
+    const cohortData = await getDb()`
+      WITH cohorts AS (
+        SELECT
+          DATE(MIN(created_at) AT TIME ZONE 'America/New_York') as cohort_date,
+          ip_address
+        FROM ragecheck_visitors
+        WHERE is_bot = false AND ip_address IS NOT NULL
+        GROUP BY ip_address
+        HAVING DATE(MIN(created_at) AT TIME ZONE 'America/New_York') >= CURRENT_DATE - INTERVAL '30 days'
+      ),
+      cohort_sizes AS (
+        SELECT cohort_date, COUNT(*) as cohort_size
+        FROM cohorts
+        GROUP BY cohort_date
+      ),
+      returns AS (
+        SELECT
+          c.cohort_date,
+          c.ip_address,
+          MAX(CASE WHEN DATE(v.created_at AT TIME ZONE 'America/New_York') > c.cohort_date THEN 1 ELSE 0 END) as returned_d1,
+          MAX(CASE WHEN DATE(v.created_at AT TIME ZONE 'America/New_York') >= c.cohort_date + INTERVAL '7 days' THEN 1 ELSE 0 END) as returned_d7,
+          MAX(CASE WHEN DATE(v.created_at AT TIME ZONE 'America/New_York') >= c.cohort_date + INTERVAL '14 days' THEN 1 ELSE 0 END) as returned_d14,
+          MAX(CASE WHEN DATE(v.created_at AT TIME ZONE 'America/New_York') >= c.cohort_date + INTERVAL '30 days' THEN 1 ELSE 0 END) as returned_d30
+        FROM cohorts c
+        LEFT JOIN ragecheck_visitors v ON c.ip_address = v.ip_address AND v.is_bot = false
+        GROUP BY c.cohort_date, c.ip_address
+      ),
+      retention_rates AS (
+        SELECT
+          r.cohort_date,
+          cs.cohort_size,
+          ROUND(100.0 * SUM(r.returned_d1) / NULLIF(cs.cohort_size, 0), 1) as d1,
+          ROUND(100.0 * SUM(r.returned_d7) / NULLIF(cs.cohort_size, 0), 1) as d7,
+          ROUND(100.0 * SUM(r.returned_d14) / NULLIF(cs.cohort_size, 0), 1) as d14,
+          ROUND(100.0 * SUM(r.returned_d30) / NULLIF(cs.cohort_size, 0), 1) as d30
+        FROM returns r
+        JOIN cohort_sizes cs ON r.cohort_date = cs.cohort_date
+        GROUP BY r.cohort_date, cs.cohort_size
+      )
+      SELECT * FROM retention_rates
+      ORDER BY cohort_date DESC
+      LIMIT 14
+    `;
+
+    const cohortRetention = cohortData.map(row => ({
+      cohortDate: row.cohort_date instanceof Date
+        ? row.cohort_date.toISOString().split('T')[0]
+        : String(row.cohort_date).split('T')[0],
+      cohortSize: Number(row.cohort_size),
+      d1: Number(row.d1) || 0,
+      d7: Number(row.d7) || 0,
+      d14: Number(row.d14) || 0,
+      d30: Number(row.d30) || 0,
+    }));
+
+    // Rolling return rate: users first seen 7+ days ago who visited 2+ times
+    const [rollingData] = await getDb()`
+      WITH user_first_visit AS (
+        SELECT
+          ip_address,
+          MIN(created_at) as first_visit,
+          COUNT(DISTINCT DATE(created_at AT TIME ZONE 'America/New_York')) as visit_days
+        FROM ragecheck_visitors
+        WHERE is_bot = false AND ip_address IS NOT NULL
+        GROUP BY ip_address
+      )
+      SELECT
+        COUNT(*) as eligible_users,
+        SUM(CASE WHEN visit_days >= 2 THEN 1 ELSE 0 END) as returned_users
+      FROM user_first_visit
+      WHERE first_visit < NOW() - INTERVAL '7 days'
+    `;
+
+    const eligibleUsers = Number(rollingData?.eligible_users) || 0;
+    const returnedUsers = Number(rollingData?.returned_users) || 0;
+
+    // DAU/WAU/MAU stickiness
+    const [dauData] = await getDb()`
+      SELECT COUNT(DISTINCT ip_address) as dau
+      FROM ragecheck_visitors
+      WHERE is_bot = false
+        AND ip_address IS NOT NULL
+        AND created_at >= DATE_TRUNC('day', NOW() AT TIME ZONE 'America/New_York') AT TIME ZONE 'America/New_York'
+    `;
+
+    const [wauData] = await getDb()`
+      SELECT COUNT(DISTINCT ip_address) as wau
+      FROM ragecheck_visitors
+      WHERE is_bot = false
+        AND ip_address IS NOT NULL
+        AND created_at >= NOW() - INTERVAL '7 days'
+    `;
+
+    const [mauData] = await getDb()`
+      SELECT COUNT(DISTINCT ip_address) as mau
+      FROM ragecheck_visitors
+      WHERE is_bot = false
+        AND ip_address IS NOT NULL
+        AND created_at >= NOW() - INTERVAL '30 days'
+    `;
+
+    const dau = Number(dauData?.dau) || 0;
+    const wau = Number(wauData?.wau) || 0;
+    const mau = Number(mauData?.mau) || 0;
+
+    // Frequency distribution (last 30 days)
+    const freqData = await getDb()`
+      WITH user_visits AS (
+        SELECT
+          ip_address,
+          COUNT(DISTINCT DATE(created_at AT TIME ZONE 'America/New_York')) as visit_days
+        FROM ragecheck_visitors
+        WHERE is_bot = false
+          AND ip_address IS NOT NULL
+          AND created_at >= NOW() - INTERVAL '30 days'
+        GROUP BY ip_address
+      )
+      SELECT
+        SUM(CASE WHEN visit_days = 1 THEN 1 ELSE 0 END) as visits_1,
+        SUM(CASE WHEN visit_days BETWEEN 2 AND 3 THEN 1 ELSE 0 END) as visits_2_3,
+        SUM(CASE WHEN visit_days BETWEEN 4 AND 10 THEN 1 ELSE 0 END) as visits_4_10,
+        SUM(CASE WHEN visit_days > 10 THEN 1 ELSE 0 END) as visits_10_plus,
+        COUNT(*) as total
+      FROM user_visits
+    `;
+
+    const freq = freqData[0] || {};
+
+    return {
+      cohortRetention,
+      rollingReturnRate: {
+        windowDays: 7,
+        eligibleUsers,
+        returnedUsers,
+        rate: eligibleUsers > 0 ? Math.round(1000 * returnedUsers / eligibleUsers) / 10 : 0,
+      },
+      stickiness: {
+        dau,
+        wau,
+        mau,
+        dauWauRatio: wau > 0 ? Math.round(1000 * dau / wau) / 10 : 0,
+        dauMauRatio: mau > 0 ? Math.round(1000 * dau / mau) / 10 : 0,
+      },
+      frequencyDistribution: {
+        visits1: Number(freq.visits_1) || 0,
+        visits2to3: Number(freq.visits_2_3) || 0,
+        visits4to10: Number(freq.visits_4_10) || 0,
+        visits10plus: Number(freq.visits_10_plus) || 0,
+        total: Number(freq.total) || 0,
+      },
+    };
+  } catch (error) {
+    console.error("Failed to get retention metrics:", error);
+    return {
+      cohortRetention: [],
+      rollingReturnRate: { windowDays: 7, eligibleUsers: 0, returnedUsers: 0, rate: 0 },
+      stickiness: { dau: 0, wau: 0, mau: 0, dauWauRatio: 0, dauMauRatio: 0 },
+      frequencyDistribution: { visits1: 0, visits2to3: 0, visits4to10: 0, visits10plus: 0, total: 0 },
+    };
+  }
+}
+
 export interface PageVisitorStats {
   totalVisitors: number;
   todayVisitors: number;

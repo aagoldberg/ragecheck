@@ -250,6 +250,37 @@ interface FunnelMetrics {
   period: string;
 }
 
+interface RetentionMetrics {
+  cohortRetention: {
+    cohortDate: string;
+    cohortSize: number;
+    d1: number;
+    d7: number;
+    d14: number;
+    d30: number;
+  }[];
+  rollingReturnRate: {
+    windowDays: number;
+    eligibleUsers: number;
+    returnedUsers: number;
+    rate: number;
+  };
+  stickiness: {
+    dau: number;
+    wau: number;
+    mau: number;
+    dauWauRatio: number;
+    dauMauRatio: number;
+  };
+  frequencyDistribution: {
+    visits1: number;
+    visits2to3: number;
+    visits4to10: number;
+    visits10plus: number;
+    total: number;
+  };
+}
+
 interface ApiResponse {
   success?: boolean;
   error?: string;
@@ -262,6 +293,7 @@ interface ApiResponse {
   conversionMetrics?: ConversionMetrics;
   conversionInsights?: ConversionInsights;
   funnelMetrics?: FunnelMetrics;
+  retentionMetrics?: RetentionMetrics;
   dbAvailable?: boolean;
 }
 
@@ -1177,7 +1209,7 @@ function PageDailyChart({ data, title }: { data: { date: string; visitors: numbe
   );
 }
 
-type TabType = "overview" | "users" | "conversions" | "feedback" | "content" | "clearview";
+type TabType = "overview" | "users" | "conversions" | "retention" | "feedback" | "content" | "clearview";
 
 interface ClearviewStats {
   lastGenerated: string | null;
@@ -1208,6 +1240,7 @@ export default function AdminDashboard() {
   const [conversionMetrics, setConversionMetrics] = useState<ConversionMetrics | null>(null);
   const [conversionInsights, setConversionInsights] = useState<ConversionInsights | null>(null);
   const [funnelMetrics, setFunnelMetrics] = useState<FunnelMetrics | null>(null);
+  const [retentionMetrics, setRetentionMetrics] = useState<RetentionMetrics | null>(null);
 
   const fetchStats = async (adminKey: string) => {
     setLoading(true);
@@ -1233,6 +1266,7 @@ export default function AdminDashboard() {
         setConversionMetrics(data.conversionMetrics || null);
         setConversionInsights(data.conversionInsights || null);
         setFunnelMetrics(data.funnelMetrics || null);
+        setRetentionMetrics(data.retentionMetrics || null);
         setAuthenticated(true);
         // Save key to localStorage
         localStorage.setItem("ragecheck-admin-key", adminKey);
@@ -1394,7 +1428,7 @@ export default function AdminDashboard() {
         {/* Tabs */}
         <div className="max-w-7xl mx-auto px-4">
           <div className="flex gap-6 -mb-px">
-            {(["overview", "users", "conversions", "feedback", "content", "clearview"] as const).map((tab) => (
+            {(["overview", "users", "conversions", "retention", "feedback", "content", "clearview"] as const).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
@@ -2341,6 +2375,131 @@ export default function AdminDashboard() {
               </div>
             )}
             </>
+            )}
+
+            {/* Retention Tab */}
+            {activeTab === "retention" && retentionMetrics && (
+              <div className="space-y-8">
+                {/* Key Metrics Row */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <StatCard
+                    title="Return Rate (7d+)"
+                    value={`${retentionMetrics.rollingReturnRate.rate}%`}
+                    subtitle={`${retentionMetrics.rollingReturnRate.returnedUsers} of ${retentionMetrics.rollingReturnRate.eligibleUsers} users`}
+                  />
+                  <StatCard
+                    title="DAU/MAU Ratio"
+                    value={`${retentionMetrics.stickiness.dauMauRatio}%`}
+                    subtitle={`${retentionMetrics.stickiness.dau} daily / ${retentionMetrics.stickiness.mau} monthly`}
+                  />
+                  <StatCard
+                    title="DAU/WAU Ratio"
+                    value={`${retentionMetrics.stickiness.dauWauRatio}%`}
+                    subtitle={`${retentionMetrics.stickiness.dau} daily / ${retentionMetrics.stickiness.wau} weekly`}
+                  />
+                  <StatCard
+                    title="Multi-Visit Users"
+                    value={retentionMetrics.frequencyDistribution.total - retentionMetrics.frequencyDistribution.visits1}
+                    subtitle={`of ${retentionMetrics.frequencyDistribution.total} total (30d)`}
+                  />
+                </div>
+
+                {/* Frequency Distribution */}
+                <div className="bg-white dark:bg-zinc-900 p-6 rounded-xl border border-zinc-200 dark:border-zinc-800">
+                  <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 mb-4">
+                    Visit Frequency Distribution (Last 30 Days)
+                  </h3>
+                  <div className="space-y-3">
+                    {[
+                      { label: "1 visit", value: retentionMetrics.frequencyDistribution.visits1, color: "bg-zinc-400" },
+                      { label: "2-3 visits", value: retentionMetrics.frequencyDistribution.visits2to3, color: "bg-blue-500" },
+                      { label: "4-10 visits", value: retentionMetrics.frequencyDistribution.visits4to10, color: "bg-indigo-500" },
+                      { label: "10+ visits", value: retentionMetrics.frequencyDistribution.visits10plus, color: "bg-emerald-500" },
+                    ].map((item) => {
+                      const pct = retentionMetrics.frequencyDistribution.total > 0
+                        ? (item.value / retentionMetrics.frequencyDistribution.total) * 100
+                        : 0;
+                      return (
+                        <div key={item.label} className="flex items-center gap-3">
+                          <span className="w-20 text-xs text-zinc-500 dark:text-zinc-400">{item.label}</span>
+                          <div className="flex-1 h-6 bg-zinc-100 dark:bg-zinc-800 rounded overflow-hidden">
+                            <div
+                              className={`h-full ${item.color} transition-all`}
+                              style={{ width: `${pct}%` }}
+                            />
+                          </div>
+                          <span className="w-16 text-xs font-medium text-zinc-700 dark:text-zinc-300 text-right">
+                            {item.value} ({pct.toFixed(1)}%)
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Cohort Retention Table */}
+                <div className="bg-white dark:bg-zinc-900 p-6 rounded-xl border border-zinc-200 dark:border-zinc-800">
+                  <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 mb-4">
+                    Cohort Retention (by First Visit Date)
+                  </h3>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-zinc-200 dark:border-zinc-700">
+                          <th className="text-left py-2 px-3 text-zinc-500 dark:text-zinc-400 font-medium">Cohort</th>
+                          <th className="text-right py-2 px-3 text-zinc-500 dark:text-zinc-400 font-medium">Size</th>
+                          <th className="text-right py-2 px-3 text-zinc-500 dark:text-zinc-400 font-medium">D1</th>
+                          <th className="text-right py-2 px-3 text-zinc-500 dark:text-zinc-400 font-medium">D7</th>
+                          <th className="text-right py-2 px-3 text-zinc-500 dark:text-zinc-400 font-medium">D14</th>
+                          <th className="text-right py-2 px-3 text-zinc-500 dark:text-zinc-400 font-medium">D30</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {retentionMetrics.cohortRetention.map((cohort) => (
+                          <tr key={cohort.cohortDate} className="border-b border-zinc-100 dark:border-zinc-800">
+                            <td className="py-2 px-3 text-zinc-700 dark:text-zinc-300">{cohort.cohortDate}</td>
+                            <td className="py-2 px-3 text-zinc-700 dark:text-zinc-300 text-right">{cohort.cohortSize}</td>
+                            <td className="py-2 px-3 text-right">
+                              <span className={`${cohort.d1 > 5 ? 'text-emerald-600 dark:text-emerald-400' : 'text-zinc-500'}`}>
+                                {cohort.d1}%
+                              </span>
+                            </td>
+                            <td className="py-2 px-3 text-right">
+                              <span className={`${cohort.d7 > 3 ? 'text-emerald-600 dark:text-emerald-400' : 'text-zinc-500'}`}>
+                                {cohort.d7}%
+                              </span>
+                            </td>
+                            <td className="py-2 px-3 text-right">
+                              <span className={`${cohort.d14 > 2 ? 'text-emerald-600 dark:text-emerald-400' : 'text-zinc-500'}`}>
+                                {cohort.d14}%
+                              </span>
+                            </td>
+                            <td className="py-2 px-3 text-right">
+                              <span className={`${cohort.d30 > 1 ? 'text-emerald-600 dark:text-emerald-400' : 'text-zinc-500'}`}>
+                                {cohort.d30}%
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  {retentionMetrics.cohortRetention.length === 0 && (
+                    <p className="text-center text-zinc-500 py-4">No cohort data available yet</p>
+                  )}
+                </div>
+
+                {/* Benchmarks */}
+                <div className="bg-zinc-50 dark:bg-zinc-900/50 p-4 rounded-lg border border-zinc-200 dark:border-zinc-800">
+                  <h4 className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mb-2">Industry Benchmarks</h4>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs text-zinc-600 dark:text-zinc-400">
+                    <div><strong>DAU/MAU:</strong> 10-20% typical, 25%+ strong</div>
+                    <div><strong>D1 Retention:</strong> 25-40% good for apps</div>
+                    <div><strong>D7 Retention:</strong> 10-20% good for apps</div>
+                    <div><strong>Return Rate:</strong> 20%+ is strong for tools</div>
+                  </div>
+                </div>
+              </div>
             )}
 
             {/* Feedback Tab */}
