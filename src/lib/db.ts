@@ -2598,33 +2598,64 @@ export async function getShareMetrics(): Promise<ShareMetrics> {
   try {
     // Filter out click events - only count completed shares
     // Click events end with "_clicked", actual shares are things like "share_image_success", "copy_link", etc.
-    const COMPLETED_SHARE_FILTER = `share_type NOT LIKE '%_clicked'`;
 
-    // Total shares (excluding click events)
-    const [totalSharesResult] = await getDb()`
-      SELECT COUNT(*) as count FROM ragecheck_shares
-      WHERE share_type NOT LIKE '%_clicked'
-    `;
+    // Admin IPs to exclude from share metrics (comma-separated in env var)
+    const adminIPs = (process.env.ADMIN_IPS || '').split(',').map(ip => ip.trim()).filter(Boolean);
 
-    // Unique sharers (excluding click events)
-    const [uniqueSharersResult] = await getDb()`
-      SELECT COUNT(DISTINCT ip_address) as count FROM ragecheck_shares
-      WHERE ip_address IS NOT NULL AND share_type NOT LIKE '%_clicked'
-    `;
+    // Build exclusion clause for admin IPs
+    const hasAdminExclusion = adminIPs.length > 0;
 
-    // Today's shares (excluding click events)
-    const [todaySharesResult] = await getDb()`
-      SELECT COUNT(*) as count FROM ragecheck_shares
-      WHERE created_at >= DATE_TRUNC('day', NOW() AT TIME ZONE 'America/New_York') AT TIME ZONE 'America/New_York'
-        AND share_type NOT LIKE '%_clicked'
-    `;
+    // Total shares (excluding click events and admin)
+    const [totalSharesResult] = hasAdminExclusion
+      ? await getDb()`
+          SELECT COUNT(*) as count FROM ragecheck_shares
+          WHERE share_type NOT LIKE '%_clicked'
+            AND (ip_address IS NULL OR ip_address NOT IN ${adminIPs})
+        `
+      : await getDb()`
+          SELECT COUNT(*) as count FROM ragecheck_shares
+          WHERE share_type NOT LIKE '%_clicked'
+        `;
 
-    // This week's shares (excluding click events)
-    const [weekSharesResult] = await getDb()`
-      SELECT COUNT(*) as count FROM ragecheck_shares
-      WHERE created_at > NOW() - INTERVAL '7 days'
-        AND share_type NOT LIKE '%_clicked'
-    `;
+    // Unique sharers (excluding click events and admin)
+    const [uniqueSharersResult] = hasAdminExclusion
+      ? await getDb()`
+          SELECT COUNT(DISTINCT ip_address) as count FROM ragecheck_shares
+          WHERE ip_address IS NOT NULL AND share_type NOT LIKE '%_clicked'
+            AND ip_address NOT IN ${adminIPs}
+        `
+      : await getDb()`
+          SELECT COUNT(DISTINCT ip_address) as count FROM ragecheck_shares
+          WHERE ip_address IS NOT NULL AND share_type NOT LIKE '%_clicked'
+        `;
+
+    // Today's shares (excluding click events and admin)
+    const [todaySharesResult] = hasAdminExclusion
+      ? await getDb()`
+          SELECT COUNT(*) as count FROM ragecheck_shares
+          WHERE created_at >= DATE_TRUNC('day', NOW() AT TIME ZONE 'America/New_York') AT TIME ZONE 'America/New_York'
+            AND share_type NOT LIKE '%_clicked'
+            AND (ip_address IS NULL OR ip_address NOT IN ${adminIPs})
+        `
+      : await getDb()`
+          SELECT COUNT(*) as count FROM ragecheck_shares
+          WHERE created_at >= DATE_TRUNC('day', NOW() AT TIME ZONE 'America/New_York') AT TIME ZONE 'America/New_York'
+            AND share_type NOT LIKE '%_clicked'
+        `;
+
+    // This week's shares (excluding click events and admin)
+    const [weekSharesResult] = hasAdminExclusion
+      ? await getDb()`
+          SELECT COUNT(*) as count FROM ragecheck_shares
+          WHERE created_at > NOW() - INTERVAL '7 days'
+            AND share_type NOT LIKE '%_clicked'
+            AND (ip_address IS NULL OR ip_address NOT IN ${adminIPs})
+        `
+      : await getDb()`
+          SELECT COUNT(*) as count FROM ragecheck_shares
+          WHERE created_at > NOW() - INTERVAL '7 days'
+            AND share_type NOT LIKE '%_clicked'
+        `;
 
     // Unique analyzers (for share rate calculation)
     const [uniqueAnalyzersResult] = await getDb()`
@@ -2640,14 +2671,23 @@ export async function getShareMetrics(): Promise<ShareMetrics> {
     const shareRate = Math.round((uniqueSharers / uniqueAnalyzers) * 1000) / 10;
     const avgSharesPerSharer = uniqueSharers > 0 ? Math.round((totalShares / uniqueSharers) * 10) / 10 : 0;
 
-    // Share type breakdown (excluding click events)
-    const shareTypeData = await getDb()`
-      SELECT share_type, COUNT(*) as count
-      FROM ragecheck_shares
-      WHERE share_type NOT LIKE '%_clicked'
-      GROUP BY share_type
-      ORDER BY count DESC
-    `;
+    // Share type breakdown (excluding click events and admin)
+    const shareTypeData = hasAdminExclusion
+      ? await getDb()`
+          SELECT share_type, COUNT(*) as count
+          FROM ragecheck_shares
+          WHERE share_type NOT LIKE '%_clicked'
+            AND (ip_address IS NULL OR ip_address NOT IN ${adminIPs})
+          GROUP BY share_type
+          ORDER BY count DESC
+        `
+      : await getDb()`
+          SELECT share_type, COUNT(*) as count
+          FROM ragecheck_shares
+          WHERE share_type NOT LIKE '%_clicked'
+          GROUP BY share_type
+          ORDER BY count DESC
+        `;
 
     const shareTypes = shareTypeData.map(row => ({
       type: String(row.share_type || "unknown"),
@@ -2655,18 +2695,31 @@ export async function getShareMetrics(): Promise<ShareMetrics> {
       percentage: totalShares > 0 ? Math.round((Number(row.count) / totalShares) * 1000) / 10 : 0,
     }));
 
-    // Top shared content (excluding click events)
-    const topSharedData = await getDb()`
-      SELECT
-        url,
-        COUNT(*) as share_count,
-        COUNT(DISTINCT ip_address) as unique_sharers
-      FROM ragecheck_shares
-      WHERE url IS NOT NULL AND share_type NOT LIKE '%_clicked'
-      GROUP BY url
-      ORDER BY share_count DESC
-      LIMIT 10
-    `;
+    // Top shared content (excluding click events and admin)
+    const topSharedData = hasAdminExclusion
+      ? await getDb()`
+          SELECT
+            url,
+            COUNT(*) as share_count,
+            COUNT(DISTINCT ip_address) as unique_sharers
+          FROM ragecheck_shares
+          WHERE url IS NOT NULL AND share_type NOT LIKE '%_clicked'
+            AND (ip_address IS NULL OR ip_address NOT IN ${adminIPs})
+          GROUP BY url
+          ORDER BY share_count DESC
+          LIMIT 10
+        `
+      : await getDb()`
+          SELECT
+            url,
+            COUNT(*) as share_count,
+            COUNT(DISTINCT ip_address) as unique_sharers
+          FROM ragecheck_shares
+          WHERE url IS NOT NULL AND share_type NOT LIKE '%_clicked'
+          GROUP BY url
+          ORDER BY share_count DESC
+          LIMIT 10
+        `;
 
     const topSharedContent = topSharedData.map(row => {
       let domain = "unknown";
@@ -2684,22 +2737,39 @@ export async function getShareMetrics(): Promise<ShareMetrics> {
       };
     });
 
-    // Sharer segmentation (excluding click events)
-    const segmentationData = await getDb()`
-      WITH sharer_counts AS (
-        SELECT ip_address, COUNT(*) as share_count
-        FROM ragecheck_shares
-        WHERE ip_address IS NOT NULL AND share_type NOT LIKE '%_clicked'
-        GROUP BY ip_address
-      )
-      SELECT
-        SUM(CASE WHEN share_count = 1 THEN 1 ELSE 0 END) as one_time,
-        SUM(CASE WHEN share_count BETWEEN 2 AND 3 THEN 1 ELSE 0 END) as occasional,
-        SUM(CASE WHEN share_count BETWEEN 4 AND 10 THEN 1 ELSE 0 END) as frequent,
-        SUM(CASE WHEN share_count > 10 THEN 1 ELSE 0 END) as power,
-        COUNT(*) as total
-      FROM sharer_counts
-    `;
+    // Sharer segmentation (excluding click events and admin)
+    const segmentationData = hasAdminExclusion
+      ? await getDb()`
+          WITH sharer_counts AS (
+            SELECT ip_address, COUNT(*) as share_count
+            FROM ragecheck_shares
+            WHERE ip_address IS NOT NULL AND share_type NOT LIKE '%_clicked'
+              AND ip_address NOT IN ${adminIPs}
+            GROUP BY ip_address
+          )
+          SELECT
+            SUM(CASE WHEN share_count = 1 THEN 1 ELSE 0 END) as one_time,
+            SUM(CASE WHEN share_count BETWEEN 2 AND 3 THEN 1 ELSE 0 END) as occasional,
+            SUM(CASE WHEN share_count BETWEEN 4 AND 10 THEN 1 ELSE 0 END) as frequent,
+            SUM(CASE WHEN share_count > 10 THEN 1 ELSE 0 END) as power,
+            COUNT(*) as total
+          FROM sharer_counts
+        `
+      : await getDb()`
+          WITH sharer_counts AS (
+            SELECT ip_address, COUNT(*) as share_count
+            FROM ragecheck_shares
+            WHERE ip_address IS NOT NULL AND share_type NOT LIKE '%_clicked'
+            GROUP BY ip_address
+          )
+          SELECT
+            SUM(CASE WHEN share_count = 1 THEN 1 ELSE 0 END) as one_time,
+            SUM(CASE WHEN share_count BETWEEN 2 AND 3 THEN 1 ELSE 0 END) as occasional,
+            SUM(CASE WHEN share_count BETWEEN 4 AND 10 THEN 1 ELSE 0 END) as frequent,
+            SUM(CASE WHEN share_count > 10 THEN 1 ELSE 0 END) as power,
+            COUNT(*) as total
+          FROM sharer_counts
+        `;
 
     const seg = segmentationData[0] || {};
     const sharerSegmentation = {
@@ -2710,7 +2780,8 @@ export async function getShareMetrics(): Promise<ShareMetrics> {
       total: Number(seg.total) || 0,
     };
 
-    // Individual sharer details (excluding click events)
+    // Individual sharer details (excluding click events, but INCLUDE admin for visibility)
+    // Admin can see all sharers including themselves
     const sharerDetailsData = await getDb()`
       SELECT
         ip_address,
@@ -2731,15 +2802,11 @@ export async function getShareMetrics(): Promise<ShareMetrics> {
       else if (shareCount >= 4) segment = 'frequent';
       else if (shareCount >= 2) segment = 'occasional';
 
-      // Mask IP for privacy (show first two octets, mask rest)
+      // Show full IP (admin dashboard only)
       const ip = String(row.ip_address || '');
-      const parts = ip.split('.');
-      const ipMasked = parts.length === 4
-        ? `${parts[0]}.${parts[1]}.***.***`
-        : ip.substring(0, 8) + '***';
 
       return {
-        ipMasked,
+        ipMasked: ip, // Full IP for admin visibility
         shareCount,
         segment,
         lastShareAt: row.last_share_at instanceof Date
@@ -2751,16 +2818,27 @@ export async function getShareMetrics(): Promise<ShareMetrics> {
       };
     });
 
-    // Score distribution of shared content (excluding click events)
-    const scoreDistData = await getDb()`
-      SELECT
-        SUM(CASE WHEN score IS NOT NULL AND score <= 33 THEN 1 ELSE 0 END) as low,
-        SUM(CASE WHEN score IS NOT NULL AND score BETWEEN 34 AND 66 THEN 1 ELSE 0 END) as medium,
-        SUM(CASE WHEN score IS NOT NULL AND score >= 67 THEN 1 ELSE 0 END) as high,
-        SUM(CASE WHEN score IS NULL THEN 1 ELSE 0 END) as unknown
-      FROM ragecheck_shares
-      WHERE share_type NOT LIKE '%_clicked'
-    `;
+    // Score distribution of shared content (excluding click events and admin)
+    const scoreDistData = hasAdminExclusion
+      ? await getDb()`
+          SELECT
+            SUM(CASE WHEN score IS NOT NULL AND score <= 33 THEN 1 ELSE 0 END) as low,
+            SUM(CASE WHEN score IS NOT NULL AND score BETWEEN 34 AND 66 THEN 1 ELSE 0 END) as medium,
+            SUM(CASE WHEN score IS NOT NULL AND score >= 67 THEN 1 ELSE 0 END) as high,
+            SUM(CASE WHEN score IS NULL THEN 1 ELSE 0 END) as unknown
+          FROM ragecheck_shares
+          WHERE share_type NOT LIKE '%_clicked'
+            AND (ip_address IS NULL OR ip_address NOT IN ${adminIPs})
+        `
+      : await getDb()`
+          SELECT
+            SUM(CASE WHEN score IS NOT NULL AND score <= 33 THEN 1 ELSE 0 END) as low,
+            SUM(CASE WHEN score IS NOT NULL AND score BETWEEN 34 AND 66 THEN 1 ELSE 0 END) as medium,
+            SUM(CASE WHEN score IS NOT NULL AND score >= 67 THEN 1 ELSE 0 END) as high,
+            SUM(CASE WHEN score IS NULL THEN 1 ELSE 0 END) as unknown
+          FROM ragecheck_shares
+          WHERE share_type NOT LIKE '%_clicked'
+        `;
 
     const scoreDist = scoreDistData[0] || {};
     const scoreDistribution = {
@@ -2770,18 +2848,31 @@ export async function getShareMetrics(): Promise<ShareMetrics> {
       unknown: Number(scoreDist.unknown) || 0,
     };
 
-    // Daily trend (last 14 days, excluding click events)
-    const trendData = await getDb()`
-      SELECT
-        DATE(created_at AT TIME ZONE 'America/New_York') as day,
-        COUNT(*) as shares,
-        COUNT(DISTINCT ip_address) as unique_sharers
-      FROM ragecheck_shares
-      WHERE created_at > NOW() - INTERVAL '14 days'
-        AND share_type NOT LIKE '%_clicked'
-      GROUP BY DATE(created_at AT TIME ZONE 'America/New_York')
-      ORDER BY day ASC
-    `;
+    // Daily trend (last 14 days, excluding click events and admin)
+    const trendData = hasAdminExclusion
+      ? await getDb()`
+          SELECT
+            DATE(created_at AT TIME ZONE 'America/New_York') as day,
+            COUNT(*) as shares,
+            COUNT(DISTINCT ip_address) as unique_sharers
+          FROM ragecheck_shares
+          WHERE created_at > NOW() - INTERVAL '14 days'
+            AND share_type NOT LIKE '%_clicked'
+            AND (ip_address IS NULL OR ip_address NOT IN ${adminIPs})
+          GROUP BY DATE(created_at AT TIME ZONE 'America/New_York')
+          ORDER BY day ASC
+        `
+      : await getDb()`
+          SELECT
+            DATE(created_at AT TIME ZONE 'America/New_York') as day,
+            COUNT(*) as shares,
+            COUNT(DISTINCT ip_address) as unique_sharers
+          FROM ragecheck_shares
+          WHERE created_at > NOW() - INTERVAL '14 days'
+            AND share_type NOT LIKE '%_clicked'
+          GROUP BY DATE(created_at AT TIME ZONE 'America/New_York')
+          ORDER BY day ASC
+        `;
 
     const dailyTrend = trendData.map(row => ({
       date: row.day instanceof Date
