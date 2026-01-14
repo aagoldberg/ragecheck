@@ -1267,7 +1267,7 @@ export async function getRetentionMetrics(): Promise<RetentionMetrics> {
       d30: Number(row.d30) || 0,
     }));
 
-    // Rolling return rate: users first seen 7+ days ago who visited 2+ times
+    // Rolling return rate: users first seen 3+ days ago who visited 2+ times
     const [rollingData] = await getDb()`
       WITH user_first_visit AS (
         SELECT
@@ -1282,7 +1282,7 @@ export async function getRetentionMetrics(): Promise<RetentionMetrics> {
         COUNT(*) as eligible_users,
         SUM(CASE WHEN visit_days >= 2 THEN 1 ELSE 0 END) as returned_users
       FROM user_first_visit
-      WHERE first_visit < NOW() - INTERVAL '7 days'
+      WHERE first_visit < NOW() - INTERVAL '3 days'
     `;
 
     const eligibleUsers = Number(rollingData?.eligible_users) || 0;
@@ -1343,7 +1343,7 @@ export async function getRetentionMetrics(): Promise<RetentionMetrics> {
     return {
       cohortRetention,
       rollingReturnRate: {
-        windowDays: 7,
+        windowDays: 3,
         eligibleUsers,
         returnedUsers,
         rate: eligibleUsers > 0 ? Math.round(1000 * returnedUsers / eligibleUsers) / 10 : 0,

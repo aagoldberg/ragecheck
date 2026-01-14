@@ -2383,7 +2383,7 @@ export default function AdminDashboard() {
                 {/* Key Metrics Row */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <StatCard
-                    title="Return Rate (7d+)"
+                    title={`Return Rate (${retentionMetrics.rollingReturnRate.windowDays}d+)`}
                     value={`${retentionMetrics.rollingReturnRate.rate}%`}
                     subtitle={`${retentionMetrics.rollingReturnRate.returnedUsers} of ${retentionMetrics.rollingReturnRate.eligibleUsers} users`}
                   />
