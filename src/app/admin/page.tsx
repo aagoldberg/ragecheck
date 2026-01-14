@@ -297,12 +297,13 @@ interface ApiResponse {
   dbAvailable?: boolean;
 }
 
-function StatCard({ title, value, subtitle, icon, accent = "indigo" }: {
+function StatCard({ title, value, subtitle, icon, accent = "indigo", tooltip }: {
   title: string;
   value: string | number;
   subtitle?: string;
   icon?: React.ReactNode;
   accent?: "indigo" | "emerald" | "amber" | "rose" | "purple";
+  tooltip?: string;
 }) {
   const accentColors = {
     indigo: "from-indigo-500 to-indigo-600 text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/50",
@@ -319,12 +320,17 @@ function StatCard({ title, value, subtitle, icon, accent = "indigo" }: {
   }, ["", "", ""]);
 
   return (
-    <div className="relative overflow-hidden bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-5 hover:shadow-lg transition-shadow group">
+    <div className="relative overflow-hidden bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-5 hover:shadow-lg transition-shadow group" title={tooltip}>
       <div className={`absolute top-0 left-0 w-1 h-full bg-gradient-to-b ${gradient}`}></div>
       <div className="flex items-start justify-between">
         <div>
-          <h3 className="text-[11px] font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 mb-1">
+          <h3 className="text-[11px] font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500 mb-1 flex items-center gap-1">
             {title}
+            {tooltip && (
+              <svg className="w-3 h-3 text-zinc-300 dark:text-zinc-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            )}
           </h3>
           <p className={`text-3xl font-bold ${textColor}`}>{value}</p>
           {subtitle && <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-1">{subtitle}</p>}
@@ -2386,21 +2392,25 @@ export default function AdminDashboard() {
                     title={`Return Rate (${retentionMetrics.rollingReturnRate.windowDays}d+)`}
                     value={`${retentionMetrics.rollingReturnRate.rate}%`}
                     subtitle={`${retentionMetrics.rollingReturnRate.returnedUsers} of ${retentionMetrics.rollingReturnRate.eligibleUsers} users`}
+                    tooltip={`Of users who first visited ${retentionMetrics.rollingReturnRate.windowDays}+ days ago, what % came back at least once? Higher = better retention.`}
                   />
                   <StatCard
                     title="DAU/MAU Ratio"
                     value={`${retentionMetrics.stickiness.dauMauRatio}%`}
                     subtitle={`${retentionMetrics.stickiness.dau} daily / ${retentionMetrics.stickiness.mau} monthly`}
+                    tooltip="Daily Active Users / Monthly Active Users. Measures how often your monthly users come back daily. 10-20% is typical, 25%+ is strong engagement."
                   />
                   <StatCard
                     title="DAU/WAU Ratio"
                     value={`${retentionMetrics.stickiness.dauWauRatio}%`}
                     subtitle={`${retentionMetrics.stickiness.dau} daily / ${retentionMetrics.stickiness.wau} weekly`}
+                    tooltip="Daily Active Users / Weekly Active Users. Higher ratio means users visit more frequently within a week."
                   />
                   <StatCard
                     title="Multi-Visit Users"
                     value={retentionMetrics.frequencyDistribution.total - retentionMetrics.frequencyDistribution.visits1}
                     subtitle={`of ${retentionMetrics.frequencyDistribution.total} total (30d)`}
+                    tooltip="Users who visited on 2+ different days in the last 30 days. These are your engaged returning users."
                   />
                 </div>
 
@@ -2447,11 +2457,11 @@ export default function AdminDashboard() {
                       <thead>
                         <tr className="border-b border-zinc-200 dark:border-zinc-700">
                           <th className="text-left py-2 px-3 text-zinc-500 dark:text-zinc-400 font-medium">Cohort</th>
-                          <th className="text-right py-2 px-3 text-zinc-500 dark:text-zinc-400 font-medium">Size</th>
-                          <th className="text-right py-2 px-3 text-zinc-500 dark:text-zinc-400 font-medium">D1</th>
-                          <th className="text-right py-2 px-3 text-zinc-500 dark:text-zinc-400 font-medium">D7</th>
-                          <th className="text-right py-2 px-3 text-zinc-500 dark:text-zinc-400 font-medium">D14</th>
-                          <th className="text-right py-2 px-3 text-zinc-500 dark:text-zinc-400 font-medium">D30</th>
+                          <th className="text-right py-2 px-3 text-zinc-500 dark:text-zinc-400 font-medium" title="Number of unique visitors who first visited on this date">Size</th>
+                          <th className="text-right py-2 px-3 text-zinc-500 dark:text-zinc-400 font-medium cursor-help" title="Day 1 Retention: % of cohort who returned within 1 day of their first visit">D1</th>
+                          <th className="text-right py-2 px-3 text-zinc-500 dark:text-zinc-400 font-medium cursor-help" title="Day 7 Retention: % of cohort who returned within 7 days of their first visit">D7</th>
+                          <th className="text-right py-2 px-3 text-zinc-500 dark:text-zinc-400 font-medium cursor-help" title="Day 14 Retention: % of cohort who returned within 14 days of their first visit">D14</th>
+                          <th className="text-right py-2 px-3 text-zinc-500 dark:text-zinc-400 font-medium cursor-help" title="Day 30 Retention: % of cohort who returned within 30 days of their first visit">D30</th>
                         </tr>
                       </thead>
                       <tbody>
