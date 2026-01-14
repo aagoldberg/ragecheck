@@ -963,17 +963,17 @@ function HomeContent() {
         </div>
       </nav>
 
-      <div className={`flex-1 max-w-6xl mx-auto px-4 ${result && !isDemo ? 'py-6 lg:py-8' : 'py-12 lg:py-24'}`}>
-        
+      <div className={`flex-1 max-w-6xl mx-auto px-4 ${result && !isDemo ? 'py-6 lg:py-8' : 'py-6 sm:py-12 lg:py-24'}`}>
+
         {/* Hero Section - Collapses after analysis */}
-        <div className={`text-center max-w-3xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-700 ${result && !isDemo ? 'mb-8' : 'mb-20'}`}>
+        <div className={`text-center max-w-3xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-700 ${result && !isDemo ? 'mb-8' : 'mb-10 sm:mb-20'}`}>
           {/* Hero text - hidden after analysis */}
           {(!result || isDemo) && (
             <>
-              <h1 className="text-4xl md:text-6xl font-black tracking-tight text-zinc-900 dark:text-zinc-100 mb-6 leading-[1.1]">
+              <h1 className="text-3xl sm:text-4xl md:text-6xl font-black tracking-tight text-zinc-900 dark:text-zinc-100 mb-4 sm:mb-6 leading-[1.1]">
                 Is that post <span className="text-transparent bg-clip-text bg-gradient-to-r from-rose-500 to-indigo-600">designed</span> to make you angry?
               </h1>
-              <p className="text-xl text-zinc-600 dark:text-zinc-400 mb-10 leading-relaxed max-w-2xl mx-auto">
+              <p className="text-lg sm:text-xl text-zinc-600 dark:text-zinc-400 mb-6 sm:mb-10 leading-relaxed max-w-2xl mx-auto">
                 See through the outrage. Understand the tactics.
               </p>
             </>
@@ -1022,56 +1022,120 @@ function HomeContent() {
             )}
 
             {!imagePreview && (
-              <div className="relative group">
-                <div className="absolute -inset-1 bg-gradient-to-r from-rose-500 to-indigo-600 rounded-2xl blur opacity-20 group-focus-within:opacity-40 transition duration-1000"></div>
-                <div className="relative flex flex-col sm:flex-row items-center bg-white dark:bg-zinc-900 rounded-2xl shadow-xl transition-shadow ring-1 ring-zinc-200 dark:ring-zinc-800 group-focus-within:ring-zinc-300 dark:group-focus-within:ring-zinc-700 p-2 sm:p-0">
-                  <input
-                    type="url"
-                    value={url}
-                    onChange={(e) => setUrl(e.target.value)}
-                    placeholder="Paste URL (article, tweet, bsky)..."
-                    className="flex-1 w-full pl-4 sm:pl-6 pr-4 py-4 sm:py-5 bg-transparent border-0 focus:ring-0 text-base sm:text-lg text-zinc-900 dark:text-zinc-100 placeholder-zinc-400"
-                    required
-                  />
-                  <div className="w-full sm:w-auto flex items-center gap-3 sm:pr-3 px-2 sm:px-0 pb-2 sm:pb-0">
-                    <label
-                      htmlFor="image-upload"
-                      className="p-3 sm:p-2.5 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 cursor-pointer transition-colors bg-zinc-100 sm:bg-zinc-50 dark:bg-zinc-800 rounded-xl hover:bg-zinc-200 dark:hover:bg-zinc-700 flex-shrink-0"
-                      title="Upload screenshot"
+              <>
+                {/* Mobile: Two prominent options */}
+                <div className="sm:hidden space-y-3">
+                  {/* Screenshot button - primary on mobile */}
+                  <label
+                    htmlFor="image-upload-mobile"
+                    className="flex items-center justify-center gap-3 w-full px-6 py-4 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 rounded-2xl font-bold text-base cursor-pointer hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-all shadow-lg active:scale-[0.98]"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    Upload Screenshot
+                    <input
+                      id="image-upload-mobile"
+                      type="file"
+                      accept="image/jpeg,image/png,image/gif,image/webp"
+                      onChange={handleImageSelect}
+                      className="hidden"
+                    />
+                  </label>
+
+                  {/* URL input with paste button and submit */}
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        try {
+                          const text = await navigator.clipboard.readText();
+                          if (text && (text.startsWith('http://') || text.startsWith('https://'))) {
+                            setUrl(text);
+                          }
+                        } catch {
+                          // Clipboard access denied - user can paste manually
+                        }
+                      }}
+                      className="absolute left-3 top-1/2 -translate-y-1/2 p-2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors"
+                      title="Paste from clipboard"
                     >
                       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                       </svg>
-                      <input
-                        id="image-upload"
-                        type="file"
-                        accept="image/jpeg,image/png,image/gif,image/webp"
-                        onChange={handleImageSelect}
-                        className="hidden"
-                      />
-                    </label>
+                    </button>
+                    <input
+                      type="url"
+                      value={url}
+                      onChange={(e) => setUrl(e.target.value)}
+                      placeholder="Paste a URL..."
+                      className="w-full pl-12 pr-20 py-4 bg-white dark:bg-zinc-800 border-2 border-zinc-300 dark:border-zinc-600 rounded-2xl text-base text-zinc-900 dark:text-zinc-100 placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
+                    />
                     <button
                       type="submit"
                       disabled={loading || !url.trim()}
-                      className="flex-1 sm:flex-none px-6 py-3 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 rounded-xl text-base font-bold hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-all shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none min-w-[120px]"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 px-4 py-2 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 rounded-xl text-sm font-bold disabled:opacity-40 disabled:cursor-not-allowed"
                     >
                       {loading ? (
-                        <span className="flex items-center justify-center gap-2">
-                          <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                          </svg>
-                        </span>
-                      ) : (
-                        <div className="flex flex-col leading-none items-center sm:items-start">
-                          <span>Analyze</span>
-                          <span className="text-[10px] opacity-60 font-medium mt-0.5">~5s</span>
-                        </div>
-                      )}
+                        <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                        </svg>
+                      ) : "Go"}
                     </button>
                   </div>
                 </div>
-              </div>
+
+                {/* Desktop: Original inline design */}
+                <div className="hidden sm:block relative group">
+                  <div className="absolute -inset-1 bg-gradient-to-r from-rose-500 to-indigo-600 rounded-2xl blur opacity-20 group-focus-within:opacity-40 transition duration-1000"></div>
+                  <div className="relative flex items-center bg-white dark:bg-zinc-900 rounded-2xl shadow-xl transition-shadow ring-1 ring-zinc-200 dark:ring-zinc-800 group-focus-within:ring-zinc-300 dark:group-focus-within:ring-zinc-700">
+                    <input
+                      type="url"
+                      value={url}
+                      onChange={(e) => setUrl(e.target.value)}
+                      placeholder="Paste URL (article, tweet, bsky)..."
+                      className="flex-1 w-full pl-6 pr-4 py-5 bg-transparent border-0 focus:ring-0 text-lg text-zinc-900 dark:text-zinc-100 placeholder-zinc-400"
+                      required
+                    />
+                    <div className="pr-3 flex items-center gap-3">
+                      <label
+                        htmlFor="image-upload-desktop"
+                        className="p-2.5 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 cursor-pointer transition-colors bg-zinc-50 dark:bg-zinc-800 rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-700 flex-shrink-0"
+                        title="Upload screenshot"
+                      >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                        <input
+                          id="image-upload-desktop"
+                          type="file"
+                          accept="image/jpeg,image/png,image/gif,image/webp"
+                          onChange={handleImageSelect}
+                          className="hidden"
+                        />
+                      </label>
+                      <button
+                        type="submit"
+                        disabled={loading || !url.trim()}
+                        className="px-6 py-3 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 rounded-xl text-base font-bold hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-all shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none min-w-[120px]"
+                      >
+                        {loading ? (
+                          <svg className="animate-spin h-4 w-4 mx-auto" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                          </svg>
+                        ) : (
+                          <div className="flex flex-col leading-none">
+                            <span>Analyze</span>
+                            <span className="text-[10px] opacity-60 font-medium mt-0.5">~5s</span>
+                          </div>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </>
             )}
 
             {!imagePreview && (!result || isDemo) && (
