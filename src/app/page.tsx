@@ -579,6 +579,31 @@ function HomeContent() {
   const [feedbackGiven, setFeedbackGiven] = useState<"up" | "down" | null>(null);
   const [feedbackComment, setFeedbackComment] = useState("");
 
+  // Track current sessionId for abandonment detection
+  const currentSessionIdRef = useRef<string | null>(null);
+
+  // Abandonment beacon - send when user leaves page during analysis
+  useEffect(() => {
+    const handlePageLeave = () => {
+      if (loading && currentSessionIdRef.current) {
+        // Use sendBeacon for reliable delivery during page unload
+        navigator.sendBeacon(
+          "/api/track-abandon",
+          JSON.stringify({ sessionId: currentSessionIdRef.current })
+        );
+      }
+    };
+
+    // Listen for page unload and visibility changes
+    window.addEventListener("beforeunload", handlePageLeave);
+    window.addEventListener("pagehide", handlePageLeave);
+
+    return () => {
+      window.removeEventListener("beforeunload", handlePageLeave);
+      window.removeEventListener("pagehide", handlePageLeave);
+    };
+  }, [loading]);
+
   // Conversation shape detection
   const conversationShape = useMemo<ConversationShape | null>(() => {
     if (!result?.success || !result.signalBreakdown) return null;
@@ -766,6 +791,7 @@ function HomeContent() {
     setActiveFilter(null);
     tracking.trackAnalysisStarted("image");
     const sessionId = trackAnalysisStartDB("image");
+    currentSessionIdRef.current = sessionId; // Track for abandonment detection
 
     try {
       const response = await fetch("/api/analyze", {
@@ -790,6 +816,7 @@ function HomeContent() {
       });
     } finally {
       setLoading(false);
+      currentSessionIdRef.current = null; // Clear on completion
     }
   };
 
@@ -803,6 +830,7 @@ function HomeContent() {
     clearImage();
     tracking.trackAnalysisStarted("url");
     const sessionId = trackAnalysisStartDB("url", targetUrl.trim());
+    currentSessionIdRef.current = sessionId; // Track for abandonment detection
 
     try {
       const response = await fetch("/api/analyze", {
@@ -827,6 +855,7 @@ function HomeContent() {
       });
     } finally {
       setLoading(false);
+      currentSessionIdRef.current = null; // Clear on completion
     }
   };
 

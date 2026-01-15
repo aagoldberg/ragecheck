@@ -215,6 +215,8 @@ export async function initDB() {
     // Session correlation for funnel tracking
     await getDb()`ALTER TABLE ragecheck_analyses ADD COLUMN IF NOT EXISTS session_id TEXT`;
     await getDb()`CREATE INDEX IF NOT EXISTS idx_analyses_session_id ON ragecheck_analyses(session_id) WHERE session_id IS NOT NULL`;
+    // Abandonment tracking
+    await getDb()`ALTER TABLE ragecheck_analysis_starts ADD COLUMN IF NOT EXISTS abandoned_at TIMESTAMPTZ`;
   } catch {
     // Columns may already exist
   }
@@ -364,6 +366,26 @@ export async function logAnalysisStart(data: AnalysisStartLog) {
   } catch (error) {
     console.error("Failed to log analysis start:", error);
     // Don't throw - logging shouldn't break the main flow
+  }
+}
+
+export async function markAnalysisAbandoned(sessionId: string) {
+  try {
+    await withRetry(async () => {
+      // Only mark as abandoned if not already completed
+      await getDb()`
+        UPDATE ragecheck_analysis_starts
+        SET abandoned_at = NOW()
+        WHERE session_id = ${sessionId}
+          AND abandoned_at IS NULL
+          AND NOT EXISTS (
+            SELECT 1 FROM ragecheck_analyses
+            WHERE session_id = ${sessionId}
+          )
+      `;
+    });
+  } catch (error) {
+    console.error("Failed to mark analysis as abandoned:", error);
   }
 }
 
