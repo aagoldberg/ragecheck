@@ -746,14 +746,15 @@ function HomeContent() {
     reader.readAsDataURL(file);
   }, []);
 
-  // Track analysis start in database (fire-and-forget for abandonment tracking)
-  const trackAnalysisStartDB = useCallback((type: "url" | "image", targetUrl?: string) => {
+  // Track analysis start in database and return sessionId for correlation
+  const trackAnalysisStartDB = useCallback((type: "url" | "image", targetUrl?: string): string => {
     const sessionId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     fetch("/api/track-start", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ sessionId, analysisType: type, url: targetUrl }),
     }).catch(() => {}); // Ignore errors - tracking shouldn't break UX
+    return sessionId;
   }, []);
 
   const analyzeImage = async () => {
@@ -764,13 +765,13 @@ function HomeContent() {
     setIsDemo(false);
     setActiveFilter(null);
     tracking.trackAnalysisStarted("image");
-    trackAnalysisStartDB("image");
+    const sessionId = trackAnalysisStartDB("image");
 
     try {
       const response = await fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ image: imagePreview }),
+        body: JSON.stringify({ image: imagePreview, sessionId }),
       });
 
       const data = await response.json();
@@ -801,13 +802,13 @@ function HomeContent() {
     setActiveFilter(null);
     clearImage();
     tracking.trackAnalysisStarted("url");
-    trackAnalysisStartDB("url", targetUrl.trim());
+    const sessionId = trackAnalysisStartDB("url", targetUrl.trim());
 
     try {
       const response = await fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: targetUrl.trim() }),
+        body: JSON.stringify({ url: targetUrl.trim(), sessionId }),
       });
 
       const data = await response.json();

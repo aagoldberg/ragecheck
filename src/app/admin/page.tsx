@@ -471,6 +471,12 @@ interface AnalysisCompletionMetrics {
     completed: number;
     completionRate: number;
     abandonmentRate: number;
+    // Correlated metrics (matched by session_id)
+    correlatedCompleted: number;
+    correlatedRate: number;
+    abandoned: number;
+    failed: number;
+    avgTimeToComplete: number;
   };
   byDevice: {
     mobile: CompletionGroup;
@@ -489,6 +495,10 @@ interface AnalysisCompletionMetrics {
     url: CompletionGroup;
     image: CompletionGroup;
   };
+  errorBreakdown: {
+    type: string;
+    count: number;
+  }[];
   hourlyTrend: {
     hour: string;
     started: number;
@@ -501,6 +511,7 @@ interface AnalysisCompletionMetrics {
     completed: number;
     rate: number;
   }[];
+  trackingSince: string | null;
 }
 
 interface ApiResponse {
@@ -2696,7 +2707,14 @@ export default function AdminDashboard() {
             {/* Funnel Tab - Analysis Completion/Abandonment */}
             {activeTab === "funnel" && analysisCompletionMetrics && (
               <div className="space-y-8">
-                {/* Overview Stats */}
+                {/* Data Quality Notice */}
+                {analysisCompletionMetrics.trackingSince && (
+                  <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-xl p-3 text-sm text-blue-700 dark:text-blue-300">
+                    Session tracking active since {analysisCompletionMetrics.trackingSince}. Correlated metrics require matched session IDs.
+                  </div>
+                )}
+
+                {/* Overview Stats - Row 1: Core Metrics */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <StatCard
                     title="Analyses Started"
@@ -2706,27 +2724,60 @@ export default function AdminDashboard() {
                     tooltip="Total number of analysis requests initiated (user clicked Analyze)"
                   />
                   <StatCard
-                    title="Analyses Completed"
-                    value={analysisCompletionMetrics.overall.completed}
-                    subtitle="Last 7 days"
+                    title="Completed (Correlated)"
+                    value={analysisCompletionMetrics.overall.correlatedCompleted}
+                    subtitle={`${analysisCompletionMetrics.overall.correlatedRate}% success rate`}
                     accent="emerald"
-                    tooltip="Total number of analysis requests that returned results"
+                    tooltip="Analyses that completed successfully, matched by session ID to their start event"
                   />
                   <StatCard
-                    title="Completion Rate"
-                    value={`${analysisCompletionMetrics.overall.completionRate}%`}
-                    subtitle={analysisCompletionMetrics.overall.completionRate >= 90 ? "Healthy" : analysisCompletionMetrics.overall.completionRate >= 75 ? "Moderate" : "Needs attention"}
-                    accent={analysisCompletionMetrics.overall.completionRate >= 90 ? "emerald" : analysisCompletionMetrics.overall.completionRate >= 75 ? "amber" : "rose"}
-                    tooltip="Percentage of started analyses that completed. Lower rates indicate users abandoning during loading."
-                  />
-                  <StatCard
-                    title="Abandonment Rate"
-                    value={`${analysisCompletionMetrics.overall.abandonmentRate}%`}
-                    subtitle={analysisCompletionMetrics.overall.started - analysisCompletionMetrics.overall.completed + " abandoned"}
+                    title="Abandoned"
+                    value={analysisCompletionMetrics.overall.abandoned}
+                    subtitle={`${analysisCompletionMetrics.overall.abandonmentRate}% of started`}
                     accent={analysisCompletionMetrics.overall.abandonmentRate <= 10 ? "emerald" : analysisCompletionMetrics.overall.abandonmentRate <= 25 ? "amber" : "rose"}
-                    tooltip="Percentage of users who started analysis but didn't receive results. High abandonment suggests UX issues or slow loading."
+                    tooltip="Users who started analysis but left before completion (no matching completion event)"
+                  />
+                  <StatCard
+                    title="Failed"
+                    value={analysisCompletionMetrics.overall.failed}
+                    subtitle="Errors returned"
+                    accent={analysisCompletionMetrics.overall.failed === 0 ? "emerald" : "rose"}
+                    tooltip="Analyses that returned an error (invalid URL, extraction failed, etc.)"
                   />
                 </div>
+
+                {/* Row 2: Performance Metrics */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <StatCard
+                    title="Avg Time to Complete"
+                    value={`${analysisCompletionMetrics.overall.avgTimeToComplete}s`}
+                    subtitle={analysisCompletionMetrics.overall.avgTimeToComplete <= 5 ? "Fast" : analysisCompletionMetrics.overall.avgTimeToComplete <= 10 ? "Moderate" : "Slow"}
+                    accent={analysisCompletionMetrics.overall.avgTimeToComplete <= 5 ? "emerald" : analysisCompletionMetrics.overall.avgTimeToComplete <= 10 ? "amber" : "rose"}
+                    tooltip="Average seconds from clicking Analyze to receiving results"
+                  />
+                  <StatCard
+                    title="Success Rate"
+                    value={`${analysisCompletionMetrics.overall.correlatedRate}%`}
+                    subtitle={analysisCompletionMetrics.overall.correlatedRate >= 90 ? "Healthy" : analysisCompletionMetrics.overall.correlatedRate >= 75 ? "Moderate" : "Needs attention"}
+                    accent={analysisCompletionMetrics.overall.correlatedRate >= 90 ? "emerald" : analysisCompletionMetrics.overall.correlatedRate >= 75 ? "amber" : "rose"}
+                    tooltip="Percentage of started analyses that completed successfully (correlated by session)"
+                  />
+                </div>
+
+                {/* Error Breakdown */}
+                {analysisCompletionMetrics.errorBreakdown && analysisCompletionMetrics.errorBreakdown.length > 0 && (
+                  <div>
+                    <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100 mb-4">Error Breakdown</h3>
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                      {analysisCompletionMetrics.errorBreakdown.map((error) => (
+                        <div key={error.type} className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-3">
+                          <div className="text-2xl font-bold text-rose-600">{error.count}</div>
+                          <div className="text-xs text-zinc-500">{error.type}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {/* By Device Type */}
                 <div>

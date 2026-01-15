@@ -56,7 +56,7 @@ function getLabel(score: number): "Low" | "Medium" | "High" {
 export async function POST(request: NextRequest): Promise<NextResponse<AnalyzeResponse>> {
   try {
     const body = await request.json();
-    const { url, image } = body;
+    const { url, image, sessionId } = body;
 
     // Capture visitor info from headers
     const ipAddress = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
@@ -100,6 +100,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<AnalyzeRe
           userAgent: userAgent || undefined,
           country: country || undefined,
           failedImageUrl: failedImageUrl || undefined,
+          sessionId: sessionId || undefined,
         });
 
         return jsonResponse(
@@ -118,6 +119,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<AnalyzeRe
           ipAddress: ipAddress || undefined,
           userAgent: userAgent || undefined,
           country: country || undefined,
+          sessionId: sessionId || undefined,
         });
 
         return jsonResponse(
@@ -145,6 +147,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<AnalyzeRe
         userAgent: userAgent || undefined,
         country: country || undefined,
         failedImageUrl: imageUrl || undefined, // Reusing this field for all uploaded images
+        sessionId: sessionId || undefined,
       });
 
       return jsonResponse({
@@ -220,6 +223,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<AnalyzeRe
         ipAddress: ipAddress || undefined,
         userAgent: userAgent || undefined,
         country: country || undefined,
+        sessionId: sessionId || undefined,
       });
 
       return jsonResponse(
@@ -300,6 +304,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<AnalyzeRe
       topic,
       contentType,
       sourceType,
+      sessionId: sessionId || undefined,
     });
 
     return jsonResponse({

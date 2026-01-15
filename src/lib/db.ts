@@ -212,6 +212,9 @@ export async function initDB() {
     await getDb()`ALTER TABLE ragecheck_analyses ADD COLUMN IF NOT EXISTS topic TEXT`;
     await getDb()`ALTER TABLE ragecheck_analyses ADD COLUMN IF NOT EXISTS content_type TEXT`;
     await getDb()`ALTER TABLE ragecheck_analyses ADD COLUMN IF NOT EXISTS source_type TEXT`;
+    // Session correlation for funnel tracking
+    await getDb()`ALTER TABLE ragecheck_analyses ADD COLUMN IF NOT EXISTS session_id TEXT`;
+    await getDb()`CREATE INDEX IF NOT EXISTS idx_analyses_session_id ON ragecheck_analyses(session_id) WHERE session_id IS NOT NULL`;
   } catch {
     // Columns may already exist
   }
@@ -251,6 +254,8 @@ export interface AnalysisLog {
   topic?: string;
   contentType?: string;
   sourceType?: string;
+  // Session correlation for funnel tracking
+  sessionId?: string;
 }
 
 function detectPlatform(domain: string): string {
@@ -283,7 +288,7 @@ export async function logAnalysis(data: AnalysisLog) {
           ip_address, user_agent, country, is_bot,
           title, reasons, highlights, context_notes, text_preview,
           sharing_patterns, technique_explanations, share_card_summary, failed_image_url,
-          topic, content_type, source_type
+          topic, content_type, source_type, session_id
         ) VALUES (
           ${data.url},
           ${data.sourceDomain || null},
@@ -313,7 +318,8 @@ export async function logAnalysis(data: AnalysisLog) {
           ${data.failedImageUrl || null},
           ${data.topic || null},
           ${data.contentType || null},
-          ${data.sourceType || null}
+          ${data.sourceType || null},
+          ${data.sessionId || null}
         )
       `;
     });
@@ -371,6 +377,12 @@ export interface AnalysisCompletionMetrics {
     completed: number;
     completionRate: number;
     abandonmentRate: number;
+    // New correlated metrics
+    correlatedCompleted: number;  // Completions matched to starts by session_id
+    correlatedRate: number;       // True completion rate based on correlation
+    abandoned: number;            // Starts without matching completion
+    failed: number;               // Completions with success=false
+    avgTimeToComplete: number;    // Average seconds from start to complete
   };
   byDevice: {
     mobile: { started: number; completed: number; completionRate: number };
@@ -389,6 +401,11 @@ export interface AnalysisCompletionMetrics {
     url: { started: number; completed: number; completionRate: number };
     image: { started: number; completed: number; completionRate: number };
   };
+  // Error breakdown
+  errorBreakdown: {
+    type: string;
+    count: number;
+  }[];
   hourlyTrend: {
     hour: string;
     started: number;
@@ -401,11 +418,23 @@ export interface AnalysisCompletionMetrics {
     completed: number;
     rate: number;
   }[];
+  // Data quality indicator
+  trackingSince: string | null;  // Date when session_id tracking started
 }
 
 export async function getAnalysisCompletionMetrics(): Promise<AnalysisCompletionMetrics> {
   try {
     await initDB();
+
+    // Get earliest tracking date (when session_id tracking started)
+    const [trackingStart] = await getDb()`
+      SELECT MIN(created_at) as start_date
+      FROM ragecheck_analysis_starts
+      WHERE is_bot = false
+    `;
+    const trackingSince = trackingStart?.start_date
+      ? new Date(trackingStart.start_date).toISOString().split('T')[0]
+      : null;
 
     // Overall started (last 7 days, non-bot)
     const [startedResult] = await getDb()`
@@ -415,16 +444,67 @@ export async function getAnalysisCompletionMetrics(): Promise<AnalysisCompletion
         AND created_at > NOW() - INTERVAL '7 days'
     `;
 
-    // Overall completed (last 7 days, non-bot)
+    // Overall completed (last 7 days, non-bot) - only where we have session_id tracking
     const [completedResult] = await getDb()`
       SELECT COUNT(*) as count
       FROM ragecheck_analyses
       WHERE is_bot = false
         AND created_at > NOW() - INTERVAL '7 days'
+        AND session_id IS NOT NULL
+    `;
+
+    // Correlated metrics - starts matched with completions by session_id
+    const [correlatedResult] = await getDb()`
+      SELECT
+        COUNT(DISTINCT s.session_id) as correlated_completed,
+        AVG(EXTRACT(EPOCH FROM (a.created_at - s.created_at))) as avg_time_seconds
+      FROM ragecheck_analysis_starts s
+      INNER JOIN ragecheck_analyses a ON s.session_id = a.session_id
+      WHERE s.is_bot = false
+        AND s.created_at > NOW() - INTERVAL '7 days'
+        AND a.success = true
+    `;
+
+    // Failed analyses (with session_id)
+    const [failedResult] = await getDb()`
+      SELECT COUNT(*) as count
+      FROM ragecheck_analyses
+      WHERE is_bot = false
+        AND created_at > NOW() - INTERVAL '7 days'
+        AND session_id IS NOT NULL
+        AND success = false
+    `;
+
+    // Error breakdown
+    const errorBreakdown = await getDb()`
+      SELECT
+        COALESCE(
+          CASE
+            WHEN error ILIKE '%timeout%' THEN 'Timeout'
+            WHEN error ILIKE '%network%' OR error ILIKE '%fetch%' THEN 'Network Error'
+            WHEN error ILIKE '%extract%' OR error ILIKE '%content%' THEN 'Content Extraction'
+            WHEN error ILIKE '%url%' OR error ILIKE '%invalid%' THEN 'Invalid URL'
+            WHEN error ILIKE '%image%' OR error ILIKE '%text%' THEN 'Invalid Image'
+            ELSE 'Other'
+          END,
+          'Unknown'
+        ) as type,
+        COUNT(*) as count
+      FROM ragecheck_analyses
+      WHERE is_bot = false
+        AND created_at > NOW() - INTERVAL '7 days'
+        AND success = false
+        AND session_id IS NOT NULL
+      GROUP BY type
+      ORDER BY count DESC
     `;
 
     const totalStarted = Number(startedResult?.count || 0);
     const totalCompleted = Number(completedResult?.count || 0);
+    const correlatedCompleted = Number(correlatedResult?.correlated_completed || 0);
+    const avgTimeToComplete = Math.round(Number(correlatedResult?.avg_time_seconds || 0) * 10) / 10;
+    const failed = Number(failedResult?.count || 0);
+    const abandoned = Math.max(0, totalStarted - correlatedCompleted - failed);
 
     // By device type - started
     const deviceStarted = await getDb()`
@@ -579,7 +659,13 @@ export async function getAnalysisCompletionMetrics(): Promise<AnalysisCompletion
         started: totalStarted,
         completed: totalCompleted,
         completionRate: calcRate(totalStarted, totalCompleted),
-        abandonmentRate: totalStarted > 0 ? Math.max(0, Math.round(((totalStarted - totalCompleted) / totalStarted) * 1000) / 10) : 0,
+        abandonmentRate: totalStarted > 0 ? Math.max(0, Math.round(((totalStarted - correlatedCompleted) / totalStarted) * 1000) / 10) : 0,
+        // New correlated metrics
+        correlatedCompleted,
+        correlatedRate: calcRate(totalStarted, correlatedCompleted),
+        abandoned,
+        failed,
+        avgTimeToComplete,
       },
       byDevice: {
         mobile: { ...deviceStats.mobile, completionRate: calcRate(deviceStats.mobile.started, deviceStats.mobile.completed) },
@@ -606,6 +692,10 @@ export async function getAnalysisCompletionMetrics(): Promise<AnalysisCompletion
           completionRate: calcRate(Number(imageStarted?.count || 0), Number(imageCompleted?.count || 0)),
         },
       },
+      errorBreakdown: errorBreakdown.map(row => ({
+        type: row.type as string,
+        count: Number(row.count),
+      })),
       hourlyTrend: Array.from(hourlyMap.entries())
         .sort((a, b) => a[0].localeCompare(b[0]))
         .map(([hour, data]) => ({
@@ -622,11 +712,15 @@ export async function getAnalysisCompletionMetrics(): Promise<AnalysisCompletion
           completed: data.completed,
           rate: calcRate(data.started, data.completed),
         })),
+      trackingSince,
     };
   } catch (error) {
     console.error("Failed to get analysis completion metrics:", error);
     return {
-      overall: { started: 0, completed: 0, completionRate: 0, abandonmentRate: 0 },
+      overall: {
+        started: 0, completed: 0, completionRate: 0, abandonmentRate: 0,
+        correlatedCompleted: 0, correlatedRate: 0, abandoned: 0, failed: 0, avgTimeToComplete: 0,
+      },
       byDevice: {
         mobile: { started: 0, completed: 0, completionRate: 0 },
         tablet: { started: 0, completed: 0, completionRate: 0 },
@@ -644,8 +738,10 @@ export async function getAnalysisCompletionMetrics(): Promise<AnalysisCompletion
         url: { started: 0, completed: 0, completionRate: 0 },
         image: { started: 0, completed: 0, completionRate: 0 },
       },
+      errorBreakdown: [],
       hourlyTrend: [],
       dailyTrend: [],
+      trackingSince: null,
     };
   }
 }
