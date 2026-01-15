@@ -463,6 +463,46 @@ interface AcquisitionMetrics {
   };
 }
 
+type CompletionGroup = { started: number; completed: number; completionRate: number };
+
+interface AnalysisCompletionMetrics {
+  overall: {
+    started: number;
+    completed: number;
+    completionRate: number;
+    abandonmentRate: number;
+  };
+  byDevice: {
+    mobile: CompletionGroup;
+    tablet: CompletionGroup;
+    desktop: CompletionGroup;
+  };
+  byOS: {
+    iOS: CompletionGroup;
+    Android: CompletionGroup;
+    Windows: CompletionGroup;
+    macOS: CompletionGroup;
+    Linux: CompletionGroup;
+    Other: CompletionGroup;
+  };
+  byAnalysisType: {
+    url: CompletionGroup;
+    image: CompletionGroup;
+  };
+  hourlyTrend: {
+    hour: string;
+    started: number;
+    completed: number;
+    rate: number;
+  }[];
+  dailyTrend: {
+    date: string;
+    started: number;
+    completed: number;
+    rate: number;
+  }[];
+}
+
 interface ApiResponse {
   success?: boolean;
   error?: string;
@@ -479,6 +519,7 @@ interface ApiResponse {
   shareMetrics?: ShareMetrics;
   contentInsights?: ContentInsights;
   acquisitionMetrics?: AcquisitionMetrics;
+  analysisCompletionMetrics?: AnalysisCompletionMetrics;
   dbAvailable?: boolean;
 }
 
@@ -1426,7 +1467,7 @@ function PageDailyChart({ data, title }: { data: { date: string; visitors: numbe
   );
 }
 
-type TabType = "overview" | "users" | "conversions" | "retention" | "shares" | "feedback" | "content" | "clearview";
+type TabType = "overview" | "users" | "conversions" | "funnel" | "retention" | "shares" | "feedback" | "content" | "clearview";
 
 interface ClearviewStats {
   lastGenerated: string | null;
@@ -1461,6 +1502,7 @@ export default function AdminDashboard() {
   const [shareMetrics, setShareMetrics] = useState<ShareMetrics | null>(null);
   const [contentInsights, setContentInsights] = useState<ContentInsights | null>(null);
   const [acquisitionMetrics, setAcquisitionMetrics] = useState<AcquisitionMetrics | null>(null);
+  const [analysisCompletionMetrics, setAnalysisCompletionMetrics] = useState<AnalysisCompletionMetrics | null>(null);
 
   const fetchStats = async (adminKey: string) => {
     setLoading(true);
@@ -1490,6 +1532,7 @@ export default function AdminDashboard() {
         setShareMetrics(data.shareMetrics || null);
         setContentInsights(data.contentInsights || null);
         setAcquisitionMetrics(data.acquisitionMetrics || null);
+        setAnalysisCompletionMetrics(data.analysisCompletionMetrics || null);
         setAuthenticated(true);
         // Save key to localStorage
         localStorage.setItem("ragecheck-admin-key", adminKey);
@@ -1651,7 +1694,7 @@ export default function AdminDashboard() {
         {/* Tabs */}
         <div className="max-w-7xl mx-auto px-4">
           <div className="flex gap-6 -mb-px">
-            {(["overview", "users", "conversions", "retention", "shares", "feedback", "content", "clearview"] as const).map((tab) => (
+            {(["overview", "users", "conversions", "funnel", "retention", "shares", "feedback", "content", "clearview"] as const).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
@@ -2156,6 +2199,54 @@ export default function AdminDashboard() {
               </div>
             )}
 
+            {/* Analysis Completion Summary */}
+            {analysisCompletionMetrics && analysisCompletionMetrics.overall.started > 0 && (
+              <div className="mb-8">
+                <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100 mb-4">
+                  Analysis Completion
+                  <span className="ml-2 text-sm font-normal text-zinc-500">(Started → Completed)</span>
+                </h2>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <StatCard
+                    title="Completion Rate"
+                    value={`${analysisCompletionMetrics.overall.completionRate}%`}
+                    subtitle={`${analysisCompletionMetrics.overall.completed}/${analysisCompletionMetrics.overall.started}`}
+                    accent={analysisCompletionMetrics.overall.completionRate >= 90 ? "emerald" : analysisCompletionMetrics.overall.completionRate >= 75 ? "amber" : "rose"}
+                    tooltip="% of started analyses that completed. Lower = users abandoning during loading."
+                  />
+                  <StatCard
+                    title="Mobile Completion"
+                    value={`${analysisCompletionMetrics.byDevice.mobile.completionRate}%`}
+                    subtitle={`${analysisCompletionMetrics.byDevice.mobile.completed}/${analysisCompletionMetrics.byDevice.mobile.started}`}
+                    accent={analysisCompletionMetrics.byDevice.mobile.completionRate >= 90 ? "emerald" : analysisCompletionMetrics.byDevice.mobile.completionRate >= 75 ? "amber" : "rose"}
+                    tooltip="Mobile users often have slower connections and may abandon more during loading."
+                  />
+                  <StatCard
+                    title="Desktop Completion"
+                    value={`${analysisCompletionMetrics.byDevice.desktop.completionRate}%`}
+                    subtitle={`${analysisCompletionMetrics.byDevice.desktop.completed}/${analysisCompletionMetrics.byDevice.desktop.started}`}
+                    accent={analysisCompletionMetrics.byDevice.desktop.completionRate >= 90 ? "emerald" : analysisCompletionMetrics.byDevice.desktop.completionRate >= 75 ? "amber" : "rose"}
+                    tooltip="Desktop completion rate - typically higher than mobile due to better connection."
+                  />
+                  <StatCard
+                    title="Abandoned"
+                    value={analysisCompletionMetrics.overall.started - analysisCompletionMetrics.overall.completed}
+                    subtitle={`${analysisCompletionMetrics.overall.abandonmentRate}% abandonment`}
+                    accent={analysisCompletionMetrics.overall.abandonmentRate <= 10 ? "emerald" : analysisCompletionMetrics.overall.abandonmentRate <= 25 ? "amber" : "rose"}
+                    tooltip="Users who started but didn't receive results - likely left during loading."
+                  />
+                </div>
+                <div className="mt-3 text-right">
+                  <button
+                    onClick={() => setActiveTab("funnel")}
+                    className="text-sm text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300"
+                  >
+                    View full funnel analysis →
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* Time to Analysis Card */}
             {timeToAnalysis && timeToAnalysis.overall.count > 0 && (
               <div className="mb-8">
@@ -2600,6 +2691,225 @@ export default function AdminDashboard() {
               </div>
             )}
             </>
+            )}
+
+            {/* Funnel Tab - Analysis Completion/Abandonment */}
+            {activeTab === "funnel" && analysisCompletionMetrics && (
+              <div className="space-y-8">
+                {/* Overview Stats */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <StatCard
+                    title="Analyses Started"
+                    value={analysisCompletionMetrics.overall.started}
+                    subtitle="Last 7 days"
+                    accent="indigo"
+                    tooltip="Total number of analysis requests initiated (user clicked Analyze)"
+                  />
+                  <StatCard
+                    title="Analyses Completed"
+                    value={analysisCompletionMetrics.overall.completed}
+                    subtitle="Last 7 days"
+                    accent="emerald"
+                    tooltip="Total number of analysis requests that returned results"
+                  />
+                  <StatCard
+                    title="Completion Rate"
+                    value={`${analysisCompletionMetrics.overall.completionRate}%`}
+                    subtitle={analysisCompletionMetrics.overall.completionRate >= 90 ? "Healthy" : analysisCompletionMetrics.overall.completionRate >= 75 ? "Moderate" : "Needs attention"}
+                    accent={analysisCompletionMetrics.overall.completionRate >= 90 ? "emerald" : analysisCompletionMetrics.overall.completionRate >= 75 ? "amber" : "rose"}
+                    tooltip="Percentage of started analyses that completed. Lower rates indicate users abandoning during loading."
+                  />
+                  <StatCard
+                    title="Abandonment Rate"
+                    value={`${analysisCompletionMetrics.overall.abandonmentRate}%`}
+                    subtitle={analysisCompletionMetrics.overall.started - analysisCompletionMetrics.overall.completed + " abandoned"}
+                    accent={analysisCompletionMetrics.overall.abandonmentRate <= 10 ? "emerald" : analysisCompletionMetrics.overall.abandonmentRate <= 25 ? "amber" : "rose"}
+                    tooltip="Percentage of users who started analysis but didn't receive results. High abandonment suggests UX issues or slow loading."
+                  />
+                </div>
+
+                {/* By Device Type */}
+                <div>
+                  <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100 mb-4">Completion by Device</h3>
+                  <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-hidden">
+                    <table className="w-full">
+                      <thead className="bg-zinc-50 dark:bg-zinc-800/50">
+                        <tr>
+                          <th className="text-left px-4 py-3 text-xs font-semibold text-zinc-500 uppercase">Device</th>
+                          <th className="text-right px-4 py-3 text-xs font-semibold text-zinc-500 uppercase">Started</th>
+                          <th className="text-right px-4 py-3 text-xs font-semibold text-zinc-500 uppercase">Completed</th>
+                          <th className="text-right px-4 py-3 text-xs font-semibold text-zinc-500 uppercase">Rate</th>
+                          <th className="px-4 py-3 text-xs font-semibold text-zinc-500 uppercase">Visual</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
+                        {(["mobile", "tablet", "desktop"] as const).map((device) => {
+                          const data = analysisCompletionMetrics.byDevice[device];
+                          const rate = data.completionRate;
+                          return (
+                            <tr key={device} className="hover:bg-zinc-50 dark:hover:bg-zinc-800/30">
+                              <td className="px-4 py-3 font-medium capitalize">{device}</td>
+                              <td className="px-4 py-3 text-right text-zinc-600 dark:text-zinc-400">{data.started}</td>
+                              <td className="px-4 py-3 text-right text-zinc-600 dark:text-zinc-400">{data.completed}</td>
+                              <td className={`px-4 py-3 text-right font-semibold ${rate >= 90 ? "text-emerald-600" : rate >= 75 ? "text-amber-600" : "text-rose-600"}`}>
+                                {rate}%
+                              </td>
+                              <td className="px-4 py-3">
+                                <div className="w-32 h-2 bg-zinc-200 dark:bg-zinc-700 rounded-full overflow-hidden">
+                                  <div
+                                    className={`h-full rounded-full ${rate >= 90 ? "bg-emerald-500" : rate >= 75 ? "bg-amber-500" : "bg-rose-500"}`}
+                                    style={{ width: `${rate}%` }}
+                                  />
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* By OS */}
+                <div>
+                  <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100 mb-4">Completion by OS</h3>
+                  <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-hidden">
+                    <table className="w-full">
+                      <thead className="bg-zinc-50 dark:bg-zinc-800/50">
+                        <tr>
+                          <th className="text-left px-4 py-3 text-xs font-semibold text-zinc-500 uppercase">OS</th>
+                          <th className="text-right px-4 py-3 text-xs font-semibold text-zinc-500 uppercase">Started</th>
+                          <th className="text-right px-4 py-3 text-xs font-semibold text-zinc-500 uppercase">Completed</th>
+                          <th className="text-right px-4 py-3 text-xs font-semibold text-zinc-500 uppercase">Rate</th>
+                          <th className="px-4 py-3 text-xs font-semibold text-zinc-500 uppercase">Visual</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
+                        {(["iOS", "Android", "macOS", "Windows", "Linux", "Other"] as const)
+                          .filter((os) => analysisCompletionMetrics.byOS[os].started > 0)
+                          .map((os) => {
+                            const data = analysisCompletionMetrics.byOS[os];
+                            const rate = data.completionRate;
+                            return (
+                              <tr key={os} className="hover:bg-zinc-50 dark:hover:bg-zinc-800/30">
+                                <td className="px-4 py-3 font-medium">{os}</td>
+                                <td className="px-4 py-3 text-right text-zinc-600 dark:text-zinc-400">{data.started}</td>
+                                <td className="px-4 py-3 text-right text-zinc-600 dark:text-zinc-400">{data.completed}</td>
+                                <td className={`px-4 py-3 text-right font-semibold ${rate >= 90 ? "text-emerald-600" : rate >= 75 ? "text-amber-600" : "text-rose-600"}`}>
+                                  {rate}%
+                                </td>
+                                <td className="px-4 py-3">
+                                  <div className="w-32 h-2 bg-zinc-200 dark:bg-zinc-700 rounded-full overflow-hidden">
+                                    <div
+                                      className={`h-full rounded-full ${rate >= 90 ? "bg-emerald-500" : rate >= 75 ? "bg-amber-500" : "bg-rose-500"}`}
+                                      style={{ width: `${rate}%` }}
+                                    />
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* By Analysis Type */}
+                <div>
+                  <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100 mb-4">Completion by Type</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    {(["url", "image"] as const).map((type) => {
+                      const data = analysisCompletionMetrics.byAnalysisType[type];
+                      return (
+                        <div key={type} className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-4">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="font-medium capitalize">{type === "url" ? "URL Analysis" : "Image Upload"}</span>
+                            <span className={`text-lg font-bold ${data.completionRate >= 90 ? "text-emerald-600" : data.completionRate >= 75 ? "text-amber-600" : "text-rose-600"}`}>
+                              {data.completionRate}%
+                            </span>
+                          </div>
+                          <div className="text-sm text-zinc-500 mb-2">
+                            {data.completed} of {data.started} completed
+                          </div>
+                          <div className="w-full h-2 bg-zinc-200 dark:bg-zinc-700 rounded-full overflow-hidden">
+                            <div
+                              className={`h-full rounded-full ${data.completionRate >= 90 ? "bg-emerald-500" : data.completionRate >= 75 ? "bg-amber-500" : "bg-rose-500"}`}
+                              style={{ width: `${data.completionRate}%` }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Daily Trend */}
+                {analysisCompletionMetrics.dailyTrend.length > 0 && (
+                  <div>
+                    <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100 mb-4">Daily Trend (14 days)</h3>
+                    <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-4">
+                      <div className="h-48 flex items-end gap-1">
+                        {analysisCompletionMetrics.dailyTrend.map((day, i) => {
+                          const maxStarted = Math.max(...analysisCompletionMetrics.dailyTrend.map(d => d.started), 1);
+                          const startedHeight = (day.started / maxStarted) * 100;
+                          const completedHeight = (day.completed / maxStarted) * 100;
+                          return (
+                            <div key={i} className="flex-1 flex flex-col items-center gap-1 group relative">
+                              <div className="w-full flex gap-0.5 items-end" style={{ height: "160px" }}>
+                                <div
+                                  className="flex-1 bg-indigo-200 dark:bg-indigo-900 rounded-t"
+                                  style={{ height: `${startedHeight}%` }}
+                                  title={`Started: ${day.started}`}
+                                />
+                                <div
+                                  className="flex-1 bg-emerald-500 rounded-t"
+                                  style={{ height: `${completedHeight}%` }}
+                                  title={`Completed: ${day.completed}`}
+                                />
+                              </div>
+                              <span className="text-[10px] text-zinc-400">{day.date.slice(5)}</span>
+                              {/* Hover tooltip */}
+                              <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-zinc-800 text-white text-xs px-2 py-1 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                                {day.rate}% rate ({day.completed}/{day.started})
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <div className="flex items-center justify-center gap-6 mt-4 text-xs text-zinc-500">
+                        <div className="flex items-center gap-2">
+                          <div className="w-3 h-3 bg-indigo-200 dark:bg-indigo-900 rounded" />
+                          <span>Started</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="w-3 h-3 bg-emerald-500 rounded" />
+                          <span>Completed</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Info Note */}
+                <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-xl p-4">
+                  <div className="flex gap-3">
+                    <svg className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <div className="text-sm text-blue-800 dark:text-blue-200">
+                      <strong>About this data:</strong> This tracks users who start an analysis (click button) vs. those who receive results.
+                      High abandonment rates suggest users are leaving during the ~5s loading time. Mobile users may be more likely to
+                      abandon due to slower connections or shorter attention spans.
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {activeTab === "funnel" && !analysisCompletionMetrics && (
+              <div className="text-center py-12 text-zinc-500">
+                <p>No funnel data available yet. Data will appear once users start analyzing content.</p>
+              </div>
             )}
 
             {/* Retention Tab */}

@@ -746,6 +746,16 @@ function HomeContent() {
     reader.readAsDataURL(file);
   }, []);
 
+  // Track analysis start in database (fire-and-forget for abandonment tracking)
+  const trackAnalysisStartDB = useCallback((type: "url" | "image", targetUrl?: string) => {
+    const sessionId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    fetch("/api/track-start", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sessionId, analysisType: type, url: targetUrl }),
+    }).catch(() => {}); // Ignore errors - tracking shouldn't break UX
+  }, []);
+
   const analyzeImage = async () => {
     if (!imagePreview) return;
 
@@ -754,6 +764,7 @@ function HomeContent() {
     setIsDemo(false);
     setActiveFilter(null);
     tracking.trackAnalysisStarted("image");
+    trackAnalysisStartDB("image");
 
     try {
       const response = await fetch("/api/analyze", {
@@ -790,6 +801,7 @@ function HomeContent() {
     setActiveFilter(null);
     clearImage();
     tracking.trackAnalysisStarted("url");
+    trackAnalysisStartDB("url", targetUrl.trim());
 
     try {
       const response = await fetch("/api/analyze", {

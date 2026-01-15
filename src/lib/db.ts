@@ -160,6 +160,21 @@ export async function initDB() {
     )
   `;
 
+  // Analysis starts table for tracking abandonment
+  await getDb()`
+    CREATE TABLE IF NOT EXISTS ragecheck_analysis_starts (
+      id SERIAL PRIMARY KEY,
+      session_id TEXT NOT NULL,
+      analysis_type TEXT NOT NULL,
+      url TEXT,
+      ip_address TEXT,
+      user_agent TEXT,
+      country TEXT,
+      is_bot BOOLEAN DEFAULT FALSE,
+      created_at TIMESTAMP DEFAULT NOW()
+    )
+  `;
+
   // Add additional columns to shares table for enhanced tracking
   try {
     await getDb()`ALTER TABLE ragecheck_shares ADD COLUMN IF NOT EXISTS score INTEGER`;
@@ -305,6 +320,333 @@ export async function logAnalysis(data: AnalysisLog) {
   } catch (error) {
     console.error("Failed to log analysis:", error);
     // Don't throw - logging shouldn't break the main flow
+  }
+}
+
+// ============================================
+// ANALYSIS START TRACKING (for abandonment metrics)
+// ============================================
+
+export interface AnalysisStartLog {
+  sessionId: string;
+  analysisType: "url" | "image";
+  url?: string;
+  ipAddress?: string;
+  userAgent?: string;
+  country?: string;
+}
+
+export async function logAnalysisStart(data: AnalysisStartLog) {
+  try {
+    const isBotUser = isBot(data.userAgent);
+
+    await withRetry(async () => {
+      await getDb()`
+        INSERT INTO ragecheck_analysis_starts (
+          session_id, analysis_type, url, ip_address, user_agent, country, is_bot
+        ) VALUES (
+          ${data.sessionId},
+          ${data.analysisType},
+          ${data.url || null},
+          ${data.ipAddress || null},
+          ${data.userAgent || null},
+          ${data.country || null},
+          ${isBotUser}
+        )
+      `;
+    });
+  } catch (error) {
+    console.error("Failed to log analysis start:", error);
+    // Don't throw - logging shouldn't break the main flow
+  }
+}
+
+// ============================================
+// ANALYSIS COMPLETION METRICS
+// ============================================
+
+export interface AnalysisCompletionMetrics {
+  overall: {
+    started: number;
+    completed: number;
+    completionRate: number;
+    abandonmentRate: number;
+  };
+  byDevice: {
+    mobile: { started: number; completed: number; completionRate: number };
+    tablet: { started: number; completed: number; completionRate: number };
+    desktop: { started: number; completed: number; completionRate: number };
+  };
+  byOS: {
+    iOS: { started: number; completed: number; completionRate: number };
+    Android: { started: number; completed: number; completionRate: number };
+    Windows: { started: number; completed: number; completionRate: number };
+    macOS: { started: number; completed: number; completionRate: number };
+    Linux: { started: number; completed: number; completionRate: number };
+    Other: { started: number; completed: number; completionRate: number };
+  };
+  byAnalysisType: {
+    url: { started: number; completed: number; completionRate: number };
+    image: { started: number; completed: number; completionRate: number };
+  };
+  hourlyTrend: {
+    hour: string;
+    started: number;
+    completed: number;
+    rate: number;
+  }[];
+  dailyTrend: {
+    date: string;
+    started: number;
+    completed: number;
+    rate: number;
+  }[];
+}
+
+export async function getAnalysisCompletionMetrics(): Promise<AnalysisCompletionMetrics> {
+  try {
+    await initDB();
+
+    // Overall started (last 7 days, non-bot)
+    const [startedResult] = await getDb()`
+      SELECT COUNT(*) as count
+      FROM ragecheck_analysis_starts
+      WHERE is_bot = false
+        AND created_at > NOW() - INTERVAL '7 days'
+    `;
+
+    // Overall completed (last 7 days, non-bot)
+    const [completedResult] = await getDb()`
+      SELECT COUNT(*) as count
+      FROM ragecheck_analyses
+      WHERE is_bot = false
+        AND created_at > NOW() - INTERVAL '7 days'
+    `;
+
+    const totalStarted = Number(startedResult?.count || 0);
+    const totalCompleted = Number(completedResult?.count || 0);
+
+    // By device type - started
+    const deviceStarted = await getDb()`
+      SELECT user_agent, COUNT(*) as count
+      FROM ragecheck_analysis_starts
+      WHERE is_bot = false
+        AND created_at > NOW() - INTERVAL '7 days'
+        AND user_agent IS NOT NULL
+      GROUP BY user_agent
+    `;
+
+    // By device type - completed
+    const deviceCompleted = await getDb()`
+      SELECT user_agent, COUNT(*) as count
+      FROM ragecheck_analyses
+      WHERE is_bot = false
+        AND created_at > NOW() - INTERVAL '7 days'
+        AND user_agent IS NOT NULL
+      GROUP BY user_agent
+    `;
+
+    // Aggregate by device
+    const deviceStats = { mobile: { started: 0, completed: 0 }, tablet: { started: 0, completed: 0 }, desktop: { started: 0, completed: 0 } };
+    for (const row of deviceStarted) {
+      const device = getDeviceType(row.user_agent);
+      deviceStats[device].started += Number(row.count);
+    }
+    for (const row of deviceCompleted) {
+      const device = getDeviceType(row.user_agent);
+      deviceStats[device].completed += Number(row.count);
+    }
+
+    // Aggregate by OS
+    const osStats: Record<string, { started: number; completed: number }> = {
+      iOS: { started: 0, completed: 0 },
+      Android: { started: 0, completed: 0 },
+      Windows: { started: 0, completed: 0 },
+      macOS: { started: 0, completed: 0 },
+      Linux: { started: 0, completed: 0 },
+      Other: { started: 0, completed: 0 },
+    };
+    for (const row of deviceStarted) {
+      const os = getOS(row.user_agent);
+      osStats[os].started += Number(row.count);
+    }
+    for (const row of deviceCompleted) {
+      const os = getOS(row.user_agent);
+      osStats[os].completed += Number(row.count);
+    }
+
+    // By analysis type
+    const [urlStarted] = await getDb()`
+      SELECT COUNT(*) as count FROM ragecheck_analysis_starts
+      WHERE is_bot = false AND created_at > NOW() - INTERVAL '7 days' AND analysis_type = 'url'
+    `;
+    const [imageStarted] = await getDb()`
+      SELECT COUNT(*) as count FROM ragecheck_analysis_starts
+      WHERE is_bot = false AND created_at > NOW() - INTERVAL '7 days' AND analysis_type = 'image'
+    `;
+    const [urlCompleted] = await getDb()`
+      SELECT COUNT(*) as count FROM ragecheck_analyses
+      WHERE is_bot = false AND created_at > NOW() - INTERVAL '7 days' AND url != 'image-upload'
+    `;
+    const [imageCompleted] = await getDb()`
+      SELECT COUNT(*) as count FROM ragecheck_analyses
+      WHERE is_bot = false AND created_at > NOW() - INTERVAL '7 days' AND url = 'image-upload'
+    `;
+
+    // Hourly trend (last 24 hours)
+    const hourlyStarted = await getDb()`
+      SELECT
+        TO_CHAR(created_at AT TIME ZONE 'America/New_York', 'HH24:00') as hour,
+        COUNT(*) as count
+      FROM ragecheck_analysis_starts
+      WHERE is_bot = false AND created_at > NOW() - INTERVAL '24 hours'
+      GROUP BY TO_CHAR(created_at AT TIME ZONE 'America/New_York', 'HH24:00')
+      ORDER BY hour
+    `;
+
+    const hourlyCompleted = await getDb()`
+      SELECT
+        TO_CHAR(created_at AT TIME ZONE 'America/New_York', 'HH24:00') as hour,
+        COUNT(*) as count
+      FROM ragecheck_analyses
+      WHERE is_bot = false AND created_at > NOW() - INTERVAL '24 hours'
+      GROUP BY TO_CHAR(created_at AT TIME ZONE 'America/New_York', 'HH24:00')
+      ORDER BY hour
+    `;
+
+    const hourlyMap = new Map<string, { started: number; completed: number }>();
+    for (let h = 0; h < 24; h++) {
+      const hour = h.toString().padStart(2, '0') + ':00';
+      hourlyMap.set(hour, { started: 0, completed: 0 });
+    }
+    for (const row of hourlyStarted) {
+      if (hourlyMap.has(row.hour)) {
+        hourlyMap.get(row.hour)!.started = Number(row.count);
+      }
+    }
+    for (const row of hourlyCompleted) {
+      if (hourlyMap.has(row.hour)) {
+        hourlyMap.get(row.hour)!.completed = Number(row.count);
+      }
+    }
+
+    // Daily trend (last 14 days)
+    const dailyStarted = await getDb()`
+      SELECT
+        DATE(created_at AT TIME ZONE 'America/New_York') as date,
+        COUNT(*) as count
+      FROM ragecheck_analysis_starts
+      WHERE is_bot = false AND created_at > NOW() - INTERVAL '14 days'
+      GROUP BY DATE(created_at AT TIME ZONE 'America/New_York')
+      ORDER BY date
+    `;
+
+    const dailyCompleted = await getDb()`
+      SELECT
+        DATE(created_at AT TIME ZONE 'America/New_York') as date,
+        COUNT(*) as count
+      FROM ragecheck_analyses
+      WHERE is_bot = false AND created_at > NOW() - INTERVAL '14 days'
+      GROUP BY DATE(created_at AT TIME ZONE 'America/New_York')
+      ORDER BY date
+    `;
+
+    const dailyMap = new Map<string, { started: number; completed: number }>();
+    for (let i = 13; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const dateStr = d.toISOString().split('T')[0];
+      dailyMap.set(dateStr, { started: 0, completed: 0 });
+    }
+    for (const row of dailyStarted) {
+      const dateStr = new Date(row.date).toISOString().split('T')[0];
+      if (dailyMap.has(dateStr)) {
+        dailyMap.get(dateStr)!.started = Number(row.count);
+      }
+    }
+    for (const row of dailyCompleted) {
+      const dateStr = new Date(row.date).toISOString().split('T')[0];
+      if (dailyMap.has(dateStr)) {
+        dailyMap.get(dateStr)!.completed = Number(row.count);
+      }
+    }
+
+    const calcRate = (started: number, completed: number) =>
+      started > 0 ? Math.round((completed / started) * 1000) / 10 : 0;
+
+    return {
+      overall: {
+        started: totalStarted,
+        completed: totalCompleted,
+        completionRate: calcRate(totalStarted, totalCompleted),
+        abandonmentRate: totalStarted > 0 ? Math.round(((totalStarted - totalCompleted) / totalStarted) * 1000) / 10 : 0,
+      },
+      byDevice: {
+        mobile: { ...deviceStats.mobile, completionRate: calcRate(deviceStats.mobile.started, deviceStats.mobile.completed) },
+        tablet: { ...deviceStats.tablet, completionRate: calcRate(deviceStats.tablet.started, deviceStats.tablet.completed) },
+        desktop: { ...deviceStats.desktop, completionRate: calcRate(deviceStats.desktop.started, deviceStats.desktop.completed) },
+      },
+      byOS: {
+        iOS: { ...osStats.iOS, completionRate: calcRate(osStats.iOS.started, osStats.iOS.completed) },
+        Android: { ...osStats.Android, completionRate: calcRate(osStats.Android.started, osStats.Android.completed) },
+        Windows: { ...osStats.Windows, completionRate: calcRate(osStats.Windows.started, osStats.Windows.completed) },
+        macOS: { ...osStats.macOS, completionRate: calcRate(osStats.macOS.started, osStats.macOS.completed) },
+        Linux: { ...osStats.Linux, completionRate: calcRate(osStats.Linux.started, osStats.Linux.completed) },
+        Other: { ...osStats.Other, completionRate: calcRate(osStats.Other.started, osStats.Other.completed) },
+      },
+      byAnalysisType: {
+        url: {
+          started: Number(urlStarted?.count || 0),
+          completed: Number(urlCompleted?.count || 0),
+          completionRate: calcRate(Number(urlStarted?.count || 0), Number(urlCompleted?.count || 0)),
+        },
+        image: {
+          started: Number(imageStarted?.count || 0),
+          completed: Number(imageCompleted?.count || 0),
+          completionRate: calcRate(Number(imageStarted?.count || 0), Number(imageCompleted?.count || 0)),
+        },
+      },
+      hourlyTrend: Array.from(hourlyMap.entries())
+        .sort((a, b) => a[0].localeCompare(b[0]))
+        .map(([hour, data]) => ({
+          hour,
+          started: data.started,
+          completed: data.completed,
+          rate: calcRate(data.started, data.completed),
+        })),
+      dailyTrend: Array.from(dailyMap.entries())
+        .sort((a, b) => a[0].localeCompare(b[0]))
+        .map(([date, data]) => ({
+          date,
+          started: data.started,
+          completed: data.completed,
+          rate: calcRate(data.started, data.completed),
+        })),
+    };
+  } catch (error) {
+    console.error("Failed to get analysis completion metrics:", error);
+    return {
+      overall: { started: 0, completed: 0, completionRate: 0, abandonmentRate: 0 },
+      byDevice: {
+        mobile: { started: 0, completed: 0, completionRate: 0 },
+        tablet: { started: 0, completed: 0, completionRate: 0 },
+        desktop: { started: 0, completed: 0, completionRate: 0 },
+      },
+      byOS: {
+        iOS: { started: 0, completed: 0, completionRate: 0 },
+        Android: { started: 0, completed: 0, completionRate: 0 },
+        Windows: { started: 0, completed: 0, completionRate: 0 },
+        macOS: { started: 0, completed: 0, completionRate: 0 },
+        Linux: { started: 0, completed: 0, completionRate: 0 },
+        Other: { started: 0, completed: 0, completionRate: 0 },
+      },
+      byAnalysisType: {
+        url: { started: 0, completed: 0, completionRate: 0 },
+        image: { started: 0, completed: 0, completionRate: 0 },
+      },
+      hourlyTrend: [],
+      dailyTrend: [],
+    };
   }
 }
 
