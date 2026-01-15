@@ -39,7 +39,7 @@ export const metadata: Metadata = {
     url: "https://ragecheck.com",
     images: [
       {
-        url: "/api/og/default",
+        url: "/api/og/default?v=2",
         width: 1200,
         height: 630,
         alt: "RageCheck - Outrage Bait Detection Tool",
@@ -50,7 +50,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "RageCheck - Detect Outrage Bait Patterns",
     description: "Analyze articles and social posts for manipulative language patterns, fear-mongering, and engagement bait.",
-    images: ["/api/og/default"],
+    images: ["/api/og/default?v=2"],
   },
   robots: {
     index: true,
