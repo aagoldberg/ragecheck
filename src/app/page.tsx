@@ -1756,6 +1756,21 @@ function HomeContent() {
                   </div>
                 </div>
               )}
+
+              {/* Support link */}
+              <div className="text-center mt-6">
+                <p className="text-sm text-zinc-400">
+                  If this was useful, you can{" "}
+                  <a
+                    href="https://buy.stripe.com/PLACEHOLDER"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-indigo-500 hover:text-indigo-400 underline underline-offset-2"
+                  >
+                    help keep it running
+                  </a>
+                </p>
+              </div>
               </>
             )}
           </div>
