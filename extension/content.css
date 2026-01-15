@@ -83,11 +83,65 @@
 
 .ragecheck-btn.ragecheck-has-result {
   cursor: pointer;
+  position: relative;
 }
 
 .ragecheck-btn.ragecheck-has-result:hover {
   transform: scale(1.08);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+/* Tooltip */
+.ragecheck-tooltip {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-bottom: 8px;
+  padding: 10px 14px;
+  background: #18181b;
+  color: #fafafa;
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 1.4;
+  white-space: nowrap;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.2s, visibility 0.2s;
+  z-index: 10000;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  pointer-events: none;
+}
+
+.ragecheck-tooltip::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 6px solid transparent;
+  border-top-color: #18181b;
+}
+
+.ragecheck-btn.ragecheck-has-result:hover .ragecheck-tooltip {
+  opacity: 1;
+  visibility: visible;
+}
+
+.ragecheck-tooltip-score {
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.ragecheck-tooltip-label {
+  color: #a1a1aa;
+  margin-bottom: 6px;
+}
+
+.ragecheck-tooltip-cta {
+  color: #818cf8;
+  font-weight: 500;
 }
 
 /* Dark mode adjustments - most social sites have dark mode */

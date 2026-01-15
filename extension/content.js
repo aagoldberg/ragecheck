@@ -143,8 +143,6 @@ function createCheckButton(postUrl) {
 
       if (data.success) {
         showResult(btn, { score: data.score, label: data.label }, postUrl);
-        // Add tooltip hint
-        btn.title = `Score: ${data.score}/100 - Click to see full analysis & share`;
       } else {
         showResult(btn, { error: data.error || 'Analysis failed' }, postUrl);
       }
@@ -173,20 +171,36 @@ function showResult(btn, result, postUrl) {
   label.textContent = score;
 
   btn.classList.remove('ragecheck-error');
+
+  let levelText, levelDesc;
   if (score >= 66) {
     btn.classList.add('ragecheck-high');
-    btn.title = `High rage score (${score}/100) - Click to see full analysis`;
+    levelText = 'High Rage';
+    levelDesc = 'Likely designed to provoke anger';
   } else if (score >= 33) {
     btn.classList.add('ragecheck-medium');
-    btn.title = `Medium rage score (${score}/100) - Click to see full analysis`;
+    levelText = 'Medium Rage';
+    levelDesc = 'Some emotional manipulation detected';
   } else {
     btn.classList.add('ragecheck-low');
-    btn.title = `Low rage score (${score}/100) - Click to see full analysis`;
+    levelText = 'Low Rage';
+    levelDesc = 'Appears relatively balanced';
   }
+
+  // Add tooltip
+  const tooltip = document.createElement('div');
+  tooltip.className = 'ragecheck-tooltip';
+  tooltip.innerHTML = `
+    <div class="ragecheck-tooltip-score">${score}/100</div>
+    <div class="ragecheck-tooltip-label">${levelText} - ${levelDesc}</div>
+    <div class="ragecheck-tooltip-cta">Click for full analysis</div>
+  `;
+  btn.appendChild(tooltip);
 
   // Make button clickable to open full analysis
   btn.classList.add('ragecheck-has-result');
   btn.dataset.postUrl = postUrl;
+  btn.title = ''; // Clear native tooltip since we have custom one
 }
 
 // Process a single post
