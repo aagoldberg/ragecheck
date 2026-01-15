@@ -1762,7 +1762,7 @@ function HomeContent() {
                 <p className="text-sm text-zinc-400">
                   If this was useful, you can{" "}
                   <a
-                    href="https://buy.stripe.com/PLACEHOLDER"
+                    href="https://buy.stripe.com/4gM8wQ8Xq8xU8gw9HvgEg00"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-indigo-500 hover:text-indigo-400 underline underline-offset-2"

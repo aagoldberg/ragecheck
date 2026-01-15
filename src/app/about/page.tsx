@@ -170,7 +170,7 @@ export default function About() {
             RageCheck is free and ad-free. If you find it useful, consider supporting its development.
           </p>
           <a
-            href="https://buy.stripe.com/PLACEHOLDER"
+            href="https://buy.stripe.com/4gM8wQ8Xq8xU8gw9HvgEg00"
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-2 text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 font-medium"
