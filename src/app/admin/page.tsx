@@ -907,7 +907,7 @@ function ConversionTrendChart({ data }: { data: ConversionTrendPoint[] }) {
         {/* Hover overlay with tooltips */}
         <div className="absolute inset-0 flex">
           {data.map((point, i) => {
-            const dateLabel = new Date(point.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            const dateLabel = new Date(point.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'America/New_York' });
             return (
               <div key={point.date} className="flex-1 group relative">
                 <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block z-10">
@@ -924,9 +924,9 @@ function ConversionTrendChart({ data }: { data: ConversionTrendPoint[] }) {
 
       {/* X-axis labels */}
       <div className="flex justify-between mt-2 text-[10px] text-zinc-400">
-        <span>{new Date(data[0].date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
-        <span>{new Date(data[Math.floor(data.length / 2)].date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
-        <span>{new Date(data[data.length - 1].date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+        <span>{new Date(data[0].date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'America/New_York' })}</span>
+        <span>{new Date(data[Math.floor(data.length / 2)].date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'America/New_York' })}</span>
+        <span>{new Date(data[data.length - 1].date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'America/New_York' })}</span>
       </div>
 
       {/* Legend */}
@@ -3288,10 +3288,10 @@ export default function AdminDashboard() {
                                   </span>
                                 </td>
                                 <td className="py-2 px-3 text-right text-xs text-zinc-500 dark:text-zinc-400">
-                                  {new Date(sharer.firstShareAt).toLocaleDateString()}
+                                  {new Date(sharer.firstShareAt).toLocaleDateString('en-US', { timeZone: 'America/New_York' })}
                                 </td>
                                 <td className="py-2 px-3 text-right text-xs text-zinc-500 dark:text-zinc-400">
-                                  {new Date(sharer.lastShareAt).toLocaleDateString()}
+                                  {new Date(sharer.lastShareAt).toLocaleDateString('en-US', { timeZone: 'America/New_York' })}
                                 </td>
                               </tr>
                             ))}
