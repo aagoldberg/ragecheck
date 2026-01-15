@@ -1,0 +1,105 @@
+/* RageCheck Button Styles */
+
+.ragecheck-wrapper {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 4px;
+}
+
+.ragecheck-wrapper.ragecheck-floating {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 100;
+}
+
+.ragecheck-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 10px;
+  border: none;
+  border-radius: 9999px;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: white;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+.ragecheck-btn:hover {
+  transform: scale(1.05);
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.4);
+}
+
+.ragecheck-btn:active {
+  transform: scale(0.98);
+}
+
+.ragecheck-btn svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+.ragecheck-label {
+  min-width: 28px;
+  text-align: center;
+}
+
+/* Loading state */
+.ragecheck-btn.ragecheck-loading {
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+.ragecheck-btn.ragecheck-loading svg {
+  animation: ragecheck-spin 1s linear infinite;
+}
+
+@keyframes ragecheck-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Score states */
+.ragecheck-btn.ragecheck-high {
+  background: linear-gradient(135deg, #ef4444, #f97316);
+}
+
+.ragecheck-btn.ragecheck-medium {
+  background: linear-gradient(135deg, #f59e0b, #eab308);
+}
+
+.ragecheck-btn.ragecheck-low {
+  background: linear-gradient(135deg, #10b981, #22c55e);
+}
+
+.ragecheck-btn.ragecheck-error {
+  background: #6b7280;
+}
+
+/* Dark mode adjustments - most social sites have dark mode */
+@media (prefers-color-scheme: dark) {
+  .ragecheck-btn {
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  }
+}
+
+/* Twitter/X specific adjustments */
+[data-testid="tweet"] .ragecheck-wrapper {
+  margin-left: 12px;
+}
+
+/* Bluesky specific adjustments */
+[data-testid="feedItem-by-"] .ragecheck-wrapper.ragecheck-floating {
+  top: 12px;
+  right: 12px;
+}
+
+/* Reddit specific adjustments */
+shreddit-post .ragecheck-wrapper {
+  margin-right: 8px;
+}

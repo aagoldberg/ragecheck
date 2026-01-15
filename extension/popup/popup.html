@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      width: 320px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #18181b;
+      color: #fafafa;
+      padding: 16px;
+    }
+
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+
+    .header h1 {
+      font-size: 18px;
+      font-weight: 700;
+      background: linear-gradient(135deg, #f43f5e, #6366f1);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .tagline {
+      font-size: 12px;
+      color: #a1a1aa;
+      margin-bottom: 16px;
+    }
+
+    .input-group {
+      margin-bottom: 12px;
+    }
+
+    input {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid #3f3f46;
+      border-radius: 8px;
+      background: #27272a;
+      color: #fafafa;
+      font-size: 14px;
+    }
+
+    input::placeholder {
+      color: #71717a;
+    }
+
+    input:focus {
+      outline: none;
+      border-color: #6366f1;
+    }
+
+    button {
+      width: 100%;
+      padding: 12px;
+      border: none;
+      border-radius: 8px;
+      background: linear-gradient(135deg, #6366f1, #8b5cf6);
+      color: white;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+
+    button:hover {
+      opacity: 0.9;
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .result {
+      margin-top: 16px;
+      padding: 12px;
+      border-radius: 8px;
+      display: none;
+    }
+
+    .result.show {
+      display: block;
+    }
+
+    .result.high {
+      background: rgba(239, 68, 68, 0.2);
+      border: 1px solid #ef4444;
+    }
+
+    .result.medium {
+      background: rgba(245, 158, 11, 0.2);
+      border: 1px solid #f59e0b;
+    }
+
+    .result.low {
+      background: rgba(16, 185, 129, 0.2);
+      border: 1px solid #10b981;
+    }
+
+    .result.error {
+      background: rgba(107, 114, 128, 0.2);
+      border: 1px solid #6b7280;
+    }
+
+    .score {
+      font-size: 36px;
+      font-weight: 700;
+      text-align: center;
+    }
+
+    .score-label {
+      font-size: 14px;
+      text-align: center;
+      color: #a1a1aa;
+      margin-top: 4px;
+    }
+
+    .footer {
+      margin-top: 16px;
+      text-align: center;
+    }
+
+    .footer a {
+      color: #6366f1;
+      text-decoration: none;
+      font-size: 12px;
+    }
+
+    .footer a:hover {
+      text-decoration: underline;
+    }
+
+    .supported {
+      margin-top: 12px;
+      font-size: 11px;
+      color: #71717a;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>RageCheck</h1>
+  </div>
+  <p class="tagline">Check if content is designed to make you angry</p>
+
+  <div class="input-group">
+    <input type="url" id="url" placeholder="Paste a URL to analyze...">
+  </div>
+  <button id="analyze">Analyze</button>
+
+  <div class="result" id="result">
+    <div class="score" id="score">--</div>
+    <div class="score-label" id="label">Rage Score</div>
+  </div>
+
+  <p class="supported">Works on Twitter, Bluesky, Facebook, Reddit, Threads</p>
+
+  <div class="footer">
+    <a href="https://ragecheck.com" target="_blank">ragecheck.com</a>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
