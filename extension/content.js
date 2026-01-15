@@ -119,6 +119,7 @@ function createCheckButton(postUrl) {
     // If already has result, open full analysis
     if (btn.classList.contains('ragecheck-has-result')) {
       const url = btn.dataset.postUrl;
+      console.log('RageCheck: Opening analysis for', url);
       window.open(`${API_BASE}?url=${encodeURIComponent(url)}`, '_blank');
       return;
     }
@@ -142,6 +143,8 @@ function createCheckButton(postUrl) {
 
       if (data.success) {
         showResult(btn, { score: data.score, label: data.label }, postUrl);
+        // Add tooltip hint
+        btn.title = `Score: ${data.score}/100 - Click to see full analysis & share`;
       } else {
         showResult(btn, { error: data.error || 'Analysis failed' }, postUrl);
       }
