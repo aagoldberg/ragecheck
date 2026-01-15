@@ -18,16 +18,22 @@ const PLATFORMS = {
   },
   bluesky: {
     host: ['bsky.app'],
-    postSelector: '[data-testid="feedItem"], [data-testid="postThreadItem"], article',
-    actionBarSelector: '[data-testid="repostBtn"], [data-testid="likeBtn"]',
+    postSelector: '[data-testid="feedItem"], [data-testid="postThreadItem"], [data-testid="contentHider-post"]',
+    actionBarSelector: null, // Use floating button
     getPostUrl: (post) => {
-      // Find timestamp link which contains the post URL
+      // Find any link containing /post/
       const links = post.querySelectorAll('a[href*="/post/"]');
       for (const link of links) {
         const href = link.getAttribute('href');
         if (href && href.includes('/post/')) {
           return href.startsWith('http') ? href : 'https://bsky.app' + href;
         }
+      }
+      // Try timestamp link
+      const timeLink = post.querySelector('a[href*="/profile/"][href*="/post/"]');
+      if (timeLink) {
+        const href = timeLink.getAttribute('href');
+        return href.startsWith('http') ? href : 'https://bsky.app' + href;
       }
       return null;
     }
@@ -170,15 +176,22 @@ function processPost(post, platform) {
   if (!postUrl) return;
 
   // Find action bar - try multiple approaches
-  let actionBar = post.querySelector(platform.actionBarSelector);
+  let actionBar = null;
+  let useFloating = !platform.actionBarSelector;
 
-  // For Twitter/X, we need the bottom action bar
-  if (platform.name === 'twitter') {
-    const groups = post.querySelectorAll('[role="group"]');
-    actionBar = groups[groups.length - 1];
+  if (platform.actionBarSelector) {
+    actionBar = post.querySelector(platform.actionBarSelector);
+
+    // For Twitter/X, we need the bottom action bar
+    if (platform.name === 'twitter') {
+      const groups = post.querySelectorAll('[role="group"]');
+      actionBar = groups[groups.length - 1];
+    }
+
+    if (!actionBar) {
+      useFloating = true; // Fallback to floating
+    }
   }
-
-  if (!actionBar) return;
 
   // Check if button already exists
   if (post.querySelector('.ragecheck-btn')) return;
@@ -190,23 +203,20 @@ function processPost(post, platform) {
   wrapper.className = 'ragecheck-wrapper';
   wrapper.appendChild(btn);
 
-  if (platform.name === 'twitter') {
+  if (useFloating) {
+    // Floating button in top-right corner
+    wrapper.className = 'ragecheck-wrapper ragecheck-floating';
+    post.style.position = 'relative';
+    post.appendChild(wrapper);
+  } else if (platform.name === 'twitter') {
     // Twitter: append to action group
     actionBar.appendChild(wrapper);
-  } else if (platform.name === 'bluesky') {
-    // Bluesky: insert after like button
-    wrapper.style.marginLeft = '12px';
-    wrapper.style.display = 'inline-flex';
-    wrapper.style.alignItems = 'center';
-    actionBar.parentElement?.appendChild(wrapper);
   } else if (platform.name === 'reddit') {
     // Reddit: insert before share button
     actionBar.insertBefore(wrapper, actionBar.firstChild);
   } else {
-    // Others: floating button
-    wrapper.className = 'ragecheck-wrapper ragecheck-floating';
-    post.style.position = 'relative';
-    post.appendChild(wrapper);
+    // Default: append to action bar
+    actionBar.appendChild(wrapper);
   }
 }
 
@@ -216,6 +226,7 @@ function processAllPosts() {
   if (!platform) return;
 
   const posts = document.querySelectorAll(platform.postSelector);
+  console.log(`RageCheck: Found ${posts.length} posts on ${platform.name}`);
   posts.forEach(post => processPost(post, platform));
 }
 
