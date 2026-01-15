@@ -8,6 +8,23 @@ import { saveFailedImage, saveUploadedImage } from "@/lib/blob";
 // Extend function timeout for slow sites
 export const maxDuration = 60; // 60 seconds
 
+// CORS headers for browser extension
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type",
+};
+
+// Handle preflight requests
+export async function OPTIONS() {
+  return new NextResponse(null, { status: 200, headers: corsHeaders });
+}
+
+// Helper to add CORS headers to response
+function jsonResponse(data: AnalyzeResponse, options?: { status?: number }) {
+  return NextResponse.json(data, { status: options?.status || 200, headers: corsHeaders });
+}
+
 export interface AnalyzeResponse {
   success: boolean;
   error?: string;
@@ -52,7 +69,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<AnalyzeRe
     if (image && typeof image === "string") {
       // Validate image format
       if (!image.startsWith("data:image/")) {
-        return NextResponse.json(
+        return jsonResponse(
           { success: false, error: "Invalid image format" },
           { status: 400 }
         );
@@ -61,7 +78,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<AnalyzeRe
       // Check approximate size (base64 is ~4/3 larger than binary)
       const base64Data = image.split(",")[1];
       if (base64Data && base64Data.length * 0.75 > MAX_IMAGE_SIZE) {
-        return NextResponse.json(
+        return jsonResponse(
           { success: false, error: "Image too large (max 5MB)" },
           { status: 400 }
         );
@@ -85,7 +102,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<AnalyzeRe
           failedImageUrl: failedImageUrl || undefined,
         });
 
-        return NextResponse.json(
+        return jsonResponse(
           { success: false, error: result.error || "Failed to analyze image" },
           { status: 422 }
         );
@@ -103,7 +120,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<AnalyzeRe
           country: country || undefined,
         });
 
-        return NextResponse.json(
+        return jsonResponse(
           {
             success: false,
             error: "This image doesn't have text content to analyze. Please upload a screenshot of a social media post, meme with text, or news headline."
@@ -130,7 +147,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<AnalyzeRe
         failedImageUrl: imageUrl || undefined, // Reusing this field for all uploaded images
       });
 
-      return NextResponse.json({
+      return jsonResponse({
         success: true,
         score: result.score,
         label: result.label,
@@ -149,7 +166,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<AnalyzeRe
 
     // Handle URL analysis (existing logic)
     if (!url || typeof url !== "string") {
-      return NextResponse.json(
+      return jsonResponse(
         { success: false, error: "URL or image is required" },
         { status: 400 }
       );
@@ -161,7 +178,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<AnalyzeRe
     try {
       new URL(url);
     } catch {
-      return NextResponse.json(
+      return jsonResponse(
         { success: false, error: "Invalid URL format" },
         { status: 400 }
       );
@@ -171,7 +188,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<AnalyzeRe
     const cached = !forceReanalyze ? await getCachedAnalysis(url) : null;
     if (cached) {
       console.log(`Cache hit for ${url}`);
-      return NextResponse.json({
+      return jsonResponse({
         success: true,
         score: cached.score,
         label: cached.label as "Low" | "Medium" | "High",
@@ -205,7 +222,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<AnalyzeRe
         country: country || undefined,
       });
 
-      return NextResponse.json(
+      return jsonResponse(
         {
           success: false,
           error: extracted.error || "Failed to extract content",
@@ -285,7 +302,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<AnalyzeRe
       sourceType,
     });
 
-    return NextResponse.json({
+    return jsonResponse({
       success: true,
       score: finalScore,
       label,
@@ -304,7 +321,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<AnalyzeRe
     });
   } catch (error) {
     console.error("Analyze error:", error);
-    return NextResponse.json(
+    return jsonResponse(
       {
         success: false,
         error: "An unexpected error occurred",
