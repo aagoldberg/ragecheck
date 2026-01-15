@@ -18,10 +18,9 @@ const PLATFORMS = {
   },
   bluesky: {
     host: ['bsky.app'],
-    postSelector: '[data-testid="feedItem"], [data-testid="postThreadItem"], [data-testid="contentHider-post"]',
-    actionBarSelector: null, // Use floating button
+    postSelector: null, // Custom detection
+    actionBarSelector: null,
     getPostUrl: (post) => {
-      // Find any link containing /post/
       const links = post.querySelectorAll('a[href*="/post/"]');
       for (const link of links) {
         const href = link.getAttribute('href');
@@ -29,13 +28,33 @@ const PLATFORMS = {
           return href.startsWith('http') ? href : 'https://bsky.app' + href;
         }
       }
-      // Try timestamp link
-      const timeLink = post.querySelector('a[href*="/profile/"][href*="/post/"]');
-      if (timeLink) {
-        const href = timeLink.getAttribute('href');
-        return href.startsWith('http') ? href : 'https://bsky.app' + href;
-      }
       return null;
+    },
+    // Custom post finder for Bluesky
+    findPosts: () => {
+      const posts = [];
+      // Find all links to posts, then get their parent containers
+      document.querySelectorAll('a[href*="/post/"]').forEach(link => {
+        // Walk up to find a reasonable container (stop at 10 levels)
+        let container = link.parentElement;
+        let depth = 0;
+        while (container && depth < 10) {
+          // Look for container that has the action buttons (comment, repost, like)
+          if (container.querySelector('svg') &&
+              container.textContent.length > 50 &&
+              !posts.includes(container)) {
+            // Check if this looks like a post (has multiple interactive elements)
+            const buttons = container.querySelectorAll('button, [role="button"]');
+            if (buttons.length >= 3) {
+              posts.push(container);
+              break;
+            }
+          }
+          container = container.parentElement;
+          depth++;
+        }
+      });
+      return posts;
     }
   },
   facebook: {
@@ -225,7 +244,16 @@ function processAllPosts() {
   const platform = getCurrentPlatform();
   if (!platform) return;
 
-  const posts = document.querySelectorAll(platform.postSelector);
+  // Use custom finder if available, otherwise use selector
+  let posts;
+  if (platform.findPosts) {
+    posts = platform.findPosts();
+  } else if (platform.postSelector) {
+    posts = document.querySelectorAll(platform.postSelector);
+  } else {
+    posts = [];
+  }
+
   console.log(`RageCheck: Found ${posts.length} posts on ${platform.name}`);
   posts.forEach(post => processPost(post, platform));
 }
