@@ -18,11 +18,18 @@ const PLATFORMS = {
   },
   bluesky: {
     host: ['bsky.app'],
-    postSelector: '[data-testid="postThreadItem"], [data-testid="feedItem-by-"]',
-    actionBarSelector: '[class*="actions"], [class*="PostCtrls"]',
+    postSelector: '[data-testid="feedItem"], [data-testid="postThreadItem"], article',
+    actionBarSelector: '[data-testid="repostBtn"], [data-testid="likeBtn"]',
     getPostUrl: (post) => {
-      const link = post.querySelector('a[href*="/post/"]');
-      return link ? 'https://bsky.app' + link.getAttribute('href') : null;
+      // Find timestamp link which contains the post URL
+      const links = post.querySelectorAll('a[href*="/post/"]');
+      for (const link of links) {
+        const href = link.getAttribute('href');
+        if (href && href.includes('/post/')) {
+          return href.startsWith('http') ? href : 'https://bsky.app' + href;
+        }
+      }
+      return null;
     }
   },
   facebook: {
@@ -179,23 +186,25 @@ function processPost(post, platform) {
   const btn = createCheckButton(postUrl);
 
   // Insert button
+  const wrapper = document.createElement('div');
+  wrapper.className = 'ragecheck-wrapper';
+  wrapper.appendChild(btn);
+
   if (platform.name === 'twitter') {
     // Twitter: append to action group
-    const wrapper = document.createElement('div');
-    wrapper.className = 'ragecheck-wrapper';
-    wrapper.appendChild(btn);
     actionBar.appendChild(wrapper);
+  } else if (platform.name === 'bluesky') {
+    // Bluesky: insert after like button
+    wrapper.style.marginLeft = '12px';
+    wrapper.style.display = 'inline-flex';
+    wrapper.style.alignItems = 'center';
+    actionBar.parentElement?.appendChild(wrapper);
   } else if (platform.name === 'reddit') {
     // Reddit: insert before share button
-    const wrapper = document.createElement('div');
-    wrapper.className = 'ragecheck-wrapper';
-    wrapper.appendChild(btn);
     actionBar.insertBefore(wrapper, actionBar.firstChild);
   } else {
-    // Others: append to post
-    const wrapper = document.createElement('div');
+    // Others: floating button
     wrapper.className = 'ragecheck-wrapper ragecheck-floating';
-    wrapper.appendChild(btn);
     post.style.position = 'relative';
     post.appendChild(wrapper);
   }
