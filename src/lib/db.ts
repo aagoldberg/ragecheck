@@ -538,13 +538,14 @@ export async function getAnalysisCompletionMetrics(): Promise<AnalysisCompletion
       GROUP BY user_agent
     `;
 
-    // By device type - completed
+    // By device type - completed (only correlated data with session_id)
     const deviceCompleted = await getDb()`
       SELECT user_agent, COUNT(*) as count
       FROM ragecheck_analyses
       WHERE is_bot = false
         AND created_at > NOW() - INTERVAL '7 days'
         AND user_agent IS NOT NULL
+        AND session_id IS NOT NULL
       GROUP BY user_agent
     `;
 
@@ -588,11 +589,11 @@ export async function getAnalysisCompletionMetrics(): Promise<AnalysisCompletion
     `;
     const [urlCompleted] = await getDb()`
       SELECT COUNT(*) as count FROM ragecheck_analyses
-      WHERE is_bot = false AND created_at > NOW() - INTERVAL '7 days' AND url != 'image-upload'
+      WHERE is_bot = false AND created_at > NOW() - INTERVAL '7 days' AND url != 'image-upload' AND session_id IS NOT NULL
     `;
     const [imageCompleted] = await getDb()`
       SELECT COUNT(*) as count FROM ragecheck_analyses
-      WHERE is_bot = false AND created_at > NOW() - INTERVAL '7 days' AND url = 'image-upload'
+      WHERE is_bot = false AND created_at > NOW() - INTERVAL '7 days' AND url = 'image-upload' AND session_id IS NOT NULL
     `;
 
     // Hourly trend (last 24 hours)
@@ -611,7 +612,7 @@ export async function getAnalysisCompletionMetrics(): Promise<AnalysisCompletion
         TO_CHAR(created_at AT TIME ZONE 'America/New_York', 'HH24:00') as hour,
         COUNT(*) as count
       FROM ragecheck_analyses
-      WHERE is_bot = false AND created_at > NOW() - INTERVAL '24 hours'
+      WHERE is_bot = false AND created_at > NOW() - INTERVAL '24 hours' AND session_id IS NOT NULL
       GROUP BY TO_CHAR(created_at AT TIME ZONE 'America/New_York', 'HH24:00')
       ORDER BY hour
     `;
@@ -648,7 +649,7 @@ export async function getAnalysisCompletionMetrics(): Promise<AnalysisCompletion
         DATE(created_at AT TIME ZONE 'America/New_York') as date,
         COUNT(*) as count
       FROM ragecheck_analyses
-      WHERE is_bot = false AND created_at > NOW() - INTERVAL '14 days'
+      WHERE is_bot = false AND created_at > NOW() - INTERVAL '14 days' AND session_id IS NOT NULL
       GROUP BY DATE(created_at AT TIME ZONE 'America/New_York')
       ORDER BY date
     `;
