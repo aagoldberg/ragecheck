@@ -572,14 +572,14 @@ export async function getAnalysisCompletionMetrics(): Promise<AnalysisCompletion
     }
 
     const calcRate = (started: number, completed: number) =>
-      started > 0 ? Math.round((completed / started) * 1000) / 10 : 0;
+      started > 0 ? Math.min(100, Math.round((completed / started) * 1000) / 10) : 0;
 
     return {
       overall: {
         started: totalStarted,
         completed: totalCompleted,
         completionRate: calcRate(totalStarted, totalCompleted),
-        abandonmentRate: totalStarted > 0 ? Math.round(((totalStarted - totalCompleted) / totalStarted) * 1000) / 10 : 0,
+        abandonmentRate: totalStarted > 0 ? Math.max(0, Math.round(((totalStarted - totalCompleted) / totalStarted) * 1000) / 10) : 0,
       },
       byDevice: {
         mobile: { ...deviceStats.mobile, completionRate: calcRate(deviceStats.mobile.started, deviceStats.mobile.completed) },
