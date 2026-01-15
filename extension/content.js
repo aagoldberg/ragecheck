@@ -84,8 +84,15 @@ function createCheckButton(postUrl) {
     e.preventDefault();
     e.stopPropagation();
 
+    // If already has result, open full analysis
+    if (btn.classList.contains('ragecheck-has-result')) {
+      const url = btn.dataset.postUrl;
+      window.open(`${API_BASE}?url=${encodeURIComponent(url)}`, '_blank');
+      return;
+    }
+
     if (!postUrl) {
-      showResult(btn, { error: 'Could not find post URL' });
+      showResult(btn, { error: 'Could not find post URL' }, postUrl);
       return;
     }
 
@@ -102,12 +109,12 @@ function createCheckButton(postUrl) {
       const data = await response.json();
 
       if (data.success) {
-        showResult(btn, { score: data.score, label: data.label });
+        showResult(btn, { score: data.score, label: data.label }, postUrl);
       } else {
-        showResult(btn, { error: data.error || 'Analysis failed' });
+        showResult(btn, { error: data.error || 'Analysis failed' }, postUrl);
       }
     } catch (err) {
-      showResult(btn, { error: 'Connection failed' });
+      showResult(btn, { error: 'Connection failed' }, postUrl);
     }
 
     btn.classList.remove('ragecheck-loading');
@@ -117,7 +124,7 @@ function createCheckButton(postUrl) {
 }
 
 // Show result on button
-function showResult(btn, result) {
+function showResult(btn, result, postUrl) {
   const label = btn.querySelector('.ragecheck-label');
 
   if (result.error) {
@@ -133,14 +140,18 @@ function showResult(btn, result) {
   btn.classList.remove('ragecheck-error');
   if (score >= 66) {
     btn.classList.add('ragecheck-high');
-    btn.title = `High rage score (${score}/100) - This content may be designed to provoke anger`;
+    btn.title = `High rage score (${score}/100) - Click to see full analysis`;
   } else if (score >= 33) {
     btn.classList.add('ragecheck-medium');
-    btn.title = `Medium rage score (${score}/100) - Some emotional manipulation detected`;
+    btn.title = `Medium rage score (${score}/100) - Click to see full analysis`;
   } else {
     btn.classList.add('ragecheck-low');
-    btn.title = `Low rage score (${score}/100) - Appears relatively balanced`;
+    btn.title = `Low rage score (${score}/100) - Click to see full analysis`;
   }
+
+  // Make button clickable to open full analysis
+  btn.classList.add('ragecheck-has-result');
+  btn.dataset.postUrl = postUrl;
 }
 
 // Process a single post
