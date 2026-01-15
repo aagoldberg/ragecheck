@@ -2850,9 +2850,9 @@ export default function AdminDashboard() {
                     <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-4">
                       <div className="h-48 flex items-end gap-1">
                         {analysisCompletionMetrics.dailyTrend.map((day, i) => {
-                          const maxStarted = Math.max(...analysisCompletionMetrics.dailyTrend.map(d => d.started), 1);
-                          const startedHeight = (day.started / maxStarted) * 100;
-                          const completedHeight = (day.completed / maxStarted) * 100;
+                          const maxValue = Math.max(...analysisCompletionMetrics.dailyTrend.map(d => Math.max(d.started, d.completed)), 1);
+                          const startedHeight = (day.started / maxValue) * 100;
+                          const completedHeight = (day.completed / maxValue) * 100;
                           return (
                             <div key={i} className="flex-1 flex flex-col items-center gap-1 group relative">
                               <div className="w-full flex gap-0.5 items-end" style={{ height: "160px" }}>
