@@ -1832,15 +1832,15 @@ function HomeContent() {
               {/* Support link */}
               <div className="text-center mt-6">
                 <p className="text-sm text-zinc-400">
-                  If this was useful, you can{" "}
+                  RageCheck is free and ad-free. If you find it useful, consider{" "}
                   <a
                     href="https://buy.stripe.com/4gM8wQ8Xq8xU8gw9HvgEg00"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-indigo-500 hover:text-indigo-400 underline underline-offset-2"
                   >
-                    support RageCheck
-                  </a>
+                    supporting its development
+                  </a>.
                 </p>
               </div>
               </>
