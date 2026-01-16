@@ -1508,14 +1508,29 @@ function HomeContent() {
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
-                  {/* Simple Share Button */}
+                  <button
+                    onClick={() => {
+                      setResult(null);
+                      setUrl("");
+                      setIsDemo(false);
+                      window.scrollTo({ top: 0, behavior: "smooth" });
+                    }}
+                    className="flex items-center gap-2 px-4 py-2.5 rounded-full text-sm font-medium bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-all shadow-sm"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    </svg>
+                    Analyze New
+                  </button>
+
+                  {/* Prominent Share Button */}
                   {!isDemo && (
                     <button
                       onClick={onShareImageClick}
-                      className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+                      className={`flex items-center gap-2 px-6 py-2.5 rounded-full text-sm font-bold transition-all shadow-md hover:shadow-lg hover:scale-105 active:scale-95 ${
                         imageCopied
-                          ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300"
-                          : "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700"
+                          ? "bg-green-500 text-white"
+                          : "bg-gradient-to-r from-rose-500 to-indigo-600 text-white"
                       }`}
                     >
                       {imageCopied ? (
@@ -1530,7 +1545,7 @@ function HomeContent() {
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
                           </svg>
-                          Share
+                          Share Result
                         </>
                       )}
                     </button>
@@ -1539,8 +1554,9 @@ function HomeContent() {
               </div>
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
 
-                {/* Score & Context Card */}
-                <BentoCard className="lg:col-span-4 lg:sticky lg:top-24 h-fit" title="Assessment">
+                {/* Left Column: Assessment & Capture */}
+                <div className="lg:col-span-4 lg:sticky lg:top-24 h-fit flex flex-col gap-6">
+                <BentoCard title="Assessment">
                   <div className="flex flex-col items-center justify-center text-center">
                     <ScoreGauge score={result.score!} label={result.label!} />
 
@@ -1620,6 +1636,69 @@ function HomeContent() {
                     )}
                   </div>
                 </BentoCard>
+
+                {/* Email Capture */}
+                <div className="bg-zinc-900 dark:bg-zinc-100 rounded-2xl p-6 shadow-lg border border-zinc-800 dark:border-zinc-200">
+                  {emailSubscribed ? (
+                    <div className="flex items-center gap-3 text-emerald-400 dark:text-emerald-600">
+                       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                       <p className="font-bold">You&apos;re in. Talk soon.</p>
+                    </div>
+                  ) : (
+                    <>
+                      <h3 className="font-bold text-lg text-white dark:text-zinc-900 mb-1">Stay sharp</h3>
+                      <p className="text-sm text-zinc-400 dark:text-zinc-600 mb-4 leading-relaxed">
+                        Occasional examples, explained calmly. No spam. No activism.
+                      </p>
+                      <form
+                        onSubmit={async (e) => {
+                          e.preventDefault();
+                          setEmailError(null);
+                          setEmailSubscribing(true);
+                          const email = (e.target as HTMLFormElement).email.value;
+                          try {
+                            const res = await fetch("/api/subscribe", {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ email }),
+                            });
+                            const data = await res.json();
+                            if (data.success) {
+                              setEmailSubscribed(true);
+                            } else {
+                              setEmailError(data.error || "Something went wrong");
+                            }
+                          } catch {
+                            setEmailError("Failed to subscribe.");
+                          } finally {
+                            setEmailSubscribing(false);
+                          }
+                        }}
+                        className="flex flex-col gap-3"
+                      >
+                        <input
+                          type="email"
+                          name="email"
+                          placeholder="you@example.com"
+                          required
+                          disabled={emailSubscribing}
+                          className="w-full px-4 py-2.5 bg-zinc-800 dark:bg-zinc-200 border border-zinc-700 dark:border-zinc-300 rounded-lg text-sm text-white dark:text-zinc-900 placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50"
+                        />
+                        <button
+                          type="submit"
+                          disabled={emailSubscribing}
+                          className="w-full px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm font-bold transition-colors disabled:opacity-50 shadow-md"
+                        >
+                          {emailSubscribing ? "..." : "Subscribe"}
+                        </button>
+                      </form>
+                      {emailError && (
+                        <p className="text-xs text-rose-400 mt-2 font-medium">{emailError}</p>
+                      )}
+                    </>
+                  )}
+                </div>
+                </div>
 
                 {/* Analysis Breakdown */}
                 <div className="lg:col-span-8 flex flex-col gap-6">
@@ -1812,65 +1891,7 @@ function HomeContent() {
                 </div>
               )}
 
-              {/* Email capture - utility-first framing */}
-              <div className="mt-8 p-6 bg-zinc-50 dark:bg-zinc-800/50 rounded-2xl border border-zinc-200 dark:border-zinc-700">
-                {emailSubscribed ? (
-                  <p className="text-sm font-medium text-emerald-600 dark:text-emerald-400">
-                    You're subscribed. We'll be in touch.
-                  </p>
-                ) : (
-                  <>
-                    <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-4">
-                      Occasional examples, explained calmly. No spam. No activism.
-                    </p>
-                    <form
-                      onSubmit={async (e) => {
-                        e.preventDefault();
-                        setEmailError(null);
-                        setEmailSubscribing(true);
-                        const email = (e.target as HTMLFormElement).email.value;
-                        try {
-                          const res = await fetch("/api/subscribe", {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ email }),
-                          });
-                          const data = await res.json();
-                          if (data.success) {
-                            setEmailSubscribed(true);
-                          } else {
-                            setEmailError(data.error || "Something went wrong");
-                          }
-                        } catch {
-                          setEmailError("Failed to subscribe. Please try again.");
-                        } finally {
-                          setEmailSubscribing(false);
-                        }
-                      }}
-                      className="flex gap-2"
-                    >
-                      <input
-                        type="email"
-                        name="email"
-                        placeholder="you@example.com"
-                        required
-                        disabled={emailSubscribing}
-                        className="flex-1 px-4 py-2 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-600 rounded-lg text-sm text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50"
-                      />
-                      <button
-                        type="submit"
-                        disabled={emailSubscribing}
-                        className="px-4 py-2 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 rounded-lg text-sm font-medium hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-colors disabled:opacity-50"
-                      >
-                        {emailSubscribing ? "..." : "Subscribe"}
-                      </button>
-                    </form>
-                    {emailError && (
-                      <p className="text-xs text-rose-500 mt-2">{emailError}</p>
-                    )}
-                  </>
-                )}
-              </div>
+
 
               {/* Support link */}
               <div className="text-center mt-6">
@@ -1887,23 +1908,7 @@ function HomeContent() {
                 </p>
               </div>
 
-              {/* Repeat use CTA */}
-              <div className="text-center mt-8">
-                <button
-                  onClick={() => {
-                    setResult(null);
-                    setUrl("");
-                    setIsDemo(true);
-                    window.scrollTo({ top: 0, behavior: "smooth" });
-                  }}
-                  className="inline-flex items-center gap-2 px-6 py-3 bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 rounded-xl font-medium text-sm hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-all"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                  </svg>
-                  Analyze another link
-                </button>
-              </div>
+
               </>
             )}
           </div>
