@@ -33,6 +33,24 @@ function getBrowser(userAgent: string | null): "Chrome" | "Safari" | "Firefox" |
   return "Other";
 }
 
+// Helper to get date string in EST timezone (YYYY-MM-DD format)
+// This ensures JS date strings match PostgreSQL DATE(... AT TIME ZONE 'America/New_York')
+function getESTDateString(date: Date = new Date()): string {
+  return date.toLocaleDateString('en-CA', { timeZone: 'America/New_York' }); // en-CA gives YYYY-MM-DD format
+}
+
+// Helper to get EST date string from a PostgreSQL date result
+// Handles both Date objects and string representations
+function parseDBDateToEST(dbDate: Date | string): string {
+  if (dbDate instanceof Date) {
+    // If it's a Date object, the DB already parsed it - extract the date parts directly
+    // PostgreSQL dates come back as midnight UTC, so we use UTC methods
+    return `${dbDate.getUTCFullYear()}-${String(dbDate.getUTCMonth() + 1).padStart(2, '0')}-${String(dbDate.getUTCDate()).padStart(2, '0')}`;
+  }
+  // If it's a string like "2025-01-15", just take the date part
+  return String(dbDate).split('T')[0];
+}
+
 // Cache the database connection
 let dbInstance: NeonQueryFunction<false, false> | null = null;
 
@@ -480,7 +498,7 @@ export async function getAnalysisCompletionMetrics(): Promise<AnalysisCompletion
       WHERE is_bot = false
     `;
     const trackingSince = trackingStart?.start_date
-      ? new Date(trackingStart.start_date).toISOString().split('T')[0]
+      ? parseDBDateToEST(trackingStart.start_date)
       : null;
 
     // Overall started (last 7 days, non-bot)
@@ -705,17 +723,17 @@ export async function getAnalysisCompletionMetrics(): Promise<AnalysisCompletion
     for (let i = 13; i >= 0; i--) {
       const d = new Date();
       d.setDate(d.getDate() - i);
-      const dateStr = d.toISOString().split('T')[0];
+      const dateStr = getESTDateString(d);
       dailyMap.set(dateStr, { started: 0, completed: 0 });
     }
     for (const row of dailyStarted) {
-      const dateStr = new Date(row.date).toISOString().split('T')[0];
+      const dateStr = parseDBDateToEST(row.date);
       if (dailyMap.has(dateStr)) {
         dailyMap.get(dateStr)!.started = Number(row.count);
       }
     }
     for (const row of dailyCompleted) {
-      const dateStr = new Date(row.date).toISOString().split('T')[0];
+      const dateStr = parseDBDateToEST(row.date);
       if (dailyMap.has(dateStr)) {
         dailyMap.get(dateStr)!.completed = Number(row.count);
       }
@@ -1180,7 +1198,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
            a.signal_loaded_language, a.signal_absolutist, a.signal_threat_panic,
            a.signal_us_vs_them, a.signal_engagement_bait,
            a.success, a.error, a.title,
-           a.created_at AT TIME ZONE 'America/New_York' as created_at,
+           a.created_at,
            a.ip_address, a.user_agent, a.country, a.is_bot,
            a.failed_image_url,
            EXISTS (SELECT 1 FROM ragecheck_shares s WHERE s.url = a.url AND s.share_type NOT LIKE '%_clicked') as shared,
@@ -1755,7 +1773,7 @@ export async function getVisitorStats(): Promise<VisitorStats> {
 
     const recentRows = await getDb()`
       SELECT v.ip_address, v.user_agent, v.country, v.referrer, v.page_path,
-             v.created_at AT TIME ZONE 'America/New_York' as created_at, v.is_bot,
+             v.created_at, v.is_bot,
              EXISTS (
                SELECT 1 FROM ragecheck_analyses a
                WHERE a.ip_address = v.ip_address AND a.llm_enhanced = true
@@ -1810,23 +1828,19 @@ export async function getVisitorStats(): Promise<VisitorStats> {
     for (let i = 14; i >= 1; i--) {
       const d = new Date();
       d.setDate(d.getDate() - i);
-      const dateStr = d.toISOString().split("T")[0];
+      const dateStr = getESTDateString(d);
       dateMap.set(dateStr, { visitors: 0, analyses: 0 });
     }
 
     for (const row of visitorTimeSeries) {
-      // Handle date without timezone conversion issues
-      const d = new Date(row.date);
-      const dateStr = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
+      const dateStr = parseDBDateToEST(row.date);
       const existing = dateMap.get(dateStr) || { visitors: 0, analyses: 0 };
       existing.visitors = Number(row.count);
       dateMap.set(dateStr, existing);
     }
 
     for (const row of analysisTimeSeries) {
-      // Handle date without timezone conversion issues
-      const d = new Date(row.date);
-      const dateStr = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
+      const dateStr = parseDBDateToEST(row.date);
       const existing = dateMap.get(dateStr) || { visitors: 0, analyses: 0 };
       existing.analyses = Number(row.count);
       dateMap.set(dateStr, existing);
@@ -2088,9 +2102,7 @@ export async function getRetentionMetrics(): Promise<RetentionMetrics> {
     `;
 
     const cohortRetention = cohortData.map(row => ({
-      cohortDate: row.cohort_date instanceof Date
-        ? row.cohort_date.toISOString().split('T')[0]
-        : String(row.cohort_date).split('T')[0],
+      cohortDate: parseDBDateToEST(row.cohort_date),
       cohortSize: Number(row.cohort_size),
       d1: Number(row.d1) || 0,
       d7: Number(row.d7) || 0,
@@ -2295,13 +2307,11 @@ export async function getPageVisitorStats(pagePath: string): Promise<PageVisitor
     for (let i = 14; i >= 1; i--) {
       const d = new Date();
       d.setDate(d.getDate() - i);
-      dateMap.set(d.toISOString().split("T")[0], 0);
+      dateMap.set(getESTDateString(d), 0);
     }
 
     for (const row of dailyData) {
-      // Handle date without timezone conversion issues
-      const d = new Date(row.date);
-      const dateStr = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
+      const dateStr = parseDBDateToEST(row.date);
       dateMap.set(dateStr, Number(row.count));
     }
 
@@ -2497,7 +2507,7 @@ export async function getFeedbackStats(): Promise<FeedbackStats> {
 
     const recentRows = await getDb()`
       SELECT url, rating, comment, score, source_domain,
-             created_at AT TIME ZONE 'America/New_York' as created_at
+             created_at
       FROM ragecheck_feedback
       ORDER BY created_at DESC
       LIMIT 50
@@ -2709,25 +2719,13 @@ export async function getViralMetrics(): Promise<ViralMetrics> {
     for (let i = 6; i >= 0; i--) {
       const d = new Date();
       d.setDate(d.getDate() - i);
-      trendDates.push(d.toISOString().split("T")[0]);
+      trendDates.push(getESTDateString(d));
     }
 
-    const visitorMap = new Map(visitorTrends.map(r => {
-      const d = new Date(r.day);
-      return [`${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`, Number(r.count)];
-    }));
-    const shareMap = new Map(shareTrends.map(r => {
-      const d = new Date(r.day);
-      return [`${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`, Number(r.count)];
-    }));
-    const analysisMap = new Map(analysisTrends.map(r => {
-      const d = new Date(r.day);
-      return [`${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`, Number(r.count)];
-    }));
-    const repeatMap = new Map(repeatVisitorTrends.map(r => {
-      const d = new Date(r.day);
-      return [`${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`, Number(r.count)];
-    }));
+    const visitorMap = new Map(visitorTrends.map(r => [parseDBDateToEST(r.day), Number(r.count)]));
+    const shareMap = new Map(shareTrends.map(r => [parseDBDateToEST(r.day), Number(r.count)]));
+    const analysisMap = new Map(analysisTrends.map(r => [parseDBDateToEST(r.day), Number(r.count)]));
+    const repeatMap = new Map(repeatVisitorTrends.map(r => [parseDBDateToEST(r.day), Number(r.count)]));
 
     const dailyVisitors = trendDates.map(d => visitorMap.get(d) || 0);
     const dailyShares = trendDates.map(d => shareMap.get(d) || 0);
@@ -3331,19 +3329,19 @@ export async function getFunnelMetrics(): Promise<FunnelMetrics> {
     for (let i = 13; i >= 0; i--) {
       const d = new Date();
       d.setDate(d.getDate() - i);
-      const dateStr = d.toISOString().split('T')[0];
+      const dateStr = getESTDateString(d);
       trendMap.set(dateStr, { visitors: 0, converted: 0 });
     }
 
     for (const row of dailyVisitors) {
-      const dateStr = new Date(row.date).toISOString().split('T')[0];
+      const dateStr = parseDBDateToEST(row.date);
       if (trendMap.has(dateStr)) {
         trendMap.get(dateStr)!.visitors = Number(row.count);
       }
     }
 
     for (const row of dailyConverted) {
-      const dateStr = new Date(row.date).toISOString().split('T')[0];
+      const dateStr = parseDBDateToEST(row.date);
       if (trendMap.has(dateStr)) {
         trendMap.get(dateStr)!.converted = Number(row.count);
       }
@@ -4204,9 +4202,7 @@ export async function getShareMetrics(): Promise<ShareMetrics> {
         `;
 
     const dailyTrend = trendData.map(row => ({
-      date: row.day instanceof Date
-        ? row.day.toISOString().split('T')[0]
-        : String(row.day).split('T')[0],
+      date: parseDBDateToEST(row.day),
       shares: Number(row.shares),
       uniqueSharers: Number(row.unique_sharers),
     }));
