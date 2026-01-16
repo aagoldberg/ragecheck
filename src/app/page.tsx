@@ -579,17 +579,43 @@ function HomeContent() {
   const [feedbackGiven, setFeedbackGiven] = useState<"up" | "down" | null>(null);
   const [feedbackComment, setFeedbackComment] = useState("");
 
-  // Track current sessionId for abandonment detection
+  // Track current sessionId and start time for abandonment detection
   const currentSessionIdRef = useRef<string | null>(null);
+  const analysisStartTimeRef = useRef<number | null>(null);
+
+  // Helper to get connection info
+  const getConnectionInfo = () => {
+    const nav = navigator as Navigator & {
+      connection?: {
+        type?: string;
+        effectiveType?: string;
+      };
+    };
+    return {
+      connectionType: nav.connection?.type || 'unknown',
+      effectiveConnectionType: nav.connection?.effectiveType || 'unknown',
+    };
+  };
 
   // Abandonment beacon - send when user leaves page during analysis
   useEffect(() => {
     const handlePageLeave = () => {
       if (loading && currentSessionIdRef.current) {
+        const timeToAbandonMs = analysisStartTimeRef.current
+          ? Date.now() - analysisStartTimeRef.current
+          : undefined;
+        const { connectionType, effectiveConnectionType } = getConnectionInfo();
+
         // Use sendBeacon for reliable delivery during page unload
         navigator.sendBeacon(
           "/api/track-abandon",
-          JSON.stringify({ sessionId: currentSessionIdRef.current })
+          JSON.stringify({
+            sessionId: currentSessionIdRef.current,
+            reason: 'page_leave',
+            timeToAbandonMs,
+            connectionType,
+            effectiveConnectionType,
+          })
         );
       }
     };
@@ -792,6 +818,7 @@ function HomeContent() {
     tracking.trackAnalysisStarted("image");
     const sessionId = trackAnalysisStartDB("image");
     currentSessionIdRef.current = sessionId; // Track for abandonment detection
+    analysisStartTimeRef.current = Date.now(); // Track start time
 
     try {
       const response = await fetch("/api/analyze", {
@@ -817,6 +844,7 @@ function HomeContent() {
     } finally {
       setLoading(false);
       currentSessionIdRef.current = null; // Clear on completion
+      analysisStartTimeRef.current = null; // Clear start time
     }
   };
 
@@ -831,6 +859,7 @@ function HomeContent() {
     tracking.trackAnalysisStarted("url");
     const sessionId = trackAnalysisStartDB("url", targetUrl.trim());
     currentSessionIdRef.current = sessionId; // Track for abandonment detection
+    analysisStartTimeRef.current = Date.now(); // Track start time
 
     try {
       const response = await fetch("/api/analyze", {
@@ -856,6 +885,7 @@ function HomeContent() {
     } finally {
       setLoading(false);
       currentSessionIdRef.current = null; // Clear on completion
+      analysisStartTimeRef.current = null; // Clear start time
     }
   };
 

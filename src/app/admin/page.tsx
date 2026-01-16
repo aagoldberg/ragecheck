@@ -516,6 +516,38 @@ interface AnalysisCompletionMetrics {
   trackingSince: string | null;
 }
 
+interface AbandonmentDiagnostics {
+  timeDistribution: {
+    bucket: string;
+    count: number;
+    percentage: number;
+  }[];
+  reasonBreakdown: {
+    reason: string;
+    count: number;
+    percentage: number;
+  }[];
+  connectionBreakdown: {
+    connectionType: string;
+    effectiveType: string;
+    count: number;
+    abandonRate: number;
+  }[];
+  durationCorrelation: {
+    durationBucket: string;
+    totalCompleted: number;
+    totalAbandoned: number;
+    abandonRate: number;
+  }[];
+  summary: {
+    totalAbandoned: number;
+    avgTimeToAbandon: number;
+    medianTimeToAbandon: number;
+    mostCommonReason: string;
+    highestAbandonConnection: string;
+  };
+}
+
 interface ApiResponse {
   success?: boolean;
   error?: string;
@@ -533,6 +565,7 @@ interface ApiResponse {
   contentInsights?: ContentInsights;
   acquisitionMetrics?: AcquisitionMetrics;
   analysisCompletionMetrics?: AnalysisCompletionMetrics;
+  abandonmentDiagnostics?: AbandonmentDiagnostics;
   dbAvailable?: boolean;
 }
 
@@ -1516,6 +1549,7 @@ export default function AdminDashboard() {
   const [contentInsights, setContentInsights] = useState<ContentInsights | null>(null);
   const [acquisitionMetrics, setAcquisitionMetrics] = useState<AcquisitionMetrics | null>(null);
   const [analysisCompletionMetrics, setAnalysisCompletionMetrics] = useState<AnalysisCompletionMetrics | null>(null);
+  const [abandonmentDiagnostics, setAbandonmentDiagnostics] = useState<AbandonmentDiagnostics | null>(null);
 
   const fetchStats = async (adminKey: string) => {
     setLoading(true);
@@ -1546,6 +1580,7 @@ export default function AdminDashboard() {
         setContentInsights(data.contentInsights || null);
         setAcquisitionMetrics(data.acquisitionMetrics || null);
         setAnalysisCompletionMetrics(data.analysisCompletionMetrics || null);
+        setAbandonmentDiagnostics(data.abandonmentDiagnostics || null);
         setAuthenticated(true);
         // Save key to localStorage
         localStorage.setItem("ragecheck-admin-key", adminKey);
@@ -2972,6 +3007,202 @@ export default function AdminDashboard() {
                     </div>
                   </div>
                 </div>
+
+                {/* Abandonment Diagnostics Section */}
+                {abandonmentDiagnostics && abandonmentDiagnostics.summary.totalAbandoned > 0 && (
+                  <>
+                    <div className="border-t border-zinc-200 dark:border-zinc-800 pt-6 mt-6">
+                      <h2 className="text-xl font-bold text-zinc-900 dark:text-zinc-100 mb-6">Abandonment Diagnostics</h2>
+
+                      {/* Summary Stats */}
+                      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+                        <StatCard
+                          title="Total Abandoned"
+                          value={abandonmentDiagnostics.summary.totalAbandoned}
+                          subtitle="Last 7 days"
+                          accent="rose"
+                        />
+                        <StatCard
+                          title="Avg Time to Abandon"
+                          value={`${abandonmentDiagnostics.summary.avgTimeToAbandon}s`}
+                          subtitle="Mean duration"
+                          accent={abandonmentDiagnostics.summary.avgTimeToAbandon < 5 ? "amber" : abandonmentDiagnostics.summary.avgTimeToAbandon < 10 ? "amber" : "rose"}
+                        />
+                        <StatCard
+                          title="Median Time"
+                          value={`${abandonmentDiagnostics.summary.medianTimeToAbandon}s`}
+                          subtitle="50th percentile"
+                          accent="indigo"
+                        />
+                        <StatCard
+                          title="Top Reason"
+                          value={abandonmentDiagnostics.summary.mostCommonReason}
+                          subtitle="Most common"
+                          accent="purple"
+                        />
+                        <StatCard
+                          title="Worst Connection"
+                          value={abandonmentDiagnostics.summary.highestAbandonConnection.split(' ')[0]}
+                          subtitle={abandonmentDiagnostics.summary.highestAbandonConnection.includes('(') ? abandonmentDiagnostics.summary.highestAbandonConnection.split('(')[1]?.replace(')', '') : 'Highest abandon rate'}
+                          accent="amber"
+                        />
+                      </div>
+
+                      {/* Time-to-Abandon Distribution */}
+                      {abandonmentDiagnostics.timeDistribution.length > 0 && (
+                        <div className="mb-6">
+                          <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100 mb-4">Time to Abandon Distribution</h3>
+                          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-4">
+                            <div className="grid grid-cols-4 gap-4">
+                              {abandonmentDiagnostics.timeDistribution.map((bucket) => (
+                                <div key={bucket.bucket} className="text-center">
+                                  <div className="relative h-24 mb-2">
+                                    <div
+                                      className={`absolute bottom-0 left-1/2 -translate-x-1/2 w-16 rounded-t ${
+                                        bucket.bucket === '0-5s' ? 'bg-rose-500' :
+                                        bucket.bucket === '5-10s' ? 'bg-amber-500' :
+                                        bucket.bucket === '10-30s' ? 'bg-indigo-500' : 'bg-zinc-400'
+                                      }`}
+                                      style={{ height: `${Math.max(bucket.percentage, 5)}%` }}
+                                    />
+                                  </div>
+                                  <div className="text-xl font-bold text-zinc-900 dark:text-zinc-100">{bucket.count}</div>
+                                  <div className="text-xs text-zinc-500">{bucket.bucket}</div>
+                                  <div className="text-xs text-zinc-400">{bucket.percentage}%</div>
+                                </div>
+                              ))}
+                            </div>
+                            <div className="mt-4 text-xs text-zinc-500 text-center">
+                              {abandonmentDiagnostics.timeDistribution[0]?.bucket === '0-5s' && abandonmentDiagnostics.timeDistribution[0]?.percentage > 40 && (
+                                <span className="text-amber-600">⚠️ High early abandonment - users may not understand loading is happening</span>
+                              )}
+                              {abandonmentDiagnostics.timeDistribution.find(b => b.bucket === '30s+')?.percentage || 0 > 30 && (
+                                <span className="text-rose-600">⚠️ Many users waiting 30s+ - consider speed optimizations</span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Reason Breakdown */}
+                      {abandonmentDiagnostics.reasonBreakdown.length > 0 && (
+                        <div className="mb-6">
+                          <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100 mb-4">Abandon Reason Breakdown</h3>
+                          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-hidden">
+                            <table className="w-full">
+                              <thead className="bg-zinc-50 dark:bg-zinc-800/50">
+                                <tr>
+                                  <th className="text-left px-4 py-3 text-xs font-semibold text-zinc-500 uppercase">Reason</th>
+                                  <th className="text-right px-4 py-3 text-xs font-semibold text-zinc-500 uppercase">Count</th>
+                                  <th className="text-right px-4 py-3 text-xs font-semibold text-zinc-500 uppercase">%</th>
+                                  <th className="px-4 py-3 text-xs font-semibold text-zinc-500 uppercase">Visual</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
+                                {abandonmentDiagnostics.reasonBreakdown.map((reason) => (
+                                  <tr key={reason.reason} className="hover:bg-zinc-50 dark:hover:bg-zinc-800/30">
+                                    <td className="px-4 py-3 font-medium capitalize">{reason.reason.replace('_', ' ')}</td>
+                                    <td className="px-4 py-3 text-right text-zinc-600 dark:text-zinc-400">{reason.count}</td>
+                                    <td className="px-4 py-3 text-right font-semibold text-rose-600">{reason.percentage}%</td>
+                                    <td className="px-4 py-3">
+                                      <div className="w-32 h-2 bg-zinc-200 dark:bg-zinc-700 rounded-full overflow-hidden">
+                                        <div className="h-full bg-rose-500 rounded-full" style={{ width: `${reason.percentage}%` }} />
+                                      </div>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Duration Correlation Chart */}
+                      {abandonmentDiagnostics.durationCorrelation.length > 0 && (
+                        <div className="mb-6">
+                          <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100 mb-4">Abandonment Rate by Duration</h3>
+                          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-4">
+                            <div className="flex items-end gap-2 h-40">
+                              {abandonmentDiagnostics.durationCorrelation.map((bucket) => {
+                                const total = bucket.totalCompleted + bucket.totalAbandoned;
+                                const completedHeight = total > 0 ? (bucket.totalCompleted / total) * 100 : 0;
+                                const abandonedHeight = total > 0 ? (bucket.totalAbandoned / total) * 100 : 0;
+                                return (
+                                  <div key={bucket.durationBucket} className="flex-1 flex flex-col items-center group relative">
+                                    <div className="w-full flex flex-col items-center" style={{ height: "120px" }}>
+                                      <div className="w-full flex flex-col-reverse" style={{ height: "100%" }}>
+                                        <div
+                                          className="w-full bg-emerald-500 rounded-b"
+                                          style={{ height: `${completedHeight}%` }}
+                                        />
+                                        <div
+                                          className="w-full bg-rose-500 rounded-t"
+                                          style={{ height: `${abandonedHeight}%` }}
+                                        />
+                                      </div>
+                                    </div>
+                                    <span className="text-xs text-zinc-500 mt-2">{bucket.durationBucket}</span>
+                                    <span className={`text-xs font-semibold ${bucket.abandonRate > 30 ? 'text-rose-600' : bucket.abandonRate > 15 ? 'text-amber-600' : 'text-emerald-600'}`}>
+                                      {bucket.abandonRate}%
+                                    </span>
+                                    {/* Tooltip */}
+                                    <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-zinc-800 text-white text-xs px-2 py-1 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                                      {bucket.totalCompleted} completed, {bucket.totalAbandoned} abandoned
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                            <div className="flex items-center justify-center gap-6 mt-4 text-xs text-zinc-500">
+                              <div className="flex items-center gap-2">
+                                <div className="w-3 h-3 bg-emerald-500 rounded" />
+                                <span>Completed</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <div className="w-3 h-3 bg-rose-500 rounded" />
+                                <span>Abandoned</span>
+                              </div>
+                            </div>
+                            <div className="mt-4 text-xs text-zinc-500 text-center">
+                              Shows abandon rate for analyses by how long they took. Higher rates at longer durations suggest impatience.
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Connection Quality */}
+                      {abandonmentDiagnostics.connectionBreakdown.length > 0 && (
+                        <div>
+                          <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100 mb-4">Abandonment by Connection Quality</h3>
+                          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-hidden">
+                            <table className="w-full">
+                              <thead className="bg-zinc-50 dark:bg-zinc-800/50">
+                                <tr>
+                                  <th className="text-left px-4 py-3 text-xs font-semibold text-zinc-500 uppercase">Connection</th>
+                                  <th className="text-left px-4 py-3 text-xs font-semibold text-zinc-500 uppercase">Effective Type</th>
+                                  <th className="text-right px-4 py-3 text-xs font-semibold text-zinc-500 uppercase">Abandoned</th>
+                                  <th className="text-right px-4 py-3 text-xs font-semibold text-zinc-500 uppercase">Abandon Rate</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
+                                {abandonmentDiagnostics.connectionBreakdown.slice(0, 6).map((conn, i) => (
+                                  <tr key={i} className="hover:bg-zinc-50 dark:hover:bg-zinc-800/30">
+                                    <td className="px-4 py-3 font-medium">{conn.connectionType}</td>
+                                    <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400">{conn.effectiveType}</td>
+                                    <td className="px-4 py-3 text-right text-zinc-600 dark:text-zinc-400">{conn.count}</td>
+                                    <td className={`px-4 py-3 text-right font-semibold ${conn.abandonRate > 30 ? 'text-rose-600' : conn.abandonRate > 15 ? 'text-amber-600' : 'text-emerald-600'}`}>
+                                      {conn.abandonRate}%
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
               </div>
             )}
 

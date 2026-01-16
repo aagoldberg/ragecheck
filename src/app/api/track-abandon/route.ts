@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { markAnalysisAbandoned } from "@/lib/db";
+import { markAnalysisAbandoned, AbandonmentData } from "@/lib/db";
 
 // CORS headers for beacon requests
 const corsHeaders = {
@@ -13,36 +13,50 @@ export async function OPTIONS() {
   return new NextResponse(null, { status: 200, headers: corsHeaders });
 }
 
+interface AbandonRequestBody {
+  sessionId?: string;
+  reason?: 'timeout' | 'error' | 'user_close' | 'page_leave';
+  timeToAbandonMs?: number;
+  connectionType?: string;
+  effectiveConnectionType?: string;
+}
+
 export async function POST(request: NextRequest) {
   try {
     // Beacon sends data as text/plain, so we need to handle both JSON and text
     const contentType = request.headers.get("content-type") || "";
-    let sessionId: string | undefined;
+    let body: AbandonRequestBody = {};
 
     if (contentType.includes("application/json")) {
-      const body = await request.json();
-      sessionId = body.sessionId;
+      body = await request.json();
     } else {
       // Beacon with text/plain
       const text = await request.text();
       try {
-        const body = JSON.parse(text);
-        sessionId = body.sessionId;
+        body = JSON.parse(text);
       } catch {
         // If not JSON, treat the whole text as sessionId
-        sessionId = text;
+        body = { sessionId: text };
       }
     }
 
-    if (!sessionId) {
+    if (!body.sessionId) {
       return NextResponse.json(
         { success: false, error: "sessionId is required" },
         { status: 400, headers: corsHeaders }
       );
     }
 
-    // Mark the analysis as abandoned
-    await markAnalysisAbandoned(sessionId);
+    // Mark the analysis as abandoned with enriched data
+    const abandonmentData: AbandonmentData = {
+      sessionId: body.sessionId,
+      reason: body.reason,
+      timeToAbandonMs: body.timeToAbandonMs,
+      connectionType: body.connectionType,
+      effectiveConnectionType: body.effectiveConnectionType,
+    };
+
+    await markAnalysisAbandoned(abandonmentData);
 
     return NextResponse.json({ success: true }, { headers: corsHeaders });
   } catch (error) {

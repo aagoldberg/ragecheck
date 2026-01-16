@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { initDB, getDashboardStats, getVisitorStats, getPageVisitorStats, getViralMetrics, isDBAvailable, invalidateIncompleteCache, recomputeBotFlags, getFeedbackStats, initFeedbackTable, getTimeToAnalysisMetrics, getConversionMetrics, getConversionInsights, getFunnelMetrics, getRetentionMetrics, getShareMetrics, getContentInsights, getAcquisitionMetrics, getAnalysisCompletionMetrics } from "@/lib/db";
+import { initDB, getDashboardStats, getVisitorStats, getPageVisitorStats, getViralMetrics, isDBAvailable, invalidateIncompleteCache, recomputeBotFlags, getFeedbackStats, initFeedbackTable, getTimeToAnalysisMetrics, getConversionMetrics, getConversionInsights, getFunnelMetrics, getRetentionMetrics, getShareMetrics, getContentInsights, getAcquisitionMetrics, getAnalysisCompletionMetrics, getAbandonmentDiagnostics } from "@/lib/db";
 
 export async function GET(request: NextRequest) {
   // Simple password protection via query param
@@ -42,6 +42,7 @@ export async function GET(request: NextRequest) {
     const contentInsights = await getContentInsights();
     const acquisitionMetrics = await getAcquisitionMetrics();
     const analysisCompletionMetrics = await getAnalysisCompletionMetrics();
+    const abandonmentDiagnostics = await getAbandonmentDiagnostics();
 
     return NextResponse.json({
       success: true,
@@ -60,6 +61,7 @@ export async function GET(request: NextRequest) {
       contentInsights,
       acquisitionMetrics,
       analysisCompletionMetrics,
+      abandonmentDiagnostics,
     });
   } catch (error) {
     console.error("Admin API error:", error);

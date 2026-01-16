@@ -217,6 +217,11 @@ export async function initDB() {
     await getDb()`CREATE INDEX IF NOT EXISTS idx_analyses_session_id ON ragecheck_analyses(session_id) WHERE session_id IS NOT NULL`;
     // Abandonment tracking
     await getDb()`ALTER TABLE ragecheck_analysis_starts ADD COLUMN IF NOT EXISTS abandoned_at TIMESTAMPTZ`;
+    // Enhanced abandonment diagnostics
+    await getDb()`ALTER TABLE ragecheck_analysis_starts ADD COLUMN IF NOT EXISTS abandon_reason TEXT`; // timeout, error, user_close, page_leave
+    await getDb()`ALTER TABLE ragecheck_analysis_starts ADD COLUMN IF NOT EXISTS time_to_abandon_ms INTEGER`;
+    await getDb()`ALTER TABLE ragecheck_analysis_starts ADD COLUMN IF NOT EXISTS connection_type TEXT`; // wifi, cellular, ethernet, none, unknown
+    await getDb()`ALTER TABLE ragecheck_analysis_starts ADD COLUMN IF NOT EXISTS effective_connection_type TEXT`; // slow-2g, 2g, 3g, 4g
   } catch {
     // Columns may already exist
   }
@@ -369,13 +374,33 @@ export async function logAnalysisStart(data: AnalysisStartLog) {
   }
 }
 
-export async function markAnalysisAbandoned(sessionId: string) {
+export interface AbandonmentData {
+  sessionId: string;
+  reason?: 'timeout' | 'error' | 'user_close' | 'page_leave';
+  timeToAbandonMs?: number;
+  connectionType?: string;
+  effectiveConnectionType?: string;
+}
+
+export async function markAnalysisAbandoned(data: AbandonmentData | string) {
   try {
+    // Support both old string signature and new object signature
+    const sessionId = typeof data === 'string' ? data : data.sessionId;
+    const reason = typeof data === 'string' ? 'page_leave' : (data.reason || 'page_leave');
+    const timeToAbandonMs = typeof data === 'string' ? null : (data.timeToAbandonMs || null);
+    const connectionType = typeof data === 'string' ? null : (data.connectionType || null);
+    const effectiveConnectionType = typeof data === 'string' ? null : (data.effectiveConnectionType || null);
+
     await withRetry(async () => {
       // Only mark as abandoned if not already completed
       await getDb()`
         UPDATE ragecheck_analysis_starts
-        SET abandoned_at = NOW()
+        SET
+          abandoned_at = NOW(),
+          abandon_reason = ${reason},
+          time_to_abandon_ms = ${timeToAbandonMs},
+          connection_type = ${connectionType},
+          effective_connection_type = ${effectiveConnectionType}
         WHERE session_id = ${sessionId}
           AND abandoned_at IS NULL
           AND NOT EXISTS (
@@ -765,6 +790,230 @@ export async function getAnalysisCompletionMetrics(): Promise<AnalysisCompletion
       hourlyTrend: [],
       dailyTrend: [],
       trackingSince: null,
+    };
+  }
+}
+
+// ============================================
+// ABANDONMENT DIAGNOSTICS
+// ============================================
+
+export interface AbandonmentDiagnostics {
+  // Time-to-abandon histogram
+  timeDistribution: {
+    bucket: string; // '0-5s', '5-10s', '10-30s', '30s+'
+    count: number;
+    percentage: number;
+  }[];
+  // Reason breakdown
+  reasonBreakdown: {
+    reason: string;
+    count: number;
+    percentage: number;
+  }[];
+  // Connection type breakdown
+  connectionBreakdown: {
+    connectionType: string;
+    effectiveType: string;
+    count: number;
+    abandonRate: number;
+  }[];
+  // Abandonment rate by analysis duration (for correlation)
+  durationCorrelation: {
+    durationBucket: string; // '<3s', '3-5s', '5-10s', '10-20s', '20s+'
+    totalCompleted: number;
+    totalAbandoned: number;
+    abandonRate: number;
+  }[];
+  // Summary stats
+  summary: {
+    totalAbandoned: number;
+    avgTimeToAbandon: number;
+    medianTimeToAbandon: number;
+    mostCommonReason: string;
+    highestAbandonConnection: string;
+  };
+}
+
+export async function getAbandonmentDiagnostics(): Promise<AbandonmentDiagnostics> {
+  try {
+    await initDB();
+
+    // Time-to-abandon distribution
+    const timeDistributionResult = await getDb()`
+      SELECT
+        CASE
+          WHEN time_to_abandon_ms IS NULL THEN 'unknown'
+          WHEN time_to_abandon_ms < 5000 THEN '0-5s'
+          WHEN time_to_abandon_ms < 10000 THEN '5-10s'
+          WHEN time_to_abandon_ms < 30000 THEN '10-30s'
+          ELSE '30s+'
+        END as bucket,
+        COUNT(*) as count
+      FROM ragecheck_analysis_starts
+      WHERE abandoned_at IS NOT NULL
+        AND is_bot = false
+        AND created_at > NOW() - INTERVAL '7 days'
+      GROUP BY bucket
+      ORDER BY
+        CASE bucket
+          WHEN '0-5s' THEN 1
+          WHEN '5-10s' THEN 2
+          WHEN '10-30s' THEN 3
+          WHEN '30s+' THEN 4
+          ELSE 5
+        END
+    `;
+
+    const totalAbandoned = timeDistributionResult.reduce((sum, r) => sum + Number(r.count), 0);
+    const timeDistribution = timeDistributionResult.map(r => ({
+      bucket: r.bucket as string,
+      count: Number(r.count),
+      percentage: totalAbandoned > 0 ? Math.round((Number(r.count) / totalAbandoned) * 1000) / 10 : 0,
+    }));
+
+    // Reason breakdown
+    const reasonResult = await getDb()`
+      SELECT
+        COALESCE(abandon_reason, 'unknown') as reason,
+        COUNT(*) as count
+      FROM ragecheck_analysis_starts
+      WHERE abandoned_at IS NOT NULL
+        AND is_bot = false
+        AND created_at > NOW() - INTERVAL '7 days'
+      GROUP BY abandon_reason
+      ORDER BY count DESC
+    `;
+
+    const reasonBreakdown = reasonResult.map(r => ({
+      reason: r.reason as string,
+      count: Number(r.count),
+      percentage: totalAbandoned > 0 ? Math.round((Number(r.count) / totalAbandoned) * 1000) / 10 : 0,
+    }));
+
+    // Connection type breakdown with abandon rates
+    const connectionResult = await getDb()`
+      SELECT
+        COALESCE(connection_type, 'unknown') as connection_type,
+        COALESCE(effective_connection_type, 'unknown') as effective_type,
+        COUNT(*) FILTER (WHERE abandoned_at IS NOT NULL) as abandoned_count,
+        COUNT(*) as total_count
+      FROM ragecheck_analysis_starts
+      WHERE is_bot = false
+        AND created_at > NOW() - INTERVAL '7 days'
+      GROUP BY connection_type, effective_connection_type
+      HAVING COUNT(*) >= 3
+      ORDER BY COUNT(*) FILTER (WHERE abandoned_at IS NOT NULL)::float / NULLIF(COUNT(*), 0) DESC
+    `;
+
+    const connectionBreakdown = connectionResult.map(r => ({
+      connectionType: r.connection_type as string,
+      effectiveType: r.effective_type as string,
+      count: Number(r.abandoned_count),
+      abandonRate: Number(r.total_count) > 0
+        ? Math.round((Number(r.abandoned_count) / Number(r.total_count)) * 1000) / 10
+        : 0,
+    }));
+
+    // Duration correlation - compare completed vs abandoned by how long the analysis took
+    const durationCorrelationResult = await getDb()`
+      WITH completed_durations AS (
+        SELECT
+          EXTRACT(EPOCH FROM (a.created_at - s.created_at)) as duration_seconds
+        FROM ragecheck_analysis_starts s
+        INNER JOIN ragecheck_analyses a ON s.session_id = a.session_id
+        WHERE s.is_bot = false
+          AND s.created_at > NOW() - INTERVAL '7 days'
+      ),
+      abandoned_durations AS (
+        SELECT
+          COALESCE(time_to_abandon_ms / 1000.0, 10) as duration_seconds
+        FROM ragecheck_analysis_starts
+        WHERE abandoned_at IS NOT NULL
+          AND is_bot = false
+          AND created_at > NOW() - INTERVAL '7 days'
+      ),
+      all_durations AS (
+        SELECT duration_seconds, 'completed' as status FROM completed_durations
+        UNION ALL
+        SELECT duration_seconds, 'abandoned' as status FROM abandoned_durations
+      )
+      SELECT
+        CASE
+          WHEN duration_seconds < 3 THEN '<3s'
+          WHEN duration_seconds < 5 THEN '3-5s'
+          WHEN duration_seconds < 10 THEN '5-10s'
+          WHEN duration_seconds < 20 THEN '10-20s'
+          ELSE '20s+'
+        END as duration_bucket,
+        COUNT(*) FILTER (WHERE status = 'completed') as completed,
+        COUNT(*) FILTER (WHERE status = 'abandoned') as abandoned
+      FROM all_durations
+      GROUP BY duration_bucket
+      ORDER BY
+        CASE duration_bucket
+          WHEN '<3s' THEN 1
+          WHEN '3-5s' THEN 2
+          WHEN '5-10s' THEN 3
+          WHEN '10-20s' THEN 4
+          ELSE 5
+        END
+    `;
+
+    const durationCorrelation = durationCorrelationResult.map(r => ({
+      durationBucket: r.duration_bucket as string,
+      totalCompleted: Number(r.completed),
+      totalAbandoned: Number(r.abandoned),
+      abandonRate: (Number(r.completed) + Number(r.abandoned)) > 0
+        ? Math.round((Number(r.abandoned) / (Number(r.completed) + Number(r.abandoned))) * 1000) / 10
+        : 0,
+    }));
+
+    // Summary stats
+    const [summaryResult] = await getDb()`
+      SELECT
+        COUNT(*) as total_abandoned,
+        AVG(time_to_abandon_ms) as avg_time,
+        PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY time_to_abandon_ms) as median_time
+      FROM ragecheck_analysis_starts
+      WHERE abandoned_at IS NOT NULL
+        AND is_bot = false
+        AND created_at > NOW() - INTERVAL '7 days'
+        AND time_to_abandon_ms IS NOT NULL
+    `;
+
+    const mostCommonReason = reasonBreakdown.length > 0 ? reasonBreakdown[0].reason : 'unknown';
+    const highestAbandonConnection = connectionBreakdown.length > 0
+      ? `${connectionBreakdown[0].effectiveType} (${connectionBreakdown[0].abandonRate}%)`
+      : 'unknown';
+
+    return {
+      timeDistribution,
+      reasonBreakdown,
+      connectionBreakdown,
+      durationCorrelation,
+      summary: {
+        totalAbandoned,
+        avgTimeToAbandon: Math.round(Number(summaryResult?.avg_time || 0) / 100) / 10, // Convert to seconds with 1 decimal
+        medianTimeToAbandon: Math.round(Number(summaryResult?.median_time || 0) / 100) / 10,
+        mostCommonReason,
+        highestAbandonConnection,
+      },
+    };
+  } catch (error) {
+    console.error("Failed to get abandonment diagnostics:", error);
+    return {
+      timeDistribution: [],
+      reasonBreakdown: [],
+      connectionBreakdown: [],
+      durationCorrelation: [],
+      summary: {
+        totalAbandoned: 0,
+        avgTimeToAbandon: 0,
+        medianTimeToAbandon: 0,
+        mostCommonReason: 'unknown',
+        highestAbandonConnection: 'unknown',
+      },
     };
   }
 }
