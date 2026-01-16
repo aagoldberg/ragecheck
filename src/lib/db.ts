@@ -3627,7 +3627,7 @@ export async function getAcquisitionMetrics(): Promise<AcquisitionMetrics> {
             ) THEN ip_address END) as conversions
           FROM ragecheck_visitors
           WHERE is_bot = false
-            AND (ip_address IS NULL OR ip_address NOT IN ${adminIPs})
+            AND (ip_address IS NULL OR ip_address != ALL(${adminIPs}))
           GROUP BY COALESCE(utm_source, 'direct')
           ORDER BY visitors DESC
           LIMIT 15
@@ -3663,7 +3663,7 @@ export async function getAcquisitionMetrics(): Promise<AcquisitionMetrics> {
             COUNT(*) as visitors
           FROM ragecheck_visitors
           WHERE is_bot = false
-            AND (ip_address IS NULL OR ip_address NOT IN ${adminIPs})
+            AND (ip_address IS NULL OR ip_address != ALL(${adminIPs}))
           GROUP BY COALESCE(utm_medium, 'none')
           ORDER BY visitors DESC
           LIMIT 10
@@ -3697,7 +3697,7 @@ export async function getAcquisitionMetrics(): Promise<AcquisitionMetrics> {
             ) THEN ip_address END) as conversions
           FROM ragecheck_visitors
           WHERE is_bot = false AND utm_campaign IS NOT NULL
-            AND (ip_address IS NULL OR ip_address NOT IN ${adminIPs})
+            AND (ip_address IS NULL OR ip_address != ALL(${adminIPs}))
           GROUP BY utm_campaign, utm_source
           ORDER BY visitors DESC
           LIMIT 10
@@ -3742,7 +3742,7 @@ export async function getAcquisitionMetrics(): Promise<AcquisitionMetrics> {
             COUNT(*) as visitors
           FROM ragecheck_visitors
           WHERE is_bot = false AND utm_source IS NULL
-            AND (ip_address IS NULL OR ip_address NOT IN ${adminIPs})
+            AND (ip_address IS NULL OR ip_address != ALL(${adminIPs}))
           GROUP BY 1
           ORDER BY visitors DESC
           LIMIT 15
@@ -3784,7 +3784,7 @@ export async function getAcquisitionMetrics(): Promise<AcquisitionMetrics> {
             COUNT(*) FILTER (WHERE utm_source IS NULL AND referrer IS NULL) as direct
           FROM ragecheck_visitors
           WHERE is_bot = false
-            AND (ip_address IS NULL OR ip_address NOT IN ${adminIPs})
+            AND (ip_address IS NULL OR ip_address != ALL(${adminIPs}))
         `
       : await getDb()`
           SELECT
@@ -3843,7 +3843,7 @@ export async function getContentInsights(): Promise<ContentInsights> {
           FROM ragecheck_analyses a
           LEFT JOIN ragecheck_shares s ON a.url = s.url AND s.share_type NOT LIKE '%_clicked'
           WHERE a.is_bot = false AND a.success = true AND a.topic IS NOT NULL
-            AND (a.ip_address IS NULL OR a.ip_address NOT IN ${adminIPs})
+            AND (a.ip_address IS NULL OR a.ip_address != ALL(${adminIPs}))
           GROUP BY a.topic
           ORDER BY count DESC
         `
@@ -3880,7 +3880,7 @@ export async function getContentInsights(): Promise<ContentInsights> {
           FROM ragecheck_analyses a
           LEFT JOIN ragecheck_shares s ON a.url = s.url AND s.share_type NOT LIKE '%_clicked'
           WHERE a.is_bot = false AND a.success = true AND a.source_domain IS NOT NULL
-            AND (a.ip_address IS NULL OR a.ip_address NOT IN ${adminIPs})
+            AND (a.ip_address IS NULL OR a.ip_address != ALL(${adminIPs}))
           GROUP BY a.source_domain
           ORDER BY count DESC
           LIMIT 20
@@ -3915,7 +3915,7 @@ export async function getContentInsights(): Promise<ContentInsights> {
             ROUND(AVG(score)) as avg_score
           FROM ragecheck_analyses
           WHERE is_bot = false AND success = true AND content_type IS NOT NULL
-            AND (ip_address IS NULL OR ip_address NOT IN ${adminIPs})
+            AND (ip_address IS NULL OR ip_address != ALL(${adminIPs}))
           GROUP BY content_type
           ORDER BY count DESC
         `
@@ -3947,7 +3947,7 @@ export async function getContentInsights(): Promise<ContentInsights> {
             ROUND(AVG(score)) as avg_score
           FROM ragecheck_analyses
           WHERE is_bot = false AND success = true AND source_type IS NOT NULL
-            AND (ip_address IS NULL OR ip_address NOT IN ${adminIPs})
+            AND (ip_address IS NULL OR ip_address != ALL(${adminIPs}))
           GROUP BY source_type
           ORDER BY count DESC
         `
@@ -4022,11 +4022,12 @@ export async function getShareMetrics(): Promise<ShareMetrics> {
     const hasAdminExclusion = adminIPs.length > 0;
 
     // Total shares (excluding click events and admin)
+    // Note: Use != ALL(array) instead of NOT IN for Neon template literals
     const [totalSharesResult] = hasAdminExclusion
       ? await getDb()`
           SELECT COUNT(*) as count FROM ragecheck_shares
           WHERE share_type NOT LIKE '%_clicked'
-            AND (ip_address IS NULL OR ip_address NOT IN ${adminIPs})
+            AND (ip_address IS NULL OR ip_address != ALL(${adminIPs}))
         `
       : await getDb()`
           SELECT COUNT(*) as count FROM ragecheck_shares
@@ -4038,7 +4039,7 @@ export async function getShareMetrics(): Promise<ShareMetrics> {
       ? await getDb()`
           SELECT COUNT(DISTINCT ip_address) as count FROM ragecheck_shares
           WHERE ip_address IS NOT NULL AND share_type NOT LIKE '%_clicked'
-            AND ip_address NOT IN ${adminIPs}
+            AND ip_address != ALL(${adminIPs})
         `
       : await getDb()`
           SELECT COUNT(DISTINCT ip_address) as count FROM ragecheck_shares
@@ -4051,7 +4052,7 @@ export async function getShareMetrics(): Promise<ShareMetrics> {
           SELECT COUNT(*) as count FROM ragecheck_shares
           WHERE created_at >= DATE_TRUNC('day', NOW() AT TIME ZONE 'America/New_York') AT TIME ZONE 'America/New_York'
             AND share_type NOT LIKE '%_clicked'
-            AND (ip_address IS NULL OR ip_address NOT IN ${adminIPs})
+            AND (ip_address IS NULL OR ip_address != ALL(${adminIPs}))
         `
       : await getDb()`
           SELECT COUNT(*) as count FROM ragecheck_shares
@@ -4065,7 +4066,7 @@ export async function getShareMetrics(): Promise<ShareMetrics> {
           SELECT COUNT(*) as count FROM ragecheck_shares
           WHERE created_at > NOW() - INTERVAL '7 days'
             AND share_type NOT LIKE '%_clicked'
-            AND (ip_address IS NULL OR ip_address NOT IN ${adminIPs})
+            AND (ip_address IS NULL OR ip_address != ALL(${adminIPs}))
         `
       : await getDb()`
           SELECT COUNT(*) as count FROM ragecheck_shares
@@ -4093,7 +4094,7 @@ export async function getShareMetrics(): Promise<ShareMetrics> {
           SELECT share_type, COUNT(*) as count
           FROM ragecheck_shares
           WHERE share_type NOT LIKE '%_clicked'
-            AND (ip_address IS NULL OR ip_address NOT IN ${adminIPs})
+            AND (ip_address IS NULL OR ip_address != ALL(${adminIPs}))
           GROUP BY share_type
           ORDER BY count DESC
         `
@@ -4120,7 +4121,7 @@ export async function getShareMetrics(): Promise<ShareMetrics> {
             COUNT(DISTINCT ip_address) as unique_sharers
           FROM ragecheck_shares
           WHERE url IS NOT NULL AND share_type NOT LIKE '%_clicked'
-            AND (ip_address IS NULL OR ip_address NOT IN ${adminIPs})
+            AND (ip_address IS NULL OR ip_address != ALL(${adminIPs}))
           GROUP BY url
           ORDER BY share_count DESC
           LIMIT 10
@@ -4160,7 +4161,7 @@ export async function getShareMetrics(): Promise<ShareMetrics> {
             SELECT ip_address, COUNT(*) as share_count
             FROM ragecheck_shares
             WHERE ip_address IS NOT NULL AND share_type NOT LIKE '%_clicked'
-              AND ip_address NOT IN ${adminIPs}
+              AND ip_address != ALL(${adminIPs})
             GROUP BY ip_address
           )
           SELECT
@@ -4244,7 +4245,7 @@ export async function getShareMetrics(): Promise<ShareMetrics> {
             SUM(CASE WHEN score IS NULL THEN 1 ELSE 0 END) as unknown
           FROM ragecheck_shares
           WHERE share_type NOT LIKE '%_clicked'
-            AND (ip_address IS NULL OR ip_address NOT IN ${adminIPs})
+            AND (ip_address IS NULL OR ip_address != ALL(${adminIPs}))
         `
       : await getDb()`
           SELECT
@@ -4274,7 +4275,7 @@ export async function getShareMetrics(): Promise<ShareMetrics> {
           FROM ragecheck_shares
           WHERE created_at > NOW() - INTERVAL '14 days'
             AND share_type NOT LIKE '%_clicked'
-            AND (ip_address IS NULL OR ip_address NOT IN ${adminIPs})
+            AND (ip_address IS NULL OR ip_address != ALL(${adminIPs}))
           GROUP BY DATE(created_at AT TIME ZONE 'America/New_York')
           ORDER BY day ASC
         `
