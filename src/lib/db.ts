@@ -908,7 +908,9 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     SELECT a.url, a.source_domain, a.platform, a.score, a.label, a.llm_enhanced,
            a.signal_loaded_language, a.signal_absolutist, a.signal_threat_panic,
            a.signal_us_vs_them, a.signal_engagement_bait,
-           a.success, a.error, a.title, a.created_at, a.ip_address, a.user_agent, a.country, a.is_bot,
+           a.success, a.error, a.title,
+           a.created_at AT TIME ZONE 'America/New_York' as created_at,
+           a.ip_address, a.user_agent, a.country, a.is_bot,
            a.failed_image_url,
            EXISTS (SELECT 1 FROM ragecheck_shares s WHERE s.url = a.url AND s.share_type NOT LIKE '%_clicked') as shared,
            (SELECT s.share_type FROM ragecheck_shares s WHERE s.url = a.url AND s.share_type NOT LIKE '%_clicked' ORDER BY s.created_at DESC LIMIT 1) as share_type,
@@ -993,8 +995,8 @@ export async function getDashboardStats(): Promise<DashboardStats> {
       ud.user_agent,
       ud.total_days,
       ud.total_searches,
-      ud.first_seen,
-      ud.last_seen,
+      ud.first_seen AT TIME ZONE 'America/New_York' as first_seen,
+      ud.last_seen AT TIME ZONE 'America/New_York' as last_seen,
       fa.first_platform,
       fa.first_referrer,
       fa.first_day_searches
@@ -1479,7 +1481,8 @@ export async function getVisitorStats(): Promise<VisitorStats> {
       : 0;
 
     const recentRows = await getDb()`
-      SELECT v.ip_address, v.user_agent, v.country, v.referrer, v.page_path, v.created_at, v.is_bot,
+      SELECT v.ip_address, v.user_agent, v.country, v.referrer, v.page_path,
+             v.created_at AT TIME ZONE 'America/New_York' as created_at, v.is_bot,
              EXISTS (
                SELECT 1 FROM ragecheck_analyses a
                WHERE a.ip_address = v.ip_address AND a.llm_enhanced = true
@@ -2153,7 +2156,8 @@ export async function getFeedbackStats(): Promise<FeedbackStats> {
     const [negativeResult] = await getDb()`SELECT COUNT(*) as count FROM ragecheck_feedback WHERE rating = 'down'`;
 
     const recentRows = await getDb()`
-      SELECT url, rating, comment, score, source_domain, created_at
+      SELECT url, rating, comment, score, source_domain,
+             created_at AT TIME ZONE 'America/New_York' as created_at
       FROM ragecheck_feedback
       ORDER BY created_at DESC
       LIMIT 50
@@ -3771,8 +3775,8 @@ export async function getShareMetrics(): Promise<ShareMetrics> {
       SELECT
         ip_address,
         COUNT(*) as share_count,
-        MAX(created_at) as last_share_at,
-        MIN(created_at) as first_share_at
+        MAX(created_at) AT TIME ZONE 'America/New_York' as last_share_at,
+        MIN(created_at) AT TIME ZONE 'America/New_York' as first_share_at
       FROM ragecheck_shares
       WHERE ip_address IS NOT NULL AND share_type NOT LIKE '%_clicked'
       GROUP BY ip_address
