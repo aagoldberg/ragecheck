@@ -191,6 +191,30 @@ export async function POST(request: NextRequest): Promise<NextResponse<AnalyzeRe
     const cached = !forceReanalyze ? await getCachedAnalysis(url) : null;
     if (cached) {
       console.log(`Cache hit for ${url}`);
+
+      // Log cache hit as a completion so funnel metrics are accurate
+      await logAnalysis({
+        url,
+        sourceDomain: cached.sourceDomain,
+        score: cached.score,
+        label: cached.label,
+        llmEnhanced: cached.llmEnhanced,
+        signalBreakdown: cached.signalBreakdown,
+        success: true,
+        ipAddress: ipAddress || undefined,
+        userAgent: userAgent || undefined,
+        country: country || undefined,
+        sessionId: sessionId || undefined,
+        title: cached.title || undefined,
+        reasons: cached.reasons,
+        highlights: cached.highlights,
+        contextNotes: cached.contextNotes || undefined,
+        textPreview: cached.textPreview || undefined,
+        sharingPatterns: cached.sharingPatterns || undefined,
+        techniqueExplanations: cached.techniqueExplanations || undefined,
+        shareCardSummary: cached.shareCardSummary || undefined,
+      });
+
       return jsonResponse({
         success: true,
         score: cached.score,
