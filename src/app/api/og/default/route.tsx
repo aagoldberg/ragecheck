@@ -49,13 +49,13 @@ export async function GET() {
               lineHeight: "1.1",
               letterSpacing: "-0.03em"
             }}>
-              <span style={{ color: "#18181b" }}>Is that post </span>
+              <span style={{ color: "#18181b" }}>Is that post&nbsp;</span>
               <span style={{
                 backgroundImage: "linear-gradient(90deg, #f43f5e, #6366f1)",
                 backgroundClip: "text",
                 color: "transparent",
               }}>designed</span>
-              <span style={{ color: "#18181b" }}> to make you angry?</span>
+              <span style={{ color: "#18181b" }}>&nbsp;to make you angry?</span>
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
               <span style={{
