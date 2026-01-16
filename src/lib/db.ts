@@ -193,6 +193,19 @@ export async function initDB() {
     )
   `;
 
+  // Email subscribers table
+  await getDb()`
+    CREATE TABLE IF NOT EXISTS ragecheck_subscribers (
+      id SERIAL PRIMARY KEY,
+      email TEXT NOT NULL UNIQUE,
+      ip_address TEXT,
+      country TEXT,
+      source TEXT DEFAULT 'website',
+      subscribed_at TIMESTAMP DEFAULT NOW(),
+      unsubscribed_at TIMESTAMP
+    )
+  `;
+
   // Add additional columns to shares table for enhanced tracking
   try {
     await getDb()`ALTER TABLE ragecheck_shares ADD COLUMN IF NOT EXISTS score INTEGER`;
@@ -1553,6 +1566,50 @@ export async function getCachedAnalysis(url: string): Promise<CachedAnalysis | n
   } catch (error) {
     console.error("Failed to get cached analysis:", error);
     return null;
+  }
+}
+
+// ============================================
+// EMAIL SUBSCRIBERS
+// ============================================
+
+export async function subscribeEmail(data: {
+  email: string;
+  ipAddress?: string;
+  country?: string;
+  source?: string;
+}): Promise<{ success: boolean; error?: string; alreadySubscribed?: boolean }> {
+  try {
+    await initDB();
+
+    // Check if already subscribed
+    const [existing] = await getDb()`
+      SELECT id, unsubscribed_at FROM ragecheck_subscribers
+      WHERE email = ${data.email.toLowerCase().trim()}
+    `;
+
+    if (existing) {
+      if (existing.unsubscribed_at) {
+        // Re-subscribe
+        await getDb()`
+          UPDATE ragecheck_subscribers
+          SET unsubscribed_at = NULL, subscribed_at = NOW()
+          WHERE email = ${data.email.toLowerCase().trim()}
+        `;
+        return { success: true };
+      }
+      return { success: true, alreadySubscribed: true };
+    }
+
+    await getDb()`
+      INSERT INTO ragecheck_subscribers (email, ip_address, country, source)
+      VALUES (${data.email.toLowerCase().trim()}, ${data.ipAddress || null}, ${data.country || null}, ${data.source || 'website'})
+    `;
+
+    return { success: true };
+  } catch (error) {
+    console.error("Failed to subscribe email:", error);
+    return { success: false, error: "Failed to subscribe" };
   }
 }
 

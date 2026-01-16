@@ -578,6 +578,9 @@ function HomeContent() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [feedbackGiven, setFeedbackGiven] = useState<"up" | "down" | null>(null);
   const [feedbackComment, setFeedbackComment] = useState("");
+  const [emailSubscribing, setEmailSubscribing] = useState(false);
+  const [emailSubscribed, setEmailSubscribed] = useState(false);
+  const [emailError, setEmailError] = useState<string | null>(null);
 
   // Track current sessionId and start time for abandonment detection
   const currentSessionIdRef = useRef<string | null>(null);
@@ -1841,33 +1844,62 @@ function HomeContent() {
 
               {/* Email capture - utility-first framing */}
               <div className="mt-8 p-6 bg-zinc-50 dark:bg-zinc-800/50 rounded-2xl border border-zinc-200 dark:border-zinc-700">
-                <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-4">
-                  Occasional examples, explained calmly. No spam. No activism.
-                </p>
-                <form
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    // Placeholder - wire to email service later
-                    const email = (e.target as HTMLFormElement).email.value;
-                    console.log("Email signup:", email);
-                    alert("Thanks! (Email capture not yet implemented)");
-                  }}
-                  className="flex gap-2"
-                >
-                  <input
-                    type="email"
-                    name="email"
-                    placeholder="you@example.com"
-                    required
-                    className="flex-1 px-4 py-2 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-600 rounded-lg text-sm text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  />
-                  <button
-                    type="submit"
-                    className="px-4 py-2 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 rounded-lg text-sm font-medium hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-colors"
-                  >
-                    Subscribe
-                  </button>
-                </form>
+                {emailSubscribed ? (
+                  <p className="text-sm font-medium text-emerald-600 dark:text-emerald-400">
+                    You're subscribed. We'll be in touch.
+                  </p>
+                ) : (
+                  <>
+                    <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-4">
+                      Occasional examples, explained calmly. No spam. No activism.
+                    </p>
+                    <form
+                      onSubmit={async (e) => {
+                        e.preventDefault();
+                        setEmailError(null);
+                        setEmailSubscribing(true);
+                        const email = (e.target as HTMLFormElement).email.value;
+                        try {
+                          const res = await fetch("/api/subscribe", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ email }),
+                          });
+                          const data = await res.json();
+                          if (data.success) {
+                            setEmailSubscribed(true);
+                          } else {
+                            setEmailError(data.error || "Something went wrong");
+                          }
+                        } catch {
+                          setEmailError("Failed to subscribe. Please try again.");
+                        } finally {
+                          setEmailSubscribing(false);
+                        }
+                      }}
+                      className="flex gap-2"
+                    >
+                      <input
+                        type="email"
+                        name="email"
+                        placeholder="you@example.com"
+                        required
+                        disabled={emailSubscribing}
+                        className="flex-1 px-4 py-2 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-600 rounded-lg text-sm text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50"
+                      />
+                      <button
+                        type="submit"
+                        disabled={emailSubscribing}
+                        className="px-4 py-2 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 rounded-lg text-sm font-medium hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-colors disabled:opacity-50"
+                      >
+                        {emailSubscribing ? "..." : "Subscribe"}
+                      </button>
+                    </form>
+                    {emailError && (
+                      <p className="text-xs text-rose-500 mt-2">{emailError}</p>
+                    )}
+                  </>
+                )}
               </div>
 
               {/* Support link */}
