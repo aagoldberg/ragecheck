@@ -129,7 +129,7 @@ export async function GET() {
             }}>
               <div style={{ width: "12px", height: "12px", borderRadius: "50%", backgroundColor: "#f43f5e" }} />
               <span style={{ fontSize: "20px", fontWeight: "700", color: "#fca5a5", letterSpacing: "0.02em", textTransform: "uppercase" }}>
-                Outrage Detected · 87
+                Emotional Intensity - High
               </span>
             </div>
 
@@ -143,7 +143,7 @@ export async function GET() {
               backgroundClip: "text",
               color: "transparent",
             }}>
-              This post is engineered to make you angry.
+              This post is optimized for anger
             </div>
 
             {/* Analysis Points */}
