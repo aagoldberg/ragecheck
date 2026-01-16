@@ -8,7 +8,7 @@ export const metadata: Metadata = {
     description: "Daily briefing synthesized from Left, Center, and Right sources. See the core facts and the framing differences.",
     images: [
       {
-        url: "/api/og/clearview",
+        url: "/api/og/clearview?v=1",
         width: 1200,
         height: 630,
         alt: "ClearView by RageCheck",
@@ -19,7 +19,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "ClearView - What Actually Happened. Minus the Spin.",
     description: "Daily briefing synthesized from Left, Center, and Right sources. See the core facts and the framing differences.",
-    images: ["/api/og/clearview"],
+    images: ["/api/og/clearview?v=1"],
   },
 };
 

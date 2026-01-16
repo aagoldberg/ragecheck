@@ -44,7 +44,7 @@ export async function generateMetadata({ searchParams }: SharePageProps): Promis
       siteName: "RageCheck",
       images: [
         {
-          url: `/api/og?score=${score}&domain=${encodeURIComponent(domain)}&title=${encodeURIComponent(title)}`,
+          url: `/api/og?score=${score}&domain=${encodeURIComponent(domain)}&title=${encodeURIComponent(title)}&v=1`,
           width: 1200,
           height: 630,
           alt: `RageCheck score: ${score}`,
@@ -55,7 +55,7 @@ export async function generateMetadata({ searchParams }: SharePageProps): Promis
       card: "summary_large_image",
       title: ogTitle,
       description: ogDescription,
-      images: [`/api/og?score=${score}&domain=${encodeURIComponent(domain)}&title=${encodeURIComponent(title)}`],
+      images: [`/api/og?score=${score}&domain=${encodeURIComponent(domain)}&title=${encodeURIComponent(title)}&v=1`],
     },
   };
 }
