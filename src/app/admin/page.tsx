@@ -161,6 +161,8 @@ interface VisitorStats {
     hasLlmAnalysis: boolean;
     isBot: boolean;
     isRepeatUser: boolean;
+    startedCount: number;
+    abandonedCount: number;
   }[];
   timeSeries: {
     date: string;
@@ -463,7 +465,7 @@ interface AcquisitionMetrics {
   };
 }
 
-type CompletionGroup = { started: number; completed: number; completionRate: number };
+type CompletionGroup = { started: number; completed: number; abandoned: number; completionRate: number };
 
 interface AnalysisCompletionMetrics {
   overall: {
@@ -2130,6 +2132,8 @@ export default function AdminDashboard() {
                         <th className="text-left py-3 px-3 text-zinc-500 font-medium">Country</th>
                         <th className="text-left py-3 px-3 text-zinc-500 font-medium">Referrer</th>
                         <th className="text-left py-3 px-3 text-zinc-500 font-medium">IP</th>
+                        <th className="text-left py-3 px-3 text-zinc-500 font-medium">Started</th>
+                        <th className="text-left py-3 px-3 text-zinc-500 font-medium">Abandoned</th>
                         <th className="text-left py-3 px-3 text-zinc-500 font-medium">Bot</th>
                         <th className="text-left py-3 px-3 text-zinc-500 font-medium">AI</th>
                       </tr>
@@ -2137,7 +2141,7 @@ export default function AdminDashboard() {
                     <tbody>
                       {visitorStats.recentVisitors.length === 0 ? (
                         <tr>
-                          <td colSpan={10} className="py-4 text-zinc-500 text-center">No visitors yet</td>
+                          <td colSpan={12} className="py-4 text-zinc-500 text-center">No visitors yet</td>
                         </tr>
                       ) : (
                         visitorStats.recentVisitors.map((v, i) => (
@@ -2170,6 +2174,16 @@ export default function AdminDashboard() {
                                   <span className="text-[9px] px-1 py-0.5 bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 rounded font-sans font-medium">repeat</span>
                                 )}
                               </span>
+                            </td>
+                            <td className="py-2 px-3 text-zinc-600 dark:text-zinc-400 text-xs text-center">
+                              {v.startedCount > 0 ? v.startedCount : "-"}
+                            </td>
+                            <td className="py-2 px-3 text-xs text-center">
+                              {v.abandonedCount > 0 ? (
+                                <span className="text-amber-600">{v.abandonedCount}</span>
+                              ) : (
+                                <span className="text-zinc-400">-</span>
+                              )}
                             </td>
                             <td className="py-2 px-3 text-xs">
                               {v.isBot ? (
@@ -2789,6 +2803,7 @@ export default function AdminDashboard() {
                           <th className="text-left px-4 py-3 text-xs font-semibold text-zinc-500 uppercase">Device</th>
                           <th className="text-right px-4 py-3 text-xs font-semibold text-zinc-500 uppercase">Started</th>
                           <th className="text-right px-4 py-3 text-xs font-semibold text-zinc-500 uppercase">Completed</th>
+                          <th className="text-right px-4 py-3 text-xs font-semibold text-zinc-500 uppercase">Abandoned</th>
                           <th className="text-right px-4 py-3 text-xs font-semibold text-zinc-500 uppercase">Rate</th>
                           <th className="px-4 py-3 text-xs font-semibold text-zinc-500 uppercase">Visual</th>
                         </tr>
@@ -2802,6 +2817,7 @@ export default function AdminDashboard() {
                               <td className="px-4 py-3 font-medium capitalize">{device}</td>
                               <td className="px-4 py-3 text-right text-zinc-600 dark:text-zinc-400">{data.started}</td>
                               <td className="px-4 py-3 text-right text-zinc-600 dark:text-zinc-400">{data.completed}</td>
+                              <td className="px-4 py-3 text-right text-amber-600">{data.abandoned}</td>
                               <td className={`px-4 py-3 text-right font-semibold ${rate >= 90 ? "text-emerald-600" : rate >= 75 ? "text-amber-600" : "text-rose-600"}`}>
                                 {rate}%
                               </td>
@@ -2831,6 +2847,7 @@ export default function AdminDashboard() {
                           <th className="text-left px-4 py-3 text-xs font-semibold text-zinc-500 uppercase">OS</th>
                           <th className="text-right px-4 py-3 text-xs font-semibold text-zinc-500 uppercase">Started</th>
                           <th className="text-right px-4 py-3 text-xs font-semibold text-zinc-500 uppercase">Completed</th>
+                          <th className="text-right px-4 py-3 text-xs font-semibold text-zinc-500 uppercase">Abandoned</th>
                           <th className="text-right px-4 py-3 text-xs font-semibold text-zinc-500 uppercase">Rate</th>
                           <th className="px-4 py-3 text-xs font-semibold text-zinc-500 uppercase">Visual</th>
                         </tr>
@@ -2846,6 +2863,7 @@ export default function AdminDashboard() {
                                 <td className="px-4 py-3 font-medium">{os}</td>
                                 <td className="px-4 py-3 text-right text-zinc-600 dark:text-zinc-400">{data.started}</td>
                                 <td className="px-4 py-3 text-right text-zinc-600 dark:text-zinc-400">{data.completed}</td>
+                                <td className="px-4 py-3 text-right text-amber-600">{data.abandoned}</td>
                                 <td className={`px-4 py-3 text-right font-semibold ${rate >= 90 ? "text-emerald-600" : rate >= 75 ? "text-amber-600" : "text-rose-600"}`}>
                                   {rate}%
                                 </td>

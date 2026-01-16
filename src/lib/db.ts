@@ -407,17 +407,17 @@ export interface AnalysisCompletionMetrics {
     avgTimeToComplete: number;    // Average seconds from start to complete
   };
   byDevice: {
-    mobile: { started: number; completed: number; completionRate: number };
-    tablet: { started: number; completed: number; completionRate: number };
-    desktop: { started: number; completed: number; completionRate: number };
+    mobile: { started: number; completed: number; abandoned: number; completionRate: number };
+    tablet: { started: number; completed: number; abandoned: number; completionRate: number };
+    desktop: { started: number; completed: number; abandoned: number; completionRate: number };
   };
   byOS: {
-    iOS: { started: number; completed: number; completionRate: number };
-    Android: { started: number; completed: number; completionRate: number };
-    Windows: { started: number; completed: number; completionRate: number };
-    macOS: { started: number; completed: number; completionRate: number };
-    Linux: { started: number; completed: number; completionRate: number };
-    Other: { started: number; completed: number; completionRate: number };
+    iOS: { started: number; completed: number; abandoned: number; completionRate: number };
+    Android: { started: number; completed: number; abandoned: number; completionRate: number };
+    Windows: { started: number; completed: number; abandoned: number; completionRate: number };
+    macOS: { started: number; completed: number; abandoned: number; completionRate: number };
+    Linux: { started: number; completed: number; abandoned: number; completionRate: number };
+    Other: { started: number; completed: number; abandoned: number; completionRate: number };
   };
   byAnalysisType: {
     url: { started: number; completed: number; completionRate: number };
@@ -691,17 +691,17 @@ export async function getAnalysisCompletionMetrics(): Promise<AnalysisCompletion
         avgTimeToComplete,
       },
       byDevice: {
-        mobile: { ...deviceStats.mobile, completionRate: calcRate(deviceStats.mobile.started, deviceStats.mobile.completed) },
-        tablet: { ...deviceStats.tablet, completionRate: calcRate(deviceStats.tablet.started, deviceStats.tablet.completed) },
-        desktop: { ...deviceStats.desktop, completionRate: calcRate(deviceStats.desktop.started, deviceStats.desktop.completed) },
+        mobile: { ...deviceStats.mobile, abandoned: Math.max(0, deviceStats.mobile.started - deviceStats.mobile.completed), completionRate: calcRate(deviceStats.mobile.started, deviceStats.mobile.completed) },
+        tablet: { ...deviceStats.tablet, abandoned: Math.max(0, deviceStats.tablet.started - deviceStats.tablet.completed), completionRate: calcRate(deviceStats.tablet.started, deviceStats.tablet.completed) },
+        desktop: { ...deviceStats.desktop, abandoned: Math.max(0, deviceStats.desktop.started - deviceStats.desktop.completed), completionRate: calcRate(deviceStats.desktop.started, deviceStats.desktop.completed) },
       },
       byOS: {
-        iOS: { ...osStats.iOS, completionRate: calcRate(osStats.iOS.started, osStats.iOS.completed) },
-        Android: { ...osStats.Android, completionRate: calcRate(osStats.Android.started, osStats.Android.completed) },
-        Windows: { ...osStats.Windows, completionRate: calcRate(osStats.Windows.started, osStats.Windows.completed) },
-        macOS: { ...osStats.macOS, completionRate: calcRate(osStats.macOS.started, osStats.macOS.completed) },
-        Linux: { ...osStats.Linux, completionRate: calcRate(osStats.Linux.started, osStats.Linux.completed) },
-        Other: { ...osStats.Other, completionRate: calcRate(osStats.Other.started, osStats.Other.completed) },
+        iOS: { ...osStats.iOS, abandoned: Math.max(0, osStats.iOS.started - osStats.iOS.completed), completionRate: calcRate(osStats.iOS.started, osStats.iOS.completed) },
+        Android: { ...osStats.Android, abandoned: Math.max(0, osStats.Android.started - osStats.Android.completed), completionRate: calcRate(osStats.Android.started, osStats.Android.completed) },
+        Windows: { ...osStats.Windows, abandoned: Math.max(0, osStats.Windows.started - osStats.Windows.completed), completionRate: calcRate(osStats.Windows.started, osStats.Windows.completed) },
+        macOS: { ...osStats.macOS, abandoned: Math.max(0, osStats.macOS.started - osStats.macOS.completed), completionRate: calcRate(osStats.macOS.started, osStats.macOS.completed) },
+        Linux: { ...osStats.Linux, abandoned: Math.max(0, osStats.Linux.started - osStats.Linux.completed), completionRate: calcRate(osStats.Linux.started, osStats.Linux.completed) },
+        Other: { ...osStats.Other, abandoned: Math.max(0, osStats.Other.started - osStats.Other.completed), completionRate: calcRate(osStats.Other.started, osStats.Other.completed) },
       },
       byAnalysisType: {
         url: {
@@ -745,17 +745,17 @@ export async function getAnalysisCompletionMetrics(): Promise<AnalysisCompletion
         correlatedCompleted: 0, correlatedRate: 0, abandoned: 0, failed: 0, avgTimeToComplete: 0,
       },
       byDevice: {
-        mobile: { started: 0, completed: 0, completionRate: 0 },
-        tablet: { started: 0, completed: 0, completionRate: 0 },
-        desktop: { started: 0, completed: 0, completionRate: 0 },
+        mobile: { started: 0, completed: 0, abandoned: 0, completionRate: 0 },
+        tablet: { started: 0, completed: 0, abandoned: 0, completionRate: 0 },
+        desktop: { started: 0, completed: 0, abandoned: 0, completionRate: 0 },
       },
       byOS: {
-        iOS: { started: 0, completed: 0, completionRate: 0 },
-        Android: { started: 0, completed: 0, completionRate: 0 },
-        Windows: { started: 0, completed: 0, completionRate: 0 },
-        macOS: { started: 0, completed: 0, completionRate: 0 },
-        Linux: { started: 0, completed: 0, completionRate: 0 },
-        Other: { started: 0, completed: 0, completionRate: 0 },
+        iOS: { started: 0, completed: 0, abandoned: 0, completionRate: 0 },
+        Android: { started: 0, completed: 0, abandoned: 0, completionRate: 0 },
+        Windows: { started: 0, completed: 0, abandoned: 0, completionRate: 0 },
+        macOS: { started: 0, completed: 0, abandoned: 0, completionRate: 0 },
+        Linux: { started: 0, completed: 0, abandoned: 0, completionRate: 0 },
+        Other: { started: 0, completed: 0, abandoned: 0, completionRate: 0 },
       },
       byAnalysisType: {
         url: { started: 0, completed: 0, completionRate: 0 },
@@ -1295,6 +1295,8 @@ export interface VisitorStats {
     hasLlmAnalysis: boolean;
     isBot: boolean;
     isRepeatUser: boolean;
+    startedCount: number;
+    abandonedCount: number;
   }[];
   timeSeries: {
     date: string;
@@ -1487,7 +1489,11 @@ export async function getVisitorStats(): Promise<VisitorStats> {
                SELECT 1 FROM ragecheck_analyses a
                WHERE a.ip_address = v.ip_address AND a.llm_enhanced = true
              ) as has_llm_analysis,
-             (SELECT COUNT(DISTINCT DATE(v2.created_at)) FROM ragecheck_visitors v2 WHERE v2.ip_address = v.ip_address AND v.ip_address IS NOT NULL) > 1 as is_repeat_user
+             (SELECT COUNT(DISTINCT DATE(v2.created_at)) FROM ragecheck_visitors v2 WHERE v2.ip_address = v.ip_address AND v.ip_address IS NOT NULL) > 1 as is_repeat_user,
+             (SELECT COUNT(*) FROM ragecheck_analysis_starts s WHERE s.ip_address = v.ip_address AND v.ip_address IS NOT NULL) as started_count,
+             (SELECT COUNT(*) FROM ragecheck_analysis_starts s
+              WHERE s.ip_address = v.ip_address AND v.ip_address IS NOT NULL
+              AND s.abandoned_at IS NOT NULL) as abandoned_count
       FROM ragecheck_visitors v
       WHERE v.created_at > NOW() - INTERVAL '3 days'
       ORDER BY v.created_at DESC
@@ -1505,6 +1511,8 @@ export async function getVisitorStats(): Promise<VisitorStats> {
       hasLlmAnalysis: row.has_llm_analysis || false,
       isBot: row.is_bot || false,
       isRepeatUser: row.is_repeat_user || false,
+      startedCount: Number(row.started_count) || 0,
+      abandonedCount: Number(row.abandoned_count) || 0,
     }));
 
     // Time series for last 14 days (grouped by EST date, excluding bots)
