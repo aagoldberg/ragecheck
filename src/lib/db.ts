@@ -560,9 +560,20 @@ export async function getAnalysisCompletionMetrics(): Promise<AnalysisCompletion
             WHEN error ILIKE '%not HTML%' OR error ILIKE '%not text%' THEN 'Invalid Content Type'
             -- Timeout
             WHEN error ILIKE '%timeout%' OR error ILIKE '%timed out%' THEN 'Timeout'
-            -- HTTP errors
-            WHEN error ILIKE '%HTTP 4%' THEN 'HTTP 4xx Error'
-            WHEN error ILIKE '%HTTP 5%' THEN 'HTTP 5xx Error'
+            -- HTTP 4xx errors (specific codes first, then catch-all)
+            WHEN error ILIKE '%HTTP 400%' OR error ILIKE '%bad request%' THEN 'HTTP 400 Bad Request'
+            WHEN error ILIKE '%HTTP 401%' OR error ILIKE '%unauthorized%' THEN 'HTTP 401 Unauthorized'
+            WHEN error ILIKE '%HTTP 403%' OR error ILIKE '%forbidden%' THEN 'HTTP 403 Forbidden'
+            WHEN error ILIKE '%HTTP 404%' OR error ILIKE '%not found%' THEN 'HTTP 404 Not Found'
+            WHEN error ILIKE '%HTTP 410%' OR error ILIKE '%gone%' THEN 'HTTP 410 Gone'
+            WHEN error ILIKE '%HTTP 429%' OR error ILIKE '%rate limit%' OR error ILIKE '%too many requests%' THEN 'HTTP 429 Rate Limited'
+            WHEN error ILIKE '%HTTP 4%' THEN 'HTTP 4xx Other'
+            -- HTTP 5xx errors (specific codes first)
+            WHEN error ILIKE '%HTTP 500%' OR error ILIKE '%internal server error%' THEN 'HTTP 500 Server Error'
+            WHEN error ILIKE '%HTTP 502%' OR error ILIKE '%bad gateway%' THEN 'HTTP 502 Bad Gateway'
+            WHEN error ILIKE '%HTTP 503%' OR error ILIKE '%service unavailable%' THEN 'HTTP 503 Unavailable'
+            WHEN error ILIKE '%HTTP 504%' OR error ILIKE '%gateway timeout%' THEN 'HTTP 504 Gateway Timeout'
+            WHEN error ILIKE '%HTTP 5%' THEN 'HTTP 5xx Other'
             -- URL issues
             WHEN error ILIKE '%invalid url%' OR error ILIKE '%url not allowed%' THEN 'Invalid URL'
             -- Image issues
