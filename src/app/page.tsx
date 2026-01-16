@@ -1839,7 +1839,7 @@ function HomeContent() {
                     rel="noopener noreferrer"
                     className="text-indigo-500 hover:text-indigo-400 underline underline-offset-2"
                   >
-                    help keep it running
+                    support RageCheck
                   </a>
                 </p>
               </div>
