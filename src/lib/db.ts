@@ -522,16 +522,38 @@ export async function getAnalysisCompletionMetrics(): Promise<AnalysisCompletion
         AND success = false
     `;
 
-    // Error breakdown
+    // Error breakdown - more granular categories
     const errorBreakdown = await getDb()`
       SELECT
         COALESCE(
           CASE
-            WHEN error ILIKE '%timeout%' THEN 'Timeout'
-            WHEN error ILIKE '%network%' OR error ILIKE '%fetch%' THEN 'Network Error'
-            WHEN error ILIKE '%extract%' OR error ILIKE '%content%' THEN 'Content Extraction'
-            WHEN error ILIKE '%url%' OR error ILIKE '%invalid%' THEN 'Invalid URL'
-            WHEN error ILIKE '%image%' OR error ILIKE '%text%' THEN 'Invalid Image'
+            -- Paywall/Login issues
+            WHEN error ILIKE '%requires login%' OR error ILIKE '%paywalled%' THEN 'Paywall/Login Required'
+            -- Platform-specific blocks
+            WHEN error ILIKE '%twitter%' OR error ILIKE '%X has restricted%' THEN 'Twitter/X Blocked'
+            WHEN error ILIKE '%threads%' THEN 'Threads Blocked'
+            WHEN error ILIKE '%truth social%' THEN 'Truth Social Blocked'
+            WHEN error ILIKE '%farcaster%' THEN 'Farcaster Blocked'
+            -- Cloudflare protection
+            WHEN error ILIKE '%cloudflare%' THEN 'Cloudflare Protected'
+            -- Content extraction issues
+            WHEN error ILIKE '%text too short%' OR error ILIKE '%couldn''t extract text%' THEN 'Content Too Short'
+            WHEN error ILIKE '%content too large%' OR error ILIKE '%too large%' THEN 'Content Too Large'
+            WHEN error ILIKE '%not HTML%' OR error ILIKE '%not text%' THEN 'Invalid Content Type'
+            -- Timeout
+            WHEN error ILIKE '%timeout%' OR error ILIKE '%timed out%' THEN 'Timeout'
+            -- HTTP errors
+            WHEN error ILIKE '%HTTP 4%' THEN 'HTTP 4xx Error'
+            WHEN error ILIKE '%HTTP 5%' THEN 'HTTP 5xx Error'
+            -- URL issues
+            WHEN error ILIKE '%invalid url%' OR error ILIKE '%url not allowed%' THEN 'Invalid URL'
+            -- Image issues
+            WHEN error ILIKE '%invalid image%' OR error ILIKE '%image too large%' THEN 'Invalid Image'
+            WHEN error ILIKE '%no text content%' OR error ILIKE '%doesn''t have text%' THEN 'No Text in Image'
+            -- Network/fetch issues
+            WHEN error ILIKE '%network%' OR error ILIKE '%fetch%' OR error ILIKE '%failed to fetch%' THEN 'Network Error'
+            -- API errors
+            WHEN error ILIKE '%api error%' OR error ILIKE '%scrapingbee%' THEN 'API Error'
             ELSE 'Other'
           END,
           'Unknown'
