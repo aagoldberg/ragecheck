@@ -1746,99 +1746,69 @@ function HomeContent() {
                 </div>
               </div>
 
-              {/* Prominent Feedback Section */}
+              {/* Minimal Feedback */}
               {!isDemo && (
-                <div className="mt-10 max-w-2xl mx-auto">
-                  <div className="bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-950/30 dark:to-purple-950/30 border border-indigo-200 dark:border-indigo-800 rounded-2xl p-6 md:p-8 text-center">
-                    {feedbackSubmitted ? (
-                      <div className="animate-in fade-in zoom-in duration-300">
-                        <div className="w-16 h-16 mx-auto mb-4 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center">
-                          <svg className="w-8 h-8 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                          </svg>
-                        </div>
-                        <h3 className="text-xl font-bold text-zinc-900 dark:text-zinc-100 mb-2">
-                          Thanks for your feedback!
-                        </h3>
-                        <p className="text-zinc-600 dark:text-zinc-400">
-                          Your input helps us improve RageCheck for everyone.
-                        </p>
-                      </div>
-                    ) : showFeedbackForm ? (
-                      <div className="animate-in fade-in duration-300">
-                        <h3 className="text-xl font-bold text-zinc-900 dark:text-zinc-100 mb-2">
-                          What could be better?
-                        </h3>
-                        <p className="text-zinc-600 dark:text-zinc-400 mb-4">
-                          Was the score too high, too low, or something else?
-                        </p>
-                        <textarea
-                          value={feedbackComment}
-                          onChange={(e) => setFeedbackComment(e.target.value)}
-                          placeholder="The score seems too high because... / I expected... / The analysis missed..."
-                          className="w-full p-4 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
-                          rows={3}
-                          maxLength={500}
-                          autoFocus
-                        />
-                        <p className="text-xs text-zinc-400 mt-1 text-right">{feedbackComment.length}/500</p>
-                        <div className="flex gap-3 mt-4 justify-center">
-                          <button
-                            onClick={submitFeedbackComment}
-                            className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl transition-colors"
-                          >
-                            Submit Feedback
-                          </button>
-                          <button
-                            onClick={() => {
-                              setFeedbackSubmitted(true);
-                              setShowFeedbackForm(false);
-                            }}
-                            className="px-6 py-2.5 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 font-medium transition-colors"
-                          >
-                            Skip
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <>
-                        <h3 className="text-xl md:text-2xl font-bold text-zinc-900 dark:text-zinc-100 mb-2">
-                          Was this analysis accurate?
-                        </h3>
-                        <p className="text-zinc-600 dark:text-zinc-400 mb-6">
-                          Your feedback helps us improve
-                        </p>
-                        <div className="flex justify-center gap-4">
-                          <button
-                            onClick={() => submitFeedback("up")}
-                            className={`group flex items-center gap-3 px-8 py-4 rounded-xl font-bold text-lg transition-all ${
-                              feedbackGiven === "up"
-                                ? "bg-green-500 text-white scale-105"
-                                : "bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-green-50 dark:hover:bg-green-900/20 hover:text-green-600 dark:hover:text-green-400 border border-zinc-200 dark:border-zinc-700 hover:border-green-300 dark:hover:border-green-700"
-                            }`}
-                          >
-                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 20m7-10V5a2 2 0 00-2-2h-.095c-.5 0-.905.405-.905.905 0 .714-.211 1.412-.608 2.006L7 11v9m7-10h-2M7 20H5a2 2 0 01-2-2v-6a2 2 0 012-2h2.5" />
-                            </svg>
-                            Yes, accurate
-                          </button>
-                          <button
-                            onClick={() => submitFeedback("down")}
-                            className={`group flex items-center gap-3 px-8 py-4 rounded-xl font-bold text-lg transition-all ${
-                              feedbackGiven === "down"
-                                ? "bg-rose-500 text-white scale-105"
-                                : "bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-rose-50 dark:hover:bg-rose-900/20 hover:text-rose-600 dark:hover:text-rose-400 border border-zinc-200 dark:border-zinc-700 hover:border-rose-300 dark:hover:border-rose-700"
-                            }`}
-                          >
-                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14H5.236a2 2 0 01-1.789-2.894l3.5-7A2 2 0 018.736 3h4.018a2 2 0 01.485.06l3.76.94m-7 10v5a2 2 0 002 2h.096c.5 0 .905-.405.905-.904 0-.715.211-1.413.608-2.008L17 13V4m-7 10h2m5-10h2a2 2 0 012 2v6a2 2 0 01-2 2h-2.5" />
-                            </svg>
-                            Not quite
-                          </button>
-                        </div>
-                      </>
-                    )}
-                  </div>
+                <div className="mt-6 flex items-center justify-center gap-3">
+                  {feedbackSubmitted ? (
+                    <span className="text-sm text-zinc-500 dark:text-zinc-400">Thanks for your feedback</span>
+                  ) : showFeedbackForm ? (
+                    <div className="flex items-center gap-2 max-w-md w-full">
+                      <input
+                        type="text"
+                        value={feedbackComment}
+                        onChange={(e) => setFeedbackComment(e.target.value)}
+                        placeholder="What could be better?"
+                        className="flex-1 px-3 py-1.5 text-sm rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:ring-1 focus:ring-indigo-500 focus:border-transparent"
+                        maxLength={500}
+                        autoFocus
+                      />
+                      <button
+                        onClick={submitFeedbackComment}
+                        className="px-3 py-1.5 text-sm bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 font-medium rounded-lg hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-colors"
+                      >
+                        Send
+                      </button>
+                      <button
+                        onClick={() => {
+                          setFeedbackSubmitted(true);
+                          setShowFeedbackForm(false);
+                        }}
+                        className="text-sm text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300"
+                      >
+                        Skip
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <span className="text-sm text-zinc-500 dark:text-zinc-400">Helpful?</span>
+                      <button
+                        onClick={() => submitFeedback("up")}
+                        className={`p-1.5 rounded-lg transition-colors ${
+                          feedbackGiven === "up"
+                            ? "bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400"
+                            : "text-zinc-400 hover:text-green-600 dark:hover:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20"
+                        }`}
+                        title="Yes, accurate"
+                      >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 20m7-10V5a2 2 0 00-2-2h-.095c-.5 0-.905.405-.905.905 0 .714-.211 1.412-.608 2.006L7 11v9m7-10h-2M7 20H5a2 2 0 01-2-2v-6a2 2 0 012-2h2.5" />
+                        </svg>
+                      </button>
+                      <button
+                        onClick={() => submitFeedback("down")}
+                        className={`p-1.5 rounded-lg transition-colors ${
+                          feedbackGiven === "down"
+                            ? "bg-rose-100 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400"
+                            : "text-zinc-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/20"
+                        }`}
+                        title="Not quite"
+                      >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14H5.236a2 2 0 01-1.789-2.894l3.5-7A2 2 0 018.736 3h4.018a2 2 0 01.485.06l3.76.94m-7 10v5a2 2 0 002 2h.096c.5 0 .905-.405.905-.904 0-.715.211-1.413.608-2.008L17 13V4m-7 10h2m5-10h2a2 2 0 012 2v6a2 2 0 01-2 2h-2.5" />
+                        </svg>
+                      </button>
+                    </>
+                  )}
                 </div>
               )}
 
