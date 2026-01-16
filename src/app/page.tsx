@@ -1086,11 +1086,24 @@ function HomeContent() {
           {/* Hero text - hidden after analysis */}
           {(!result || isDemo) && (
             <>
+              {/* Trust anchor */}
+              <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-6 flex items-center justify-center gap-2">
+                <span className="inline-block w-1.5 h-1.5 bg-emerald-500 rounded-full"></span>
+                As seen in{" "}
+                <a
+                  href="https://lifehacker.com/tech/ragecheck-manipulative-language-news-articles"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-medium text-zinc-700 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-zinc-100 underline underline-offset-2"
+                >
+                  Lifehacker
+                </a>
+              </p>
               <h1 className="text-3xl sm:text-4xl md:text-6xl font-black tracking-tight text-zinc-900 dark:text-zinc-100 mb-4 sm:mb-6 leading-[1.1]">
                 Is that post <span className="text-transparent bg-clip-text bg-gradient-to-r from-rose-500 to-indigo-600">designed</span> to make you angry?
               </h1>
               <p className="text-lg sm:text-xl text-zinc-600 dark:text-zinc-400 mb-6 sm:mb-10 leading-relaxed max-w-2xl mx-auto">
-                See through the outrage. Understand the tactics.
+                Paste any article or social post. See the persuasive techniques—explained clearly.
               </p>
             </>
           )}
@@ -1829,6 +1842,40 @@ function HomeContent() {
                 </div>
               )}
 
+              {/* Email capture - utility-first framing */}
+              <div className="mt-8 p-6 bg-zinc-50 dark:bg-zinc-800/50 rounded-2xl border border-zinc-200 dark:border-zinc-700">
+                <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                  Occasional examples of persuasive language — explained calmly.
+                </p>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-4">
+                  A few times a month, max. No spam, no activism.
+                </p>
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    // Placeholder - wire to email service later
+                    const email = (e.target as HTMLFormElement).email.value;
+                    console.log("Email signup:", email);
+                    alert("Thanks! (Email capture not yet implemented)");
+                  }}
+                  className="flex gap-2"
+                >
+                  <input
+                    type="email"
+                    name="email"
+                    placeholder="you@example.com"
+                    required
+                    className="flex-1 px-4 py-2 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-600 rounded-lg text-sm text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                  <button
+                    type="submit"
+                    className="px-4 py-2 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 rounded-lg text-sm font-medium hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-colors"
+                  >
+                    Subscribe
+                  </button>
+                </form>
+              </div>
+
               {/* Support link */}
               <div className="text-center mt-6">
                 <p className="text-sm text-zinc-400">
@@ -1842,6 +1889,24 @@ function HomeContent() {
                     supporting its development
                   </a>.
                 </p>
+              </div>
+
+              {/* Repeat use CTA */}
+              <div className="text-center mt-8">
+                <button
+                  onClick={() => {
+                    setResult(null);
+                    setUrl("");
+                    setIsDemo(true);
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                  }}
+                  className="inline-flex items-center gap-2 px-6 py-3 bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 rounded-xl font-medium text-sm hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-all"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  </svg>
+                  Analyze another link
+                </button>
               </div>
               </>
             )}
