@@ -1841,11 +1841,8 @@ function HomeContent() {
 
               {/* Email capture - utility-first framing */}
               <div className="mt-8 p-6 bg-zinc-50 dark:bg-zinc-800/50 rounded-2xl border border-zinc-200 dark:border-zinc-700">
-                <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
-                  Occasional examples of persuasive language — explained calmly.
-                </p>
-                <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-4">
-                  A few times a month, max. No spam, no activism.
+                <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-4">
+                  Occasional examples, explained calmly. No spam. No activism.
                 </p>
                 <form
                   onSubmit={(e) => {
