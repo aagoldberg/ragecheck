@@ -297,6 +297,27 @@ export async function logAnalysis(data: AnalysisLog) {
     const platform = data.sourceDomain ? detectPlatform(data.sourceDomain) : "unknown";
     const isBotUser = isBot(data.userAgent);
 
+    // Ensure a visitor record exists for this IP (fallback if /api/visit didn't fire)
+    if (data.ipAddress) {
+      try {
+        const [existingVisitor] = await getDb()`
+          SELECT 1 FROM ragecheck_visitors
+          WHERE ip_address = ${data.ipAddress}
+            AND created_at > NOW() - INTERVAL '1 hour'
+          LIMIT 1
+        `;
+        if (!existingVisitor) {
+          await getDb()`
+            INSERT INTO ragecheck_visitors (ip_address, user_agent, country, is_bot, page_path)
+            VALUES (${data.ipAddress}, ${data.userAgent || null}, ${data.country || null}, ${isBotUser}, '/')
+          `;
+        }
+      } catch (visitorError) {
+        // Don't fail analysis logging if visitor fallback fails
+        console.error("Failed to ensure visitor exists:", visitorError);
+      }
+    }
+
     // Map new 5-bar model to database columns (keeping old column names for backwards compat)
     // arousal -> signal_loaded_language (emotional intensity)
     // enemy_construction -> signal_us_vs_them (othering/division)
