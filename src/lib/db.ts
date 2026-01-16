@@ -1837,37 +1837,74 @@ export async function getVisitorStats(): Promise<VisitorStats> {
       .map(([date, data]) => ({ date, ...data }));
 
     // Realtime series - 30 minute buckets for last 3 days (72 hours), excluding bots
+    // Bucket in EST timezone so charts align with EST hours, then convert back to UTC for JS
     const visitorRealtime = await getDb()`
       SELECT
-        date_trunc('hour', created_at) +
-        (floor(extract(minute FROM created_at) / 30) * interval '30 minutes') as bucket,
+        (date_trunc('hour', created_at AT TIME ZONE 'America/New_York') +
+        (floor(extract(minute FROM created_at AT TIME ZONE 'America/New_York') / 30) * interval '30 minutes')) AT TIME ZONE 'America/New_York' as bucket,
         COUNT(*) as count
       FROM ragecheck_visitors
       WHERE is_bot = false AND created_at > NOW() - INTERVAL '72 hours'
-      GROUP BY bucket
+      GROUP BY 1
       ORDER BY bucket ASC
     `;
 
     const analysisRealtime = await getDb()`
       SELECT
-        date_trunc('hour', created_at) +
-        (floor(extract(minute FROM created_at) / 30) * interval '30 minutes') as bucket,
+        (date_trunc('hour', created_at AT TIME ZONE 'America/New_York') +
+        (floor(extract(minute FROM created_at AT TIME ZONE 'America/New_York') / 30) * interval '30 minutes')) AT TIME ZONE 'America/New_York' as bucket,
         COUNT(*) as count
       FROM ragecheck_analyses
       WHERE is_bot = false AND created_at > NOW() - INTERVAL '72 hours'
-      GROUP BY bucket
+      GROUP BY 1
       ORDER BY bucket ASC
     `;
 
     // Merge realtime data into 30-minute buckets
     const realtimeMap = new Map<string, { visitors: number; analyses: number }>();
 
+    // Helper to get current EST-aligned bucket start
+    // Returns UTC timestamp of the most recent complete EST 30-min bucket
+    const getESTAlignedBucketStart = () => {
+      const now = new Date();
+      // Get current time formatted as EST
+      const estFormatter = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'America/New_York',
+        year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit', second: '2-digit',
+        hour12: false
+      });
+      const parts = estFormatter.formatToParts(now);
+      const getPart = (type: string) => parts.find(p => p.type === type)?.value || '0';
+
+      // Build EST date/time
+      const estYear = parseInt(getPart('year'));
+      const estMonth = parseInt(getPart('month')) - 1;
+      const estDay = parseInt(getPart('day'));
+      const estHour = parseInt(getPart('hour'));
+      const estMinute = parseInt(getPart('minute'));
+
+      // Round down to nearest 30 min in EST
+      const roundedMinute = Math.floor(estMinute / 30) * 30;
+
+      // Create a date string in EST and parse it to get UTC
+      const estDateStr = `${estYear}-${String(estMonth + 1).padStart(2, '0')}-${String(estDay).padStart(2, '0')}T${String(estHour).padStart(2, '0')}:${String(roundedMinute).padStart(2, '0')}:00`;
+
+      // Parse as EST and convert to UTC using the timezone offset
+      const estDate = new Date(estDateStr);
+      // Get the EST offset for this date
+      const utcDate = new Date(now.toLocaleString('en-US', { timeZone: 'UTC' }));
+      const estDateForOffset = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' }));
+      const offsetMs = utcDate.getTime() - estDateForOffset.getTime();
+
+      // Apply offset to get UTC time
+      return new Date(estDate.getTime() + offsetMs);
+    };
+
     // Initialize last 3 days (72 hours) in 30-minute intervals (144 buckets, excluding current incomplete bucket)
-    const now = new Date();
-    // Round down to current 30-min bucket start
-    now.setMinutes(Math.floor(now.getMinutes() / 30) * 30, 0, 0);
+    const bucketStart = getESTAlignedBucketStart();
     for (let i = 144; i >= 1; i--) {
-      const d = new Date(now.getTime() - i * 30 * 60 * 1000);
+      const d = new Date(bucketStart.getTime() - i * 30 * 60 * 1000);
       const timeStr = d.toISOString();
       realtimeMap.set(timeStr, { visitors: 0, analyses: 0 });
     }
@@ -1894,32 +1931,32 @@ export async function getVisitorStats(): Promise<VisitorStats> {
     // This shows unique visitors rather than total page loads
     const uniqueVisitorRealtime = await getDb()`
       SELECT
-        date_trunc('hour', created_at) +
-        (floor(extract(minute FROM created_at) / 30) * interval '30 minutes') as bucket,
+        (date_trunc('hour', created_at AT TIME ZONE 'America/New_York') +
+        (floor(extract(minute FROM created_at AT TIME ZONE 'America/New_York') / 30) * interval '30 minutes')) AT TIME ZONE 'America/New_York' as bucket,
         COUNT(DISTINCT ip_address) as count
       FROM ragecheck_visitors
       WHERE is_bot = false AND ip_address IS NOT NULL AND created_at > NOW() - INTERVAL '72 hours'
-      GROUP BY bucket
+      GROUP BY 1
       ORDER BY bucket ASC
     `;
 
     const uniqueAnalyzerRealtime = await getDb()`
       SELECT
-        date_trunc('hour', created_at) +
-        (floor(extract(minute FROM created_at) / 30) * interval '30 minutes') as bucket,
+        (date_trunc('hour', created_at AT TIME ZONE 'America/New_York') +
+        (floor(extract(minute FROM created_at AT TIME ZONE 'America/New_York') / 30) * interval '30 minutes')) AT TIME ZONE 'America/New_York' as bucket,
         COUNT(DISTINCT ip_address) as count
       FROM ragecheck_analyses
       WHERE is_bot = false AND ip_address IS NOT NULL AND created_at > NOW() - INTERVAL '72 hours'
-      GROUP BY bucket
+      GROUP BY 1
       ORDER BY bucket ASC
     `;
 
     // Build unique realtime map
     const uniqueRealtimeMap = new Map<string, { uniqueVisitors: number; uniqueAnalyzers: number }>();
 
-    // Initialize same 144 buckets
+    // Initialize same 144 buckets (using same EST-aligned bucket start)
     for (let i = 144; i >= 1; i--) {
-      const d = new Date(now.getTime() - i * 30 * 60 * 1000);
+      const d = new Date(bucketStart.getTime() - i * 30 * 60 * 1000);
       const timeStr = d.toISOString();
       uniqueRealtimeMap.set(timeStr, { uniqueVisitors: 0, uniqueAnalyzers: 0 });
     }
@@ -2192,22 +2229,46 @@ export async function getPageVisitorStats(pagePath: string): Promise<PageVisitor
     // Realtime series - 30 minute buckets for last 24 hours (excluding bots)
     const visitorRealtime = await getDb()`
       SELECT
-        date_trunc('hour', created_at) +
-        (floor(extract(minute FROM created_at) / 30) * interval '30 minutes') as bucket,
+        (date_trunc('hour', created_at AT TIME ZONE 'America/New_York') +
+        (floor(extract(minute FROM created_at AT TIME ZONE 'America/New_York') / 30) * interval '30 minutes')) AT TIME ZONE 'America/New_York' as bucket,
         COUNT(*) as count
       FROM ragecheck_visitors
       WHERE is_bot = false AND page_path = ${pagePath} AND created_at > NOW() - INTERVAL '24 hours'
-      GROUP BY bucket
+      GROUP BY 1
       ORDER BY bucket ASC
     `;
 
     // Merge realtime data into 30-minute buckets (excluding current incomplete bucket)
     const realtimeMap = new Map<string, number>();
-    const now = new Date();
-    // Round down to current 30-min bucket start
-    now.setMinutes(Math.floor(now.getMinutes() / 30) * 30, 0, 0);
+
+    // Helper to get current EST-aligned bucket start
+    const getESTAlignedBucketStart = () => {
+      const now = new Date();
+      const estFormatter = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'America/New_York',
+        year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit', second: '2-digit',
+        hour12: false
+      });
+      const parts = estFormatter.formatToParts(now);
+      const getPart = (type: string) => parts.find(p => p.type === type)?.value || '0';
+      const estYear = parseInt(getPart('year'));
+      const estMonth = parseInt(getPart('month')) - 1;
+      const estDay = parseInt(getPart('day'));
+      const estHour = parseInt(getPart('hour'));
+      const estMinute = parseInt(getPart('minute'));
+      const roundedMinute = Math.floor(estMinute / 30) * 30;
+      const estDateStr = `${estYear}-${String(estMonth + 1).padStart(2, '0')}-${String(estDay).padStart(2, '0')}T${String(estHour).padStart(2, '0')}:${String(roundedMinute).padStart(2, '0')}:00`;
+      const estDate = new Date(estDateStr);
+      const utcDate = new Date(now.toLocaleString('en-US', { timeZone: 'UTC' }));
+      const estDateForOffset = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' }));
+      const offsetMs = utcDate.getTime() - estDateForOffset.getTime();
+      return new Date(estDate.getTime() + offsetMs);
+    };
+
+    const bucketStart = getESTAlignedBucketStart();
     for (let i = 48; i >= 1; i--) {
-      const d = new Date(now.getTime() - i * 30 * 60 * 1000);
+      const d = new Date(bucketStart.getTime() - i * 30 * 60 * 1000);
       realtimeMap.set(d.toISOString(), 0);
     }
 
