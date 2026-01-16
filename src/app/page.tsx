@@ -1244,7 +1244,7 @@ function HomeContent() {
                       type="url"
                       value={url}
                       onChange={(e) => setUrl(e.target.value)}
-                      placeholder="Paste URL (article, tweet, bsky)..."
+                      placeholder="Paste URL or image (article, tweet, meme)..."
                       className="flex-1 w-full pl-6 pr-4 py-5 bg-transparent border-0 focus:ring-0 text-lg text-zinc-900 dark:text-zinc-100 placeholder-zinc-400"
                       required
                     />
