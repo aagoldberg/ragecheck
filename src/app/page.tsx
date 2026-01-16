@@ -1648,7 +1648,7 @@ function HomeContent() {
                     <>
                       <h3 className="font-bold text-lg text-white dark:text-zinc-900 mb-1">Stay sharp</h3>
                       <p className="text-sm text-zinc-400 dark:text-zinc-600 mb-4 leading-relaxed">
-                        Occasional examples, explained calmly. No spam. No activism.
+                        How this week&apos;s most viral posts push emotional buttons.
                       </p>
                       <form
                         onSubmit={async (e) => {
