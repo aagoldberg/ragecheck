@@ -2831,14 +2831,21 @@ export async function getViralMetrics(): Promise<ViralMetrics> {
     `;
 
     // Use EST timezone for "today" calculations
+    // Calculate start of today in EST using JavaScript to avoid SQL timezone issues
+    const now = new Date();
+    const estOffset = -5; // EST is UTC-5
+    const estNow = new Date(now.getTime() + estOffset * 60 * 60 * 1000);
+    const estMidnight = new Date(estNow.getFullYear(), estNow.getMonth(), estNow.getDate());
+    const todayStartUTC = new Date(estMidnight.getTime() - estOffset * 60 * 60 * 1000);
+
     const [todaySharesResult] = await getDb()`
       SELECT COUNT(*) as count FROM ragecheck_shares
-      WHERE created_at >= DATE_TRUNC('day', NOW() AT TIME ZONE 'America/New_York') AT TIME ZONE 'America/New_York'
+      WHERE created_at >= ${todayStartUTC}
     `;
 
     const [todayUniqueSharersResult] = await getDb()`
       SELECT COUNT(DISTINCT ip_address) as count FROM ragecheck_shares
-      WHERE created_at >= DATE_TRUNC('day', NOW() AT TIME ZONE 'America/New_York') AT TIME ZONE 'America/New_York' AND ip_address IS NOT NULL
+      WHERE created_at >= ${todayStartUTC} AND ip_address IS NOT NULL
     `;
 
     // Unique users for share rate calculation (unique sharers / unique analyzers, excluding bots)
@@ -4206,16 +4213,23 @@ export async function getShareMetrics(): Promise<ShareMetrics> {
         `;
 
     // Today's shares (excluding click events and admin)
+    // Calculate start of today in EST using JavaScript to avoid SQL timezone complexity
+    const now = new Date();
+    const estOffset = -5; // EST is UTC-5 (ignoring DST for simplicity)
+    const estNow = new Date(now.getTime() + estOffset * 60 * 60 * 1000);
+    const estMidnight = new Date(estNow.getFullYear(), estNow.getMonth(), estNow.getDate());
+    const todayStartUTC = new Date(estMidnight.getTime() - estOffset * 60 * 60 * 1000);
+
     const [todaySharesResult] = hasAdminExclusion
       ? await getDb()`
           SELECT COUNT(*) as count FROM ragecheck_shares
-          WHERE created_at >= DATE_TRUNC('day', NOW() AT TIME ZONE 'America/New_York') AT TIME ZONE 'America/New_York'
+          WHERE created_at >= ${todayStartUTC}
             AND share_type NOT LIKE '%_clicked'
             AND (ip_address IS NULL OR ip_address != ALL(${adminIPs}))
         `
       : await getDb()`
           SELECT COUNT(*) as count FROM ragecheck_shares
-          WHERE created_at >= DATE_TRUNC('day', NOW() AT TIME ZONE 'America/New_York') AT TIME ZONE 'America/New_York'
+          WHERE created_at >= ${todayStartUTC}
             AND share_type NOT LIKE '%_clicked'
         `;
 
