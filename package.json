@@ -19,6 +19,7 @@
     "linkedom": "^0.18.12",
     "next": "16.1.1",
     "posthog-js": "^1.319.0",
+    "qrcode": "^1.5.4",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "rss-parser": "^3.13.0"

@@ -1,6 +1,7 @@
 // Canvas-based share image generator matching the "Bait vs Check" Split Design
 // Left: The Content (Mock Post) | Right: The Analysis (Dark Mode)
 
+import QRCode from "qrcode";
 import { SIGNAL_LABELS } from "@/lib/shareCard";
 import type { SignalBreakdown } from "@/lib/score";
 
@@ -15,6 +16,7 @@ export interface ShareImageData {
   shareCardBullets?: string[]; // Short punchy bullets for share card (5-8 words each)
   uploadedImageUrl?: string;
   textPreview?: string; // For social posts, show the actual content instead of title
+  sourceUrl?: string; // Original URL for QR code
 }
 
 export type ImageSize = "x" | "bluesky";
@@ -104,6 +106,22 @@ export async function generateShareImage(
       uploadedImg = await loadImage(data.uploadedImageUrl);
     } catch (e) {
       console.warn("Failed to load uploaded image for share card:", e);
+    }
+  }
+
+  // Generate QR code if we have a source URL
+  let qrImg: HTMLImageElement | null = null;
+  if (data.sourceUrl) {
+    try {
+      const qrUrl = `https://ragecheck.com?url=${encodeURIComponent(data.sourceUrl)}`;
+      const qrDataUrl = await QRCode.toDataURL(qrUrl, {
+        width: 80,
+        margin: 0,
+        color: { dark: "#ffffff", light: "#00000000" }, // White QR on transparent
+      });
+      qrImg = await loadImage(qrDataUrl);
+    } catch (e) {
+      console.warn("Failed to generate QR code:", e);
     }
   }
 
@@ -257,6 +275,14 @@ export async function generateShareImage(
     
     ctx.fillStyle = colors.main;
     ctx.fillRect(rightX + padding + prefixWidth, ctaY + 8, ctx.measureText("ragecheck.com").width, 3);
+
+    // 6. QR Code (bottom right corner)
+    if (qrImg) {
+      const qrSize = 64;
+      const qrX = width - padding - qrSize;
+      const qrY = height - padding - qrSize + 12; // Align with CTA baseline
+      ctx.drawImage(qrImg, qrX, qrY, qrSize, qrSize);
+    }
 
 
     // === LEFT SIDE: THE BAIT ===

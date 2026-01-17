@@ -1023,6 +1023,7 @@ function HomeContent() {
         // Use local base64 image (more reliable) or fall back to blob URL
         uploadedImageUrl: imagePreview || result.uploadedImageUrl,
         textPreview: result.textPreview,
+        sourceUrl: url || undefined, // For QR code linking back
       });
 
       if (success && !silent) {
