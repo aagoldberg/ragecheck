@@ -40,6 +40,7 @@ interface AnalysisResult {
   techniqueExplanations?: string[];
   shareCardSummary?: string;
   image?: string;
+  uploadedImageUrl?: string;
 }
 
 interface Headline {
@@ -1017,6 +1018,7 @@ function HomeContent() {
         techniqueExplanations: result.techniqueExplanations,
         sharingPatterns: result.sharingPatterns,
         shareCardSummary: result.shareCardSummary,
+        uploadedImageUrl: result.uploadedImageUrl,
       });
 
       if (success && !silent) {

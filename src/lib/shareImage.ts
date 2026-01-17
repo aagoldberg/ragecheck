@@ -12,6 +12,7 @@ export interface ShareImageData {
   techniqueExplanations?: string[];
   sharingPatterns?: string[];
   shareCardSummary?: string;
+  uploadedImageUrl?: string;
 }
 
 export type ImageSize = "x" | "bluesky";
@@ -56,11 +57,32 @@ function wrapText(
   return lines;
 }
 
-export function generateShareImage(
+// Helper to load an image from URL
+function loadImage(url: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error("Failed to load image"));
+    img.src = url;
+  });
+}
+
+export async function generateShareImage(
   data: ShareImageData,
   format: "jpeg" | "png" = "png",
   size: ImageSize = "x"
 ): Promise<Blob> {
+  // Load uploaded image if available
+  let uploadedImg: HTMLImageElement | null = null;
+  if (data.uploadedImageUrl) {
+    try {
+      uploadedImg = await loadImage(data.uploadedImageUrl);
+    } catch (e) {
+      console.warn("Failed to load uploaded image for share card:", e);
+    }
+  }
+
   return new Promise((resolve, reject) => {
     const canvas = document.createElement("canvas");
     const ctx = canvas.getContext("2d");
@@ -72,7 +94,7 @@ export function generateShareImage(
     const { width, height } = SIZE_CONFIGS[size];
     canvas.width = width;
     canvas.height = height;
-    
+
     // Landing Page Palette
     const getColors = (s: number) => {
       if (s <= 33) return { main: "#10b981", bg: "#ecfdf5", text: "#065f46" }; // Emerald
@@ -86,24 +108,24 @@ export function generateShareImage(
     // === BACKGROUND (Zinc-50) ===
     ctx.fillStyle = "#fafafa";
     ctx.fillRect(0, 0, width, height);
-    
+
     // === BENTO CARD ===
     const cardPadding = 60;
     const cardX = 40;
     const cardY = 40;
     const cardW = width - 80;
     const cardH = height - 80;
-    
+
     // Card Shadow
     ctx.shadowColor = "rgba(0,0,0,0.05)";
     ctx.shadowBlur = 40;
     ctx.shadowOffsetY = 20;
-    
+
     // Card Body
     ctx.fillStyle = "#ffffff";
     ctx.strokeStyle = "#e4e4e7"; // zinc-200
     ctx.lineWidth = 2;
-    
+
     ctx.beginPath();
     ctx.roundRect(cardX, cardY, cardW, cardH, 32);
     ctx.fill();
@@ -120,43 +142,102 @@ export function generateShareImage(
     ctx.beginPath();
     ctx.roundRect(innerX, innerY, 32, 32, 8);
     ctx.fill();
-    
+
     ctx.font = "700 28px system-ui, -apple-system, sans-serif";
     ctx.fillStyle = "#18181b";
     ctx.textAlign = "left";
     ctx.textBaseline = "middle";
     ctx.fillText("RageCheck", innerX + 44, innerY + 18);
 
-    // Domain Pill
-    ctx.font = "600 20px system-ui, -apple-system, sans-serif";
-    const domainText = data.domain;
-    const domainWidth = ctx.measureText(domainText).width + 40;
-    
-    ctx.fillStyle = "#f4f4f5"; // zinc-100
-    ctx.beginPath();
-    ctx.roundRect(innerX + innerW - domainWidth, innerY, domainWidth, 40, 20);
-    ctx.fill();
-    
-    ctx.fillStyle = "#52525b"; // zinc-600
-    ctx.textAlign = "center";
-    ctx.fillText(domainText, innerX + innerW - (domainWidth/2), innerY + 22);
+    // Domain Pill (hide "unknown" for image uploads with image)
+    const showDomain = data.domain && data.domain !== "unknown";
+    if (showDomain) {
+      ctx.font = "600 20px system-ui, -apple-system, sans-serif";
+      const domainText = data.domain;
+      const domainWidth = ctx.measureText(domainText).width + 40;
 
-    // === TITLE ===
-    const titleY = innerY + 100;
-    ctx.fillStyle = "#18181b";
-    ctx.font = "800 56px system-ui, -apple-system, sans-serif";
-    ctx.textAlign = "left";
-    ctx.textBaseline = "top";
-    
-    const titleLines = wrapText(ctx, data.title, innerW, 2); // Max 2 lines to keep it airy
-    const lineHeight = 68;
-    
-    titleLines.forEach((line, i) => {
-      ctx.fillText(line, innerX, titleY + (i * lineHeight));
-    });
+      ctx.fillStyle = "#f4f4f5"; // zinc-100
+      ctx.beginPath();
+      ctx.roundRect(innerX + innerW - domainWidth, innerY, domainWidth, 40, 20);
+      ctx.fill();
+
+      ctx.fillStyle = "#52525b"; // zinc-600
+      ctx.textAlign = "center";
+      ctx.fillText(domainText, innerX + innerW - (domainWidth/2), innerY + 22);
+    }
+
+    // === CONTENT AREA (Image or Title) ===
+    const contentY = innerY + 80;
+    let insightsY: number;
+
+    if (uploadedImg) {
+      // Draw uploaded image thumbnail
+      const imgMaxW = 280;
+      const imgMaxH = 220;
+
+      // Calculate dimensions maintaining aspect ratio
+      const imgRatio = uploadedImg.width / uploadedImg.height;
+      let imgW = imgMaxW;
+      let imgH = imgW / imgRatio;
+      if (imgH > imgMaxH) {
+        imgH = imgMaxH;
+        imgW = imgH * imgRatio;
+      }
+
+      const imgX = innerX;
+      const imgY = contentY;
+
+      // Draw rounded image
+      ctx.save();
+      ctx.beginPath();
+      ctx.roundRect(imgX, imgY, imgW, imgH, 16);
+      ctx.clip();
+      ctx.drawImage(uploadedImg, imgX, imgY, imgW, imgH);
+      ctx.restore();
+
+      // Draw border
+      ctx.strokeStyle = "#e4e4e7";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.roundRect(imgX, imgY, imgW, imgH, 16);
+      ctx.stroke();
+
+      // Title next to image (or below if image is wide)
+      const textX = imgX + imgW + 32;
+      const textMaxW = innerW - imgW - 32;
+
+      ctx.fillStyle = "#18181b";
+      ctx.font = "700 32px system-ui, -apple-system, sans-serif";
+      ctx.textAlign = "left";
+      ctx.textBaseline = "top";
+
+      // Use shareCardSummary or a default headline
+      const headline = data.shareCardSummary || "Analyzed for manipulation patterns";
+      const headlineLines = wrapText(ctx, headline, textMaxW, 3);
+      headlineLines.forEach((line, i) => {
+        ctx.fillText(line, textX, contentY + (i * 40));
+      });
+
+      insightsY = contentY + imgH + 24;
+    } else {
+      // Original title layout
+      const titleY = contentY;
+      ctx.fillStyle = "#18181b";
+      ctx.font = "800 56px system-ui, -apple-system, sans-serif";
+      ctx.textAlign = "left";
+      ctx.textBaseline = "top";
+
+      const titleLines = wrapText(ctx, data.title, innerW, 2);
+      const lineHeight = 68;
+
+      titleLines.forEach((line, i) => {
+        ctx.fillText(line, innerX, titleY + (i * lineHeight));
+      });
+
+      insightsY = titleY + (titleLines.length * lineHeight) + 40;
+    }
 
     // === FORENSIC INSIGHTS (The "Why") ===
-    const insightsY = titleY + (titleLines.length * lineHeight) + 40;
     
     // Only show if we have data
     const points = [

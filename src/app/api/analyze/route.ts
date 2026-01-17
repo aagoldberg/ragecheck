@@ -43,6 +43,7 @@ export interface AnalyzeResponse {
   techniqueExplanations?: string[];
   shareCardSummary?: string;
   cached?: boolean;
+  uploadedImageUrl?: string;
 }
 
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5MB
@@ -164,6 +165,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<AnalyzeRe
         sharingPatterns: result.sharingPatterns,
         techniqueExplanations: result.techniqueExplanations,
         shareCardSummary: result.shareCardSummary,
+        uploadedImageUrl: imageUrl || undefined,
       });
     }
 
