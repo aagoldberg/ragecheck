@@ -70,6 +70,10 @@ export async function GET(request: NextRequest) {
       interactionStats,
       clearviewSubscriberStats,
       languageStats,
+    }, {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate',
+      },
     });
   } catch (error) {
     console.error("Admin API error:", error);
