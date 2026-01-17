@@ -1683,7 +1683,8 @@ function HomeContent() {
                   </div>
                 </BentoCard>
 
-                {/* Email Capture */}
+                {/* Email Capture - only show after real analysis, not demo */}
+                {!isDemo && (
                 <div className="bg-zinc-900 dark:bg-zinc-100 rounded-2xl p-6 shadow-lg border border-zinc-800 dark:border-zinc-200">
                   {emailSubscribed ? (
                     <div className="flex items-center gap-3 text-emerald-400 dark:text-emerald-600">
@@ -1744,6 +1745,7 @@ function HomeContent() {
                     </>
                   )}
                 </div>
+                )}
                 </div>
 
                 {/* Analysis Breakdown */}
