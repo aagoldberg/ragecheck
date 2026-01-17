@@ -2011,11 +2011,6 @@ export async function getVisitorStats(): Promise<VisitorStats> {
     const [todayResult] = await getDb()`SELECT COUNT(*) as count FROM ragecheck_visitors WHERE is_bot = false AND created_at >= DATE_TRUNC('day', NOW() AT TIME ZONE 'America/New_York') AT TIME ZONE 'America/New_York'`;
     const [weekResult] = await getDb()`SELECT COUNT(*) as count FROM ragecheck_visitors WHERE is_bot = false AND created_at > NOW() - INTERVAL '7 days'`;
 
-    // Debug: get PostgreSQL's current time
-    const [dbTimeResult] = await getDb()`SELECT NOW() as db_now, NOW() AT TIME ZONE 'America/New_York' as db_now_est`;
-    const debugDbTime = dbTimeResult?.db_now;
-    const debugDbTimeEST = dbTimeResult?.db_now_est;
-
     // True conversion rate: unique visitors who performed at least one analysis (today in EST)
     const [uniqueVisitorsToday] = await getDb()`
       SELECT COUNT(DISTINCT ip_address) as count
@@ -2156,11 +2151,6 @@ export async function getVisitorStats(): Promise<VisitorStats> {
     const nowMs = Date.now();
     const currentBucketMs = Math.floor(nowMs / THIRTY_MIN_MS) * THIRTY_MIN_MS;
 
-    // Debug info for timezone troubleshooting
-    const debugServerTime = new Date(nowMs).toISOString();
-    const debugCurrentBucket = new Date(currentBucketMs).toISOString();
-    const debugServerTimeEST = new Date(nowMs).toLocaleString('en-US', { timeZone: 'America/New_York' });
-
     // Initialize last 3 days (72 hours) in 30-minute intervals (144 buckets)
     // Start from current bucket and go backwards
     for (let i = 143; i >= 0; i--) {
@@ -2249,17 +2239,6 @@ export async function getVisitorStats(): Promise<VisitorStats> {
       timeSeries,
       realtimeSeries,
       uniqueRealtimeSeries,
-      // Debug info - can be removed after timezone issue is fixed
-      debug: {
-        serverTimeUTC: debugServerTime,
-        serverTimeEST: debugServerTimeEST,
-        currentBucketUTC: debugCurrentBucket,
-        firstBucket: realtimeSeries[0]?.time,
-        lastBucket: realtimeSeries[realtimeSeries.length - 1]?.time,
-        totalBuckets: realtimeSeries.length,
-        dbTimeUTC: debugDbTime,
-        dbTimeEST: debugDbTimeEST,
-      },
     };
   } catch (error) {
     console.error("Failed to get visitor stats:", error);

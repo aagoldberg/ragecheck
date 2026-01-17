@@ -1131,11 +1131,18 @@ function TimeSeriesChart({ data }: { data: { date: string; visitors: number; ana
 function RealtimeChart({ data }: { data: { time: string; visitors: number; analyses: number }[] }) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Scroll to the right (most recent) on mount
+  // Scroll to the right (most recent) on mount and data change
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollLeft = scrollRef.current.scrollWidth;
-    }
+    // Use requestAnimationFrame to ensure DOM is painted before scrolling
+    const scrollToEnd = () => {
+      if (scrollRef.current) {
+        scrollRef.current.scrollLeft = scrollRef.current.scrollWidth;
+      }
+    };
+    // Double RAF to ensure layout is complete
+    requestAnimationFrame(() => {
+      requestAnimationFrame(scrollToEnd);
+    });
   }, [data]);
 
   if (!data || data.length === 0) return null;
@@ -1263,11 +1270,17 @@ function RealtimeChart({ data }: { data: { time: string; visitors: number; analy
 function UniqueSessionsChart({ data }: { data: { time: string; uniqueVisitors: number; uniqueAnalyzers: number }[] }) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Scroll to the right (most recent) on mount
+  // Scroll to the right (most recent) on mount and data change
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollLeft = scrollRef.current.scrollWidth;
-    }
+    const scrollToEnd = () => {
+      if (scrollRef.current) {
+        scrollRef.current.scrollLeft = scrollRef.current.scrollWidth;
+      }
+    };
+    // Double RAF to ensure layout is complete
+    requestAnimationFrame(() => {
+      requestAnimationFrame(scrollToEnd);
+    });
   }, [data]);
 
   if (!data || data.length === 0) return null;
@@ -2120,22 +2133,6 @@ export default function AdminDashboard() {
               />
             </div>
 
-            {/* Timezone Debug Info - remove after fixing */}
-            {visitorStats && (visitorStats as { debug?: { serverTimeUTC?: string; serverTimeEST?: string; currentBucketUTC?: string; firstBucket?: string; lastBucket?: string; totalBuckets?: number; dbTimeUTC?: string; dbTimeEST?: string } }).debug && (
-              <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4 mb-4 text-xs font-mono">
-                <strong className="text-yellow-800 dark:text-yellow-200">Timezone Debug:</strong>
-                <div className="mt-2 grid grid-cols-2 gap-2 text-yellow-700 dark:text-yellow-300">
-                  <div>Server UTC: {(visitorStats as { debug?: { serverTimeUTC?: string } }).debug?.serverTimeUTC}</div>
-                  <div>Server EST: {(visitorStats as { debug?: { serverTimeEST?: string } }).debug?.serverTimeEST}</div>
-                  <div>DB UTC: {String((visitorStats as { debug?: { dbTimeUTC?: string } }).debug?.dbTimeUTC)}</div>
-                  <div>DB EST: {String((visitorStats as { debug?: { dbTimeEST?: string } }).debug?.dbTimeEST)}</div>
-                  <div>Current Bucket: {(visitorStats as { debug?: { currentBucketUTC?: string } }).debug?.currentBucketUTC}</div>
-                  <div>Total Buckets: {(visitorStats as { debug?: { totalBuckets?: number } }).debug?.totalBuckets}</div>
-                  <div>First Bucket: {(visitorStats as { debug?: { firstBucket?: string } }).debug?.firstBucket}</div>
-                  <div>Last Bucket: {(visitorStats as { debug?: { lastBucket?: string } }).debug?.lastBucket}</div>
-                </div>
-              </div>
-            )}
 
             {/* Realtime Chart (10-min intervals) */}
             {visitorStats && visitorStats.realtimeSeries && visitorStats.realtimeSeries.length > 0 && (
