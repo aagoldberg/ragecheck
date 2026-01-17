@@ -17,6 +17,7 @@ export interface ShareImageData {
   uploadedImageUrl?: string;
   textPreview?: string; // For social posts, show the actual content instead of title
   sourceUrl?: string; // Original URL for QR code
+  shareUrl?: string; // Share page URL for QR code
 }
 
 export type ImageSize = "x" | "bluesky";
@@ -109,13 +110,14 @@ export async function generateShareImage(
     }
   }
 
-  // Generate QR code if we have a source URL
+  // Generate QR code if we have a source URL or share URL
   let qrImg: HTMLImageElement | null = null;
-  if (data.sourceUrl && typeof window !== "undefined") {
+  const targetUrl = data.shareUrl || (data.sourceUrl ? `https://ragecheck.com?url=${encodeURIComponent(data.sourceUrl)}&ref=qr` : "https://ragecheck.com");
+  
+  if (typeof window !== "undefined") {
     try {
-      const qrUrl = `https://ragecheck.com?url=${encodeURIComponent(data.sourceUrl)}&ref=qr`;
       const qr = qrcode(0, "M"); // Type 0 = auto, Error correction M
-      qr.addData(qrUrl);
+      qr.addData(targetUrl);
       qr.make();
       // Create image data URL - cellSize 4 gives good resolution
       const dataUrl = qr.createDataURL(4, 0);
@@ -159,8 +161,17 @@ export async function generateShareImage(
     // === RIGHT SIDE: THE CHECK (Analysis) ===
     const rightX = width / 2;
     const padding = 64;
-    const contentWidth = (width / 2) - (padding * 2);
-    const centerX = rightX + (width / 4);
+    
+    // QR Config
+    const qrBoxSize = 200;
+    const qrSize = 180;
+    const qrPadding = 10;
+    
+    // Content width must account for QR code at bottom to avoid overlap
+    // For top elements (Badge, Headline) we might want full width, but let's keep it consistent
+    // Actually, let's give the headline full width, but constrain bullets/CTA
+    const fullContentWidth = (width / 2) - (padding * 2);
+    const constrainedWidth = fullContentWidth - qrBoxSize - 20;
 
     // Subtle Glow (Top Right)
     const gradient = ctx.createRadialGradient(width, 0, 0, width, 0, 600);
@@ -186,9 +197,8 @@ export async function generateShareImage(
     const badgeText = `EMOTIONAL INTENSITY - ${riskLabel.toUpperCase()}`;
     const badgeTextWidth = ctx.measureText(badgeText).width;
     const badgeHeight = 48;
-    const badgeWidth = badgeTextWidth + 48; // text + padding
+    const badgeWidth = badgeTextWidth + 48;
 
-    // Badge Background
     ctx.fillStyle = colors.bg;
     ctx.strokeStyle = colors.border;
     ctx.lineWidth = 1;
@@ -196,22 +206,19 @@ export async function generateShareImage(
     ctx.fill();
     ctx.stroke();
 
-    // Badge Text (Centered)
     ctx.fillStyle = colors.text;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillText(badgeText, rightX + padding + (badgeWidth / 2), badgeY + (badgeHeight / 2));
-    ctx.textAlign = "left"; // Reset to left for subsequent elements
+    ctx.textAlign = "left";
 
-    // 3. Main Statement (Detected Pattern)
+    // 3. Main Statement
     const statementY = badgeY + badgeHeight + 50;
-
-    // Label: "DETECTED PATTERN"
+    
     ctx.font = "700 16px system-ui, -apple-system, sans-serif";
-    ctx.fillStyle = colors.main; // Match badge color
+    ctx.fillStyle = colors.main;
     ctx.fillText("DETECTED PATTERN", rightX + padding, statementY);
 
-    // Value: For LOW scores show "None", otherwise show top signal
     let topSignal = "None";
     if (data.score > 33 && data.signalBreakdown) {
        const entries = Object.entries(data.signalBreakdown);
@@ -223,28 +230,52 @@ export async function generateShareImage(
 
     ctx.font = "900 64px system-ui, -apple-system, sans-serif";
     ctx.fillStyle = "#ffffff";
-    const signalLines = wrapText(ctx, topSignal, contentWidth, 2);
-
+    // Use full width for headline, it sits above QR
+    const signalLines = wrapText(ctx, topSignal, fullContentWidth, 2);
+    
     signalLines.forEach((line, i) => {
         ctx.fillText(line, rightX + padding, statementY + 40 + (i * 72));
     });
 
-    // 4. Bullet Points (Insights) - prefer short shareCardBullets, fall back to verbose explanations
-    // Limited to 2 to make room for larger QR code
+    // 4. QR Code (Bottom Right)
+    if (qrImg) {
+      const qrBoxX = width - padding - qrBoxSize + 20; // Shift right slightly to align with edge
+      const qrBoxY = height - padding - qrBoxSize + 20; // Shift down slightly
+
+      // Label above QR box
+      ctx.font = "500 14px system-ui, -apple-system, sans-serif";
+      ctx.fillStyle = "#a1a1aa";
+      ctx.textAlign = "center";
+      ctx.fillText("Scan to view analysis", qrBoxX + (qrBoxSize / 2), qrBoxY - 8);
+      ctx.textAlign = "left";
+
+      // White background box
+      ctx.fillStyle = "#ffffff";
+      roundRect(ctx, qrBoxX, qrBoxY, qrBoxSize, qrBoxSize, 12);
+      ctx.fill();
+
+      const qrImgX = qrBoxX + (qrBoxSize - qrSize) / 2;
+      const qrImgY = qrBoxY + (qrBoxSize - qrSize) / 2;
+      ctx.drawImage(qrImg, qrImgX, qrImgY, qrSize, qrSize);
+    }
+
+    // 5. Bullet Points (Constrained Width)
     const allInsights = data.shareCardBullets && data.shareCardBullets.length > 0
-      ? data.shareCardBullets.slice(0, 2)
+      ? data.shareCardBullets.slice(0, 3)
       : [
           ...(data.techniqueExplanations || []),
           ...(data.sharingPatterns || [])
-        ].slice(0, 2);
+        ].slice(0, 3);
 
-    const bulletsY = statementY + 40 + (signalLines.length * 72) + 20;
-    const ctaY = height - padding;
+    const bulletsY = statementY + 40 + (signalLines.length * 72) + 30;
+    const ctaY = height - padding - 20; // Anchor for bottom check
     
     if (allInsights.length > 0) {
         let currentBulletY = bulletsY;
         allInsights.forEach((point, i) => {
-            if (currentBulletY > ctaY - 40) return;
+            // Check vertical overlap with QR area start (approx height - padding - qrBoxSize)
+            const qrTopY = height - padding - qrBoxSize;
+            if (currentBulletY > qrTopY && constrainedWidth < 100) return; // Should not happen with current layout
 
             ctx.fillStyle = colors.main;
             ctx.beginPath();
@@ -254,53 +285,31 @@ export async function generateShareImage(
             ctx.font = "500 24px system-ui, -apple-system, sans-serif";
             ctx.fillStyle = "#d4d4d8";
             
-            const pointLines = wrapText(ctx, point, contentWidth - 30, 2);
+            // Wrap text to constrained width to avoid hitting QR
+            const pointLines = wrapText(ctx, point, constrainedWidth, 2);
             pointLines.forEach((line, j) => {
-                if (currentBulletY + (j * 32) > ctaY - 40) return;
                 ctx.fillText(line, rightX + padding + 24, currentBulletY + (j * 32) + 14);
             });
             
-            currentBulletY += (pointLines.length * 32) + 12;
+            currentBulletY += (pointLines.length * 32) + 16;
         });
     }
 
-    // 5. CTA
-    ctx.font = "500 24px system-ui, -apple-system, sans-serif";
+    // 6. CTA (Bottom Left of Right Panel)
+    // Align with bottom of QR box
+    const ctaBaselineY = height - padding;
+    
+    ctx.font = "500 20px system-ui, -apple-system, sans-serif";
     ctx.fillStyle = "#a1a1aa";
-    ctx.fillText("See through it at ", rightX + padding, ctaY);
+    ctx.fillText("See through it at ", rightX + padding, ctaBaselineY);
     
     const prefixWidth = ctx.measureText("See through it at ").width;
-    ctx.font = "700 24px system-ui, -apple-system, sans-serif";
+    ctx.font = "700 20px system-ui, -apple-system, sans-serif";
     ctx.fillStyle = "#ffffff";
-    ctx.fillText("ragecheck.com", rightX + padding + prefixWidth, ctaY);
+    ctx.fillText("ragecheck.com", rightX + padding + prefixWidth, ctaBaselineY);
     
     ctx.fillStyle = colors.main;
-    ctx.fillRect(rightX + padding + prefixWidth, ctaY + 8, ctx.measureText("ragecheck.com").width, 3);
-
-    // 6. QR Code with white background box (bottom right)
-    if (qrImg) {
-      const qrSize = 180;
-      const qrPadding = 12; // Quiet zone around QR
-      const boxSize = qrSize + (qrPadding * 2);
-      const qrMargin = 20;
-      const qrBoxX = width - qrMargin - boxSize;
-      const qrBoxY = height - qrMargin - boxSize - 24; // Room for label below
-
-      // White background box with rounded corners
-      ctx.fillStyle = "#ffffff";
-      roundRect(ctx, qrBoxX, qrBoxY, boxSize, boxSize, 12);
-      ctx.fill();
-
-      // Draw QR code inside the box
-      ctx.drawImage(qrImg, qrBoxX + qrPadding, qrBoxY + qrPadding, qrSize, qrSize);
-
-      // Label below: "Scan to view analysis"
-      ctx.font = "500 14px system-ui, -apple-system, sans-serif";
-      ctx.fillStyle = "#a1a1aa";
-      ctx.textAlign = "center";
-      ctx.fillText("Scan to view analysis", qrBoxX + (boxSize / 2), qrBoxY + boxSize + 18);
-      ctx.textAlign = "left"; // Reset
-    }
+    ctx.fillRect(rightX + padding + prefixWidth, ctaBaselineY + 8, ctx.measureText("ragecheck.com").width, 3);
 
 
     // === LEFT SIDE: THE BAIT ===
