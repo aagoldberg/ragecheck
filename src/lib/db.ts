@@ -1251,8 +1251,8 @@ export async function getDashboardStats(): Promise<DashboardStats> {
            a.created_at,
            a.ip_address, a.user_agent, a.country, a.is_bot,
            a.failed_image_url,
-           EXISTS (SELECT 1 FROM ragecheck_shares s WHERE s.url = a.url AND s.ip_address = a.ip_address AND s.share_type NOT LIKE '%_clicked' AND s.created_at >= a.created_at AND s.created_at < a.created_at + INTERVAL '1 hour') as shared,
-           (SELECT s.share_type FROM ragecheck_shares s WHERE s.url = a.url AND s.ip_address = a.ip_address AND s.share_type NOT LIKE '%_clicked' AND s.created_at >= a.created_at AND s.created_at < a.created_at + INTERVAL '1 hour' ORDER BY s.created_at DESC LIMIT 1) as share_type,
+           EXISTS (SELECT 1 FROM ragecheck_shares s WHERE s.url = a.url AND s.share_type NOT LIKE '%_clicked') as shared,
+           (SELECT s.share_type FROM ragecheck_shares s WHERE s.url = a.url AND s.share_type NOT LIKE '%_clicked' ORDER BY s.created_at DESC LIMIT 1) as share_type,
            (SELECT COUNT(DISTINCT DATE(a2.created_at)) FROM ragecheck_analyses a2 WHERE a2.ip_address = a.ip_address AND a.ip_address IS NOT NULL) > 1 as is_repeat_user
     FROM ragecheck_analyses a
     WHERE a.created_at > NOW() - INTERVAL '3 days'
