@@ -150,16 +150,18 @@ export async function generateShareImage(
     const riskLabel = data.score > 66 ? "High" : data.score > 33 ? "Medium" : "Low";
 
     // === BACKGROUNDS ===
-    // Left side (White)
+    // Left side (White) - 40%
+    const splitRatio = 0.4;
     ctx.fillStyle = "#ffffff";
-    ctx.fillRect(0, 0, width / 2, height);
+    ctx.fillRect(0, 0, width * splitRatio, height);
     
-    // Right side (Dark Zinc)
+    // Right side (Dark Zinc) - 60%
     ctx.fillStyle = "#18181b"; // zinc-950
-    ctx.fillRect(width / 2, 0, width / 2, height);
+    ctx.fillRect(width * splitRatio, 0, width * (1 - splitRatio), height);
 
     // === RIGHT SIDE: THE CHECK (Analysis) ===
-    const rightX = width / 2;
+    const rightX = width * splitRatio;
+    const rightWidth = width * (1 - splitRatio);
     const padding = 64;
     
     // QR Config
@@ -168,9 +170,7 @@ export async function generateShareImage(
     const qrPadding = 10;
     
     // Content width must account for QR code at bottom to avoid overlap
-    // For top elements (Badge, Headline) we might want full width, but let's keep it consistent
-    // Actually, let's give the headline full width, but constrain bullets/CTA
-    const fullContentWidth = (width / 2) - (padding * 2);
+    const fullContentWidth = rightWidth - (padding * 2);
     const constrainedWidth = fullContentWidth - qrBoxSize - 20;
 
     // Subtle Glow (Top Right)
@@ -178,7 +178,7 @@ export async function generateShareImage(
     gradient.addColorStop(0, colors.bg);
     gradient.addColorStop(1, "rgba(0,0,0,0)");
     ctx.fillStyle = gradient;
-    ctx.fillRect(rightX, 0, width / 2, height);
+    ctx.fillRect(rightX, 0, rightWidth, height);
 
     // 1. Logo
     const logoY = padding;
@@ -213,12 +213,15 @@ export async function generateShareImage(
     ctx.textAlign = "left";
 
     // 3. Main Statement
-    const statementY = badgeY + badgeHeight + 50;
+    const statementY = badgeY + badgeHeight + 40;
     
+    // Label: "DETECTED PATTERN"
     ctx.font = "700 16px system-ui, -apple-system, sans-serif";
-    ctx.fillStyle = colors.main;
+    ctx.fillStyle = "#a1a1aa"; // Zinc-400 for metadata
+    ctx.textBaseline = "top"; // Ensure consistent positioning
     ctx.fillText("DETECTED PATTERN", rightX + padding, statementY);
 
+    // Value: For LOW scores show "None", otherwise show top signal
     let topSignal = "None";
     if (data.score > 33 && data.signalBreakdown) {
        const entries = Object.entries(data.signalBreakdown);
@@ -230,33 +233,37 @@ export async function generateShareImage(
 
     ctx.font = "900 64px system-ui, -apple-system, sans-serif";
     ctx.fillStyle = "#ffffff";
-    // Use full width for headline, it sits above QR
     const signalLines = wrapText(ctx, topSignal, fullContentWidth, 2);
-    
+
     signalLines.forEach((line, i) => {
-        ctx.fillText(line, rightX + padding, statementY + 40 + (i * 72));
+        ctx.fillText(line, rightX + padding, statementY + 24 + (i * 72));
     });
 
-    // 4. QR Code (Bottom Right)
+    // 6. QR Code "Sticker" (Bottom Right)
     if (qrImg) {
-      const qrBoxX = width - padding - qrBoxSize + 20; // Shift right slightly to align with edge
-      const qrBoxY = height - padding - qrBoxSize + 20; // Shift down slightly
+      const qrBoxWidth = 200;
+      const qrBoxHeight = 240; // Optimized height
+      
+      const qrBoxX = width - padding - qrBoxWidth + 20; 
+      const qrBoxY = height - padding - qrBoxHeight + 20;
 
-      // Label above QR box
-      ctx.font = "500 14px system-ui, -apple-system, sans-serif";
-      ctx.fillStyle = "#a1a1aa";
-      ctx.textAlign = "center";
-      ctx.fillText("Scan to view analysis", qrBoxX + (qrBoxSize / 2), qrBoxY - 8);
-      ctx.textAlign = "left";
-
-      // White background box
+      // White Background Box
       ctx.fillStyle = "#ffffff";
-      roundRect(ctx, qrBoxX, qrBoxY, qrBoxSize, qrBoxSize, 12);
+      roundRect(ctx, qrBoxX, qrBoxY, qrBoxWidth, qrBoxHeight, 16);
       ctx.fill();
 
-      const qrImgX = qrBoxX + (qrBoxSize - qrSize) / 2;
-      const qrImgY = qrBoxY + (qrBoxSize - qrSize) / 2;
+      // Draw QR code inside the box (Top with padding)
+      const qrImgX = qrBoxX + (qrBoxWidth - qrSize) / 2;
+      const qrImgY = qrBoxY + 12;
       ctx.drawImage(qrImg, qrImgX, qrImgY, qrSize, qrSize);
+
+      // Label below QR (Centered in remaining space)
+      ctx.font = "700 18px system-ui, -apple-system, sans-serif";
+      ctx.fillStyle = "#18181b"; // Dark text on white
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("Scan for details", qrBoxX + (qrBoxWidth / 2), qrBoxY + 216);
+      ctx.textAlign = "left"; // Reset
     }
 
     // 5. Bullet Points (Constrained Width)
@@ -267,10 +274,13 @@ export async function generateShareImage(
           ...(data.sharingPatterns || [])
         ].slice(0, 3);
 
-    const bulletsY = statementY + 40 + (signalLines.length * 72) + 30;
-    const ctaY = height - padding - 20; // Anchor for bottom check
+    const bulletsY = statementY + 20 + (signalLines.length * 72) + 20;
+    const ctaY = height - padding;
     
     if (allInsights.length > 0) {
+        // Use top baseline for multi-line bullet text for easier calculation
+        ctx.textBaseline = "top";
+        
         let currentBulletY = bulletsY;
         allInsights.forEach((point, i) => {
             // Check vertical overlap with QR area start (approx height - padding - qrBoxSize)
@@ -279,7 +289,7 @@ export async function generateShareImage(
 
             ctx.fillStyle = colors.main;
             ctx.beginPath();
-            ctx.arc(rightX + padding + 5, currentBulletY + 14, 4, 0, Math.PI * 2);
+            ctx.arc(rightX + padding + 5, currentBulletY + 10, 4, 0, Math.PI * 2);
             ctx.fill();
             
             ctx.font = "500 24px system-ui, -apple-system, sans-serif";
@@ -288,32 +298,32 @@ export async function generateShareImage(
             // Wrap text to constrained width to avoid hitting QR
             const pointLines = wrapText(ctx, point, constrainedWidth, 2);
             pointLines.forEach((line, j) => {
-                ctx.fillText(line, rightX + padding + 24, currentBulletY + (j * 32) + 14);
+                ctx.fillText(line, rightX + padding + 24, currentBulletY + (j * 32));
             });
             
             currentBulletY += (pointLines.length * 32) + 16;
         });
     }
 
-    // 6. CTA (Bottom Left of Right Panel)
-    // Align with bottom of QR box
-    const ctaBaselineY = height - padding;
+    // 5. CTA
+    // Reset to alphabetic baseline for standard footer alignment
+    ctx.textBaseline = "alphabetic";
     
     ctx.font = "500 20px system-ui, -apple-system, sans-serif";
     ctx.fillStyle = "#a1a1aa";
-    ctx.fillText("See through it at ", rightX + padding, ctaBaselineY);
+    ctx.fillText("See through it at ", rightX + padding, ctaY);
     
     const prefixWidth = ctx.measureText("See through it at ").width;
     ctx.font = "700 20px system-ui, -apple-system, sans-serif";
     ctx.fillStyle = "#ffffff";
-    ctx.fillText("ragecheck.com", rightX + padding + prefixWidth, ctaBaselineY);
+    ctx.fillText("ragecheck.com", rightX + padding + prefixWidth, ctaY);
     
     ctx.fillStyle = colors.main;
-    ctx.fillRect(rightX + padding + prefixWidth, ctaBaselineY + 8, ctx.measureText("ragecheck.com").width, 3);
+    ctx.fillRect(rightX + padding + prefixWidth, ctaY + 6, ctx.measureText("ragecheck.com").width, 3);
 
 
     // === LEFT SIDE: THE BAIT ===
-    const leftWidth = width / 2;
+    const leftWidth = width * splitRatio;
 
     if (uploadedImg) {
       // Show the actual uploaded image
@@ -380,7 +390,7 @@ export async function generateShareImage(
 
       // Center the title block vertically (below the pill)
       const availableHeight = height - pillY - pillHeight - contentPadding - 40;
-      const titleStartY = pillY + pillHeight + 40 + (availableHeight - bodyHeight) / 2;
+      const titleStartY = pillY + pillHeight + (availableHeight - bodyHeight) / 2 - 20;
 
       ctx.fillStyle = "#18181b";
       ctx.textAlign = "left";

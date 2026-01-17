@@ -1613,6 +1613,109 @@ export async function subscribeEmail(data: {
   }
 }
 
+export interface SubscriberStats {
+  total: number;
+  active: number;
+  unsubscribed: number;
+  today: number;
+  thisWeek: number;
+  thisMonth: number;
+  bySource: { source: string; count: number }[];
+  byCountry: { country: string; count: number }[];
+  recentSubscribers: {
+    email: string;
+    subscribedAt: string;
+    source: string;
+    country: string | null;
+  }[];
+  dailySignups: { date: string; count: number }[];
+}
+
+export async function getSubscriberStats(): Promise<SubscriberStats | null> {
+  try {
+    await initDB();
+
+    // Total counts
+    const [totals] = await getDb()`
+      SELECT
+        COUNT(*) as total,
+        COUNT(*) FILTER (WHERE unsubscribed_at IS NULL) as active,
+        COUNT(*) FILTER (WHERE unsubscribed_at IS NOT NULL) as unsubscribed,
+        COUNT(*) FILTER (WHERE subscribed_at > NOW() - INTERVAL '1 day' AND unsubscribed_at IS NULL) as today,
+        COUNT(*) FILTER (WHERE subscribed_at > NOW() - INTERVAL '7 days' AND unsubscribed_at IS NULL) as this_week,
+        COUNT(*) FILTER (WHERE subscribed_at > NOW() - INTERVAL '30 days' AND unsubscribed_at IS NULL) as this_month
+      FROM ragecheck_subscribers
+    `;
+
+    // By source
+    const bySource = await getDb()`
+      SELECT COALESCE(source, 'unknown') as source, COUNT(*) as count
+      FROM ragecheck_subscribers
+      WHERE unsubscribed_at IS NULL
+      GROUP BY source
+      ORDER BY count DESC
+    `;
+
+    // By country
+    const byCountry = await getDb()`
+      SELECT COALESCE(country, 'Unknown') as country, COUNT(*) as count
+      FROM ragecheck_subscribers
+      WHERE unsubscribed_at IS NULL
+      GROUP BY country
+      ORDER BY count DESC
+      LIMIT 10
+    `;
+
+    // Recent subscribers
+    const recentSubscribers = await getDb()`
+      SELECT email, subscribed_at, COALESCE(source, 'website') as source, country
+      FROM ragecheck_subscribers
+      WHERE unsubscribed_at IS NULL
+      ORDER BY subscribed_at DESC
+      LIMIT 20
+    `;
+
+    // Daily signups (last 30 days)
+    const dailySignups = await getDb()`
+      SELECT DATE(subscribed_at) as date, COUNT(*) as count
+      FROM ragecheck_subscribers
+      WHERE subscribed_at > NOW() - INTERVAL '30 days'
+      GROUP BY DATE(subscribed_at)
+      ORDER BY date DESC
+    `;
+
+    return {
+      total: Number(totals.total) || 0,
+      active: Number(totals.active) || 0,
+      unsubscribed: Number(totals.unsubscribed) || 0,
+      today: Number(totals.today) || 0,
+      thisWeek: Number(totals.this_week) || 0,
+      thisMonth: Number(totals.this_month) || 0,
+      bySource: bySource.map((r) => ({
+        source: r.source as string,
+        count: Number(r.count),
+      })),
+      byCountry: byCountry.map((r) => ({
+        country: r.country as string,
+        count: Number(r.count),
+      })),
+      recentSubscribers: recentSubscribers.map((r) => ({
+        email: r.email as string,
+        subscribedAt: r.subscribed_at as string,
+        source: r.source as string,
+        country: r.country as string | null,
+      })),
+      dailySignups: dailySignups.map((r) => ({
+        date: r.date as string,
+        count: Number(r.count),
+      })),
+    };
+  } catch (error) {
+    console.error("Failed to get subscriber stats:", error);
+    return null;
+  }
+}
+
 export interface VisitorLog {
   ipAddress?: string;
   userAgent?: string;

@@ -566,6 +566,7 @@ interface ApiResponse {
   acquisitionMetrics?: AcquisitionMetrics;
   analysisCompletionMetrics?: AnalysisCompletionMetrics;
   abandonmentDiagnostics?: AbandonmentDiagnostics;
+  subscriberStats?: SubscriberStats;
   dbAvailable?: boolean;
 }
 
@@ -1513,7 +1514,7 @@ function PageDailyChart({ data, title }: { data: { date: string; visitors: numbe
   );
 }
 
-type TabType = "overview" | "users" | "conversions" | "funnel" | "retention" | "shares" | "feedback" | "content" | "clearview";
+type TabType = "overview" | "users" | "conversions" | "funnel" | "retention" | "shares" | "feedback" | "content" | "clearview" | "subscribers";
 
 interface ClearviewStats {
   lastGenerated: string | null;
@@ -1524,6 +1525,24 @@ interface ClearviewStats {
     sourceCount: number;
     perspectives: number;
   }[];
+}
+
+interface SubscriberStats {
+  total: number;
+  active: number;
+  unsubscribed: number;
+  today: number;
+  thisWeek: number;
+  thisMonth: number;
+  bySource: { source: string; count: number }[];
+  byCountry: { country: string; count: number }[];
+  recentSubscribers: {
+    email: string;
+    subscribedAt: string;
+    source: string;
+    country: string | null;
+  }[];
+  dailySignups: { date: string; count: number }[];
 }
 
 export default function AdminDashboard() {
@@ -1550,6 +1569,7 @@ export default function AdminDashboard() {
   const [acquisitionMetrics, setAcquisitionMetrics] = useState<AcquisitionMetrics | null>(null);
   const [analysisCompletionMetrics, setAnalysisCompletionMetrics] = useState<AnalysisCompletionMetrics | null>(null);
   const [abandonmentDiagnostics, setAbandonmentDiagnostics] = useState<AbandonmentDiagnostics | null>(null);
+  const [subscriberStats, setSubscriberStats] = useState<SubscriberStats | null>(null);
 
   const fetchStats = async (adminKey: string) => {
     setLoading(true);
@@ -1581,6 +1601,7 @@ export default function AdminDashboard() {
         setAcquisitionMetrics(data.acquisitionMetrics || null);
         setAnalysisCompletionMetrics(data.analysisCompletionMetrics || null);
         setAbandonmentDiagnostics(data.abandonmentDiagnostics || null);
+        setSubscriberStats(data.subscriberStats || null);
         setAuthenticated(true);
         // Save key to localStorage
         localStorage.setItem("ragecheck-admin-key", adminKey);
@@ -1742,7 +1763,7 @@ export default function AdminDashboard() {
         {/* Tabs */}
         <div className="max-w-7xl mx-auto px-4">
           <div className="flex gap-6 -mb-px">
-            {(["overview", "users", "conversions", "funnel", "retention", "shares", "feedback", "content", "clearview"] as const).map((tab) => (
+            {(["overview", "users", "conversions", "funnel", "retention", "shares", "feedback", "content", "clearview", "subscribers"] as const).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
@@ -4398,6 +4419,148 @@ export default function AdminDashboard() {
             )}
           </>
         ) : null}
+
+        {/* Subscribers Tab */}
+        {activeTab === "subscribers" && subscriberStats && (
+          <div className="space-y-6">
+            {/* Summary Stats */}
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+              <div className="bg-white dark:bg-zinc-900 rounded-lg p-4 border border-zinc-200 dark:border-zinc-800">
+                <div className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">{subscriberStats.total}</div>
+                <div className="text-sm text-zinc-500">Total</div>
+              </div>
+              <div className="bg-white dark:bg-zinc-900 rounded-lg p-4 border border-zinc-200 dark:border-zinc-800">
+                <div className="text-2xl font-bold text-emerald-600">{subscriberStats.active}</div>
+                <div className="text-sm text-zinc-500">Active</div>
+              </div>
+              <div className="bg-white dark:bg-zinc-900 rounded-lg p-4 border border-zinc-200 dark:border-zinc-800">
+                <div className="text-2xl font-bold text-zinc-400">{subscriberStats.unsubscribed}</div>
+                <div className="text-sm text-zinc-500">Unsubscribed</div>
+              </div>
+              <div className="bg-white dark:bg-zinc-900 rounded-lg p-4 border border-zinc-200 dark:border-zinc-800">
+                <div className="text-2xl font-bold text-blue-600">{subscriberStats.today}</div>
+                <div className="text-sm text-zinc-500">Today</div>
+              </div>
+              <div className="bg-white dark:bg-zinc-900 rounded-lg p-4 border border-zinc-200 dark:border-zinc-800">
+                <div className="text-2xl font-bold text-purple-600">{subscriberStats.thisWeek}</div>
+                <div className="text-sm text-zinc-500">This Week</div>
+              </div>
+              <div className="bg-white dark:bg-zinc-900 rounded-lg p-4 border border-zinc-200 dark:border-zinc-800">
+                <div className="text-2xl font-bold text-amber-600">{subscriberStats.thisMonth}</div>
+                <div className="text-sm text-zinc-500">This Month</div>
+              </div>
+            </div>
+
+            {/* Breakdowns Row */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* By Source */}
+              {subscriberStats.bySource.length > 0 && (
+                <div className="bg-white dark:bg-zinc-900 rounded-lg p-4 border border-zinc-200 dark:border-zinc-800">
+                  <h3 className="text-sm font-medium text-zinc-500 mb-3">By Source</h3>
+                  <div className="space-y-2">
+                    {subscriberStats.bySource.map((s, i) => (
+                      <div key={i} className="flex justify-between items-center">
+                        <span className="text-sm text-zinc-600 dark:text-zinc-400">{s.source || "direct"}</span>
+                        <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">{s.count}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* By Country */}
+              {subscriberStats.byCountry.length > 0 && (
+                <div className="bg-white dark:bg-zinc-900 rounded-lg p-4 border border-zinc-200 dark:border-zinc-800">
+                  <h3 className="text-sm font-medium text-zinc-500 mb-3">By Country</h3>
+                  <div className="space-y-2">
+                    {subscriberStats.byCountry.map((c, i) => (
+                      <div key={i} className="flex justify-between items-center">
+                        <span className="text-sm text-zinc-600 dark:text-zinc-400">{c.country || "Unknown"}</span>
+                        <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">{c.count}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Daily Signups Chart */}
+            {subscriberStats.dailySignups.length > 0 && (
+              <div className="bg-white dark:bg-zinc-900 rounded-lg p-4 border border-zinc-200 dark:border-zinc-800">
+                <h3 className="text-sm font-medium text-zinc-500 mb-3">Daily Signups (Last 30 Days)</h3>
+                <div className="h-32 flex items-end gap-1">
+                  {subscriberStats.dailySignups.map((d, i) => {
+                    const max = Math.max(...subscriberStats.dailySignups.map(x => x.count), 1);
+                    const height = (d.count / max) * 100;
+                    return (
+                      <div
+                        key={i}
+                        className="flex-1 bg-emerald-500 rounded-t hover:bg-emerald-400 transition-colors"
+                        style={{ height: `${Math.max(height, 2)}%` }}
+                        title={`${d.date}: ${d.count} signups`}
+                      />
+                    );
+                  })}
+                </div>
+                <div className="flex justify-between mt-2 text-xs text-zinc-400">
+                  <span>{subscriberStats.dailySignups[0]?.date}</span>
+                  <span>{subscriberStats.dailySignups[subscriberStats.dailySignups.length - 1]?.date}</span>
+                </div>
+              </div>
+            )}
+
+            {/* Recent Subscribers Table */}
+            {subscriberStats.recentSubscribers.length > 0 && (
+              <div className="bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800 overflow-hidden">
+                <div className="px-4 py-3 border-b border-zinc-200 dark:border-zinc-800">
+                  <h3 className="text-sm font-medium text-zinc-500">Recent Subscribers</h3>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="bg-zinc-50 dark:bg-zinc-800/50">
+                        <th className="px-4 py-2 text-left text-xs font-medium text-zinc-500">Email</th>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-zinc-500">Source</th>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-zinc-500">Country</th>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-zinc-500">Subscribed</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
+                      {subscriberStats.recentSubscribers.map((sub, i) => (
+                        <tr key={i} className="hover:bg-zinc-50 dark:hover:bg-zinc-800/50">
+                          <td className="px-4 py-2 text-sm text-zinc-900 dark:text-zinc-100 font-mono">
+                            {sub.email}
+                          </td>
+                          <td className="px-4 py-2 text-sm text-zinc-600 dark:text-zinc-400">
+                            {sub.source || "direct"}
+                          </td>
+                          <td className="px-4 py-2 text-sm text-zinc-600 dark:text-zinc-400">
+                            {sub.country || "—"}
+                          </td>
+                          <td className="px-4 py-2 text-sm text-zinc-500">
+                            {new Date(sub.subscribedAt).toLocaleDateString()}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {subscriberStats.total === 0 && (
+              <p className="text-sm text-zinc-500 text-center py-8">
+                No subscribers yet.
+              </p>
+            )}
+          </div>
+        )}
+
+        {activeTab === "subscribers" && !subscriberStats && (
+          <p className="text-sm text-zinc-500 text-center py-8">
+            Loading subscriber data...
+          </p>
+        )}
       </div>
     </div>
   );
