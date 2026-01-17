@@ -278,9 +278,10 @@ export async function generateShareImage(
 
     // 6. QR Code (bottom right corner)
     if (qrImg) {
-      const qrSize = 96;
-      const qrX = width - padding - qrSize;
-      const qrY = height - padding - qrSize + 16;
+      const qrSize = 110;
+      const qrMargin = 24; // Tighter to corner than main padding
+      const qrX = width - qrMargin - qrSize;
+      const qrY = height - qrMargin - qrSize;
       ctx.drawImage(qrImg, qrX, qrY, qrSize, qrSize);
     }
 
