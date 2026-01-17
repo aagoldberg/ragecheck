@@ -1,7 +1,7 @@
 // Canvas-based share image generator matching the "Bait vs Check" Split Design
 // Left: The Content (Mock Post) | Right: The Analysis (Dark Mode)
 
-import QRCode from "qrcode/lib/browser";
+import qrcode from "qrcode-generator";
 import { SIGNAL_LABELS } from "@/lib/shareCard";
 import type { SignalBreakdown } from "@/lib/score";
 
@@ -114,12 +114,15 @@ export async function generateShareImage(
   if (data.sourceUrl) {
     try {
       const qrUrl = `https://ragecheck.com?url=${encodeURIComponent(data.sourceUrl)}&ref=qr`;
-      const qrDataUrl = await QRCode.toDataURL(qrUrl, {
-        width: 80,
-        margin: 0,
-        color: { dark: "#ffffff", light: "#00000000" }, // White QR on transparent
-      });
-      qrImg = await loadImage(qrDataUrl);
+      const qr = qrcode(0, "M"); // Type 0 = auto, Error correction M
+      qr.addData(qrUrl);
+      qr.make();
+      // Create SVG data URL (white on transparent)
+      const svgStr = qr.createSvgTag({ cellSize: 4, margin: 0, scalable: true });
+      // Convert to white color
+      const whiteSvg = svgStr.replace(/fill="#000000"/g, 'fill="#ffffff"');
+      const svgDataUrl = `data:image/svg+xml;base64,${btoa(whiteSvg)}`;
+      qrImg = await loadImage(svgDataUrl);
     } catch (e) {
       console.warn("Failed to generate QR code:", e);
     }
