@@ -113,7 +113,7 @@ export async function generateShareImage(
   let qrImg: HTMLImageElement | null = null;
   if (data.sourceUrl) {
     try {
-      const qrUrl = `https://ragecheck.com?url=${encodeURIComponent(data.sourceUrl)}`;
+      const qrUrl = `https://ragecheck.com?url=${encodeURIComponent(data.sourceUrl)}&ref=qr`;
       const qrDataUrl = await QRCode.toDataURL(qrUrl, {
         width: 80,
         margin: 0,

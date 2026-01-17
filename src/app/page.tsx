@@ -658,6 +658,7 @@ function HomeContent() {
     const utmCampaign = urlParams.get("utm_campaign");
     const utmContent = urlParams.get("utm_content");
     const utmTerm = urlParams.get("utm_term");
+    const refParam = urlParams.get("ref"); // QR code referrals use ref=qr
 
     fetch("/api/visit", {
       method: "POST",
@@ -665,8 +666,8 @@ function HomeContent() {
       body: JSON.stringify({
         referrer: document.referrer || null,
         pagePath: window.location.pathname,
-        utmSource,
-        utmMedium,
+        utmSource: utmSource || refParam || null, // Use ref as source if no utm_source
+        utmMedium: utmMedium || (refParam ? "qr_code" : null),
         utmCampaign,
         utmContent,
         utmTerm,
