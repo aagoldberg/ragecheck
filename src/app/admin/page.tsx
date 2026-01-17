@@ -3372,14 +3372,14 @@ export default function AdminDashboard() {
                   <StatCard
                     title="DAU/MAU Ratio"
                     value={`${retentionMetrics.stickiness.dauMauRatio}%`}
-                    subtitle={`${retentionMetrics.stickiness.dau} daily / ${retentionMetrics.stickiness.mau} monthly`}
-                    tooltip="Daily Active Users / Monthly Active Users. Measures how often your monthly users come back daily. 10-20% is typical, 25%+ is strong engagement."
+                    subtitle={`${retentionMetrics.stickiness.dau} avg daily / ${retentionMetrics.stickiness.mau} monthly`}
+                    tooltip="Average Daily Active Users (last 7 days) / Monthly Active Users. Measures how often your monthly users come back daily. 10-20% is typical, 25%+ is strong engagement."
                   />
                   <StatCard
                     title="DAU/WAU Ratio"
                     value={`${retentionMetrics.stickiness.dauWauRatio}%`}
-                    subtitle={`${retentionMetrics.stickiness.dau} daily / ${retentionMetrics.stickiness.wau} weekly`}
-                    tooltip="Daily Active Users / Weekly Active Users. Higher ratio means users visit more frequently within a week."
+                    subtitle={`${retentionMetrics.stickiness.dau} avg daily / ${retentionMetrics.stickiness.wau} weekly`}
+                    tooltip="Average Daily Active Users (last 7 days) / Weekly Active Users. Higher ratio means users visit more frequently within a week."
                   />
                   <StatCard
                     title="Multi-Visit Users"

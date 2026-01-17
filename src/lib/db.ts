@@ -2399,12 +2399,21 @@ export async function getRetentionMetrics(): Promise<RetentionMetrics> {
     const returnedUsers = Number(rollingData?.returned_users) || 0;
 
     // DAU/WAU/MAU stickiness
+    // DAU = Average daily unique users over last 7 complete days (not including today which is incomplete)
     const [dauData] = await getDb()`
-      SELECT COUNT(DISTINCT ip_address) as dau
-      FROM ragecheck_visitors
-      WHERE is_bot = false
-        AND ip_address IS NOT NULL
-        AND created_at >= DATE_TRUNC('day', NOW() AT TIME ZONE 'America/New_York') AT TIME ZONE 'America/New_York'
+      WITH daily_users AS (
+        SELECT
+          DATE(created_at AT TIME ZONE 'America/New_York') as day,
+          COUNT(DISTINCT ip_address) as unique_users
+        FROM ragecheck_visitors
+        WHERE is_bot = false
+          AND ip_address IS NOT NULL
+          AND created_at >= NOW() - INTERVAL '8 days'
+          AND created_at < DATE_TRUNC('day', NOW() AT TIME ZONE 'America/New_York') AT TIME ZONE 'America/New_York'
+        GROUP BY DATE(created_at AT TIME ZONE 'America/New_York')
+      )
+      SELECT COALESCE(ROUND(AVG(unique_users)), 0) as dau
+      FROM daily_users
     `;
 
     const [wauData] = await getDb()`
