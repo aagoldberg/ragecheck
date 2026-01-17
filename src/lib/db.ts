@@ -2145,47 +2145,17 @@ export async function getVisitorStats(): Promise<VisitorStats> {
     // Merge realtime data into 30-minute buckets
     const realtimeMap = new Map<string, { visitors: number; analyses: number }>();
 
-    // Helper to get current EST-aligned bucket start
-    // Returns UTC timestamp of the most recent complete EST 30-min bucket
-    const getESTAlignedBucketStart = () => {
-      const now = new Date();
-      // Get current time formatted as EST
-      const estFormatter = new Intl.DateTimeFormat('en-US', {
-        timeZone: 'America/New_York',
-        year: 'numeric', month: '2-digit', day: '2-digit',
-        hour: '2-digit', minute: '2-digit', second: '2-digit',
-        hour12: false
-      });
-      const parts = estFormatter.formatToParts(now);
-      const getPart = (type: string) => parts.find(p => p.type === type)?.value || '0';
+    // Get current bucket start: round current UTC time down to nearest 30 minutes
+    // This MUST match the database bucketing logic exactly
+    const THIRTY_MIN_MS = 30 * 60 * 1000;
+    const nowMs = Date.now();
+    const currentBucketMs = Math.floor(nowMs / THIRTY_MIN_MS) * THIRTY_MIN_MS;
 
-      // Build EST date/time
-      const estYear = parseInt(getPart('year'));
-      const estMonth = parseInt(getPart('month')) - 1;
-      const estDay = parseInt(getPart('day'));
-      const estHour = parseInt(getPart('hour'));
-      const estMinute = parseInt(getPart('minute'));
-
-      // Round down to nearest 30 min in EST
-      const roundedMinute = Math.floor(estMinute / 30) * 30;
-
-      // Create a date string in EST and parse it to get UTC
-      const estDateStr = `${estYear}-${String(estMonth + 1).padStart(2, '0')}-${String(estDay).padStart(2, '0')}T${String(estHour).padStart(2, '0')}:${String(roundedMinute).padStart(2, '0')}:00`;
-
-      // Simpler approach: round current UTC time down to nearest 30 minutes
-      // The EST formatting above was just to get the rounded minute in EST
-      // But we can just round the UTC timestamp directly
-      const nowMs = now.getTime();
-      const thirtyMinMs = 30 * 60 * 1000;
-      const roundedMs = Math.floor(nowMs / thirtyMinMs) * thirtyMinMs;
-      return new Date(roundedMs);
-    };
-
-    // Initialize last 3 days (72 hours) in 30-minute intervals (144 buckets, excluding current incomplete bucket)
-    const bucketStart = getESTAlignedBucketStart();
-    for (let i = 144; i >= 1; i--) {
-      const d = new Date(bucketStart.getTime() - i * 30 * 60 * 1000);
-      const timeStr = d.toISOString();
+    // Initialize last 3 days (72 hours) in 30-minute intervals (144 buckets)
+    // Start from current bucket and go backwards
+    for (let i = 143; i >= 0; i--) {
+      const bucketMs = currentBucketMs - i * THIRTY_MIN_MS;
+      const timeStr = new Date(bucketMs).toISOString();
       realtimeMap.set(timeStr, { visitors: 0, analyses: 0 });
     }
 
@@ -2235,10 +2205,10 @@ export async function getVisitorStats(): Promise<VisitorStats> {
     // Build unique realtime map
     const uniqueRealtimeMap = new Map<string, { uniqueVisitors: number; uniqueAnalyzers: number }>();
 
-    // Initialize same 144 buckets (using same EST-aligned bucket start)
-    for (let i = 144; i >= 1; i--) {
-      const d = new Date(bucketStart.getTime() - i * 30 * 60 * 1000);
-      const timeStr = d.toISOString();
+    // Initialize same 144 buckets (using same bucket calculation as above)
+    for (let i = 143; i >= 0; i--) {
+      const bucketMs = currentBucketMs - i * THIRTY_MIN_MS;
+      const timeStr = new Date(bucketMs).toISOString();
       uniqueRealtimeMap.set(timeStr, { uniqueVisitors: 0, uniqueAnalyzers: 0 });
     }
 
@@ -2527,21 +2497,18 @@ export async function getPageVisitorStats(pagePath: string): Promise<PageVisitor
       ORDER BY bucket_ms ASC
     `;
 
-    // Merge realtime data into 30-minute buckets (excluding current incomplete bucket)
+    // Merge realtime data into 30-minute buckets
     const realtimeMap = new Map<string, number>();
 
-    // Helper to get current bucket start (rounded to 30 min)
-    const getESTAlignedBucketStart = () => {
-      const now = new Date();
-      const thirtyMinMs = 30 * 60 * 1000;
-      const roundedMs = Math.floor(now.getTime() / thirtyMinMs) * thirtyMinMs;
-      return new Date(roundedMs);
-    };
+    // Get current bucket start: round current UTC time down to nearest 30 minutes
+    const THIRTY_MIN_MS = 30 * 60 * 1000;
+    const nowMs = Date.now();
+    const currentBucketMs = Math.floor(nowMs / THIRTY_MIN_MS) * THIRTY_MIN_MS;
 
-    const bucketStart = getESTAlignedBucketStart();
-    for (let i = 48; i >= 1; i--) {
-      const d = new Date(bucketStart.getTime() - i * 30 * 60 * 1000);
-      realtimeMap.set(d.toISOString(), 0);
+    // Initialize last 24 hours (48 buckets)
+    for (let i = 47; i >= 0; i--) {
+      const bucketMs = currentBucketMs - i * THIRTY_MIN_MS;
+      realtimeMap.set(new Date(bucketMs).toISOString(), 0);
     }
 
     for (const row of visitorRealtime) {
