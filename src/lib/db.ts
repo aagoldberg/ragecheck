@@ -1251,8 +1251,8 @@ export async function getDashboardStats(): Promise<DashboardStats> {
            a.created_at,
            a.ip_address, a.user_agent, a.country, a.is_bot,
            a.failed_image_url,
-           EXISTS (SELECT 1 FROM ragecheck_shares s WHERE s.url = a.url AND s.share_type NOT LIKE '%_clicked') as shared,
-           (SELECT s.share_type FROM ragecheck_shares s WHERE s.url = a.url AND s.share_type NOT LIKE '%_clicked' ORDER BY s.created_at DESC LIMIT 1) as share_type,
+           EXISTS (SELECT 1 FROM ragecheck_shares s WHERE s.url = a.url AND s.ip_address = a.ip_address AND s.share_type NOT LIKE '%_clicked' AND s.created_at >= a.created_at AND s.created_at < a.created_at + INTERVAL '1 hour') as shared,
+           (SELECT s.share_type FROM ragecheck_shares s WHERE s.url = a.url AND s.ip_address = a.ip_address AND s.share_type NOT LIKE '%_clicked' AND s.created_at >= a.created_at AND s.created_at < a.created_at + INTERVAL '1 hour' ORDER BY s.created_at DESC LIMIT 1) as share_type,
            (SELECT COUNT(DISTINCT DATE(a2.created_at)) FROM ragecheck_analyses a2 WHERE a2.ip_address = a.ip_address AND a.ip_address IS NOT NULL) > 1 as is_repeat_user
     FROM ragecheck_analyses a
     WHERE a.created_at > NOW() - INTERVAL '3 days'
@@ -2171,15 +2171,13 @@ export async function getVisitorStats(): Promise<VisitorStats> {
       // Create a date string in EST and parse it to get UTC
       const estDateStr = `${estYear}-${String(estMonth + 1).padStart(2, '0')}-${String(estDay).padStart(2, '0')}T${String(estHour).padStart(2, '0')}:${String(roundedMinute).padStart(2, '0')}:00`;
 
-      // Parse as EST and convert to UTC using the timezone offset
-      const estDate = new Date(estDateStr);
-      // Get the EST offset for this date
-      const utcDate = new Date(now.toLocaleString('en-US', { timeZone: 'UTC' }));
-      const estDateForOffset = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' }));
-      const offsetMs = utcDate.getTime() - estDateForOffset.getTime();
-
-      // Apply offset to get UTC time
-      return new Date(estDate.getTime() + offsetMs);
+      // Simpler approach: round current UTC time down to nearest 30 minutes
+      // The EST formatting above was just to get the rounded minute in EST
+      // But we can just round the UTC timestamp directly
+      const nowMs = now.getTime();
+      const thirtyMinMs = 30 * 60 * 1000;
+      const roundedMs = Math.floor(nowMs / thirtyMinMs) * thirtyMinMs;
+      return new Date(roundedMs);
     };
 
     // Initialize last 3 days (72 hours) in 30-minute intervals (144 buckets, excluding current incomplete bucket)
@@ -2520,29 +2518,12 @@ export async function getPageVisitorStats(pagePath: string): Promise<PageVisitor
     // Merge realtime data into 30-minute buckets (excluding current incomplete bucket)
     const realtimeMap = new Map<string, number>();
 
-    // Helper to get current EST-aligned bucket start
+    // Helper to get current bucket start (rounded to 30 min)
     const getESTAlignedBucketStart = () => {
       const now = new Date();
-      const estFormatter = new Intl.DateTimeFormat('en-US', {
-        timeZone: 'America/New_York',
-        year: 'numeric', month: '2-digit', day: '2-digit',
-        hour: '2-digit', minute: '2-digit', second: '2-digit',
-        hour12: false
-      });
-      const parts = estFormatter.formatToParts(now);
-      const getPart = (type: string) => parts.find(p => p.type === type)?.value || '0';
-      const estYear = parseInt(getPart('year'));
-      const estMonth = parseInt(getPart('month')) - 1;
-      const estDay = parseInt(getPart('day'));
-      const estHour = parseInt(getPart('hour'));
-      const estMinute = parseInt(getPart('minute'));
-      const roundedMinute = Math.floor(estMinute / 30) * 30;
-      const estDateStr = `${estYear}-${String(estMonth + 1).padStart(2, '0')}-${String(estDay).padStart(2, '0')}T${String(estHour).padStart(2, '0')}:${String(roundedMinute).padStart(2, '0')}:00`;
-      const estDate = new Date(estDateStr);
-      const utcDate = new Date(now.toLocaleString('en-US', { timeZone: 'UTC' }));
-      const estDateForOffset = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' }));
-      const offsetMs = utcDate.getTime() - estDateForOffset.getTime();
-      return new Date(estDate.getTime() + offsetMs);
+      const thirtyMinMs = 30 * 60 * 1000;
+      const roundedMs = Math.floor(now.getTime() / thirtyMinMs) * thirtyMinMs;
+      return new Date(roundedMs);
     };
 
     const bucketStart = getESTAlignedBucketStart();
