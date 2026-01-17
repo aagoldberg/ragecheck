@@ -1716,6 +1716,76 @@ export async function getSubscriberStats(): Promise<SubscriberStats | null> {
   }
 }
 
+export interface ClearviewSubscriberStats {
+  total: number;
+  active: number;
+  today: number;
+  thisWeek: number;
+  thisMonth: number;
+  recentSubscribers: {
+    email: string;
+    subscribedAt: string;
+    country: string | null;
+  }[];
+  dailySignups: { date: string; count: number }[];
+}
+
+export async function getClearviewSubscriberStats(): Promise<ClearviewSubscriberStats | null> {
+  try {
+    await initDB();
+
+    // Total counts for clearview source
+    const [totals] = await getDb()`
+      SELECT
+        COUNT(*) as total,
+        COUNT(*) FILTER (WHERE unsubscribed_at IS NULL) as active,
+        COUNT(*) FILTER (WHERE subscribed_at > NOW() - INTERVAL '1 day' AND unsubscribed_at IS NULL) as today,
+        COUNT(*) FILTER (WHERE subscribed_at > NOW() - INTERVAL '7 days' AND unsubscribed_at IS NULL) as this_week,
+        COUNT(*) FILTER (WHERE subscribed_at > NOW() - INTERVAL '30 days' AND unsubscribed_at IS NULL) as this_month
+      FROM ragecheck_subscribers
+      WHERE source = 'clearview'
+    `;
+
+    // Recent clearview subscribers
+    const recentSubscribers = await getDb()`
+      SELECT email, subscribed_at, country
+      FROM ragecheck_subscribers
+      WHERE source = 'clearview' AND unsubscribed_at IS NULL
+      ORDER BY subscribed_at DESC
+      LIMIT 10
+    `;
+
+    // Daily signups (last 30 days) for clearview
+    const dailySignups = await getDb()`
+      SELECT DATE(subscribed_at) as date, COUNT(*) as count
+      FROM ragecheck_subscribers
+      WHERE source = 'clearview' AND subscribed_at > NOW() - INTERVAL '30 days'
+      GROUP BY DATE(subscribed_at)
+      ORDER BY date DESC
+    `;
+
+    return {
+      total: Number(totals.total) || 0,
+      active: Number(totals.active) || 0,
+      today: Number(totals.today) || 0,
+      thisWeek: Number(totals.this_week) || 0,
+      thisMonth: Number(totals.this_month) || 0,
+      recentSubscribers: recentSubscribers.map((r) => ({
+        email: r.email as string,
+        subscribedAt: r.subscribed_at as string,
+        country: r.country as string | null,
+      })),
+      dailySignups: dailySignups.map((r) => ({
+        date: r.date as string,
+        count: Number(r.count),
+      })),
+    };
+  } catch (error) {
+    console.error("Failed to get clearview subscriber stats:", error);
+    return null;
+  }
+}
+
 export interface VisitorLog {
   ipAddress?: string;
   userAgent?: string;

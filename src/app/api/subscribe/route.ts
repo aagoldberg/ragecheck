@@ -4,7 +4,7 @@ import { subscribeEmail } from "@/lib/db";
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { email } = body;
+    const { email, source } = body;
 
     if (!email || typeof email !== "string") {
       return NextResponse.json(
@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
       email,
       ipAddress: ipAddress || undefined,
       country: country || undefined,
-      source: "website",
+      source: source || "website",
     });
 
     if (!result.success) {

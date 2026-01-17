@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import * as tracking from "@/lib/tracking";
 
 // --- Types ---
 
@@ -629,6 +630,9 @@ export default function ClearviewPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [generatedAt, setGeneratedAt] = useState<string | null>(null);
+  const [email, setEmail] = useState("");
+  const [subscribeStatus, setSubscribeStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
+  const [subscribeMessage, setSubscribeMessage] = useState("");
 
   useEffect(() => {
     fetch("/api/clearview")
@@ -649,6 +653,35 @@ export default function ClearviewPage() {
         setLoading(false);
       });
   }, []);
+
+  const handleSubscribe = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email.trim()) return;
+
+    tracking.trackEmailSubscribe("clearview");
+    setSubscribeStatus("loading");
+    try {
+      const res = await fetch("/api/subscribe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim(), source: "clearview" }),
+      });
+      const data = await res.json();
+
+      if (data.success) {
+        tracking.trackEmailSubscribeSuccess("clearview");
+        setSubscribeStatus("success");
+        setSubscribeMessage(data.alreadySubscribed ? "You're already subscribed!" : "You're in! Watch for your first briefing.");
+        setEmail("");
+      } else {
+        setSubscribeStatus("error");
+        setSubscribeMessage(data.error || "Something went wrong");
+      }
+    } catch {
+      setSubscribeStatus("error");
+      setSubscribeMessage("Failed to subscribe. Please try again.");
+    }
+  };
 
   // Track page visit with UTM params
   useEffect(() => {
@@ -718,6 +751,56 @@ export default function ClearviewPage() {
                  Updated {new Date(generatedAt).toLocaleDateString()} at {new Date(generatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
               </div>
             )}
+
+            {/* Email Subscription */}
+            <div className="pt-8 max-w-md mx-auto">
+              {subscribeStatus === "success" ? (
+                <div className="flex items-center justify-center gap-2 px-4 py-3 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 rounded-xl border border-emerald-200 dark:border-emerald-800">
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
+                  <span className="text-sm font-medium">{subscribeMessage}</span>
+                </div>
+              ) : (
+                <form onSubmit={handleSubscribe} className="space-y-3">
+                  <p className="text-sm text-zinc-500 dark:text-zinc-400 text-center">
+                    Get the daily briefing delivered to your inbox
+                  </p>
+                  <div className="flex gap-2">
+                    <input
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="your@email.com"
+                      className="flex-1 px-4 py-3 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                      disabled={subscribeStatus === "loading"}
+                    />
+                    <button
+                      type="submit"
+                      disabled={subscribeStatus === "loading" || !email.trim()}
+                      className="px-5 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                    >
+                      {subscribeStatus === "loading" ? (
+                        <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                        </svg>
+                      ) : (
+                        <>
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                          </svg>
+                          Subscribe
+                        </>
+                      )}
+                    </button>
+                  </div>
+                  {subscribeStatus === "error" && (
+                    <p className="text-sm text-rose-600 dark:text-rose-400 text-center">{subscribeMessage}</p>
+                  )}
+                </form>
+              )}
+            </div>
         </div>
       </header>
 

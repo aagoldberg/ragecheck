@@ -58,7 +58,7 @@ function getLabel(score: number): "Low" | "Medium" | "High" {
 export async function POST(request: NextRequest): Promise<NextResponse<AnalyzeResponse>> {
   try {
     const body = await request.json();
-    const { url, image, sessionId } = body;
+    const { url, image, sessionId, language } = body;
 
     // Capture visitor info from headers
     const ipAddress = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
@@ -87,7 +87,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<AnalyzeRe
       }
 
       // Analyze with Vision API
-      const result = await analyzeImageWithVision(image);
+      const result = await analyzeImageWithVision(image, language);
 
       if (!result.success) {
         // Save failed image to blob storage for diagnosis
@@ -292,6 +292,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<AnalyzeRe
         ruleBasedScore: ruleAnalysis.score,
         signalBreakdown: ruleAnalysis.signalBreakdown,
         highlights: ruleAnalysis.highlights,
+        language,
       });
 
       if (llmResult) {

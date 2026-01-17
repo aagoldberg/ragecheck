@@ -44,6 +44,7 @@ interface AnalysisRequest {
   ruleBasedScore: number;
   signalBreakdown: SignalBreakdown;
   highlights: Highlight[];
+  language?: string; // Optional language for response (e.g., "Spanish", "French")
 }
 
 export async function enhanceWithLLM(
@@ -103,7 +104,9 @@ Respond with this exact JSON structure:
   "topic": "<politics|health|technology|business|entertainment|sports|science|crime|culture_wars|environment|education|other>",
   "contentType": "<news_article|opinion|social_post|blog|press_release|satire|academic|other>",
   "sourceType": "<mainstream_news|tabloid|partisan_outlet|independent_blog|social_media|wire_service|government|corporate|other>"
-}`;
+}${request.language ? `
+
+IMPORTANT: Write ALL text fields (reasons, contextNotes, sharingPatterns, techniqueExplanations, shareCardBullets) in ${request.language}. The JSON keys must remain in English, but all values should be in ${request.language}.` : ""}`;
 
   try {
     const response = await client.messages.create({
@@ -218,7 +221,8 @@ Respond with this exact JSON structure:
 }`;
 
 export async function analyzeImageWithVision(
-  imageBase64: string
+  imageBase64: string,
+  language?: string
 ): Promise<ImageAnalysisResult> {
   if (!client) {
     return { success: false, error: "LLM not available" };
@@ -270,7 +274,7 @@ export async function analyzeImageWithVision(
             },
             {
               type: "text",
-              text: "Analyze this social media screenshot for outrage bait patterns. " + IMAGE_ANALYSIS_PROMPT,
+              text: "Analyze this social media screenshot for outrage bait patterns. " + IMAGE_ANALYSIS_PROMPT + (language ? `\n\nIMPORTANT: Write ALL text fields (extractedText can stay as-is from the image, but reasons, sharingPatterns, techniqueExplanations, shareCardBullets) in ${language}. The JSON keys must remain in English, but all values should be in ${language}.` : ""),
             },
           ],
         },

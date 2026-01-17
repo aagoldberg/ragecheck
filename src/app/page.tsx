@@ -583,6 +583,7 @@ function HomeContent() {
   const [emailSubscribing, setEmailSubscribing] = useState(false);
   const [emailSubscribed, setEmailSubscribed] = useState(false);
   const [emailError, setEmailError] = useState<string | null>(null);
+  const [language, setLanguage] = useState<string>(""); // Empty string = English (default)
 
   // Track current sessionId and start time for abandonment detection
   const currentSessionIdRef = useRef<string | null>(null);
@@ -830,7 +831,7 @@ function HomeContent() {
       const response = await fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ image: imagePreview, sessionId }),
+        body: JSON.stringify({ image: imagePreview, sessionId, language: language || undefined }),
       });
 
       const data = await response.json();
@@ -871,7 +872,7 @@ function HomeContent() {
       const response = await fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: targetUrl.trim(), sessionId }),
+        body: JSON.stringify({ url: targetUrl.trim(), sessionId, language: language || undefined }),
       });
 
       const data = await response.json();
@@ -1298,6 +1299,35 @@ function HomeContent() {
             )}
 
           </form>
+
+          {/* Language selector */}
+          <div className="mt-4 flex items-center justify-center gap-2 text-sm">
+            <label htmlFor="language-select" className="text-zinc-500 dark:text-zinc-400">
+              Results in:
+            </label>
+            <select
+              id="language-select"
+              value={language}
+              onChange={(e) => setLanguage(e.target.value)}
+              className="bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-1.5 text-zinc-700 dark:text-zinc-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+            >
+              <option value="">English</option>
+              <option value="Spanish">Español</option>
+              <option value="French">Français</option>
+              <option value="German">Deutsch</option>
+              <option value="Portuguese">Português</option>
+              <option value="Italian">Italiano</option>
+              <option value="Dutch">Nederlands</option>
+              <option value="Polish">Polski</option>
+              <option value="Russian">Русский</option>
+              <option value="Japanese">日本語</option>
+              <option value="Korean">한국어</option>
+              <option value="Chinese">中文</option>
+              <option value="Arabic">العربية</option>
+              <option value="Hindi">हिन्दी</option>
+              <option value="Turkish">Türkçe</option>
+            </select>
+          </div>
         </div>
 
         {/* Live Headlines Section */}

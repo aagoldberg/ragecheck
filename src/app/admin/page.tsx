@@ -568,6 +568,7 @@ interface ApiResponse {
   abandonmentDiagnostics?: AbandonmentDiagnostics;
   subscriberStats?: SubscriberStats;
   interactionStats?: InteractionStats;
+  clearviewSubscriberStats?: ClearviewSubscriberStats;
   dbAvailable?: boolean;
 }
 
@@ -1565,6 +1566,20 @@ interface InteractionStats {
   dailyTrend: { date: string; count: number }[];
 }
 
+interface ClearviewSubscriberStats {
+  total: number;
+  active: number;
+  today: number;
+  thisWeek: number;
+  thisMonth: number;
+  recentSubscribers: {
+    email: string;
+    subscribedAt: string;
+    country: string | null;
+  }[];
+  dailySignups: { date: string; count: number }[];
+}
+
 export default function AdminDashboard() {
   const [key, setKey] = useState("");
   const [authenticated, setAuthenticated] = useState(false);
@@ -1591,6 +1606,7 @@ export default function AdminDashboard() {
   const [abandonmentDiagnostics, setAbandonmentDiagnostics] = useState<AbandonmentDiagnostics | null>(null);
   const [subscriberStats, setSubscriberStats] = useState<SubscriberStats | null>(null);
   const [interactionStats, setInteractionStats] = useState<InteractionStats | null>(null);
+  const [clearviewSubscriberStats, setClearviewSubscriberStats] = useState<ClearviewSubscriberStats | null>(null);
 
   const fetchStats = async (adminKey: string) => {
     setLoading(true);
@@ -1624,6 +1640,7 @@ export default function AdminDashboard() {
         setAbandonmentDiagnostics(data.abandonmentDiagnostics || null);
         setSubscriberStats(data.subscriberStats || null);
         setInteractionStats(data.interactionStats || null);
+        setClearviewSubscriberStats(data.clearviewSubscriberStats || null);
         setAuthenticated(true);
         // Save key to localStorage
         localStorage.setItem("ragecheck-admin-key", adminKey);
@@ -1835,6 +1852,82 @@ export default function AdminDashboard() {
                           />
                         )}
                       </>
+                    )}
+
+                    {/* Clearview Subscriber Stats */}
+                    {clearviewSubscriberStats && (
+                      <div className="mb-8">
+                        <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-4">
+                          Clearview Subscribers
+                        </h3>
+                        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+                          <StatCard title="Total Subscribers" value={clearviewSubscriberStats.total} />
+                          <StatCard title="Active" value={clearviewSubscriberStats.active} />
+                          <StatCard title="Today" value={clearviewSubscriberStats.today} />
+                          <StatCard title="This Week" value={clearviewSubscriberStats.thisWeek} />
+                          <StatCard title="This Month" value={clearviewSubscriberStats.thisMonth} />
+                        </div>
+
+                        {/* Daily Signups Chart */}
+                        {clearviewSubscriberStats.dailySignups.length > 0 && (
+                          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 mb-6">
+                            <h4 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-4">
+                              Daily Signups (Last 14 Days)
+                            </h4>
+                            <div className="h-48">
+                              <div className="flex items-end justify-between h-full gap-1">
+                                {clearviewSubscriberStats.dailySignups.map((day, i) => {
+                                  const maxCount = Math.max(...clearviewSubscriberStats.dailySignups.map(d => d.count), 1);
+                                  const height = (day.count / maxCount) * 100;
+                                  return (
+                                    <div key={i} className="flex-1 flex flex-col items-center justify-end h-full">
+                                      <div className="text-xs text-zinc-500 mb-1">{day.count}</div>
+                                      <div
+                                        className="w-full bg-indigo-500 rounded-t transition-all"
+                                        style={{ height: `${Math.max(height, 2)}%` }}
+                                      />
+                                      <div className="text-xs text-zinc-400 mt-2 transform -rotate-45 origin-top-left whitespace-nowrap">
+                                        {new Date(day.date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Recent Subscribers Table */}
+                        {clearviewSubscriberStats.recentSubscribers.length > 0 && (
+                          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6">
+                            <h4 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-4">
+                              Recent Subscribers
+                            </h4>
+                            <div className="overflow-x-auto border border-zinc-100 dark:border-zinc-800 rounded-lg">
+                              <table className="w-full text-sm">
+                                <thead className="bg-zinc-50 dark:bg-zinc-800">
+                                  <tr className="border-b border-zinc-200 dark:border-zinc-700">
+                                    <th className="text-left py-3 px-4 text-zinc-500 font-medium">Email</th>
+                                    <th className="text-left py-3 px-4 text-zinc-500 font-medium">Subscribed</th>
+                                    <th className="text-left py-3 px-4 text-zinc-500 font-medium">Country</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {clearviewSubscriberStats.recentSubscribers.map((sub, i) => (
+                                    <tr key={i} className="border-b border-zinc-100 dark:border-zinc-800 last:border-0">
+                                      <td className="py-3 px-4 text-zinc-900 dark:text-zinc-100">{sub.email}</td>
+                                      <td className="py-3 px-4 text-zinc-500">
+                                        {new Date(sub.subscribedAt).toLocaleString()}
+                                      </td>
+                                      <td className="py-3 px-4 text-zinc-500">{sub.country || "-"}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     )}
 
                     {/* Clearview Content Stats */}
