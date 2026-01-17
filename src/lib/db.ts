@@ -253,6 +253,8 @@ export async function initDB() {
     await getDb()`ALTER TABLE ragecheck_analysis_starts ADD COLUMN IF NOT EXISTS time_to_abandon_ms INTEGER`;
     await getDb()`ALTER TABLE ragecheck_analysis_starts ADD COLUMN IF NOT EXISTS connection_type TEXT`; // wifi, cellular, ethernet, none, unknown
     await getDb()`ALTER TABLE ragecheck_analysis_starts ADD COLUMN IF NOT EXISTS effective_connection_type TEXT`; // slow-2g, 2g, 3g, 4g
+    // Language selection tracking
+    await getDb()`ALTER TABLE ragecheck_analyses ADD COLUMN IF NOT EXISTS language TEXT`;
   } catch {
     // Columns may already exist
   }
@@ -294,6 +296,8 @@ export interface AnalysisLog {
   sourceType?: string;
   // Session correlation for funnel tracking
   sessionId?: string;
+  // Language selection
+  language?: string;
 }
 
 function detectPlatform(domain: string): string {
@@ -347,7 +351,7 @@ export async function logAnalysis(data: AnalysisLog) {
           ip_address, user_agent, country, is_bot,
           title, reasons, highlights, context_notes, text_preview,
           sharing_patterns, technique_explanations, share_card_summary, failed_image_url,
-          topic, content_type, source_type, session_id
+          topic, content_type, source_type, session_id, language
         ) VALUES (
           ${data.url},
           ${data.sourceDomain || null},
@@ -378,7 +382,8 @@ export async function logAnalysis(data: AnalysisLog) {
           ${data.topic || null},
           ${data.contentType || null},
           ${data.sourceType || null},
-          ${data.sessionId || null}
+          ${data.sessionId || null},
+          ${data.language || null}
         )
       `;
     });
@@ -4801,6 +4806,108 @@ export async function getInteractionStats(): Promise<InteractionStats | null> {
     };
   } catch (error) {
     console.error("Failed to get interaction stats:", error);
+    return null;
+  }
+}
+
+// ============================================
+// LANGUAGE STATS
+// ============================================
+
+export interface LanguageStats {
+  totalWithLanguage: number;
+  byLanguage: { language: string; count: number; percentage: number }[];
+  dailyTrend: { date: string; language: string; count: number }[];
+  topLanguagesToday: { language: string; count: number }[];
+}
+
+export async function getLanguageStats(): Promise<LanguageStats | null> {
+  try {
+    await initDB();
+
+    // Total analyses with language set (non-English)
+    const [totalResult] = await getDb()`
+      SELECT COUNT(*) as count
+      FROM ragecheck_analyses
+      WHERE language IS NOT NULL
+        AND is_bot = false
+        AND created_at > NOW() - INTERVAL '30 days'
+    `;
+
+    // Breakdown by language (last 30 days)
+    const byLanguage = await getDb()`
+      SELECT
+        COALESCE(language, 'English') as language,
+        COUNT(*) as count
+      FROM ragecheck_analyses
+      WHERE is_bot = false
+        AND success = true
+        AND created_at > NOW() - INTERVAL '30 days'
+      GROUP BY COALESCE(language, 'English')
+      ORDER BY count DESC
+    `;
+
+    // Daily trend by language (last 14 days, top 5 languages)
+    const dailyTrend = await getDb()`
+      WITH top_languages AS (
+        SELECT COALESCE(language, 'English') as language
+        FROM ragecheck_analyses
+        WHERE is_bot = false
+          AND success = true
+          AND created_at > NOW() - INTERVAL '14 days'
+        GROUP BY COALESCE(language, 'English')
+        ORDER BY COUNT(*) DESC
+        LIMIT 5
+      )
+      SELECT
+        DATE(created_at) as date,
+        COALESCE(language, 'English') as language,
+        COUNT(*) as count
+      FROM ragecheck_analyses
+      WHERE is_bot = false
+        AND success = true
+        AND created_at > NOW() - INTERVAL '14 days'
+        AND COALESCE(language, 'English') IN (SELECT language FROM top_languages)
+      GROUP BY DATE(created_at), COALESCE(language, 'English')
+      ORDER BY date DESC, count DESC
+    `;
+
+    // Top languages today
+    const topToday = await getDb()`
+      SELECT
+        COALESCE(language, 'English') as language,
+        COUNT(*) as count
+      FROM ragecheck_analyses
+      WHERE is_bot = false
+        AND success = true
+        AND DATE(created_at) = CURRENT_DATE
+      GROUP BY COALESCE(language, 'English')
+      ORDER BY count DESC
+      LIMIT 10
+    `;
+
+    const total = Number(totalResult?.count || 0);
+    const totalAll = byLanguage.reduce((sum, r) => sum + Number(r.count), 0);
+
+    return {
+      totalWithLanguage: total,
+      byLanguage: byLanguage.map((r) => ({
+        language: r.language as string,
+        count: Number(r.count),
+        percentage: totalAll > 0 ? Math.round((Number(r.count) / totalAll) * 100) : 0,
+      })),
+      dailyTrend: dailyTrend.map((r) => ({
+        date: r.date as string,
+        language: r.language as string,
+        count: Number(r.count),
+      })),
+      topLanguagesToday: topToday.map((r) => ({
+        language: r.language as string,
+        count: Number(r.count),
+      })),
+    };
+  } catch (error) {
+    console.error("Failed to get language stats:", error);
     return null;
   }
 }

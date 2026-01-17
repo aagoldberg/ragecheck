@@ -943,11 +943,15 @@ function HomeContent() {
       .slice(0, 3)
       .map(([key]) => key);
 
+    // Use the actual URL that was analyzed - for image uploads this is "image-upload"
+    // For URL analyses, use the input URL or fall back to the source domain
+    const shareUrl = url.trim() || (imagePreview ? "image-upload" : result.sourceDomain || "unknown");
+
     fetch("/api/share", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        url,
+        url: shareUrl,
         shareType: eventType,
         baitScoreBucket: getScoreBucket(result.score),
         topBars,
@@ -1308,7 +1312,7 @@ function HomeContent() {
             <select
               id="language-select"
               value={language}
-              onChange={(e) => setLanguage(e.target.value)}
+              onChange={(e) => { setLanguage(e.target.value); tracking.trackLanguageSelected(e.target.value); }}
               className="bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-1.5 text-zinc-700 dark:text-zinc-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
             >
               <option value="">English</option>

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { initDB, getDashboardStats, getVisitorStats, getPageVisitorStats, getViralMetrics, isDBAvailable, invalidateIncompleteCache, recomputeBotFlags, getFeedbackStats, initFeedbackTable, getTimeToAnalysisMetrics, getConversionMetrics, getConversionInsights, getFunnelMetrics, getRetentionMetrics, getShareMetrics, getContentInsights, getAcquisitionMetrics, getAnalysisCompletionMetrics, getAbandonmentDiagnostics, getSubscriberStats, getInteractionStats, getClearviewSubscriberStats } from "@/lib/db";
+import { initDB, getDashboardStats, getVisitorStats, getPageVisitorStats, getViralMetrics, isDBAvailable, invalidateIncompleteCache, recomputeBotFlags, getFeedbackStats, initFeedbackTable, getTimeToAnalysisMetrics, getConversionMetrics, getConversionInsights, getFunnelMetrics, getRetentionMetrics, getShareMetrics, getContentInsights, getAcquisitionMetrics, getAnalysisCompletionMetrics, getAbandonmentDiagnostics, getSubscriberStats, getInteractionStats, getClearviewSubscriberStats, getLanguageStats } from "@/lib/db";
 
 export async function GET(request: NextRequest) {
   // Simple password protection via query param
@@ -46,6 +46,7 @@ export async function GET(request: NextRequest) {
     const subscriberStats = await getSubscriberStats();
     const interactionStats = await getInteractionStats();
     const clearviewSubscriberStats = await getClearviewSubscriberStats();
+    const languageStats = await getLanguageStats();
 
     return NextResponse.json({
       success: true,
@@ -68,6 +69,7 @@ export async function GET(request: NextRequest) {
       subscriberStats,
       interactionStats,
       clearviewSubscriberStats,
+      languageStats,
     });
   } catch (error) {
     console.error("Admin API error:", error);

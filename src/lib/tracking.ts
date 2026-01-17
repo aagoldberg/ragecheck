@@ -266,3 +266,8 @@ export const trackEmailSubscribe = (location: string) => {
 export const trackEmailSubscribeSuccess = (location: string) => {
   trackInteraction("email", "subscribe_success", location);
 };
+
+// Language selection tracking
+export const trackLanguageSelected = (language: string) => {
+  trackInteraction("language", "selected", language || "English");
+};

@@ -569,6 +569,7 @@ interface ApiResponse {
   subscriberStats?: SubscriberStats;
   interactionStats?: InteractionStats;
   clearviewSubscriberStats?: ClearviewSubscriberStats;
+  languageStats?: LanguageStats;
   dbAvailable?: boolean;
 }
 
@@ -1516,7 +1517,7 @@ function PageDailyChart({ data, title }: { data: { date: string; visitors: numbe
   );
 }
 
-type TabType = "overview" | "users" | "conversions" | "funnel" | "retention" | "shares" | "feedback" | "content" | "clearview" | "subscribers" | "interactions";
+type TabType = "overview" | "users" | "conversions" | "funnel" | "retention" | "shares" | "feedback" | "content" | "clearview" | "subscribers" | "interactions" | "languages";
 
 interface ClearviewStats {
   lastGenerated: string | null;
@@ -1580,6 +1581,13 @@ interface ClearviewSubscriberStats {
   dailySignups: { date: string; count: number }[];
 }
 
+interface LanguageStats {
+  totalWithLanguage: number;
+  byLanguage: { language: string; count: number; percentage: number }[];
+  dailyTrend: { date: string; language: string; count: number }[];
+  topLanguagesToday: { language: string; count: number }[];
+}
+
 export default function AdminDashboard() {
   const [key, setKey] = useState("");
   const [authenticated, setAuthenticated] = useState(false);
@@ -1607,6 +1615,7 @@ export default function AdminDashboard() {
   const [subscriberStats, setSubscriberStats] = useState<SubscriberStats | null>(null);
   const [interactionStats, setInteractionStats] = useState<InteractionStats | null>(null);
   const [clearviewSubscriberStats, setClearviewSubscriberStats] = useState<ClearviewSubscriberStats | null>(null);
+  const [languageStats, setLanguageStats] = useState<LanguageStats | null>(null);
 
   const fetchStats = async (adminKey: string) => {
     setLoading(true);
@@ -1641,6 +1650,7 @@ export default function AdminDashboard() {
         setSubscriberStats(data.subscriberStats || null);
         setInteractionStats(data.interactionStats || null);
         setClearviewSubscriberStats(data.clearviewSubscriberStats || null);
+        setLanguageStats(data.languageStats || null);
         setAuthenticated(true);
         // Save key to localStorage
         localStorage.setItem("ragecheck-admin-key", adminKey);
@@ -1802,7 +1812,7 @@ export default function AdminDashboard() {
         {/* Tabs */}
         <div className="max-w-7xl mx-auto px-4">
           <div className="flex gap-6 -mb-px">
-            {(["overview", "users", "conversions", "funnel", "retention", "shares", "feedback", "content", "clearview", "subscribers", "interactions"] as const).map((tab) => (
+            {(["overview", "users", "conversions", "funnel", "retention", "shares", "feedback", "content", "clearview", "subscribers", "interactions", "languages"] as const).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
@@ -4873,6 +4883,91 @@ export default function AdminDashboard() {
         {activeTab === "interactions" && !interactionStats && (
           <p className="text-sm text-zinc-500 text-center py-8">
             Loading interaction data...
+          </p>
+        )}
+
+        {/* Languages Tab */}
+        {activeTab === "languages" && languageStats && (
+          <div>
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-4">
+              Language Selection (Last 30 Days)
+            </h3>
+
+            {/* Summary Stats */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+              <StatCard
+                title="Non-English Analyses"
+                value={languageStats.totalWithLanguage}
+              />
+              <StatCard
+                title="Languages Used"
+                value={languageStats.byLanguage.filter(l => l.language !== "English").length}
+              />
+              <StatCard
+                title="Top Language Today"
+                value={languageStats.topLanguagesToday[0]?.language || "English"}
+                subtitle={languageStats.topLanguagesToday[0] ? `${languageStats.topLanguagesToday[0].count} analyses` : undefined}
+              />
+              <StatCard
+                title="English Usage"
+                value={`${languageStats.byLanguage.find(l => l.language === "English")?.percentage || 0}%`}
+              />
+            </div>
+
+            {/* Language Breakdown */}
+            <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 mb-8">
+              <h4 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-4">
+                Usage by Language
+              </h4>
+              <div className="space-y-3">
+                {languageStats.byLanguage.map((lang, i) => (
+                  <div key={i} className="flex items-center gap-4">
+                    <div className="w-24 text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                      {lang.language}
+                    </div>
+                    <div className="flex-1 h-6 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full rounded-full ${lang.language === "English" ? "bg-indigo-500" : "bg-emerald-500"}`}
+                        style={{ width: `${lang.percentage}%` }}
+                      />
+                    </div>
+                    <div className="w-20 text-right text-sm text-zinc-500">
+                      {lang.count} ({lang.percentage}%)
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Today's Usage */}
+            {languageStats.topLanguagesToday.length > 0 && (
+              <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6">
+                <h4 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-4">
+                  Today&apos;s Language Usage
+                </h4>
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                  {languageStats.topLanguagesToday.map((lang, i) => (
+                    <div
+                      key={i}
+                      className="p-4 rounded-xl bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-100 dark:border-zinc-800 text-center"
+                    >
+                      <div className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">
+                        {lang.count}
+                      </div>
+                      <div className="text-xs text-zinc-500 mt-1">
+                        {lang.language}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === "languages" && !languageStats && (
+          <p className="text-sm text-zinc-500 text-center py-8">
+            Loading language data...
           </p>
         )}
       </div>

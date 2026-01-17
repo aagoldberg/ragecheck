@@ -103,6 +103,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<AnalyzeRe
           country: country || undefined,
           failedImageUrl: failedImageUrl || undefined,
           sessionId: sessionId || undefined,
+          language: language || undefined,
         });
 
         return jsonResponse(
@@ -122,6 +123,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<AnalyzeRe
           userAgent: userAgent || undefined,
           country: country || undefined,
           sessionId: sessionId || undefined,
+          language: language || undefined,
         });
 
         return jsonResponse(
@@ -150,6 +152,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<AnalyzeRe
         country: country || undefined,
         failedImageUrl: imageUrl || undefined, // Reusing this field for all uploaded images
         sessionId: sessionId || undefined,
+        language: language || undefined,
       });
 
       return jsonResponse({
@@ -217,6 +220,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<AnalyzeRe
         sharingPatterns: cached.sharingPatterns || undefined,
         techniqueExplanations: cached.techniqueExplanations || undefined,
         shareCardSummary: cached.shareCardSummary || undefined,
+        language: language || undefined,
       });
 
       return jsonResponse({
@@ -252,6 +256,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<AnalyzeRe
         userAgent: userAgent || undefined,
         country: country || undefined,
         sessionId: sessionId || undefined,
+        language: language || undefined,
       });
 
       return jsonResponse(
@@ -336,6 +341,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<AnalyzeRe
       contentType,
       sourceType,
       sessionId: sessionId || undefined,
+      language: language || undefined,
     });
 
     return jsonResponse({
