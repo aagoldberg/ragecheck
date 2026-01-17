@@ -1018,7 +1018,8 @@ function HomeContent() {
         techniqueExplanations: result.techniqueExplanations,
         sharingPatterns: result.sharingPatterns,
         shareCardSummary: result.shareCardSummary,
-        uploadedImageUrl: result.uploadedImageUrl,
+        // Use local base64 image (more reliable) or fall back to blob URL
+        uploadedImageUrl: imagePreview || result.uploadedImageUrl,
       });
 
       if (success && !silent) {

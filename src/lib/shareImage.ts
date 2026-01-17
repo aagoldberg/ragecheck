@@ -99,10 +99,14 @@ export async function generateShareImage(
   let uploadedImg: HTMLImageElement | null = null;
   if (data.uploadedImageUrl) {
     try {
+      console.log("Loading uploaded image for share card:", data.uploadedImageUrl.substring(0, 100));
       uploadedImg = await loadImage(data.uploadedImageUrl);
+      console.log("Successfully loaded image:", uploadedImg.width, "x", uploadedImg.height);
     } catch (e) {
       console.warn("Failed to load uploaded image for share card:", e);
     }
+  } else {
+    console.log("No uploadedImageUrl provided for share card");
   }
 
   return new Promise((resolve, reject) => {
