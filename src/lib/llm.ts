@@ -86,12 +86,15 @@ Consider:
 2. Are there manipulation tactics the rules missed?
 3. What's the overall intent - to inform or to provoke?
 
-CRITICAL - shareCardBullets format rules:
-- MUST be 3-7 words each
-- MUST be NOUN PHRASES (no verbs at start)
-- GOOD: "In-group status signaling", "Crisis compression", "Expertise authority appeal"
-- BAD: "Uses emotional language", "Creates fear", "Makes reader feel"
-- If score ≤33 (low), describe journalistic quality: "Wire-service style", "Multi-source attribution"
+CRITICAL - shareCardBullets must be NOUN PHRASES only:
+- 3-7 words, NO VERBS
+- Transform verbs to nouns:
+  "Uses scary numbers" → "Scary number framing"
+  "Creates urgency" → "Artificial urgency"
+  "Quotes experts" → "Expert authority appeal"
+  "Makes readers fear" → "Fear activation"
+  "Plays on emotions" → "Emotional manipulation"
+- For LOW scores: "Wire-service style", "Multi-source attribution", "Neutral framing"
 
 Respond with this exact JSON structure:
 {
@@ -193,12 +196,14 @@ Key patterns to detect:
 
 IMPORTANT: You are detecting MANIPULATION TACTICS, not political bias. Score the manipulation level regardless of the political viewpoint.
 
-CRITICAL - shareCardBullets format rules:
-- MUST be 3-7 words each
-- MUST be NOUN PHRASES (no verbs at start)
-- GOOD: "In-group status signaling", "Crisis compression", "Expertise authority appeal"
-- BAD: "Uses emotional language", "Creates fear", "Makes reader feel"
-- If score ≤33 (low), describe quality: "Wire-service style", "Multi-source attribution"
+CRITICAL - shareCardBullets must be NOUN PHRASES only:
+- 3-7 words, NO VERBS
+- Transform verbs to nouns:
+  "Uses scary numbers" → "Scary number framing"
+  "Creates urgency" → "Artificial urgency"
+  "Quotes experts" → "Expert authority appeal"
+  "Makes readers fear" → "Fear activation"
+- For LOW scores: "Wire-service style", "Multi-source attribution"
 
 Respond with this exact JSON structure:
 {
