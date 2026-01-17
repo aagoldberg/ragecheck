@@ -16,10 +16,12 @@ interface FeedSource {
   lean: "Far Right" | "Right" | "Center" | "Left" | "Far Left";
   color: string;
   feedUrl: string;
+  fallbackUrls?: string[]; // Alternative feeds if primary fails
 }
 
 // One source per political lean for the spectrum display
-// Using feeds verified to return 200 status codes
+// Using feeds verified to extract well with Readability
+// Each source has fallback feeds in case primary fails
 const FEED_SOURCES: FeedSource[] = [
   {
     name: "Jacobin",
@@ -28,22 +30,25 @@ const FEED_SOURCES: FeedSource[] = [
     feedUrl: "https://jacobin.com/feed",
   },
   {
-    name: "NPR",
+    name: "The Guardian",
     lean: "Left",
-    color: "#5a8dc5",
-    feedUrl: "https://feeds.npr.org/1014/rss.xml", // NPR Politics
+    color: "#005689",
+    feedUrl: "https://www.theguardian.com/us-news/rss",
+    fallbackUrls: ["https://www.theguardian.com/us/rss"],
   },
   {
     name: "PBS",
     lean: "Center",
     color: "#1d4a8c",
-    feedUrl: "https://www.pbs.org/newshour/feeds/rss/headlines",
+    feedUrl: "https://www.pbs.org/newshour/feeds/rss/politics",
+    fallbackUrls: ["https://www.pbs.org/newshour/feeds/rss/headlines"],
   },
   {
     name: "Fox News",
     lean: "Right",
     color: "#003366",
     feedUrl: "https://moxie.foxnews.com/google-publisher/politics.xml",
+    fallbackUrls: ["https://moxie.foxnews.com/google-publisher/latest.xml"],
   },
   {
     name: "Breitbart",
@@ -71,22 +76,32 @@ let cacheTimestamp = 0;
 const CACHE_DURATION = 2 * 60 * 60 * 1000; // 2 hours
 
 async function fetchFeed(source: FeedSource): Promise<HeadlineItem[]> {
-  try {
-    const feed = await parser.parseURL(source.feedUrl);
+  const urlsToTry = [source.feedUrl, ...(source.fallbackUrls || [])];
 
-    // Get top 3 items from each feed
-    return feed.items.slice(0, 3).map((item) => ({
-      source: source.name,
-      lean: source.lean,
-      color: source.color,
-      title: item.title || "Untitled",
-      url: item.link || "",
-      publishedAt: item.pubDate || new Date().toISOString(),
-    }));
-  } catch (error) {
-    console.error(`Failed to fetch ${source.name} feed:`, error);
-    return [];
+  for (const feedUrl of urlsToTry) {
+    try {
+      const feed = await parser.parseURL(feedUrl);
+
+      // Get top 3 items from each feed
+      const items = feed.items.slice(0, 3).map((item) => ({
+        source: source.name,
+        lean: source.lean,
+        color: source.color,
+        title: item.title || "Untitled",
+        url: item.link || "",
+        publishedAt: item.pubDate || new Date().toISOString(),
+      }));
+
+      if (items.length > 0) {
+        return items;
+      }
+    } catch (error) {
+      console.error(`Failed to fetch ${source.name} from ${feedUrl}:`, error);
+      // Try next URL
+    }
   }
+
+  return [];
 }
 
 async function fetchAllHeadlines(): Promise<HeadlineItem[]> {
