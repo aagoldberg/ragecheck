@@ -1,7 +1,7 @@
 // Canvas-based share image generator matching the "Bait vs Check" Split Design
 // Left: The Content (Mock Post) | Right: The Analysis (Dark Mode)
 
-import QRCode from "qrcode";
+import QRCode from "qrcode/lib/browser";
 import { SIGNAL_LABELS } from "@/lib/shareCard";
 import type { SignalBreakdown } from "@/lib/score";
 
