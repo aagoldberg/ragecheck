@@ -1167,11 +1167,11 @@ function RealtimeChart({ data }: { data: { time: string; visitors: number; analy
   const visitorsPoints = data.map((d, i) => ({ x: getX(i), y: getY(d.visitors) }));
   const analysesPoints = data.map((d, i) => ({ x: getX(i), y: getY(d.analyses) }));
 
-  // Format time labels in EST
+  // Format time labels in EST (including minutes for 30-min bucket accuracy)
   const formatTimeEST = (isoString: string) => {
     const d = new Date(isoString);
     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'America/New_York' }) + ' ' +
-           d.toLocaleTimeString('en-US', { hour: 'numeric', hour12: true, timeZone: 'America/New_York' });
+           d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'America/New_York' });
   };
 
   // Generate label positions every 6 hours (12 buckets per 6 hours at 30-min intervals)
@@ -1300,7 +1300,7 @@ function UniqueSessionsChart({ data }: { data: { time: string; uniqueVisitors: n
   const formatTimeEST = (isoString: string) => {
     const d = new Date(isoString);
     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'America/New_York' }) + ' ' +
-           d.toLocaleTimeString('en-US', { hour: 'numeric', hour12: true, timeZone: 'America/New_York' });
+           d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'America/New_York' });
   };
 
   const labelIndices: number[] = [];
