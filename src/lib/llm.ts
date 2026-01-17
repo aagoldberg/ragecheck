@@ -93,7 +93,7 @@ Respond with this exact JSON structure:
   "contextNotes": "<optional: note if rule-based score was misleading due to context>",
   "sharingPatterns": [<2-3 reasons why people share this. Use plain everyday language a teenager would understand. NO jargon. e.g. "Confirms what many already suspect about X", "Makes readers feel part of a group who 'gets it'", "The outrage feels satisfying to pass along">],
   "techniqueExplanations": [<2-3 things to notice about how it's written. Use plain everyday words - NO academic labels like "Framing" or "Rhetoric". Just describe what's happening. e.g. "Plays on fear: Makes the threat feel urgent so you react before thinking", "Loaded words: Uses emotional language to make ordinary things seem worse", "Quotes without context: Cherry-picks what someone said to change the meaning">],
-  "shareCardBullets": [<3 ultra-short punchy phrases for social sharing, MAX 8 words each. If score is LOW (≤33), describe what makes the content GOOD journalism: e.g. "Wire-style factual reporting", "Multiple perspectives quoted", "No identity framing". If score is MEDIUM/HIGH, describe the manipulation: e.g. "Insider language creates in-group status", "Urgency framing bypasses critical thinking">],
+  "shareCardBullets": [<2-3 bullets for social share card. HARD CONSTRAINTS: 3-7 words each, NOUN PHRASES ONLY (no leading verbs), describe the psychological tactic or reader effect. If score LOW (≤33): describe journalistic quality (e.g. "Wire-service reporting style", "Multi-source attribution", "Neutral event framing"). If score MEDIUM/HIGH: describe manipulation (e.g. "In-group status signaling", "Crisis compression", "Historical trauma activation"). BAD examples to avoid: "Uses emotionally charged language", "Plays on fears", "Creates urgency". If a bullet starts with a verb, rewrite as noun phrase.>],
   "topic": "<primary topic: politics, health, technology, business, entertainment, sports, science, crime, culture_wars, environment, education, other>",
   "contentType": "<content format: news_article, opinion, social_post, blog, press_release, satire, academic, other>",
   "sourceType": "<source category: mainstream_news, tabloid, partisan_outlet, independent_blog, social_media, wire_service, government, corporate, other>"
@@ -202,7 +202,7 @@ Respond with this exact JSON structure:
   "highlights": [{"text": "<problematic phrase>", "category": "<signal category>"}],
   "sharingPatterns": [<2-3 reasons why people share this. Plain everyday language, NO jargon>],
   "techniqueExplanations": [<2-3 things to notice about how it's written. Plain words, NO academic labels>],
-  "shareCardBullets": [<3 ultra-short punchy phrases for social sharing, MAX 8 words each. If score is LOW (≤33), describe what makes it GOOD: e.g. "Wire-style factual reporting", "Multiple perspectives shown", "No identity framing". If MEDIUM/HIGH, describe the manipulation: e.g. "Insider language creates in-group status", "Urgency framing bypasses critical thinking">]
+  "shareCardBullets": [<2-3 bullets for share card. HARD CONSTRAINTS: 3-7 words each, NOUN PHRASES ONLY (no leading verbs), describe psychological tactic or reader effect. If LOW (≤33): journalistic quality (e.g. "Wire-service style", "Multi-source attribution"). If MEDIUM/HIGH: manipulation (e.g. "In-group status signaling", "Crisis compression", "Historical trauma activation"). AVOID: "Uses charged language", "Plays on fears". Rewrite any verb-led bullet as noun phrase.>]
 }`;
 
 export async function analyzeImageWithVision(
