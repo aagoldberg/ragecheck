@@ -86,15 +86,11 @@ Consider:
 2. Are there manipulation tactics the rules missed?
 3. What's the overall intent - to inform or to provoke?
 
-CRITICAL - shareCardBullets must be NOUN PHRASES only:
-- 3-7 words, NO VERBS
-- Transform verbs to nouns:
-  "Uses scary numbers" → "Scary number framing"
-  "Creates urgency" → "Artificial urgency"
-  "Quotes experts" → "Expert authority appeal"
-  "Makes readers fear" → "Fear activation"
-  "Plays on emotions" → "Emotional manipulation"
-- For LOW scores: "Wire-service style", "Multi-source attribution", "Neutral framing"
+shareCardBullets format:
+- 5-10 words each, concise but descriptive
+- Describe the tactic or what makes the content good/bad
+- For LOW scores (≤33): describe journalistic quality, e.g. "Quotes multiple sources directly", "Presents conflicting views neutrally"
+- For MEDIUM/HIGH: describe the manipulation, e.g. "Uses scary numbers to amplify threat", "Appeals to insider expertise"
 
 Respond with this exact JSON structure:
 {
@@ -196,14 +192,11 @@ Key patterns to detect:
 
 IMPORTANT: You are detecting MANIPULATION TACTICS, not political bias. Score the manipulation level regardless of the political viewpoint.
 
-CRITICAL - shareCardBullets must be NOUN PHRASES only:
-- 3-7 words, NO VERBS
-- Transform verbs to nouns:
-  "Uses scary numbers" → "Scary number framing"
-  "Creates urgency" → "Artificial urgency"
-  "Quotes experts" → "Expert authority appeal"
-  "Makes readers fear" → "Fear activation"
-- For LOW scores: "Wire-service style", "Multi-source attribution"
+shareCardBullets format:
+- 5-10 words each, concise but descriptive
+- Describe the tactic or what makes the content good/bad
+- For LOW scores (≤33): describe quality, e.g. "Quotes multiple sources directly"
+- For MEDIUM/HIGH: describe manipulation, e.g. "Uses scary numbers to amplify threat"
 
 Respond with this exact JSON structure:
 {
