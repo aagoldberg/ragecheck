@@ -181,15 +181,11 @@ export async function generateShareImage(
     ctx.fill();
     ctx.stroke();
 
-    // Dot
-    ctx.fillStyle = colors.main;
-    ctx.beginPath();
-    ctx.arc(rightX + padding + 24, badgeY + (badgeHeight/2), 6, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Badge Text
+    // Badge Text (Centered)
     ctx.fillStyle = colors.text;
-    ctx.fillText(badgeText, rightX + padding + 44, badgeY + (badgeHeight/2));
+    ctx.textAlign = "center";
+    ctx.fillText(badgeText, rightX + padding + (badgeWidth / 2), badgeY + (badgeHeight / 2));
+    ctx.textAlign = "left"; // Reset to left for subsequent elements
 
     // 3. Main Statement
     const statementY = badgeY + badgeHeight + 40;
@@ -228,28 +224,24 @@ export async function generateShareImage(
     const bulletsY = statementY + (statementLines.length * 56) + 40;
     
     if (allInsights.length > 0) {
+        let currentBulletY = bulletsY;
         allInsights.forEach((point, i) => {
-            const pointY = bulletsY + (i * 40);
-            
             // Dot
             ctx.fillStyle = colors.main;
             ctx.beginPath();
-            ctx.arc(rightX + padding + 5, pointY + 5, 4, 0, Math.PI * 2);
+            ctx.arc(rightX + padding + 5, currentBulletY + 14, 4, 0, Math.PI * 2);
             ctx.fill();
             
-            // Text
+            // Text (Wrapping instead of truncating)
             ctx.font = "500 24px system-ui, -apple-system, sans-serif";
             ctx.fillStyle = "#e4e4e7"; // zinc-200
             
-            // Truncate
-            let text = point;
-            if (ctx.measureText(text).width > contentWidth - 30) {
-                 while (ctx.measureText(text + "...").width > contentWidth - 30 && text.length > 0) {
-                    text = text.slice(0, -1);
-                 }
-                 text += "...";
-            }
-            ctx.fillText(text, rightX + padding + 24, pointY + 12); // baseline adjustment
+            const pointLines = wrapText(ctx, point, contentWidth - 30, 2);
+            pointLines.forEach((line, j) => {
+                ctx.fillText(line, rightX + padding + 24, currentBulletY + (j * 32) + 14);
+            });
+            
+            currentBulletY += (pointLines.length * 32) + 12;
         });
     }
 
@@ -326,21 +318,21 @@ export async function generateShareImage(
       ctx.fillText(domainText, contentPadding + 16, pillY + pillHeight / 2);
 
       // Title/headline - centered vertically in remaining space
-      ctx.font = "700 48px system-ui, -apple-system, sans-serif";
-      const titleText = data.title.length > 120 ? data.title.substring(0, 117) + "..." : data.title;
-      const titleLines = wrapText(ctx, titleText, contentWidth, 5);
-      const lineHeight = 58;
-      const titleBlockHeight = titleLines.length * lineHeight;
+      ctx.font = "500 42px system-ui, -apple-system, sans-serif";
+      const bodyText = data.title;
+      const bodyLines = wrapText(ctx, bodyText, contentWidth, 10);
+      const lineHeight = 50;
+      const bodyHeight = bodyLines.length * lineHeight;
 
       // Center the title block vertically (below the pill)
       const availableHeight = height - pillY - pillHeight - contentPadding - 40;
-      const titleStartY = pillY + pillHeight + 40 + (availableHeight - titleBlockHeight) / 2;
+      const titleStartY = pillY + pillHeight + 40 + (availableHeight - bodyHeight) / 2;
 
       ctx.fillStyle = "#18181b";
       ctx.textAlign = "left";
       ctx.textBaseline = "top";
 
-      titleLines.forEach((line, i) => {
+      bodyLines.forEach((line, i) => {
         ctx.fillText(line, contentPadding, titleStartY + (i * lineHeight));
       });
     }
