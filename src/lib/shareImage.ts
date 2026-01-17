@@ -433,19 +433,70 @@ export async function downloadShareImage(
   URL.revokeObjectURL(url);
 }
 
+// Check if we're on a mobile device
+function isMobile(): boolean {
+  if (typeof window === "undefined") return false;
+  return /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+}
+
+// Check if Web Share API supports files
+function canShareFiles(): boolean {
+  if (typeof navigator === "undefined" || !navigator.share || !navigator.canShare) return false;
+  // Check if sharing files is supported
+  return navigator.canShare({
+    files: [new File(["test"], "test.png", { type: "image/png" })],
+  });
+}
+
+// Check if clipboard write with images is supported
+async function canWriteImageToClipboard(): Promise<boolean> {
+  if (typeof navigator === "undefined" || !navigator.clipboard || !navigator.clipboard.write) return false;
+  // ClipboardItem is not available on all browsers
+  if (typeof ClipboardItem === "undefined") return false;
+  return true;
+}
+
 export async function copyShareImageToClipboard(
   data: ShareImageData,
   size: ImageSize = "x"
 ): Promise<boolean> {
   try {
     const blob = await generateShareImage(data, "png", size);
-    await navigator.clipboard.write([
-      new ClipboardItem({
-        "image/png": blob,
-      }),
-    ]);
+
+    // On mobile, prefer Web Share API which works better
+    if (isMobile() && canShareFiles()) {
+      const file = new File([blob], "ragecheck-result.png", { type: "image/png" });
+      await navigator.share({
+        files: [file],
+        title: "RageCheck Analysis",
+        text: `Emotional Intensity Score: ${data.score}/100`,
+      });
+      return true;
+    }
+
+    // Desktop: try clipboard API
+    if (await canWriteImageToClipboard()) {
+      await navigator.clipboard.write([
+        new ClipboardItem({
+          "image/png": blob,
+        }),
+      ]);
+      return true;
+    }
+
+    // Fallback: download the image
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `ragecheck-${data.score}.png`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
     return true;
-  } catch {
+  } catch (error) {
+    console.error("Share failed:", error);
+    // If share was cancelled by user, still return false gracefully
     return false;
   }
 }
