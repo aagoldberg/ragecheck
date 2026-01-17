@@ -111,18 +111,15 @@ export async function generateShareImage(
 
   // Generate QR code if we have a source URL
   let qrImg: HTMLImageElement | null = null;
-  if (data.sourceUrl) {
+  if (data.sourceUrl && typeof window !== "undefined") {
     try {
       const qrUrl = `https://ragecheck.com?url=${encodeURIComponent(data.sourceUrl)}&ref=qr`;
       const qr = qrcode(0, "M"); // Type 0 = auto, Error correction M
       qr.addData(qrUrl);
       qr.make();
-      // Create SVG data URL (white on transparent)
-      const svgStr = qr.createSvgTag({ cellSize: 4, margin: 0, scalable: true });
-      // Convert to white color
-      const whiteSvg = svgStr.replace(/fill="#000000"/g, 'fill="#ffffff"');
-      const svgDataUrl = `data:image/svg+xml;base64,${btoa(whiteSvg)}`;
-      qrImg = await loadImage(svgDataUrl);
+      // Create image data URL - cellSize 4 gives good resolution
+      const dataUrl = qr.createDataURL(4, 0);
+      qrImg = await loadImage(dataUrl);
     } catch (e) {
       console.warn("Failed to generate QR code:", e);
     }
@@ -233,12 +230,13 @@ export async function generateShareImage(
     });
 
     // 4. Bullet Points (Insights) - prefer short shareCardBullets, fall back to verbose explanations
+    // Limited to 2 to make room for larger QR code
     const allInsights = data.shareCardBullets && data.shareCardBullets.length > 0
-      ? data.shareCardBullets.slice(0, 3)
+      ? data.shareCardBullets.slice(0, 2)
       : [
           ...(data.techniqueExplanations || []),
           ...(data.sharingPatterns || [])
-        ].slice(0, 3);
+        ].slice(0, 2);
 
     const bulletsY = statementY + 40 + (signalLines.length * 72) + 20;
     const ctaY = height - padding;
@@ -279,13 +277,29 @@ export async function generateShareImage(
     ctx.fillStyle = colors.main;
     ctx.fillRect(rightX + padding + prefixWidth, ctaY + 8, ctx.measureText("ragecheck.com").width, 3);
 
-    // 6. QR Code (bottom right corner)
+    // 6. QR Code with white background box (bottom right)
     if (qrImg) {
-      const qrSize = 110;
-      const qrMargin = 24; // Tighter to corner than main padding
-      const qrX = width - qrMargin - qrSize;
-      const qrY = height - qrMargin - qrSize;
-      ctx.drawImage(qrImg, qrX, qrY, qrSize, qrSize);
+      const qrSize = 180;
+      const qrPadding = 12; // Quiet zone around QR
+      const boxSize = qrSize + (qrPadding * 2);
+      const qrMargin = 20;
+      const qrBoxX = width - qrMargin - boxSize;
+      const qrBoxY = height - qrMargin - boxSize - 24; // Room for label below
+
+      // White background box with rounded corners
+      ctx.fillStyle = "#ffffff";
+      roundRect(ctx, qrBoxX, qrBoxY, boxSize, boxSize, 12);
+      ctx.fill();
+
+      // Draw QR code inside the box
+      ctx.drawImage(qrImg, qrBoxX + qrPadding, qrBoxY + qrPadding, qrSize, qrSize);
+
+      // Label below: "Scan to view analysis"
+      ctx.font = "500 14px system-ui, -apple-system, sans-serif";
+      ctx.fillStyle = "#a1a1aa";
+      ctx.textAlign = "center";
+      ctx.fillText("Scan to view analysis", qrBoxX + (boxSize / 2), qrBoxY + boxSize + 18);
+      ctx.textAlign = "left"; // Reset
     }
 
 
