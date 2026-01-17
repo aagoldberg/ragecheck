@@ -158,3 +158,111 @@ export const resetUser = () => {
   if (!isPostHogAvailable()) return;
   posthog.reset();
 };
+
+// ==========================================
+// INTERACTION TRACKING (with DB logging)
+// ==========================================
+
+// Generic interaction tracker - logs to PostHog and DB
+export const trackInteraction = async (
+  category: string,
+  action: string,
+  label?: string,
+  value?: number,
+  metadata?: Record<string, unknown>
+) => {
+  // PostHog tracking
+  if (isPostHogAvailable()) {
+    posthog.capture("interaction", {
+      category,
+      action,
+      label,
+      value,
+      ...metadata,
+    });
+  }
+
+  // DB tracking (fire and forget)
+  try {
+    navigator.sendBeacon(
+      "/api/track-interaction",
+      JSON.stringify({ category, action, label, value, metadata })
+    );
+  } catch {
+    // Silently fail - don't break UX for tracking
+  }
+};
+
+// Navigation tracking
+export const trackNavClick = (destination: string, location: "header" | "footer" | "menu") => {
+  trackInteraction("navigation", "click", destination, undefined, { location });
+};
+
+// Share card interactions
+export const trackShareCardVariant = (variant: "x" | "bluesky") => {
+  trackInteraction("share_card", "variant_selected", variant);
+};
+
+export const trackShareCardCopy = (variant: string) => {
+  trackInteraction("share_card", "copy_clicked", variant);
+};
+
+export const trackShareCardDownload = (variant: string) => {
+  trackInteraction("share_card", "download_clicked", variant);
+};
+
+export const trackShareToTwitter = () => {
+  trackInteraction("share_card", "share_to_twitter");
+};
+
+export const trackShareToBluesky = () => {
+  trackInteraction("share_card", "share_to_bluesky");
+};
+
+// Result interactions
+export const trackFilterClick = (filter: string) => {
+  trackInteraction("results", "filter_clicked", filter);
+};
+
+export const trackScoreClick = () => {
+  trackInteraction("results", "score_clicked");
+};
+
+export const trackSectionExpand = (section: string) => {
+  trackInteraction("results", "section_expanded", section);
+};
+
+export const trackSectionCollapse = (section: string) => {
+  trackInteraction("results", "section_collapsed", section);
+};
+
+// Form/input interactions
+export const trackPasteButtonClick = () => {
+  trackInteraction("input", "paste_button_clicked");
+};
+
+export const trackSubmitButtonClick = (inputType: "url" | "image") => {
+  trackInteraction("input", "submit_clicked", inputType);
+};
+
+export const trackSurpriseMeClick = () => {
+  trackInteraction("input", "surprise_me_clicked");
+};
+
+export const trackFeedbackThumbClick = (type: "up" | "down") => {
+  trackInteraction("feedback", "thumb_clicked", type);
+};
+
+// External link tracking
+export const trackExternalLink = (destination: string, context?: string) => {
+  trackInteraction("external_link", "clicked", destination, undefined, { context });
+};
+
+// Email subscription tracking
+export const trackEmailSubscribe = (location: string) => {
+  trackInteraction("email", "subscribe_clicked", location);
+};
+
+export const trackEmailSubscribeSuccess = (location: string) => {
+  trackInteraction("email", "subscribe_success", location);
+};

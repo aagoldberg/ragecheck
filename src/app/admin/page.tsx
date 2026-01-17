@@ -567,6 +567,7 @@ interface ApiResponse {
   analysisCompletionMetrics?: AnalysisCompletionMetrics;
   abandonmentDiagnostics?: AbandonmentDiagnostics;
   subscriberStats?: SubscriberStats;
+  interactionStats?: InteractionStats;
   dbAvailable?: boolean;
 }
 
@@ -1514,7 +1515,7 @@ function PageDailyChart({ data, title }: { data: { date: string; visitors: numbe
   );
 }
 
-type TabType = "overview" | "users" | "conversions" | "funnel" | "retention" | "shares" | "feedback" | "content" | "clearview" | "subscribers";
+type TabType = "overview" | "users" | "conversions" | "funnel" | "retention" | "shares" | "feedback" | "content" | "clearview" | "subscribers" | "interactions";
 
 interface ClearviewStats {
   lastGenerated: string | null;
@@ -1545,6 +1546,25 @@ interface SubscriberStats {
   dailySignups: { date: string; count: number }[];
 }
 
+interface InteractionStats {
+  summary: {
+    total: number;
+    today: number;
+    thisWeek: number;
+    uniqueIPs: number;
+  };
+  byCategory: { category: string; count: number }[];
+  byAction: { category: string; action: string; count: number }[];
+  topLabels: { label: string; count: number }[];
+  navigation: { destination: string; location: string; count: number }[];
+  shareCard: { action: string; count: number }[];
+  results: { action: string; label: string; count: number }[];
+  inputs: { action: string; count: number }[];
+  externalLinks: { destination: string; count: number }[];
+  hourlyTrend: { hour: string; count: number }[];
+  dailyTrend: { date: string; count: number }[];
+}
+
 export default function AdminDashboard() {
   const [key, setKey] = useState("");
   const [authenticated, setAuthenticated] = useState(false);
@@ -1570,6 +1590,7 @@ export default function AdminDashboard() {
   const [analysisCompletionMetrics, setAnalysisCompletionMetrics] = useState<AnalysisCompletionMetrics | null>(null);
   const [abandonmentDiagnostics, setAbandonmentDiagnostics] = useState<AbandonmentDiagnostics | null>(null);
   const [subscriberStats, setSubscriberStats] = useState<SubscriberStats | null>(null);
+  const [interactionStats, setInteractionStats] = useState<InteractionStats | null>(null);
 
   const fetchStats = async (adminKey: string) => {
     setLoading(true);
@@ -1602,6 +1623,7 @@ export default function AdminDashboard() {
         setAnalysisCompletionMetrics(data.analysisCompletionMetrics || null);
         setAbandonmentDiagnostics(data.abandonmentDiagnostics || null);
         setSubscriberStats(data.subscriberStats || null);
+        setInteractionStats(data.interactionStats || null);
         setAuthenticated(true);
         // Save key to localStorage
         localStorage.setItem("ragecheck-admin-key", adminKey);
@@ -1763,7 +1785,7 @@ export default function AdminDashboard() {
         {/* Tabs */}
         <div className="max-w-7xl mx-auto px-4">
           <div className="flex gap-6 -mb-px">
-            {(["overview", "users", "conversions", "funnel", "retention", "shares", "feedback", "content", "clearview", "subscribers"] as const).map((tab) => (
+            {(["overview", "users", "conversions", "funnel", "retention", "shares", "feedback", "content", "clearview", "subscribers", "interactions"] as const).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
@@ -4559,6 +4581,205 @@ export default function AdminDashboard() {
         {activeTab === "subscribers" && !subscriberStats && (
           <p className="text-sm text-zinc-500 text-center py-8">
             Loading subscriber data...
+          </p>
+        )}
+
+        {/* Interactions Tab */}
+        {activeTab === "interactions" && interactionStats && (
+          <div className="space-y-6">
+            {/* Summary Stats */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="bg-white dark:bg-zinc-900 rounded-lg p-4 border border-zinc-200 dark:border-zinc-800">
+                <div className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">{interactionStats.summary.total.toLocaleString()}</div>
+                <div className="text-sm text-zinc-500">Total Interactions</div>
+              </div>
+              <div className="bg-white dark:bg-zinc-900 rounded-lg p-4 border border-zinc-200 dark:border-zinc-800">
+                <div className="text-2xl font-bold text-blue-600">{interactionStats.summary.today.toLocaleString()}</div>
+                <div className="text-sm text-zinc-500">Today</div>
+              </div>
+              <div className="bg-white dark:bg-zinc-900 rounded-lg p-4 border border-zinc-200 dark:border-zinc-800">
+                <div className="text-2xl font-bold text-purple-600">{interactionStats.summary.thisWeek.toLocaleString()}</div>
+                <div className="text-sm text-zinc-500">This Week</div>
+              </div>
+              <div className="bg-white dark:bg-zinc-900 rounded-lg p-4 border border-zinc-200 dark:border-zinc-800">
+                <div className="text-2xl font-bold text-emerald-600">{interactionStats.summary.uniqueIPs.toLocaleString()}</div>
+                <div className="text-sm text-zinc-500">Unique Users</div>
+              </div>
+            </div>
+
+            {/* Category & Action Breakdowns */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* By Category */}
+              {interactionStats.byCategory.length > 0 && (
+                <div className="bg-white dark:bg-zinc-900 rounded-lg p-4 border border-zinc-200 dark:border-zinc-800">
+                  <h3 className="text-sm font-medium text-zinc-500 mb-3">By Category</h3>
+                  <div className="space-y-2">
+                    {interactionStats.byCategory.map((c, i) => (
+                      <div key={i} className="flex justify-between items-center">
+                        <span className="text-sm text-zinc-600 dark:text-zinc-400 font-mono">{c.category}</span>
+                        <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">{c.count.toLocaleString()}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Top Actions */}
+              {interactionStats.byAction.length > 0 && (
+                <div className="bg-white dark:bg-zinc-900 rounded-lg p-4 border border-zinc-200 dark:border-zinc-800">
+                  <h3 className="text-sm font-medium text-zinc-500 mb-3">Top Actions</h3>
+                  <div className="space-y-2 max-h-64 overflow-y-auto">
+                    {interactionStats.byAction.map((a, i) => (
+                      <div key={i} className="flex justify-between items-center">
+                        <span className="text-sm text-zinc-600 dark:text-zinc-400">
+                          <span className="font-mono text-xs text-zinc-400">{a.category}/</span>
+                          <span className="font-mono">{a.action}</span>
+                        </span>
+                        <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">{a.count.toLocaleString()}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Specific Interaction Types */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {/* Navigation */}
+              {interactionStats.navigation.length > 0 && (
+                <div className="bg-white dark:bg-zinc-900 rounded-lg p-4 border border-zinc-200 dark:border-zinc-800">
+                  <h3 className="text-sm font-medium text-zinc-500 mb-3">Navigation Clicks</h3>
+                  <div className="space-y-2">
+                    {interactionStats.navigation.map((n, i) => (
+                      <div key={i} className="flex justify-between items-center">
+                        <span className="text-xs text-zinc-600 dark:text-zinc-400">
+                          {n.destination} <span className="text-zinc-400">({n.location})</span>
+                        </span>
+                        <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">{n.count}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Share Card */}
+              {interactionStats.shareCard.length > 0 && (
+                <div className="bg-white dark:bg-zinc-900 rounded-lg p-4 border border-zinc-200 dark:border-zinc-800">
+                  <h3 className="text-sm font-medium text-zinc-500 mb-3">Share Card</h3>
+                  <div className="space-y-2">
+                    {interactionStats.shareCard.map((s, i) => (
+                      <div key={i} className="flex justify-between items-center">
+                        <span className="text-xs text-zinc-600 dark:text-zinc-400 font-mono">{s.action}</span>
+                        <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">{s.count}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Input Actions */}
+              {interactionStats.inputs.length > 0 && (
+                <div className="bg-white dark:bg-zinc-900 rounded-lg p-4 border border-zinc-200 dark:border-zinc-800">
+                  <h3 className="text-sm font-medium text-zinc-500 mb-3">Input Actions</h3>
+                  <div className="space-y-2">
+                    {interactionStats.inputs.map((inp, i) => (
+                      <div key={i} className="flex justify-between items-center">
+                        <span className="text-xs text-zinc-600 dark:text-zinc-400 font-mono">{inp.action}</span>
+                        <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">{inp.count}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* External Links */}
+              {interactionStats.externalLinks.length > 0 && (
+                <div className="bg-white dark:bg-zinc-900 rounded-lg p-4 border border-zinc-200 dark:border-zinc-800">
+                  <h3 className="text-sm font-medium text-zinc-500 mb-3">External Links</h3>
+                  <div className="space-y-2">
+                    {interactionStats.externalLinks.map((e, i) => (
+                      <div key={i} className="flex justify-between items-center">
+                        <span className="text-xs text-zinc-600 dark:text-zinc-400 truncate max-w-32">{e.destination}</span>
+                        <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">{e.count}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Results Interactions */}
+            {interactionStats.results.length > 0 && (
+              <div className="bg-white dark:bg-zinc-900 rounded-lg p-4 border border-zinc-200 dark:border-zinc-800">
+                <h3 className="text-sm font-medium text-zinc-500 mb-3">Result Interactions</h3>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  {interactionStats.results.map((r, i) => (
+                    <div key={i} className="flex justify-between items-center p-2 bg-zinc-50 dark:bg-zinc-800 rounded">
+                      <span className="text-xs text-zinc-600 dark:text-zinc-400">
+                        <span className="font-mono">{r.action}</span>
+                        {r.label !== "none" && <span className="text-zinc-400 ml-1">({r.label})</span>}
+                      </span>
+                      <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">{r.count}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Daily Trend Chart */}
+            {interactionStats.dailyTrend.length > 0 && (
+              <div className="bg-white dark:bg-zinc-900 rounded-lg p-4 border border-zinc-200 dark:border-zinc-800">
+                <h3 className="text-sm font-medium text-zinc-500 mb-3">Daily Interactions (Last 30 Days)</h3>
+                <div className="h-32 flex items-end gap-1">
+                  {interactionStats.dailyTrend.map((d, i) => {
+                    const max = Math.max(...interactionStats.dailyTrend.map(x => x.count), 1);
+                    const height = (d.count / max) * 100;
+                    return (
+                      <div
+                        key={i}
+                        className="flex-1 bg-indigo-500 rounded-t hover:bg-indigo-400 transition-colors"
+                        style={{ height: `${Math.max(height, 2)}%` }}
+                        title={`${d.date}: ${d.count} interactions`}
+                      />
+                    );
+                  })}
+                </div>
+                <div className="flex justify-between mt-2 text-xs text-zinc-400">
+                  <span>{interactionStats.dailyTrend[0]?.date}</span>
+                  <span>{interactionStats.dailyTrend[interactionStats.dailyTrend.length - 1]?.date}</span>
+                </div>
+              </div>
+            )}
+
+            {/* Top Labels */}
+            {interactionStats.topLabels.length > 0 && (
+              <div className="bg-white dark:bg-zinc-900 rounded-lg p-4 border border-zinc-200 dark:border-zinc-800">
+                <h3 className="text-sm font-medium text-zinc-500 mb-3">Top Labels/Destinations</h3>
+                <div className="flex flex-wrap gap-2">
+                  {interactionStats.topLabels.map((l, i) => (
+                    <span
+                      key={i}
+                      className="inline-flex items-center gap-1 px-2 py-1 bg-zinc-100 dark:bg-zinc-800 rounded text-xs"
+                    >
+                      <span className="text-zinc-600 dark:text-zinc-400">{l.label}</span>
+                      <span className="font-medium text-zinc-900 dark:text-zinc-100">{l.count}</span>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {interactionStats.summary.total === 0 && (
+              <p className="text-sm text-zinc-500 text-center py-8">
+                No interactions tracked yet. Interactions will appear here once users start clicking buttons, links, and other UI elements.
+              </p>
+            )}
+          </div>
+        )}
+
+        {activeTab === "interactions" && !interactionStats && (
+          <p className="text-sm text-zinc-500 text-center py-8">
+            Loading interaction data...
           </p>
         )}
       </div>

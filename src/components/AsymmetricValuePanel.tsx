@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { AsymmetricValueOutput } from "@/lib/asymmetricValue/types";
+import * as tracking from "@/lib/tracking";
 
 interface AsymmetricValuePanelProps {
   data: AsymmetricValueOutput;
@@ -152,7 +153,15 @@ function Block({ icon, title, badge, children, explainItems, accentColor = "indi
 
       {/* Explain accordion */}
       <button
-        onClick={() => setExpanded(!expanded)}
+        onClick={() => {
+          const newExpanded = !expanded;
+          setExpanded(newExpanded);
+          if (newExpanded) {
+            tracking.trackSectionExpand(title);
+          } else {
+            tracking.trackSectionCollapse(title);
+          }
+        }}
         className="w-full px-4 py-2 flex items-center justify-between text-xs font-medium text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 bg-white dark:bg-zinc-900 border-t border-zinc-100 dark:border-zinc-800 transition-colors"
       >
         <span>Explain</span>

@@ -10,6 +10,7 @@ import {
   VARIANT_INFO,
   getRecommendedVariant,
 } from "@/lib/asymmetricValue/SharecardRenderer";
+import * as tracking from "@/lib/tracking";
 
 interface SharecardSelectorProps {
   sharecards: SharecardOutput;
@@ -40,6 +41,7 @@ export function SharecardSelector({ sharecards, resultUrl }: SharecardSelectorPr
   }, [selectedVariant, selectedContent]);
 
   const handleCopy = async () => {
+    tracking.trackShareCardCopy(selectedVariant);
     const success = await copySharecardToClipboard({
       variant: selectedVariant,
       content: selectedContent,
@@ -51,6 +53,7 @@ export function SharecardSelector({ sharecards, resultUrl }: SharecardSelectorPr
   };
 
   const handleDownload = async () => {
+    tracking.trackShareCardDownload(selectedVariant);
     setDownloading(true);
     await downloadSharecard(
       { variant: selectedVariant, content: selectedContent },
@@ -60,12 +63,14 @@ export function SharecardSelector({ sharecards, resultUrl }: SharecardSelectorPr
   };
 
   const handleShareTwitter = () => {
+    tracking.trackShareToTwitter();
     const { twitterText } = getSharecardText(selectedContent, resultUrl);
     const url = `https://twitter.com/intent/tweet?text=${encodeURIComponent(twitterText)}`;
     window.open(url, "_blank");
   };
 
   const handleShareBluesky = () => {
+    tracking.trackShareToBluesky();
     const { blueskyText } = getSharecardText(selectedContent, resultUrl);
     const url = `https://bsky.app/intent/compose?text=${encodeURIComponent(blueskyText)}`;
     window.open(url, "_blank");
@@ -84,7 +89,10 @@ export function SharecardSelector({ sharecards, resultUrl }: SharecardSelectorPr
         {VARIANT_INFO.map((info) => (
           <button
             key={info.id}
-            onClick={() => setSelectedVariant(info.id)}
+            onClick={() => {
+              setSelectedVariant(info.id);
+              tracking.trackShareCardVariant(info.id === "respectful_share" ? "x" : "bluesky");
+            }}
             className={`flex-1 px-3 py-2 rounded-lg text-left transition-all ${
               selectedVariant === info.id
                 ? "bg-indigo-100 dark:bg-indigo-900/30 border-2 border-indigo-500"

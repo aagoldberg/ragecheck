@@ -4452,3 +4452,285 @@ export async function getShareMetrics(): Promise<ShareMetrics> {
     };
   }
 }
+
+// ==========================================
+// INTERACTION TRACKING
+// ==========================================
+
+export interface InteractionLog {
+  category: string;
+  action: string;
+  label?: string;
+  value?: number;
+  metadata?: Record<string, unknown>;
+  ip?: string;
+  userAgent?: string;
+  referer?: string;
+}
+
+export async function initInteractionsTable(): Promise<void> {
+  try {
+    await getDb()`
+      CREATE TABLE IF NOT EXISTS ragecheck_interactions (
+        id SERIAL PRIMARY KEY,
+        category VARCHAR(50) NOT NULL,
+        action VARCHAR(100) NOT NULL,
+        label VARCHAR(255),
+        value INTEGER,
+        metadata JSONB,
+        ip_address VARCHAR(45),
+        user_agent TEXT,
+        referer TEXT,
+        is_bot BOOLEAN DEFAULT false,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      )
+    `;
+    // Create indexes for fast querying
+    await getDb()`
+      CREATE INDEX IF NOT EXISTS idx_interactions_category ON ragecheck_interactions(category)
+    `;
+    await getDb()`
+      CREATE INDEX IF NOT EXISTS idx_interactions_action ON ragecheck_interactions(action)
+    `;
+    await getDb()`
+      CREATE INDEX IF NOT EXISTS idx_interactions_created ON ragecheck_interactions(created_at)
+    `;
+  } catch (error) {
+    console.error("Failed to init interactions table:", error);
+  }
+}
+
+export async function logInteraction(data: InteractionLog): Promise<void> {
+  try {
+    const isBotUser = isBot(data.userAgent);
+    await getDb()`
+      INSERT INTO ragecheck_interactions (
+        category, action, label, value, metadata, ip_address, user_agent, referer, is_bot
+      ) VALUES (
+        ${data.category},
+        ${data.action},
+        ${data.label || null},
+        ${data.value || null},
+        ${data.metadata ? JSON.stringify(data.metadata) : null},
+        ${data.ip || null},
+        ${data.userAgent || null},
+        ${data.referer || null},
+        ${isBotUser}
+      )
+    `;
+  } catch (error) {
+    console.error("Failed to log interaction:", error);
+  }
+}
+
+export interface InteractionStats {
+  summary: {
+    total: number;
+    today: number;
+    thisWeek: number;
+    uniqueIPs: number;
+  };
+  byCategory: { category: string; count: number }[];
+  byAction: { category: string; action: string; count: number }[];
+  topLabels: { label: string; count: number }[];
+  navigation: {
+    destination: string;
+    location: string;
+    count: number;
+  }[];
+  shareCard: {
+    action: string;
+    count: number;
+  }[];
+  results: {
+    action: string;
+    label: string;
+    count: number;
+  }[];
+  inputs: {
+    action: string;
+    count: number;
+  }[];
+  externalLinks: {
+    destination: string;
+    count: number;
+  }[];
+  hourlyTrend: { hour: string; count: number }[];
+  dailyTrend: { date: string; count: number }[];
+}
+
+export async function getInteractionStats(): Promise<InteractionStats | null> {
+  try {
+    const dbAvailable = await isDBAvailable();
+    if (!dbAvailable) return null;
+
+    // Initialize table if needed
+    await initInteractionsTable();
+
+    // Summary stats
+    const summaryResult = await getDb()`
+      SELECT
+        COUNT(*) as total,
+        COUNT(*) FILTER (WHERE created_at >= CURRENT_DATE AND NOT is_bot) as today,
+        COUNT(*) FILTER (WHERE created_at >= CURRENT_DATE - INTERVAL '7 days' AND NOT is_bot) as this_week,
+        COUNT(DISTINCT ip_address) FILTER (WHERE NOT is_bot) as unique_ips
+      FROM ragecheck_interactions
+    `;
+    const summary = summaryResult[0] || { total: 0, today: 0, this_week: 0, unique_ips: 0 };
+
+    // By category
+    const byCategory = await getDb()`
+      SELECT category, COUNT(*) as count
+      FROM ragecheck_interactions
+      WHERE NOT is_bot
+      GROUP BY category
+      ORDER BY count DESC
+    `;
+
+    // By action (top 20)
+    const byAction = await getDb()`
+      SELECT category, action, COUNT(*) as count
+      FROM ragecheck_interactions
+      WHERE NOT is_bot
+      GROUP BY category, action
+      ORDER BY count DESC
+      LIMIT 20
+    `;
+
+    // Top labels
+    const topLabels = await getDb()`
+      SELECT label, COUNT(*) as count
+      FROM ragecheck_interactions
+      WHERE label IS NOT NULL AND NOT is_bot
+      GROUP BY label
+      ORDER BY count DESC
+      LIMIT 15
+    `;
+
+    // Navigation breakdown
+    const navigation = await getDb()`
+      SELECT
+        label as destination,
+        metadata->>'location' as location,
+        COUNT(*) as count
+      FROM ragecheck_interactions
+      WHERE category = 'navigation' AND NOT is_bot
+      GROUP BY label, metadata->>'location'
+      ORDER BY count DESC
+    `;
+
+    // Share card breakdown
+    const shareCard = await getDb()`
+      SELECT action, COUNT(*) as count
+      FROM ragecheck_interactions
+      WHERE category = 'share_card' AND NOT is_bot
+      GROUP BY action
+      ORDER BY count DESC
+    `;
+
+    // Results interactions
+    const results = await getDb()`
+      SELECT action, COALESCE(label, 'none') as label, COUNT(*) as count
+      FROM ragecheck_interactions
+      WHERE category = 'results' AND NOT is_bot
+      GROUP BY action, label
+      ORDER BY count DESC
+      LIMIT 20
+    `;
+
+    // Input interactions
+    const inputs = await getDb()`
+      SELECT action, COUNT(*) as count
+      FROM ragecheck_interactions
+      WHERE category = 'input' AND NOT is_bot
+      GROUP BY action
+      ORDER BY count DESC
+    `;
+
+    // External links
+    const externalLinks = await getDb()`
+      SELECT label as destination, COUNT(*) as count
+      FROM ragecheck_interactions
+      WHERE category = 'external_link' AND NOT is_bot
+      GROUP BY label
+      ORDER BY count DESC
+    `;
+
+    // Hourly trend (last 24 hours)
+    const hourlyTrend = await getDb()`
+      SELECT
+        TO_CHAR(created_at, 'HH24:00') as hour,
+        COUNT(*) as count
+      FROM ragecheck_interactions
+      WHERE created_at >= NOW() - INTERVAL '24 hours' AND NOT is_bot
+      GROUP BY TO_CHAR(created_at, 'HH24:00')
+      ORDER BY hour
+    `;
+
+    // Daily trend (last 30 days)
+    const dailyTrend = await getDb()`
+      SELECT
+        TO_CHAR(created_at, 'YYYY-MM-DD') as date,
+        COUNT(*) as count
+      FROM ragecheck_interactions
+      WHERE created_at >= NOW() - INTERVAL '30 days' AND NOT is_bot
+      GROUP BY TO_CHAR(created_at, 'YYYY-MM-DD')
+      ORDER BY date
+    `;
+
+    return {
+      summary: {
+        total: Number(summary.total) || 0,
+        today: Number(summary.today) || 0,
+        thisWeek: Number(summary.this_week) || 0,
+        uniqueIPs: Number(summary.unique_ips) || 0,
+      },
+      byCategory: byCategory.map((r) => ({
+        category: r.category as string,
+        count: Number(r.count),
+      })),
+      byAction: byAction.map((r) => ({
+        category: r.category as string,
+        action: r.action as string,
+        count: Number(r.count),
+      })),
+      topLabels: topLabels.map((r) => ({
+        label: r.label as string,
+        count: Number(r.count),
+      })),
+      navigation: navigation.map((r) => ({
+        destination: r.destination as string,
+        location: (r.location as string) || "unknown",
+        count: Number(r.count),
+      })),
+      shareCard: shareCard.map((r) => ({
+        action: r.action as string,
+        count: Number(r.count),
+      })),
+      results: results.map((r) => ({
+        action: r.action as string,
+        label: r.label as string,
+        count: Number(r.count),
+      })),
+      inputs: inputs.map((r) => ({
+        action: r.action as string,
+        count: Number(r.count),
+      })),
+      externalLinks: externalLinks.map((r) => ({
+        destination: r.destination as string,
+        count: Number(r.count),
+      })),
+      hourlyTrend: hourlyTrend.map((r) => ({
+        hour: r.hour as string,
+        count: Number(r.count),
+      })),
+      dailyTrend: dailyTrend.map((r) => ({
+        date: r.date as string,
+        count: Number(r.count),
+      })),
+    };
+  } catch (error) {
+    console.error("Failed to get interaction stats:", error);
+    return null;
+  }
+}

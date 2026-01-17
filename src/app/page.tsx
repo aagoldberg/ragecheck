@@ -910,6 +910,7 @@ function HomeContent() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    tracking.trackSubmitButtonClick("url");
     analyze(url);
   };
 
@@ -1057,9 +1058,9 @@ function HomeContent() {
           </div>
           {/* Desktop nav */}
           <div className="hidden sm:flex gap-6 text-sm font-medium text-zinc-500">
-            <a href="/clearview" className="hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors">Clearview</a>
-            <a href="/methodology" className="hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors">Methodology</a>
-            <a href="/about" className="hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors">About</a>
+            <a href="/clearview" onClick={() => tracking.trackNavClick("clearview", "header")} className="hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors">Clearview</a>
+            <a href="/methodology" onClick={() => tracking.trackNavClick("methodology", "header")} className="hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors">Methodology</a>
+            <a href="/about" onClick={() => tracking.trackNavClick("about", "header")} className="hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors">About</a>
           </div>
           {/* Mobile menu button */}
           <button
@@ -1082,9 +1083,9 @@ function HomeContent() {
         {menuOpen && (
           <div className="sm:hidden border-t border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900">
             <div className="px-4 py-3 space-y-1">
-              <a href="/clearview" className="block py-2 text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors">Clearview</a>
-              <a href="/methodology" className="block py-2 text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors">Methodology</a>
-              <a href="/about" className="block py-2 text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors">About</a>
+              <a href="/clearview" onClick={() => tracking.trackNavClick("clearview", "menu")} className="block py-2 text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors">Clearview</a>
+              <a href="/methodology" onClick={() => tracking.trackNavClick("methodology", "menu")} className="block py-2 text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors">Methodology</a>
+              <a href="/about" onClick={() => tracking.trackNavClick("about", "menu")} className="block py-2 text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors">About</a>
             </div>
           </div>
         )}
@@ -1105,6 +1106,7 @@ function HomeContent() {
                   href="https://lifehacker.com/tech/ragecheck-manipulative-language-news-articles"
                   target="_blank"
                   rel="noopener noreferrer"
+                  onClick={() => tracking.trackExternalLink("lifehacker", "hero")}
                   className="font-medium text-zinc-700 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-zinc-100 underline underline-offset-2"
                 >
                   Lifehacker
@@ -1155,7 +1157,7 @@ function HomeContent() {
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                   </button>
                 </div>
-                <button type="button" onClick={analyzeImage} disabled={loading} className="mt-4 w-full px-6 py-4 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 rounded-xl font-bold text-lg hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-all shadow-lg hover:shadow-xl disabled:opacity-70">
+                <button type="button" onClick={() => { tracking.trackSubmitButtonClick("image"); analyzeImage(); }} disabled={loading} className="mt-4 w-full px-6 py-4 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 rounded-xl font-bold text-lg hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-all shadow-lg hover:shadow-xl disabled:opacity-70">
                   {loading ? "Scanning Image..." : "Analyze Screenshot"}
                 </button>
               </div>
@@ -1170,6 +1172,7 @@ function HomeContent() {
                     <button
                       type="button"
                       onClick={async () => {
+                        tracking.trackPasteButtonClick();
                         try {
                           const text = await navigator.clipboard.readText();
                           if (text && (text.startsWith('http://') || text.startsWith('https://'))) {
@@ -1230,6 +1233,7 @@ function HomeContent() {
                     type="button"
                     onClick={(e) => {
                       e.preventDefault();
+                      tracking.trackSurpriseMeClick();
                       const randomExample = CURATED_EXAMPLES[Math.floor(Math.random() * CURATED_EXAMPLES.length)];
                       setUrl(randomExample.url);
                       analyze(randomExample.url);
@@ -1764,10 +1768,14 @@ function HomeContent() {
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-12 gap-y-6 pt-8 border-t border-zinc-100 dark:border-zinc-800">
                       {result.signalBreakdown && Object.entries(result.signalBreakdown).map(([key, value]) => (
-                         <div 
+                         <div
                           key={key}
                           className={`cursor-pointer hover:opacity-80 transition-opacity ${activeFilter && activeFilter !== key ? 'opacity-30' : ''}`}
-                          onClick={() => setActiveFilter(activeFilter === key ? null : key)}
+                          onClick={() => {
+                            const newFilter = activeFilter === key ? null : key;
+                            setActiveFilter(newFilter);
+                            tracking.trackFilterClick(newFilter || "clear");
+                          }}
                          >
                            <SignalBar 
                              label={SIGNAL_LABELS[key as keyof SignalBreakdown]} 
@@ -1869,7 +1877,7 @@ function HomeContent() {
                     <>
                       <span className="text-sm text-zinc-500 dark:text-zinc-400">Helpful?</span>
                       <button
-                        onClick={() => submitFeedback("up")}
+                        onClick={() => { tracking.trackFeedbackThumbClick("up"); submitFeedback("up"); }}
                         className={`p-1.5 rounded-lg transition-colors ${
                           feedbackGiven === "up"
                             ? "bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400"
@@ -1882,7 +1890,7 @@ function HomeContent() {
                         </svg>
                       </button>
                       <button
-                        onClick={() => submitFeedback("down")}
+                        onClick={() => { tracking.trackFeedbackThumbClick("down"); submitFeedback("down"); }}
                         className={`p-1.5 rounded-lg transition-colors ${
                           feedbackGiven === "down"
                             ? "bg-rose-100 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400"
@@ -1909,6 +1917,7 @@ function HomeContent() {
                     href="https://buy.stripe.com/4gM8wQ8Xq8xU8gw9HvgEg00"
                     target="_blank"
                     rel="noopener noreferrer"
+                    onClick={() => tracking.trackExternalLink("stripe_donate", "results")}
                     className="text-indigo-500 hover:text-indigo-400 underline underline-offset-2"
                   >
                     supporting its development
@@ -1927,11 +1936,11 @@ function HomeContent() {
       {/* Footer */}
       <footer className="border-t border-zinc-200 dark:border-zinc-800 py-6 mt-auto">
         <div className="max-w-2xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-center gap-4 text-sm text-zinc-500 dark:text-zinc-400">
-          <a href="/about" className="hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors">About</a>
+          <a href="/about" onClick={() => tracking.trackNavClick("about", "footer")} className="hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors">About</a>
           <span className="hidden sm:inline">·</span>
-          <a href="/methodology" className="hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors">Methodology</a>
+          <a href="/methodology" onClick={() => tracking.trackNavClick("methodology", "footer")} className="hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors">Methodology</a>
           <span className="hidden sm:inline">·</span>
-          <a href="mailto:hello@ragecheck.com" className="hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors">Contact</a>
+          <a href="mailto:hello@ragecheck.com" onClick={() => tracking.trackExternalLink("email", "footer")} className="hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors">Contact</a>
         </div>
       </footer>
 
