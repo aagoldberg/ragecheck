@@ -86,17 +86,24 @@ Consider:
 2. Are there manipulation tactics the rules missed?
 3. What's the overall intent - to inform or to provoke?
 
+CRITICAL - shareCardBullets format rules:
+- MUST be 3-7 words each
+- MUST be NOUN PHRASES (no verbs at start)
+- GOOD: "In-group status signaling", "Crisis compression", "Expertise authority appeal"
+- BAD: "Uses emotional language", "Creates fear", "Makes reader feel"
+- If score ≤33 (low), describe journalistic quality: "Wire-service style", "Multi-source attribution"
+
 Respond with this exact JSON structure:
 {
-  "adjustedScore": <number 0-100, adjust rule-based score based on context>,
-  "reasons": [<3-5 concise bullet points explaining the score>],
-  "contextNotes": "<optional: note if rule-based score was misleading due to context>",
-  "sharingPatterns": [<2-3 reasons why people share this. Use plain everyday language a teenager would understand. NO jargon. e.g. "Confirms what many already suspect about X", "Makes readers feel part of a group who 'gets it'", "The outrage feels satisfying to pass along">],
-  "techniqueExplanations": [<2-3 things to notice about how it's written. Use plain everyday words - NO academic labels like "Framing" or "Rhetoric". Just describe what's happening. e.g. "Plays on fear: Makes the threat feel urgent so you react before thinking", "Loaded words: Uses emotional language to make ordinary things seem worse", "Quotes without context: Cherry-picks what someone said to change the meaning">],
-  "shareCardBullets": [<2-3 bullets for social share card. HARD CONSTRAINTS: 3-7 words each, NOUN PHRASES ONLY (no leading verbs), describe the psychological tactic or reader effect. If score LOW (≤33): describe journalistic quality (e.g. "Wire-service reporting style", "Multi-source attribution", "Neutral event framing"). If score MEDIUM/HIGH: describe manipulation (e.g. "In-group status signaling", "Crisis compression", "Historical trauma activation"). BAD examples to avoid: "Uses emotionally charged language", "Plays on fears", "Creates urgency". If a bullet starts with a verb, rewrite as noun phrase.>],
-  "topic": "<primary topic: politics, health, technology, business, entertainment, sports, science, crime, culture_wars, environment, education, other>",
-  "contentType": "<content format: news_article, opinion, social_post, blog, press_release, satire, academic, other>",
-  "sourceType": "<source category: mainstream_news, tabloid, partisan_outlet, independent_blog, social_media, wire_service, government, corporate, other>"
+  "adjustedScore": <number 0-100>,
+  "reasons": [<3-5 bullet points explaining the score>],
+  "contextNotes": "<optional: note if rule-based score was misleading>",
+  "sharingPatterns": [<2-3 reasons why people share this, plain language>],
+  "techniqueExplanations": [<2-3 things to notice about how it's written, plain language>],
+  "shareCardBullets": [<2-3 NOUN PHRASES, 3-7 words each, NO VERBS>],
+  "topic": "<politics|health|technology|business|entertainment|sports|science|crime|culture_wars|environment|education|other>",
+  "contentType": "<news_article|opinion|social_post|blog|press_release|satire|academic|other>",
+  "sourceType": "<mainstream_news|tabloid|partisan_outlet|independent_blog|social_media|wire_service|government|corporate|other>"
 }`;
 
   try {
@@ -186,11 +193,18 @@ Key patterns to detect:
 
 IMPORTANT: You are detecting MANIPULATION TACTICS, not political bias. Score the manipulation level regardless of the political viewpoint.
 
+CRITICAL - shareCardBullets format rules:
+- MUST be 3-7 words each
+- MUST be NOUN PHRASES (no verbs at start)
+- GOOD: "In-group status signaling", "Crisis compression", "Expertise authority appeal"
+- BAD: "Uses emotional language", "Creates fear", "Makes reader feel"
+- If score ≤33 (low), describe quality: "Wire-service style", "Multi-source attribution"
+
 Respond with this exact JSON structure:
 {
   "extractedText": "<all visible text from the image>",
   "platform": "<detected platform>",
-  "score": <number 0-100, where 0=neutral/informative, 100=extreme outrage bait>,
+  "score": <number 0-100>,
   "signalBreakdown": {
     "arousal": <0-100>,
     "enemy_construction": <0-100>,
@@ -198,11 +212,11 @@ Respond with this exact JSON structure:
     "simplification": <0-100>,
     "call_to_conflict": <0-100>
   },
-  "reasons": [<3-5 concise bullet points explaining the score>],
-  "highlights": [{"text": "<problematic phrase>", "category": "<signal category>"}],
-  "sharingPatterns": [<2-3 reasons why people share this. Plain everyday language, NO jargon>],
-  "techniqueExplanations": [<2-3 things to notice about how it's written. Plain words, NO academic labels>],
-  "shareCardBullets": [<2-3 bullets for share card. HARD CONSTRAINTS: 3-7 words each, NOUN PHRASES ONLY (no leading verbs), describe psychological tactic or reader effect. If LOW (≤33): journalistic quality (e.g. "Wire-service style", "Multi-source attribution"). If MEDIUM/HIGH: manipulation (e.g. "In-group status signaling", "Crisis compression", "Historical trauma activation"). AVOID: "Uses charged language", "Plays on fears". Rewrite any verb-led bullet as noun phrase.>]
+  "reasons": [<3-5 bullet points explaining the score>],
+  "highlights": [{"text": "<phrase>", "category": "<category>"}],
+  "sharingPatterns": [<2-3 reasons why people share this>],
+  "techniqueExplanations": [<2-3 things to notice about how it's written>],
+  "shareCardBullets": [<2-3 NOUN PHRASES, 3-7 words each, NO VERBS>]
 }`;
 
 export async function analyzeImageWithVision(
