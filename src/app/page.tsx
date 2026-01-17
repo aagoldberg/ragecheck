@@ -39,6 +39,7 @@ interface AnalysisResult {
   sharingPatterns?: string[];
   techniqueExplanations?: string[];
   shareCardSummary?: string;
+  shareCardBullets?: string[];
   image?: string;
   uploadedImageUrl?: string;
 }
@@ -1018,6 +1019,7 @@ function HomeContent() {
         techniqueExplanations: result.techniqueExplanations,
         sharingPatterns: result.sharingPatterns,
         shareCardSummary: result.shareCardSummary,
+        shareCardBullets: result.shareCardBullets,
         // Use local base64 image (more reliable) or fall back to blob URL
         uploadedImageUrl: imagePreview || result.uploadedImageUrl,
       });

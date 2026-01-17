@@ -42,6 +42,7 @@ export interface AnalyzeResponse {
   sharingPatterns?: string[];
   techniqueExplanations?: string[];
   shareCardSummary?: string;
+  shareCardBullets?: string[];
   cached?: boolean;
   uploadedImageUrl?: string;
 }
@@ -165,6 +166,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<AnalyzeRe
         sharingPatterns: result.sharingPatterns,
         techniqueExplanations: result.techniqueExplanations,
         shareCardSummary: result.shareCardSummary,
+        shareCardBullets: result.shareCardBullets,
         uploadedImageUrl: imageUrl || undefined,
       });
     }
@@ -278,6 +280,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<AnalyzeRe
     let sharingPatterns: string[] | undefined;
     let techniqueExplanations: string[] | undefined;
     let shareCardSummary: string | undefined;
+    let shareCardBullets: string[] | undefined;
     let topic: string | undefined;
     let contentType: string | undefined;
     let sourceType: string | undefined;
@@ -298,6 +301,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<AnalyzeRe
         sharingPatterns = llmResult.sharingPatterns;
         techniqueExplanations = llmResult.techniqueExplanations;
         shareCardSummary = llmResult.shareCardSummary;
+        shareCardBullets = llmResult.shareCardBullets;
         topic = llmResult.topic;
         contentType = llmResult.contentType;
         sourceType = llmResult.sourceType;
@@ -349,6 +353,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<AnalyzeRe
       sharingPatterns,
       techniqueExplanations,
       shareCardSummary,
+      shareCardBullets,
     });
   } catch (error) {
     console.error("Analyze error:", error);

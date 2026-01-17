@@ -12,6 +12,7 @@ export interface ShareImageData {
   techniqueExplanations?: string[];
   sharingPatterns?: string[];
   shareCardSummary?: string;
+  shareCardBullets?: string[]; // Short punchy bullets for share card (5-8 words each)
   uploadedImageUrl?: string;
 }
 
@@ -99,14 +100,10 @@ export async function generateShareImage(
   let uploadedImg: HTMLImageElement | null = null;
   if (data.uploadedImageUrl) {
     try {
-      console.log("Loading uploaded image for share card:", data.uploadedImageUrl.substring(0, 100));
       uploadedImg = await loadImage(data.uploadedImageUrl);
-      console.log("Successfully loaded image:", uploadedImg.width, "x", uploadedImg.height);
     } catch (e) {
       console.warn("Failed to load uploaded image for share card:", e);
     }
-  } else {
-    console.log("No uploadedImageUrl provided for share card");
   }
 
   return new Promise((resolve, reject) => {
@@ -144,6 +141,7 @@ export async function generateShareImage(
     const rightX = width / 2;
     const padding = 64;
     const contentWidth = (width / 2) - (padding * 2);
+    const centerX = rightX + (width / 4);
 
     // Subtle Glow (Top Right)
     const gradient = ctx.createRadialGradient(width, 0, 0, width, 0, 600);
@@ -153,14 +151,12 @@ export async function generateShareImage(
     ctx.fillRect(rightX, 0, width / 2, height);
 
     // 1. Logo
-    const logoY = padding + 20;
-    // Icon
+    const logoY = padding;
     ctx.fillStyle = "#ffffff";
     roundRect(ctx, rightX + padding, logoY, 24, 24, 6);
     ctx.fill();
-    // Text
     ctx.font = "600 20px system-ui, -apple-system, sans-serif";
-    ctx.fillStyle = "#e4e4e7"; // zinc-200
+    ctx.fillStyle = "#e4e4e7";
     ctx.textAlign = "left";
     ctx.textBaseline = "middle";
     ctx.fillText("RageCheck", rightX + padding + 36, logoY + 12);
@@ -171,73 +167,76 @@ export async function generateShareImage(
     const badgeText = `EMOTIONAL INTENSITY - ${riskLabel.toUpperCase()}`;
     const badgeTextWidth = ctx.measureText(badgeText).width;
     const badgeHeight = 48;
-    const badgeWidth = badgeTextWidth + 60; // text + dot + padding
+    const badgeWidth = badgeTextWidth + 48; // text + padding
 
     // Badge Background
     ctx.fillStyle = colors.bg;
     ctx.strokeStyle = colors.border;
     ctx.lineWidth = 1;
-    roundRect(ctx, rightX + padding, badgeY, badgeWidth, badgeHeight, 100);
+    roundRect(ctx, rightX + padding, badgeY, badgeWidth, badgeHeight, 24);
     ctx.fill();
     ctx.stroke();
 
     // Badge Text (Centered)
     ctx.fillStyle = colors.text;
     ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
     ctx.fillText(badgeText, rightX + padding + (badgeWidth / 2), badgeY + (badgeHeight / 2));
     ctx.textAlign = "left"; // Reset to left for subsequent elements
 
-    // 3. Main Statement
-    const statementY = badgeY + badgeHeight + 40;
-    ctx.font = "900 48px system-ui, -apple-system, sans-serif";
-    
-    // Determine Top Signal for dynamic headline
-    let topSignal = "Anger";
-    if (data.signalBreakdown) {
+    // 3. Main Statement (Detected Pattern)
+    const statementY = badgeY + badgeHeight + 50;
+
+    // Label: "DETECTED PATTERN"
+    ctx.font = "700 16px system-ui, -apple-system, sans-serif";
+    ctx.fillStyle = colors.main; // Match badge color
+    ctx.fillText("DETECTED PATTERN", rightX + padding, statementY);
+
+    // Value: For LOW scores show "None", otherwise show top signal
+    let topSignal = "None";
+    if (data.score > 33 && data.signalBreakdown) {
        const entries = Object.entries(data.signalBreakdown);
        if (entries.length > 0) {
          const top = entries.sort((a, b) => b[1] - a[1])[0];
          topSignal = SIGNAL_LABELS[top[0] as keyof SignalBreakdown] || "Anger";
        }
     }
-    
-    // Gradient Text
-    const gradientText = ctx.createLinearGradient(0, statementY, 0, statementY + 120);
-    gradientText.addColorStop(0, "#ffffff");
-    gradientText.addColorStop(1, "#a1a1aa");
-    ctx.fillStyle = gradientText;
-    
-    const statement = `This post is optimized for ${topSignal}.`;
-    const statementLines = wrapText(ctx, statement, contentWidth, 3);
-    
-    statementLines.forEach((line, i) => {
-        ctx.fillText(line, rightX + padding, statementY + (i * 56) + 24);
+
+    ctx.font = "900 64px system-ui, -apple-system, sans-serif";
+    ctx.fillStyle = "#ffffff";
+    const signalLines = wrapText(ctx, topSignal, contentWidth, 2);
+
+    signalLines.forEach((line, i) => {
+        ctx.fillText(line, rightX + padding, statementY + 40 + (i * 72));
     });
 
-    // 4. Bullet Points (Insights)
-    // Combine technique explanations and sharing patterns
-    const allInsights = [
-        ...(data.techniqueExplanations || []),
-        ...(data.sharingPatterns || [])
-    ].slice(0, 3);
+    // 4. Bullet Points (Insights) - prefer short shareCardBullets, fall back to verbose explanations
+    const allInsights = data.shareCardBullets && data.shareCardBullets.length > 0
+      ? data.shareCardBullets.slice(0, 3)
+      : [
+          ...(data.techniqueExplanations || []),
+          ...(data.sharingPatterns || [])
+        ].slice(0, 3);
 
-    const bulletsY = statementY + (statementLines.length * 56) + 40;
+    const bulletsY = statementY + 40 + (signalLines.length * 72) + 20;
+    const ctaY = height - padding;
     
     if (allInsights.length > 0) {
         let currentBulletY = bulletsY;
         allInsights.forEach((point, i) => {
-            // Dot
+            if (currentBulletY > ctaY - 40) return;
+
             ctx.fillStyle = colors.main;
             ctx.beginPath();
             ctx.arc(rightX + padding + 5, currentBulletY + 14, 4, 0, Math.PI * 2);
             ctx.fill();
             
-            // Text (Wrapping instead of truncating)
             ctx.font = "500 24px system-ui, -apple-system, sans-serif";
-            ctx.fillStyle = "#e4e4e7"; // zinc-200
+            ctx.fillStyle = "#d4d4d8";
             
             const pointLines = wrapText(ctx, point, contentWidth - 30, 2);
             pointLines.forEach((line, j) => {
+                if (currentBulletY + (j * 32) > ctaY - 40) return;
                 ctx.fillText(line, rightX + padding + 24, currentBulletY + (j * 32) + 14);
             });
             
@@ -246,9 +245,8 @@ export async function generateShareImage(
     }
 
     // 5. CTA
-    const ctaY = height - padding - 20;
     ctx.font = "500 24px system-ui, -apple-system, sans-serif";
-    ctx.fillStyle = "#a1a1aa"; // zinc-400
+    ctx.fillStyle = "#a1a1aa";
     ctx.fillText("See through it at ", rightX + padding, ctaY);
     
     const prefixWidth = ctx.measureText("See through it at ").width;
@@ -256,7 +254,6 @@ export async function generateShareImage(
     ctx.fillStyle = "#ffffff";
     ctx.fillText("ragecheck.com", rightX + padding + prefixWidth, ctaY);
     
-    // Underline
     ctx.fillStyle = colors.main;
     ctx.fillRect(rightX + padding + prefixWidth, ctaY + 8, ctx.measureText("ragecheck.com").width, 3);
 

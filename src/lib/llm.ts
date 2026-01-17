@@ -12,6 +12,7 @@ export interface LLMAnalysis {
   sharingPatterns?: string[];
   techniqueExplanations?: string[];
   shareCardSummary?: string;
+  shareCardBullets?: string[]; // Short punchy bullets for share card (5-8 words each)
   // Content categorization
   topic?: string;
   contentType?: string;
@@ -92,6 +93,7 @@ Respond with this exact JSON structure:
   "contextNotes": "<optional: note if rule-based score was misleading due to context>",
   "sharingPatterns": [<2-3 reasons why people share this. Use plain everyday language a teenager would understand. NO jargon. e.g. "Confirms what many already suspect about X", "Makes readers feel part of a group who 'gets it'", "The outrage feels satisfying to pass along">],
   "techniqueExplanations": [<2-3 things to notice about how it's written. Use plain everyday words - NO academic labels like "Framing" or "Rhetoric". Just describe what's happening. e.g. "Plays on fear: Makes the threat feel urgent so you react before thinking", "Loaded words: Uses emotional language to make ordinary things seem worse", "Quotes without context: Cherry-picks what someone said to change the meaning">],
+  "shareCardBullets": [<3 ultra-short punchy phrases for social sharing, MAX 8 words each. If score is LOW (≤33), describe what makes the content GOOD journalism: e.g. "Wire-style factual reporting", "Multiple perspectives quoted", "No identity framing". If score is MEDIUM/HIGH, describe the manipulation: e.g. "Insider language creates in-group status", "Urgency framing bypasses critical thinking">],
   "topic": "<primary topic: politics, health, technology, business, entertainment, sports, science, crime, culture_wars, environment, education, other>",
   "contentType": "<content format: news_article, opinion, social_post, blog, press_release, satire, academic, other>",
   "sourceType": "<source category: mainstream_news, tabloid, partisan_outlet, independent_blog, social_media, wire_service, government, corporate, other>"
@@ -131,6 +133,7 @@ Respond with this exact JSON structure:
       sharingPatterns: parsed.sharingPatterns || [],
       techniqueExplanations: parsed.techniqueExplanations || [],
       shareCardSummary: parsed.shareCardSummary,
+      shareCardBullets: parsed.shareCardBullets || [],
       topic: parsed.topic || undefined,
       contentType: parsed.contentType || undefined,
       sourceType: parsed.sourceType || undefined,
@@ -158,6 +161,7 @@ export interface ImageAnalysisResult {
   sharingPatterns?: string[];
   techniqueExplanations?: string[];
   shareCardSummary?: string;
+  shareCardBullets?: string[];
 }
 
 const IMAGE_ANALYSIS_PROMPT = `You are analyzing an image for outrage bait and manipulation patterns. This could be:
@@ -197,7 +201,8 @@ Respond with this exact JSON structure:
   "reasons": [<3-5 concise bullet points explaining the score>],
   "highlights": [{"text": "<problematic phrase>", "category": "<signal category>"}],
   "sharingPatterns": [<2-3 reasons why people share this. Plain everyday language, NO jargon>],
-  "techniqueExplanations": [<2-3 things to notice about how it's written. Plain words, NO academic labels>]
+  "techniqueExplanations": [<2-3 things to notice about how it's written. Plain words, NO academic labels>],
+  "shareCardBullets": [<3 ultra-short punchy phrases for social sharing, MAX 8 words each. If score is LOW (≤33), describe what makes it GOOD: e.g. "Wire-style factual reporting", "Multiple perspectives shown", "No identity framing". If MEDIUM/HIGH, describe the manipulation: e.g. "Insider language creates in-group status", "Urgency framing bypasses critical thinking">]
 }`;
 
 export async function analyzeImageWithVision(
@@ -326,6 +331,7 @@ export async function analyzeImageWithVision(
       sharingPatterns: parsed.sharingPatterns || [],
       techniqueExplanations: parsed.techniqueExplanations || [],
       shareCardSummary: parsed.shareCardSummary,
+      shareCardBullets: parsed.shareCardBullets || [],
     };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "Unknown error";
