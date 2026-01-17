@@ -14,6 +14,7 @@ export interface ShareImageData {
   shareCardSummary?: string;
   shareCardBullets?: string[]; // Short punchy bullets for share card (5-8 words each)
   uploadedImageUrl?: string;
+  textPreview?: string; // For social posts, show the actual content instead of title
 }
 
 export type ImageSize = "x" | "bluesky";
@@ -315,8 +316,11 @@ export async function generateShareImage(
       ctx.fillText(domainText, contentPadding + 16, pillY + pillHeight / 2);
 
       // Title/headline - centered vertically in remaining space
+      // For social posts, use textPreview (actual content) instead of title
+      const socialDomains = ["x.com", "twitter.com", "bsky.app", "facebook.com", "instagram.com", "reddit.com", "threads.net"];
+      const isSocialPost = socialDomains.some(d => data.domain.includes(d));
       ctx.font = "500 42px system-ui, -apple-system, sans-serif";
-      const bodyText = data.title;
+      const bodyText = (isSocialPost && data.textPreview) ? data.textPreview : data.title;
       const bodyLines = wrapText(ctx, bodyText, contentWidth, 10);
       const lineHeight = 50;
       const bodyHeight = bodyLines.length * lineHeight;

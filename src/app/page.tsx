@@ -1022,6 +1022,7 @@ function HomeContent() {
         shareCardBullets: result.shareCardBullets,
         // Use local base64 image (more reliable) or fall back to blob URL
         uploadedImageUrl: imagePreview || result.uploadedImageUrl,
+        textPreview: result.textPreview,
       });
 
       if (success && !silent) {
