@@ -304,96 +304,45 @@ export async function generateShareImage(
       roundRect(ctx, drawX, drawY, drawW, drawH, 16);
       ctx.stroke();
     } else {
-      // Show mock post for URL analyses
-      const leftX = 0;
-      const postPadding = 48;
-      const postContentWidth = leftWidth - (postPadding * 2);
+      // Show content cleanly for URL analyses
+      const contentPadding = 48;
+      const contentWidth = leftWidth - (contentPadding * 2);
 
-      // Calculate vertical centering for the post content
-      ctx.font = "500 42px system-ui, -apple-system, sans-serif";
-      const bodyText = data.title.length > 150 ? data.title.substring(0, 150) + "..." : data.title;
-      const bodyLines = wrapText(ctx, bodyText, postContentWidth, 6);
-      const bodyHeight = bodyLines.length * 50;
+      // Source domain pill at top
+      ctx.font = "600 18px system-ui, -apple-system, sans-serif";
+      const displayDomain = data.domain.replace(/^www\./, "").split('/')[0];
+      const domainText = displayDomain || "source";
+      const pillWidth = ctx.measureText(domainText).width + 32;
+      const pillHeight = 36;
+      const pillY = contentPadding;
 
-      const totalContentHeight = 56 + 24 + bodyHeight + 24 + 24;
-      const startY = (height - totalContentHeight) / 2;
-
-      // 1. Post Header
-      const avatarSize = 56;
-      ctx.fillStyle = "#e4e4e7";
-      ctx.beginPath();
-      ctx.arc(leftX + postPadding + (avatarSize/2), startY + (avatarSize/2), avatarSize/2, 0, Math.PI * 2);
+      ctx.fillStyle = "#f4f4f5";
+      roundRect(ctx, contentPadding, pillY, pillWidth, pillHeight, 18);
       ctx.fill();
 
-      // Avatar Initial/Icon
-      ctx.font = "24px system-ui";
-      ctx.textAlign = "center";
+      ctx.fillStyle = "#52525b";
+      ctx.textAlign = "left";
       ctx.textBaseline = "middle";
-      ctx.fillStyle = "#71717a";
-      let initial = "📄";
-      if (data.domain.includes("twitter") || data.domain.includes("x.com")) initial = "✖️";
-      else if (data.domain.includes("bsky")) initial = "🦋";
-      else if (data.domain.length > 0) initial = data.domain[0].toUpperCase();
-      ctx.fillText(initial, leftX + postPadding + (avatarSize/2), startY + (avatarSize/2) + 2);
+      ctx.fillText(domainText, contentPadding + 16, pillY + pillHeight / 2);
 
-      // Name & Handle
-      const nameX = leftX + postPadding + avatarSize + 16;
-      const nameY = startY + (avatarSize/2);
+      // Title/headline - centered vertically in remaining space
+      ctx.font = "700 48px system-ui, -apple-system, sans-serif";
+      const titleText = data.title.length > 120 ? data.title.substring(0, 117) + "..." : data.title;
+      const titleLines = wrapText(ctx, titleText, contentWidth, 5);
+      const lineHeight = 58;
+      const titleBlockHeight = titleLines.length * lineHeight;
 
-      ctx.textAlign = "left";
-      ctx.textBaseline = "bottom";
-      ctx.font = "700 20px system-ui, -apple-system, sans-serif";
-      ctx.fillStyle = "#18181b";
-      const displayDomain = data.domain.replace(/^www\./, "").split('/')[0];
-      const displayName = displayDomain.charAt(0).toUpperCase() + displayDomain.slice(1).split('.')[0];
-      ctx.fillText(displayName || "Unknown Source", nameX, nameY - 4);
+      // Center the title block vertically (below the pill)
+      const availableHeight = height - pillY - pillHeight - contentPadding - 40;
+      const titleStartY = pillY + pillHeight + 40 + (availableHeight - titleBlockHeight) / 2;
 
-      ctx.textBaseline = "top";
-      ctx.font = "500 18px system-ui, -apple-system, sans-serif";
-      ctx.fillStyle = "#71717a";
-      ctx.fillText(`@${displayDomain || "source"}`, nameX, nameY + 2);
-
-      // 2. Post Body
-      const bodyY = startY + 56 + 24;
-      ctx.font = "500 42px system-ui, -apple-system, sans-serif";
       ctx.fillStyle = "#18181b";
       ctx.textAlign = "left";
       ctx.textBaseline = "top";
 
-      bodyLines.forEach((line, i) => {
-          ctx.fillText(line, leftX + postPadding, bodyY + (i * 50));
+      titleLines.forEach((line, i) => {
+        ctx.fillText(line, contentPadding, titleStartY + (i * lineHeight));
       });
-
-      // 3. Post Footer (Stats/Date)
-      const footerStatsY = bodyY + bodyHeight + 24;
-
-      ctx.strokeStyle = "#f4f4f5";
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(leftX + postPadding, footerStatsY);
-      ctx.lineTo(leftX + postPadding + postContentWidth, footerStatsY);
-      ctx.stroke();
-
-      ctx.font = "500 18px system-ui, -apple-system, sans-serif";
-      ctx.fillStyle = "#71717a";
-      ctx.textBaseline = "top";
-
-      const date = new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-      const time = new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
-
-      ctx.fillText(`${time} · ${date}`, leftX + postPadding, footerStatsY + 16);
-
-      const dateWidth = ctx.measureText(`${time} · ${date}`).width;
-      ctx.fillText("·", leftX + postPadding + dateWidth + 12, footerStatsY + 16);
-
-      ctx.font = "700 18px system-ui, -apple-system, sans-serif";
-      ctx.fillStyle = "#18181b";
-      ctx.fillText("12K", leftX + postPadding + dateWidth + 32, footerStatsY + 16);
-
-      const viewsWidth = ctx.measureText("12K").width;
-      ctx.font = "500 18px system-ui, -apple-system, sans-serif";
-      ctx.fillStyle = "#71717a";
-      ctx.fillText("Views", leftX + postPadding + dateWidth + 32 + viewsWidth + 4, footerStatsY + 16);
     }
 
 
