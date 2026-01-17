@@ -2118,27 +2118,28 @@ export async function getVisitorStats(): Promise<VisitorStats> {
       .map(([date, data]) => ({ date, ...data }));
 
     // Realtime series - 30 minute buckets for last 3 days (72 hours), excluding bots
-    // Bucket in EST timezone so charts align with EST hours, then convert back to UTC for JS
+    // Use EXTRACT(EPOCH) to get Unix timestamp in seconds - this is unambiguous and avoids timezone parsing issues
+    // The bucketing is done in UTC (using date_trunc on created_at directly)
     const visitorRealtime = await getDb()`
       SELECT
-        (date_trunc('hour', created_at AT TIME ZONE 'America/New_York') +
-        (floor(extract(minute FROM created_at AT TIME ZONE 'America/New_York') / 30) * interval '30 minutes')) AT TIME ZONE 'America/New_York' as bucket,
+        EXTRACT(EPOCH FROM date_trunc('hour', created_at) +
+          (floor(extract(minute FROM created_at) / 30) * interval '30 minutes')) * 1000 as bucket_ms,
         COUNT(*) as count
       FROM ragecheck_visitors
       WHERE is_bot = false AND created_at > NOW() - INTERVAL '72 hours'
       GROUP BY 1
-      ORDER BY bucket ASC
+      ORDER BY bucket_ms ASC
     `;
 
     const analysisRealtime = await getDb()`
       SELECT
-        (date_trunc('hour', created_at AT TIME ZONE 'America/New_York') +
-        (floor(extract(minute FROM created_at AT TIME ZONE 'America/New_York') / 30) * interval '30 minutes')) AT TIME ZONE 'America/New_York' as bucket,
+        EXTRACT(EPOCH FROM date_trunc('hour', created_at) +
+          (floor(extract(minute FROM created_at) / 30) * interval '30 minutes')) * 1000 as bucket_ms,
         COUNT(*) as count
       FROM ragecheck_analyses
       WHERE is_bot = false AND created_at > NOW() - INTERVAL '72 hours'
       GROUP BY 1
-      ORDER BY bucket ASC
+      ORDER BY bucket_ms ASC
     `;
 
     // Merge realtime data into 30-minute buckets
@@ -2189,14 +2190,14 @@ export async function getVisitorStats(): Promise<VisitorStats> {
     }
 
     for (const row of visitorRealtime) {
-      const timeStr = new Date(row.bucket).toISOString();
+      const timeStr = new Date(Number(row.bucket_ms)).toISOString();
       const existing = realtimeMap.get(timeStr) || { visitors: 0, analyses: 0 };
       existing.visitors = Number(row.count);
       realtimeMap.set(timeStr, existing);
     }
 
     for (const row of analysisRealtime) {
-      const timeStr = new Date(row.bucket).toISOString();
+      const timeStr = new Date(Number(row.bucket_ms)).toISOString();
       const existing = realtimeMap.get(timeStr) || { visitors: 0, analyses: 0 };
       existing.analyses = Number(row.count);
       realtimeMap.set(timeStr, existing);
@@ -2208,26 +2209,27 @@ export async function getVisitorStats(): Promise<VisitorStats> {
 
     // Unique sessions - count distinct IP addresses per bucket
     // This shows unique visitors rather than total page loads
+    // Use EXTRACT(EPOCH) for unambiguous timestamp transfer
     const uniqueVisitorRealtime = await getDb()`
       SELECT
-        (date_trunc('hour', created_at AT TIME ZONE 'America/New_York') +
-        (floor(extract(minute FROM created_at AT TIME ZONE 'America/New_York') / 30) * interval '30 minutes')) AT TIME ZONE 'America/New_York' as bucket,
+        EXTRACT(EPOCH FROM date_trunc('hour', created_at) +
+          (floor(extract(minute FROM created_at) / 30) * interval '30 minutes')) * 1000 as bucket_ms,
         COUNT(DISTINCT ip_address) as count
       FROM ragecheck_visitors
       WHERE is_bot = false AND ip_address IS NOT NULL AND created_at > NOW() - INTERVAL '72 hours'
       GROUP BY 1
-      ORDER BY bucket ASC
+      ORDER BY bucket_ms ASC
     `;
 
     const uniqueAnalyzerRealtime = await getDb()`
       SELECT
-        (date_trunc('hour', created_at AT TIME ZONE 'America/New_York') +
-        (floor(extract(minute FROM created_at AT TIME ZONE 'America/New_York') / 30) * interval '30 minutes')) AT TIME ZONE 'America/New_York' as bucket,
+        EXTRACT(EPOCH FROM date_trunc('hour', created_at) +
+          (floor(extract(minute FROM created_at) / 30) * interval '30 minutes')) * 1000 as bucket_ms,
         COUNT(DISTINCT ip_address) as count
       FROM ragecheck_analyses
       WHERE is_bot = false AND ip_address IS NOT NULL AND created_at > NOW() - INTERVAL '72 hours'
       GROUP BY 1
-      ORDER BY bucket ASC
+      ORDER BY bucket_ms ASC
     `;
 
     // Build unique realtime map
@@ -2241,14 +2243,14 @@ export async function getVisitorStats(): Promise<VisitorStats> {
     }
 
     for (const row of uniqueVisitorRealtime) {
-      const timeStr = new Date(row.bucket).toISOString();
+      const timeStr = new Date(Number(row.bucket_ms)).toISOString();
       const existing = uniqueRealtimeMap.get(timeStr) || { uniqueVisitors: 0, uniqueAnalyzers: 0 };
       existing.uniqueVisitors = Number(row.count);
       uniqueRealtimeMap.set(timeStr, existing);
     }
 
     for (const row of uniqueAnalyzerRealtime) {
-      const timeStr = new Date(row.bucket).toISOString();
+      const timeStr = new Date(Number(row.bucket_ms)).toISOString();
       const existing = uniqueRealtimeMap.get(timeStr) || { uniqueVisitors: 0, uniqueAnalyzers: 0 };
       existing.uniqueAnalyzers = Number(row.count);
       uniqueRealtimeMap.set(timeStr, existing);
@@ -2504,15 +2506,16 @@ export async function getPageVisitorStats(pagePath: string): Promise<PageVisitor
     const [weekResult] = await getDb()`SELECT COUNT(*) as count FROM ragecheck_visitors WHERE is_bot = false AND page_path = ${pagePath} AND created_at > NOW() - INTERVAL '7 days'`;
 
     // Realtime series - 30 minute buckets for last 24 hours (excluding bots)
+    // Use EXTRACT(EPOCH) for unambiguous timestamp transfer
     const visitorRealtime = await getDb()`
       SELECT
-        (date_trunc('hour', created_at AT TIME ZONE 'America/New_York') +
-        (floor(extract(minute FROM created_at AT TIME ZONE 'America/New_York') / 30) * interval '30 minutes')) AT TIME ZONE 'America/New_York' as bucket,
+        EXTRACT(EPOCH FROM date_trunc('hour', created_at) +
+          (floor(extract(minute FROM created_at) / 30) * interval '30 minutes')) * 1000 as bucket_ms,
         COUNT(*) as count
       FROM ragecheck_visitors
       WHERE is_bot = false AND page_path = ${pagePath} AND created_at > NOW() - INTERVAL '24 hours'
       GROUP BY 1
-      ORDER BY bucket ASC
+      ORDER BY bucket_ms ASC
     `;
 
     // Merge realtime data into 30-minute buckets (excluding current incomplete bucket)
@@ -2533,7 +2536,7 @@ export async function getPageVisitorStats(pagePath: string): Promise<PageVisitor
     }
 
     for (const row of visitorRealtime) {
-      const timeStr = new Date(row.bucket).toISOString();
+      const timeStr = new Date(Number(row.bucket_ms)).toISOString();
       realtimeMap.set(timeStr, Number(row.count));
     }
 
