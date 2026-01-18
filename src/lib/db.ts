@@ -770,10 +770,13 @@ export async function getAnalysisCompletionMetrics(): Promise<AnalysisCompletion
     `;
 
     const dailyMap = new Map<string, { started: number; completed: number }>();
+    // Calculate dates in EST to match database query results
+    const estFmt = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' });
+    const todayESTStr = estFmt.format(new Date());
+    const [tYear, tMonth, tDay] = todayESTStr.split('-').map(Number);
     for (let i = 13; i >= 0; i--) {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
-      const dateStr = getESTDateString(d);
+      const targetDate = new Date(Date.UTC(tYear, tMonth - 1, tDay - i, 12, 0, 0));
+      const dateStr = estFmt.format(targetDate);
       dailyMap.set(dateStr, { started: 0, completed: 0 });
     }
     for (const row of dailyStarted) {
@@ -2092,10 +2095,26 @@ export async function getVisitorStats(): Promise<VisitorStats> {
     const dateMap = new Map<string, { visitors: number; analyses: number }>();
 
     // Initialize last 14 complete days (excluding today which is incomplete)
-    for (let i = 14; i >= 1; i--) {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
-      const dateStr = getESTDateString(d);
+    // Must calculate dates in EST to match database query results
+    const now = new Date();
+    const estFormatter = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/New_York',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    });
+
+    // Get today's date in EST as a starting point
+    const todayEST = estFormatter.format(now); // YYYY-MM-DD format
+    const [todayYear, todayMonth, todayDay] = todayEST.split('-').map(Number);
+
+    // Create a date object representing midnight EST for today
+    // EST is UTC-5 (or UTC-4 during DST), so midnight EST = 5am UTC (winter) or 4am UTC (summer)
+    // We'll calculate backwards from today in EST
+    for (let i = 14; i >= 0; i--) {
+      // Calculate the date i days before today in EST
+      const targetDate = new Date(Date.UTC(todayYear, todayMonth - 1, todayDay - i, 12, 0, 0)); // Use noon UTC to avoid DST edge cases
+      const dateStr = estFormatter.format(targetDate);
       dateMap.set(dateStr, { visitors: 0, analyses: 0 });
     }
 
@@ -2530,11 +2549,13 @@ export async function getPageVisitorStats(pagePath: string): Promise<PageVisitor
     `;
 
     const dateMap = new Map<string, number>();
-    // Exclude today (incomplete)
-    for (let i = 14; i >= 1; i--) {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
-      dateMap.set(getESTDateString(d), 0);
+    // Calculate dates in EST to match database query results
+    const estFmt = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' });
+    const todayESTStr = estFmt.format(new Date());
+    const [tYear, tMonth, tDay] = todayESTStr.split('-').map(Number);
+    for (let i = 14; i >= 0; i--) {
+      const targetDate = new Date(Date.UTC(tYear, tMonth - 1, tDay - i, 12, 0, 0));
+      dateMap.set(estFmt.format(targetDate), 0);
     }
 
     for (const row of dailyData) {
@@ -2955,11 +2976,14 @@ export async function getViralMetrics(): Promise<ViralMetrics> {
     `;
 
     // Build trend arrays (7 days, oldest to newest)
+    // Calculate dates in EST to match database query results
+    const estFmt = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' });
+    const todayESTStr = estFmt.format(new Date());
+    const [tYear, tMonth, tDay] = todayESTStr.split('-').map(Number);
     const trendDates: string[] = [];
     for (let i = 6; i >= 0; i--) {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
-      trendDates.push(getESTDateString(d));
+      const targetDate = new Date(Date.UTC(tYear, tMonth - 1, tDay - i, 12, 0, 0));
+      trendDates.push(estFmt.format(targetDate));
     }
 
     const visitorMap = new Map(visitorTrends.map(r => [parseDBDateToEST(r.day), Number(r.count)]));
@@ -3565,12 +3589,13 @@ export async function getFunnelMetrics(): Promise<FunnelMetrics> {
     // Build trend data
     const trendMap = new Map<string, { visitors: number; converted: number }>();
 
-    // Initialize last 14 days
+    // Initialize last 14 days in EST to match database query results
+    const estFmt = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' });
+    const todayESTStr = estFmt.format(new Date());
+    const [tYear, tMonth, tDay] = todayESTStr.split('-').map(Number);
     for (let i = 13; i >= 0; i--) {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
-      const dateStr = getESTDateString(d);
-      trendMap.set(dateStr, { visitors: 0, converted: 0 });
+      const targetDate = new Date(Date.UTC(tYear, tMonth - 1, tDay - i, 12, 0, 0));
+      trendMap.set(estFmt.format(targetDate), { visitors: 0, converted: 0 });
     }
 
     for (const row of dailyVisitors) {
