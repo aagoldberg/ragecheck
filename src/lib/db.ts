@@ -3698,6 +3698,16 @@ export interface ShareMetrics {
     estimatedConversion: number; // estimated conversion from shares
     kFactorValue: number; // shareRate * conversion
   };
+  // Share attribution - how effective are shares at bringing in new users
+  attribution: {
+    qrScans: number; // visitors from QR code scans (utm_source=qr)
+    qrScansWeek: number;
+    twitterReferrals: number; // visitors from twitter/t.co
+    twitterReferralsWeek: number;
+    totalAttributed: number; // all visitors attributable to shares
+    totalAttributedWeek: number;
+    conversionFromQr: number; // % of QR scanners who analyze
+  };
 }
 
 // Content Insights for understanding what users analyze and share
@@ -4498,6 +4508,64 @@ export async function getShareMetrics(): Promise<ShareMetrics> {
     const estimatedConversion = totalShares > 0 ? Math.min(referralVisits / totalShares, 1) : 0;
     const kFactorValue = Math.round((shareRate / 100) * estimatedConversion * 1000) / 1000;
 
+    // Share attribution - track effectiveness of shares
+    // QR code scans (from shared images)
+    const [qrScansTotal] = await getDb()`
+      SELECT COUNT(*) as count FROM ragecheck_visitors
+      WHERE is_bot = false AND utm_source = 'qr'
+    `;
+    const [qrScansWeek] = await getDb()`
+      SELECT COUNT(*) as count FROM ragecheck_visitors
+      WHERE is_bot = false AND utm_source = 'qr' AND created_at > NOW() - INTERVAL '7 days'
+    `;
+
+    // Twitter referrals (people clicking links from Twitter)
+    const [twitterReferralsTotal] = await getDb()`
+      SELECT COUNT(*) as count FROM ragecheck_visitors
+      WHERE is_bot = false AND (referrer LIKE '%t.co%' OR referrer LIKE '%twitter.com%' OR referrer LIKE '%x.com%')
+    `;
+    const [twitterReferralsWeek] = await getDb()`
+      SELECT COUNT(*) as count FROM ragecheck_visitors
+      WHERE is_bot = false AND (referrer LIKE '%t.co%' OR referrer LIKE '%twitter.com%' OR referrer LIKE '%x.com%')
+        AND created_at > NOW() - INTERVAL '7 days'
+    `;
+
+    // Total attributable to shares (QR + twitter referrals + other share params)
+    const [totalAttributed] = await getDb()`
+      SELECT COUNT(*) as count FROM ragecheck_visitors
+      WHERE is_bot = false AND (
+        utm_source = 'qr' OR
+        utm_source LIKE '%share%' OR
+        referrer LIKE '%t.co%' OR
+        referrer LIKE '%twitter.com%' OR
+        referrer LIKE '%x.com%' OR
+        referrer LIKE '%bsky%'
+      )
+    `;
+    const [totalAttributedWeek] = await getDb()`
+      SELECT COUNT(*) as count FROM ragecheck_visitors
+      WHERE is_bot = false AND (
+        utm_source = 'qr' OR
+        utm_source LIKE '%share%' OR
+        referrer LIKE '%t.co%' OR
+        referrer LIKE '%twitter.com%' OR
+        referrer LIKE '%x.com%' OR
+        referrer LIKE '%bsky%'
+      ) AND created_at > NOW() - INTERVAL '7 days'
+    `;
+
+    // Conversion from QR scans (how many QR scanners then analyzed)
+    const [qrAnalyzers] = await getDb()`
+      SELECT COUNT(DISTINCT a.ip_address) as count
+      FROM ragecheck_analyses a
+      WHERE a.is_bot = false AND a.success = true AND a.ip_address IN (
+        SELECT ip_address FROM ragecheck_visitors WHERE utm_source = 'qr' AND ip_address IS NOT NULL
+      )
+    `;
+    const qrScansCount = Number(qrScansTotal?.count) || 0;
+    const qrAnalyzersCount = Number(qrAnalyzers?.count) || 0;
+    const conversionFromQr = qrScansCount > 0 ? Math.round((qrAnalyzersCount / qrScansCount) * 1000) / 10 : 0;
+
     return {
       overview: {
         totalShares,
@@ -4519,6 +4587,15 @@ export async function getShareMetrics(): Promise<ShareMetrics> {
         estimatedConversion: Math.round(estimatedConversion * 1000) / 10,
         kFactorValue,
       },
+      attribution: {
+        qrScans: Number(qrScansTotal?.count) || 0,
+        qrScansWeek: Number(qrScansWeek?.count) || 0,
+        twitterReferrals: Number(twitterReferralsTotal?.count) || 0,
+        twitterReferralsWeek: Number(twitterReferralsWeek?.count) || 0,
+        totalAttributed: Number(totalAttributed?.count) || 0,
+        totalAttributedWeek: Number(totalAttributedWeek?.count) || 0,
+        conversionFromQr,
+      },
     };
   } catch (error) {
     console.error("Failed to get share metrics:", error);
@@ -4538,6 +4615,7 @@ export async function getShareMetrics(): Promise<ShareMetrics> {
       scoreDistribution: { low: 0, medium: 0, high: 0, unknown: 0 },
       dailyTrend: [],
       kFactor: { shareRate: 0, avgSharesPerSharer: 0, estimatedConversion: 0, kFactorValue: 0 },
+      attribution: { qrScans: 0, qrScansWeek: 0, twitterReferrals: 0, twitterReferralsWeek: 0, totalAttributed: 0, totalAttributedWeek: 0, conversionFromQr: 0 },
     };
   }
 }

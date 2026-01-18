@@ -391,6 +391,15 @@ interface ShareMetrics {
     estimatedConversion: number;
     kFactorValue: number;
   };
+  attribution: {
+    qrScans: number;
+    qrScansWeek: number;
+    twitterReferrals: number;
+    twitterReferralsWeek: number;
+    totalAttributed: number;
+    totalAttributedWeek: number;
+    conversionFromQr: number;
+  };
 }
 
 interface ContentInsights {
@@ -3545,6 +3554,53 @@ export default function AdminDashboard() {
                     tooltip="Estimated percentage of share recipients who visit the site. Based on referral traffic patterns."
                   />
                 </div>
+
+                {/* Share Attribution - How effective are shares at bringing users */}
+                {shareMetrics.attribution && (
+                  <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 mb-6">
+                    <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-4">
+                      Share Attribution
+                      <span className="ml-2 text-[10px] font-normal normal-case text-zinc-400">
+                        Track where visitors come from after seeing shared content
+                      </span>
+                    </h3>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div className="text-center p-3 bg-zinc-50 dark:bg-zinc-800/50 rounded-lg">
+                        <div className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">
+                          {shareMetrics.attribution.qrScans}
+                        </div>
+                        <div className="text-xs text-zinc-500">QR Code Scans</div>
+                        <div className="text-[10px] text-zinc-400">{shareMetrics.attribution.qrScansWeek} this week</div>
+                      </div>
+                      <div className="text-center p-3 bg-zinc-50 dark:bg-zinc-800/50 rounded-lg">
+                        <div className="text-2xl font-bold text-sky-600 dark:text-sky-400">
+                          {shareMetrics.attribution.twitterReferrals}
+                        </div>
+                        <div className="text-xs text-zinc-500">Twitter/X Referrals</div>
+                        <div className="text-[10px] text-zinc-400">{shareMetrics.attribution.twitterReferralsWeek} this week</div>
+                      </div>
+                      <div className="text-center p-3 bg-zinc-50 dark:bg-zinc-800/50 rounded-lg">
+                        <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
+                          {shareMetrics.attribution.totalAttributed}
+                        </div>
+                        <div className="text-xs text-zinc-500">Total From Shares</div>
+                        <div className="text-[10px] text-zinc-400">{shareMetrics.attribution.totalAttributedWeek} this week</div>
+                      </div>
+                      <div className="text-center p-3 bg-zinc-50 dark:bg-zinc-800/50 rounded-lg">
+                        <div className="text-2xl font-bold text-amber-600 dark:text-amber-400">
+                          {shareMetrics.attribution.conversionFromQr}%
+                        </div>
+                        <div className="text-xs text-zinc-500">QR → Analyze</div>
+                        <div className="text-[10px] text-zinc-400">conversion rate</div>
+                      </div>
+                    </div>
+                    {shareMetrics.attribution.totalAttributed === 0 && (
+                      <p className="mt-4 text-xs text-zinc-400 text-center">
+                        No attributed visits yet. Shares include a QR code that tracks scans (utm_source=qr).
+                      </p>
+                    )}
+                  </div>
+                )}
 
                 {/* Share Method & Score Distribution Row */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
