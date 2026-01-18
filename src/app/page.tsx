@@ -1464,9 +1464,9 @@ function HomeContent() {
           </div>
         )}
 
-        {/* Results Section */}
+        {/* Results Section - hide demo on mobile so users see search bar first */}
         {result && !loading && (
-          <div className="animate-in fade-in slide-in-from-bottom-8 duration-700 space-y-8 mt-12">
+          <div className={`animate-in fade-in slide-in-from-bottom-8 duration-700 space-y-8 mt-12 ${isDemo ? 'hidden sm:block' : ''}`}>
 
             {/* Demo Banner */}
             {isDemo && (
