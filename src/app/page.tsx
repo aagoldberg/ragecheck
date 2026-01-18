@@ -1039,7 +1039,8 @@ function HomeContent() {
         // Use local base64 image (more reliable) or fall back to blob URL
         uploadedImageUrl: imagePreview || result.uploadedImageUrl,
         textPreview: result.textPreview,
-        sourceUrl: url || undefined, // For QR code linking back
+        sourceUrl: result.analyzedUrl || url || undefined, // For QR code linking back
+        shareUrl: getShareUrl() || undefined, // Share page URL
       });
 
       if (success && !silent) {
@@ -1047,9 +1048,14 @@ function HomeContent() {
         setTimeout(() => setImageCopied(false), 3000);
         trackShareEvent("share_image_success");
         tracking.trackShareCompleted("copy");
+      } else if (!success && !silent) {
+        // Track failed share attempts so we can see if there's a pattern
+        trackShareEvent("share_image_failed");
       }
     } catch (error) {
       console.error("Failed to copy image:", error);
+      // Track the error so we can see failed attempts
+      trackShareEvent("share_image_error", { error: String(error).slice(0, 100) });
     }
   };
 
