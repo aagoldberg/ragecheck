@@ -42,6 +42,7 @@ interface AnalysisResult {
   shareCardBullets?: string[];
   image?: string;
   uploadedImageUrl?: string;
+  analyzedUrl?: string; // The URL that was analyzed, for share tracking
 }
 
 interface Headline {
@@ -835,6 +836,8 @@ function HomeContent() {
       });
 
       const data = await response.json();
+      // Store that this was an image upload for share tracking
+      data.analyzedUrl = "image-upload";
       setResult(data);
       // Scroll to top so users see results from the beginning
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -878,6 +881,8 @@ function HomeContent() {
       });
 
       const data = await response.json();
+      // Store the analyzed URL in the result for share tracking
+      data.analyzedUrl = targetUrl.trim();
       setResult(data);
       // Scroll to top so users see results from the beginning
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -948,8 +953,8 @@ function HomeContent() {
       .map(([key]) => key);
 
     // Use the actual URL that was analyzed - for image uploads this is "image-upload"
-    // For URL analyses, use the input URL or fall back to the source domain
-    const shareUrl = url.trim() || (imagePreview ? "image-upload" : result.sourceDomain || "unknown");
+    // For URL analyses, prefer the stored analyzedUrl, then input URL, then fall back to source domain
+    const shareUrl = result.analyzedUrl || url.trim() || (imagePreview ? "image-upload" : result.sourceDomain || "unknown");
 
     fetch("/api/share", {
       method: "POST",
