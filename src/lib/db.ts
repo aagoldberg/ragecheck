@@ -39,25 +39,6 @@ function getESTDateString(date: Date = new Date()): string {
   return date.toLocaleDateString('en-CA', { timeZone: 'America/New_York' }); // en-CA gives YYYY-MM-DD format
 }
 
-// Helper to get EST date string from a PostgreSQL date result
-// Handles both Date objects and string representations
-// Uses Intl.DateTimeFormat for consistent formatting with date initialization
-const dbDateFormatter = new Intl.DateTimeFormat('en-CA', {
-  timeZone: 'UTC', // DB dates are in UTC
-  year: 'numeric',
-  month: '2-digit',
-  day: '2-digit',
-});
-
-function parseDBDateToEST(dbDate: Date | string): string {
-  if (dbDate instanceof Date) {
-    // Use Intl.DateTimeFormat for consistent YYYY-MM-DD format
-    return dbDateFormatter.format(dbDate);
-  }
-  // If it's a string like "2025-01-15", just take the date part
-  return String(dbDate).split('T')[0];
-}
-
 // Cache the database connection
 let dbInstance: NeonQueryFunction<false, false> | null = null;
 
@@ -539,13 +520,12 @@ export async function getAnalysisCompletionMetrics(): Promise<AnalysisCompletion
 
     // Get earliest tracking date (when session_id tracking started)
     const [trackingStart] = await getDb()`
-      SELECT MIN(created_at) as start_date
+      SELECT TO_CHAR(DATE(MIN(created_at) AT TIME ZONE 'America/New_York'), 'YYYY-MM-DD') as start_date
       FROM ragecheck_analysis_starts
       WHERE is_bot = false
     `;
-    const trackingSince = trackingStart?.start_date
-      ? parseDBDateToEST(trackingStart.start_date)
-      : null;
+    // Date is already a string from TO_CHAR
+    const trackingSince = trackingStart?.start_date || null;
 
     // Overall started (last 7 days, non-bot)
     const [startedResult] = await getDb()`
@@ -756,9 +736,10 @@ export async function getAnalysisCompletionMetrics(): Promise<AnalysisCompletion
     }
 
     // Daily trend (last 14 days)
+    // Use TO_CHAR to return dates as strings matching the generate_series format
     const dailyStarted = await getDb()`
       SELECT
-        DATE(created_at AT TIME ZONE 'America/New_York') as date,
+        TO_CHAR(DATE(created_at AT TIME ZONE 'America/New_York'), 'YYYY-MM-DD') as date,
         COUNT(*) as count
       FROM ragecheck_analysis_starts
       WHERE is_bot = false AND created_at > NOW() - INTERVAL '14 days'
@@ -768,7 +749,7 @@ export async function getAnalysisCompletionMetrics(): Promise<AnalysisCompletion
 
     const dailyCompleted = await getDb()`
       SELECT
-        DATE(created_at AT TIME ZONE 'America/New_York') as date,
+        TO_CHAR(DATE(created_at AT TIME ZONE 'America/New_York'), 'YYYY-MM-DD') as date,
         COUNT(*) as count
       FROM ragecheck_analyses
       WHERE is_bot = false AND created_at > NOW() - INTERVAL '14 days' AND session_id IS NOT NULL
@@ -790,15 +771,15 @@ export async function getAnalysisCompletionMetrics(): Promise<AnalysisCompletion
       dailyMap.set(row.date, { started: 0, completed: 0 });
     }
     for (const row of dailyStarted) {
-      const dateStr = parseDBDateToEST(row.date);
-      if (dailyMap.has(dateStr)) {
-        dailyMap.get(dateStr)!.started = Number(row.count);
+      // Date is already a string from TO_CHAR
+      if (dailyMap.has(row.date)) {
+        dailyMap.get(row.date)!.started = Number(row.count);
       }
     }
     for (const row of dailyCompleted) {
-      const dateStr = parseDBDateToEST(row.date);
-      if (dailyMap.has(dateStr)) {
-        dailyMap.get(dateStr)!.completed = Number(row.count);
+      // Date is already a string from TO_CHAR
+      if (dailyMap.has(row.date)) {
+        dailyMap.get(row.date)!.completed = Number(row.count);
       }
     }
 
@@ -2085,8 +2066,9 @@ export async function getVisitorStats(): Promise<VisitorStats> {
     }));
 
     // Time series for last 14 days (grouped by EST date, excluding bots)
+    // Use TO_CHAR to return dates as strings matching the generate_series format
     const visitorTimeSeries = await getDb()`
-      SELECT DATE(created_at AT TIME ZONE 'America/New_York') as date, COUNT(*) as count
+      SELECT TO_CHAR(DATE(created_at AT TIME ZONE 'America/New_York'), 'YYYY-MM-DD') as date, COUNT(*) as count
       FROM ragecheck_visitors
       WHERE is_bot = false AND created_at > NOW() - INTERVAL '14 days'
       GROUP BY DATE(created_at AT TIME ZONE 'America/New_York')
@@ -2094,7 +2076,7 @@ export async function getVisitorStats(): Promise<VisitorStats> {
     `;
 
     const analysisTimeSeries = await getDb()`
-      SELECT DATE(created_at AT TIME ZONE 'America/New_York') as date, COUNT(*) as count
+      SELECT TO_CHAR(DATE(created_at AT TIME ZONE 'America/New_York'), 'YYYY-MM-DD') as date, COUNT(*) as count
       FROM ragecheck_analyses
       WHERE is_bot = false AND created_at > NOW() - INTERVAL '14 days'
       GROUP BY DATE(created_at AT TIME ZONE 'America/New_York')
@@ -2122,17 +2104,17 @@ export async function getVisitorStats(): Promise<VisitorStats> {
     }
 
     for (const row of visitorTimeSeries) {
-      const dateStr = parseDBDateToEST(row.date);
-      const existing = dateMap.get(dateStr) || { visitors: 0, analyses: 0 };
+      // Date is already a string from TO_CHAR
+      const existing = dateMap.get(row.date) || { visitors: 0, analyses: 0 };
       existing.visitors = Number(row.count);
-      dateMap.set(dateStr, existing);
+      dateMap.set(row.date, existing);
     }
 
     for (const row of analysisTimeSeries) {
-      const dateStr = parseDBDateToEST(row.date);
-      const existing = dateMap.get(dateStr) || { visitors: 0, analyses: 0 };
+      // Date is already a string from TO_CHAR
+      const existing = dateMap.get(row.date) || { visitors: 0, analyses: 0 };
       existing.analyses = Number(row.count);
-      dateMap.set(dateStr, existing);
+      dateMap.set(row.date, existing);
     }
 
     const timeSeries = Array.from(dateMap.entries())
@@ -2355,13 +2337,14 @@ export async function getRetentionMetrics(): Promise<RetentionMetrics> {
         JOIN cohort_sizes cs ON r.cohort_date = cs.cohort_date
         GROUP BY r.cohort_date, cs.cohort_size
       )
-      SELECT * FROM retention_rates
+      SELECT TO_CHAR(cohort_date, 'YYYY-MM-DD') as cohort_date, cohort_size, d1, d7, d14, d30 FROM retention_rates
       ORDER BY cohort_date DESC
       LIMIT 14
     `;
 
     const cohortRetention = cohortData.map(row => ({
-      cohortDate: parseDBDateToEST(row.cohort_date),
+      // Date is already a string from TO_CHAR
+      cohortDate: row.cohort_date,
       cohortSize: Number(row.cohort_size),
       d1: Number(row.d1) || 0,
       d7: Number(row.d7) || 0,
@@ -2543,8 +2526,9 @@ export async function getPageVisitorStats(pagePath: string): Promise<PageVisitor
       .map(([time, visitors]) => ({ time, visitors }));
 
     // Daily time series for last 14 days (grouped by EST date, excluding bots)
+    // Use TO_CHAR to return dates as strings matching the generate_series format
     const dailyData = await getDb()`
-      SELECT DATE(created_at AT TIME ZONE 'America/New_York') as date, COUNT(*) as count
+      SELECT TO_CHAR(DATE(created_at AT TIME ZONE 'America/New_York'), 'YYYY-MM-DD') as date, COUNT(*) as count
       FROM ragecheck_visitors
       WHERE is_bot = false AND page_path = ${pagePath} AND created_at > NOW() - INTERVAL '14 days'
       GROUP BY DATE(created_at AT TIME ZONE 'America/New_York')
@@ -2566,8 +2550,8 @@ export async function getPageVisitorStats(pagePath: string): Promise<PageVisitor
     }
 
     for (const row of dailyData) {
-      const dateStr = parseDBDateToEST(row.date);
-      dateMap.set(dateStr, Number(row.count));
+      // Date is already a string from TO_CHAR
+      dateMap.set(row.date, Number(row.count));
     }
 
     const timeSeries = Array.from(dateMap.entries())
@@ -2943,8 +2927,9 @@ export async function getViralMetrics(): Promise<ViralMetrics> {
     const isSpike = trafficVsBaseline > 3; // 3x normal = spike
 
     // Get 7-day trends for sparklines (grouped by EST date, excluding bots)
+    // Use TO_CHAR to return dates as strings matching the generate_series format
     const visitorTrends = await getDb()`
-      SELECT DATE(created_at AT TIME ZONE 'America/New_York') as day, COUNT(DISTINCT ip_address) as count
+      SELECT TO_CHAR(DATE(created_at AT TIME ZONE 'America/New_York'), 'YYYY-MM-DD') as day, COUNT(DISTINCT ip_address) as count
       FROM ragecheck_visitors
       WHERE is_bot = false AND created_at > NOW() - INTERVAL '7 days' AND ip_address IS NOT NULL
       GROUP BY DATE(created_at AT TIME ZONE 'America/New_York')
@@ -2952,7 +2937,7 @@ export async function getViralMetrics(): Promise<ViralMetrics> {
     `;
 
     const shareTrends = await getDb()`
-      SELECT DATE(created_at AT TIME ZONE 'America/New_York') as day, COUNT(*) as count
+      SELECT TO_CHAR(DATE(created_at AT TIME ZONE 'America/New_York'), 'YYYY-MM-DD') as day, COUNT(*) as count
       FROM ragecheck_shares
       WHERE created_at > NOW() - INTERVAL '7 days'
       GROUP BY DATE(created_at AT TIME ZONE 'America/New_York')
@@ -2960,7 +2945,7 @@ export async function getViralMetrics(): Promise<ViralMetrics> {
     `;
 
     const analysisTrends = await getDb()`
-      SELECT DATE(created_at AT TIME ZONE 'America/New_York') as day, COUNT(*) as count
+      SELECT TO_CHAR(DATE(created_at AT TIME ZONE 'America/New_York'), 'YYYY-MM-DD') as day, COUNT(*) as count
       FROM ragecheck_analyses
       WHERE is_bot = false AND created_at > NOW() - INTERVAL '7 days' AND success = true
       GROUP BY DATE(created_at AT TIME ZONE 'America/New_York')
@@ -2969,7 +2954,7 @@ export async function getViralMetrics(): Promise<ViralMetrics> {
 
     // Repeat visitors per day (visitors who had visited before that day, excluding bots)
     const repeatVisitorTrends = await getDb()`
-      SELECT DATE(v.created_at AT TIME ZONE 'America/New_York') as day, COUNT(DISTINCT v.ip_address) as count
+      SELECT TO_CHAR(DATE(v.created_at AT TIME ZONE 'America/New_York'), 'YYYY-MM-DD') as day, COUNT(DISTINCT v.ip_address) as count
       FROM ragecheck_visitors v
       WHERE v.is_bot = false AND v.created_at > NOW() - INTERVAL '7 days'
         AND v.ip_address IS NOT NULL
@@ -2994,10 +2979,11 @@ export async function getViralMetrics(): Promise<ViralMetrics> {
     `;
     const trendDates: string[] = trendDateRange.map(r => r.date);
 
-    const visitorMap = new Map(visitorTrends.map(r => [parseDBDateToEST(r.day), Number(r.count)]));
-    const shareMap = new Map(shareTrends.map(r => [parseDBDateToEST(r.day), Number(r.count)]));
-    const analysisMap = new Map(analysisTrends.map(r => [parseDBDateToEST(r.day), Number(r.count)]));
-    const repeatMap = new Map(repeatVisitorTrends.map(r => [parseDBDateToEST(r.day), Number(r.count)]));
+    // Dates are already strings from TO_CHAR
+    const visitorMap = new Map(visitorTrends.map(r => [r.day, Number(r.count)]));
+    const shareMap = new Map(shareTrends.map(r => [r.day, Number(r.count)]));
+    const analysisMap = new Map(analysisTrends.map(r => [r.day, Number(r.count)]));
+    const repeatMap = new Map(repeatVisitorTrends.map(r => [r.day, Number(r.count)]));
 
     const dailyVisitors = trendDates.map(d => visitorMap.get(d) || 0);
     const dailyShares = trendDates.map(d => shareMap.get(d) || 0);
@@ -3569,9 +3555,10 @@ export async function getFunnelMetrics(): Promise<FunnelMetrics> {
     ];
 
     // Get daily conversion trend (last 14 days, excluding bots)
+    // Use TO_CHAR to return dates as strings matching the generate_series format
     const dailyVisitors = await getDb()`
       SELECT
-        DATE(created_at AT TIME ZONE 'America/New_York') as date,
+        TO_CHAR(DATE(created_at AT TIME ZONE 'America/New_York'), 'YYYY-MM-DD') as date,
         COUNT(DISTINCT ip_address) as count
       FROM ragecheck_visitors
       WHERE is_bot = false
@@ -3583,7 +3570,7 @@ export async function getFunnelMetrics(): Promise<FunnelMetrics> {
 
     const dailyConverted = await getDb()`
       SELECT
-        DATE(created_at AT TIME ZONE 'America/New_York') as date,
+        TO_CHAR(DATE(created_at AT TIME ZONE 'America/New_York'), 'YYYY-MM-DD') as date,
         COUNT(DISTINCT ip_address) as count
       FROM ragecheck_analyses
       WHERE is_bot = false
@@ -3611,16 +3598,16 @@ export async function getFunnelMetrics(): Promise<FunnelMetrics> {
     }
 
     for (const row of dailyVisitors) {
-      const dateStr = parseDBDateToEST(row.date);
-      if (trendMap.has(dateStr)) {
-        trendMap.get(dateStr)!.visitors = Number(row.count);
+      // Date is already a string from TO_CHAR
+      if (trendMap.has(row.date)) {
+        trendMap.get(row.date)!.visitors = Number(row.count);
       }
     }
 
     for (const row of dailyConverted) {
-      const dateStr = parseDBDateToEST(row.date);
-      if (trendMap.has(dateStr)) {
-        trendMap.get(dateStr)!.converted = Number(row.count);
+      // Date is already a string from TO_CHAR
+      if (trendMap.has(row.date)) {
+        trendMap.get(row.date)!.converted = Number(row.count);
       }
     }
 
@@ -4469,10 +4456,11 @@ export async function getShareMetrics(): Promise<ShareMetrics> {
     };
 
     // Daily trend (last 14 days, excluding click events and admin)
+    // Use TO_CHAR to return dates as strings for consistent formatting
     const trendData = hasAdminExclusion
       ? await getDb()`
           SELECT
-            DATE(created_at AT TIME ZONE 'America/New_York') as day,
+            TO_CHAR(DATE(created_at AT TIME ZONE 'America/New_York'), 'YYYY-MM-DD') as day,
             COUNT(*) as shares,
             COUNT(DISTINCT ip_address) as unique_sharers
           FROM ragecheck_shares
@@ -4484,7 +4472,7 @@ export async function getShareMetrics(): Promise<ShareMetrics> {
         `
       : await getDb()`
           SELECT
-            DATE(created_at AT TIME ZONE 'America/New_York') as day,
+            TO_CHAR(DATE(created_at AT TIME ZONE 'America/New_York'), 'YYYY-MM-DD') as day,
             COUNT(*) as shares,
             COUNT(DISTINCT ip_address) as unique_sharers
           FROM ragecheck_shares
@@ -4495,7 +4483,8 @@ export async function getShareMetrics(): Promise<ShareMetrics> {
         `;
 
     const dailyTrend = trendData.map(row => ({
-      date: parseDBDateToEST(row.day),
+      // Date is already a string from TO_CHAR
+      date: row.day,
       shares: Number(row.shares),
       uniqueSharers: Number(row.unique_sharers),
     }));
