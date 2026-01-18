@@ -358,47 +358,163 @@ export async function generateShareImage(
       ctx.stroke();
     } else {
       // Show content cleanly for URL analyses
-      const contentPadding = 48;
+      const contentPadding = 32;
       const contentWidth = leftWidth - (contentPadding * 2);
 
-      // Source domain pill at top
-      ctx.font = "600 18px system-ui, -apple-system, sans-serif";
-      const displayDomain = data.domain.replace(/^www\./, "").split('/')[0];
-      const domainText = displayDomain || "source";
-      const pillWidth = ctx.measureText(domainText).width + 32;
-      const pillHeight = 36;
-      const pillY = contentPadding;
-
-      ctx.fillStyle = "#f4f4f5";
-      roundRect(ctx, contentPadding, pillY, pillWidth, pillHeight, 18);
-      ctx.fill();
-
-      ctx.fillStyle = "#52525b";
-      ctx.textAlign = "left";
-      ctx.textBaseline = "middle";
-      ctx.fillText(domainText, contentPadding + 16, pillY + pillHeight / 2);
-
-      // Title/headline - centered vertically in remaining space
-      // For social posts, use textPreview (actual content) instead of title
+      // Check if it's a social post
       const socialDomains = ["x.com", "twitter.com", "bsky.app", "facebook.com", "instagram.com", "reddit.com", "threads.net"];
       const isSocialPost = socialDomains.some(d => data.domain.includes(d));
-      ctx.font = "500 42px system-ui, -apple-system, sans-serif";
-      const bodyText = (isSocialPost && data.textPreview) ? data.textPreview : data.title;
-      const bodyLines = wrapText(ctx, bodyText, contentWidth, 10);
-      const lineHeight = 50;
-      const bodyHeight = bodyLines.length * lineHeight;
+      const isTwitter = data.domain.includes("x.com") || data.domain.includes("twitter.com");
+      const isBluesky = data.domain.includes("bsky.app");
 
-      // Center the title block vertically (below the pill)
-      const availableHeight = height - pillY - pillHeight - contentPadding - 40;
-      const titleStartY = pillY + pillHeight + (availableHeight - bodyHeight) / 2 - 20;
+      if (isSocialPost && data.textPreview) {
+        // === SOCIAL POST CARD DESIGN ===
+        const cardPadding = 24;
+        const cardMargin = 24;
+        const cardWidth = leftWidth - (cardMargin * 2);
+        const cardX = cardMargin;
 
-      ctx.fillStyle = "#18181b";
-      ctx.textAlign = "left";
-      ctx.textBaseline = "top";
+        // Extract username from title (e.g., "Tweet by @MayorFrey" or "Post by @username")
+        let username = "User";
+        let handle = "@user";
+        const titleMatch = data.title.match(/(?:Tweet|Post|Skeet)\s+by\s+@?(\w+)/i);
+        if (titleMatch) {
+          username = titleMatch[1];
+          handle = `@${titleMatch[1]}`;
+        } else if (data.title.includes("@")) {
+          const atMatch = data.title.match(/@(\w+)/);
+          if (atMatch) {
+            username = atMatch[1];
+            handle = `@${atMatch[1]}`;
+          }
+        }
 
-      bodyLines.forEach((line, i) => {
-        ctx.fillText(line, contentPadding, titleStartY + (i * lineHeight));
-      });
+        // Calculate card height based on content
+        ctx.font = "400 28px system-ui, -apple-system, sans-serif";
+        const postLines = wrapText(ctx, data.textPreview, cardWidth - (cardPadding * 2), 8);
+        const postLineHeight = 36;
+        const postHeight = postLines.length * postLineHeight;
+        const headerHeight = 60; // Avatar + name area
+        const cardHeight = Math.min(height - (cardMargin * 2), cardPadding * 2 + headerHeight + postHeight + 20);
+        const cardY = (height - cardHeight) / 2;
+
+        // Card background with shadow effect
+        ctx.fillStyle = "rgba(0,0,0,0.08)";
+        roundRect(ctx, cardX + 4, cardY + 4, cardWidth, cardHeight, 16);
+        ctx.fill();
+
+        ctx.fillStyle = "#ffffff";
+        roundRect(ctx, cardX, cardY, cardWidth, cardHeight, 16);
+        ctx.fill();
+
+        // Card border
+        ctx.strokeStyle = "#e4e4e7";
+        ctx.lineWidth = 1;
+        roundRect(ctx, cardX, cardY, cardWidth, cardHeight, 16);
+        ctx.stroke();
+
+        // Avatar circle
+        const avatarSize = 48;
+        const avatarX = cardX + cardPadding;
+        const avatarY = cardY + cardPadding;
+
+        ctx.fillStyle = "#18181b";
+        ctx.beginPath();
+        ctx.arc(avatarX + avatarSize / 2, avatarY + avatarSize / 2, avatarSize / 2, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Avatar letter
+        ctx.font = "700 24px system-ui, -apple-system, sans-serif";
+        ctx.fillStyle = "#ffffff";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(username[0].toUpperCase(), avatarX + avatarSize / 2, avatarY + avatarSize / 2);
+
+        // Username and handle
+        const nameX = avatarX + avatarSize + 12;
+        const nameY = avatarY + 14;
+
+        ctx.font = "700 22px system-ui, -apple-system, sans-serif";
+        ctx.fillStyle = "#18181b";
+        ctx.textAlign = "left";
+        ctx.textBaseline = "top";
+        ctx.fillText(username, nameX, nameY);
+
+        ctx.font = "400 18px system-ui, -apple-system, sans-serif";
+        ctx.fillStyle = "#71717a";
+        ctx.fillText(handle, nameX, nameY + 26);
+
+        // Platform logo (X/Twitter or Bluesky)
+        const logoX = cardX + cardWidth - cardPadding - 24;
+        const logoY = avatarY + 12;
+
+        if (isTwitter) {
+          // X logo
+          ctx.font = "700 28px system-ui, -apple-system, sans-serif";
+          ctx.fillStyle = "#18181b";
+          ctx.textAlign = "center";
+          ctx.fillText("𝕏", logoX + 12, logoY + 14);
+        } else if (isBluesky) {
+          // Bluesky butterfly (simplified)
+          ctx.fillStyle = "#0085ff";
+          ctx.beginPath();
+          ctx.arc(logoX + 12, logoY + 12, 12, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.font = "700 16px system-ui, -apple-system, sans-serif";
+          ctx.fillStyle = "#ffffff";
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillText("☁", logoX + 12, logoY + 12);
+        }
+
+        // Post content
+        const postY = avatarY + avatarSize + 16;
+        ctx.font = "400 28px system-ui, -apple-system, sans-serif";
+        ctx.fillStyle = "#18181b";
+        ctx.textAlign = "left";
+        ctx.textBaseline = "top";
+
+        postLines.forEach((line, i) => {
+          ctx.fillText(line, cardX + cardPadding, postY + (i * postLineHeight));
+        });
+
+      } else {
+        // === ARTICLE/NEWS CARD DESIGN ===
+        // Source domain pill at top
+        ctx.font = "600 18px system-ui, -apple-system, sans-serif";
+        const displayDomain = data.domain.replace(/^www\./, "").split('/')[0];
+        const domainText = displayDomain || "source";
+        const pillWidth = ctx.measureText(domainText).width + 32;
+        const pillHeight = 36;
+        const pillY = contentPadding + 16;
+
+        ctx.fillStyle = "#f4f4f5";
+        roundRect(ctx, contentPadding, pillY, pillWidth, pillHeight, 18);
+        ctx.fill();
+
+        ctx.fillStyle = "#52525b";
+        ctx.textAlign = "left";
+        ctx.textBaseline = "middle";
+        ctx.fillText(domainText, contentPadding + 16, pillY + pillHeight / 2);
+
+        // Title/headline - centered vertically in remaining space
+        ctx.font = "500 42px system-ui, -apple-system, sans-serif";
+        const bodyLines = wrapText(ctx, data.title, contentWidth, 10);
+        const lineHeight = 50;
+        const bodyHeight = bodyLines.length * lineHeight;
+
+        // Center the title block vertically (below the pill)
+        const availableHeight = height - pillY - pillHeight - contentPadding - 40;
+        const titleStartY = pillY + pillHeight + (availableHeight - bodyHeight) / 2 - 20;
+
+        ctx.fillStyle = "#18181b";
+        ctx.textAlign = "left";
+        ctx.textBaseline = "top";
+
+        bodyLines.forEach((line, i) => {
+          ctx.fillText(line, contentPadding, titleStartY + (i * lineHeight));
+        });
+      }
     }
 
 
