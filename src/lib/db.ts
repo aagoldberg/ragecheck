@@ -2101,28 +2101,21 @@ export async function getVisitorStats(): Promise<VisitorStats> {
     // Merge into single time series
     const dateMap = new Map<string, { visitors: number; analyses: number }>();
 
-    // Initialize last 14 complete days (excluding today which is incomplete)
-    // Must calculate dates in EST to match database query results
-    const now = new Date();
-    const estFormatter = new Intl.DateTimeFormat('en-CA', {
-      timeZone: 'America/New_York',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-    });
+    // Get the date range directly from PostgreSQL to ensure dates match exactly
+    // This generates 15 dates (today + 14 days back) in EST timezone
+    const dateRange = await getDb()`
+      SELECT TO_CHAR(d::date, 'YYYY-MM-DD') as date
+      FROM generate_series(
+        (NOW() AT TIME ZONE 'America/New_York')::date - INTERVAL '14 days',
+        (NOW() AT TIME ZONE 'America/New_York')::date,
+        '1 day'
+      ) d
+      ORDER BY d ASC
+    `;
 
-    // Get today's date in EST as a starting point
-    const todayEST = estFormatter.format(now); // YYYY-MM-DD format
-    const [todayYear, todayMonth, todayDay] = todayEST.split('-').map(Number);
-
-    // Create a date object representing midnight EST for today
-    // EST is UTC-5 (or UTC-4 during DST), so midnight EST = 5am UTC (winter) or 4am UTC (summer)
-    // We'll calculate backwards from today in EST
-    for (let i = 14; i >= 0; i--) {
-      // Calculate the date i days before today in EST
-      const targetDate = new Date(Date.UTC(todayYear, todayMonth - 1, todayDay - i, 12, 0, 0)); // Use noon UTC to avoid DST edge cases
-      const dateStr = estFormatter.format(targetDate);
-      dateMap.set(dateStr, { visitors: 0, analyses: 0 });
+    // Initialize with dates from database (guaranteed to match)
+    for (const row of dateRange) {
+      dateMap.set(row.date, { visitors: 0, analyses: 0 });
     }
 
     for (const row of visitorTimeSeries) {
@@ -2145,10 +2138,6 @@ export async function getVisitorStats(): Promise<VisitorStats> {
 
     // Debug: log what we're generating
     console.log("TimeSeries Debug:", {
-      todayEST,
-      todayYear,
-      todayMonth,
-      todayDay,
       generatedDates: Array.from(dateMap.keys()),
       dbVisitorDates: visitorTimeSeries.map(r => ({ raw: r.date, parsed: parseDBDateToEST(r.date) })),
       finalTimeSeries: timeSeries.map(t => ({ date: t.date, visitors: t.visitors, analyses: t.analyses })),
