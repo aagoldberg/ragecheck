@@ -41,11 +41,18 @@ function getESTDateString(date: Date = new Date()): string {
 
 // Helper to get EST date string from a PostgreSQL date result
 // Handles both Date objects and string representations
+// Uses Intl.DateTimeFormat for consistent formatting with date initialization
+const dbDateFormatter = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'UTC', // DB dates are in UTC
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+});
+
 function parseDBDateToEST(dbDate: Date | string): string {
   if (dbDate instanceof Date) {
-    // If it's a Date object, the DB already parsed it - extract the date parts directly
-    // PostgreSQL dates come back as midnight UTC, so we use UTC methods
-    return `${dbDate.getUTCFullYear()}-${String(dbDate.getUTCMonth() + 1).padStart(2, '0')}-${String(dbDate.getUTCDate()).padStart(2, '0')}`;
+    // Use Intl.DateTimeFormat for consistent YYYY-MM-DD format
+    return dbDateFormatter.format(dbDate);
   }
   // If it's a string like "2025-01-15", just take the date part
   return String(dbDate).split('T')[0];
