@@ -777,14 +777,17 @@ export async function getAnalysisCompletionMetrics(): Promise<AnalysisCompletion
     `;
 
     const dailyMap = new Map<string, { started: number; completed: number }>();
-    // Calculate dates in EST to match database query results
-    const estFmt = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' });
-    const todayESTStr = estFmt.format(new Date());
-    const [tYear, tMonth, tDay] = todayESTStr.split('-').map(Number);
-    for (let i = 13; i >= 0; i--) {
-      const targetDate = new Date(Date.UTC(tYear, tMonth - 1, tDay - i, 12, 0, 0));
-      const dateStr = estFmt.format(targetDate);
-      dailyMap.set(dateStr, { started: 0, completed: 0 });
+    // Get date range from PostgreSQL to ensure exact match
+    const funnelDateRange = await getDb()`
+      SELECT TO_CHAR(d::date, 'YYYY-MM-DD') as date
+      FROM generate_series(
+        (NOW() AT TIME ZONE 'America/New_York')::date - INTERVAL '13 days',
+        (NOW() AT TIME ZONE 'America/New_York')::date,
+        '1 day'
+      ) d ORDER BY d ASC
+    `;
+    for (const row of funnelDateRange) {
+      dailyMap.set(row.date, { started: 0, completed: 0 });
     }
     for (const row of dailyStarted) {
       const dateStr = parseDBDateToEST(row.date);
@@ -2136,13 +2139,6 @@ export async function getVisitorStats(): Promise<VisitorStats> {
       .sort((a, b) => a[0].localeCompare(b[0]))
       .map(([date, data]) => ({ date, ...data }));
 
-    // Debug: log what we're generating
-    console.log("TimeSeries Debug:", {
-      generatedDates: Array.from(dateMap.keys()),
-      dbVisitorDates: visitorTimeSeries.map(r => ({ raw: r.date, parsed: parseDBDateToEST(r.date) })),
-      finalTimeSeries: timeSeries.map(t => ({ date: t.date, visitors: t.visitors, analyses: t.analyses })),
-    });
-
     // Realtime series - 30 minute buckets for last 3 days (72 hours), excluding bots
     // Use EXTRACT(EPOCH) to get Unix timestamp in seconds - this is unambiguous and avoids timezone parsing issues
     // The bucketing is done in UTC (using date_trunc on created_at directly)
@@ -2556,13 +2552,17 @@ export async function getPageVisitorStats(pagePath: string): Promise<PageVisitor
     `;
 
     const dateMap = new Map<string, number>();
-    // Calculate dates in EST to match database query results
-    const estFmt = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' });
-    const todayESTStr = estFmt.format(new Date());
-    const [tYear, tMonth, tDay] = todayESTStr.split('-').map(Number);
-    for (let i = 14; i >= 0; i--) {
-      const targetDate = new Date(Date.UTC(tYear, tMonth - 1, tDay - i, 12, 0, 0));
-      dateMap.set(estFmt.format(targetDate), 0);
+    // Get date range from PostgreSQL to ensure exact match
+    const pageVisitorDateRange = await getDb()`
+      SELECT TO_CHAR(d::date, 'YYYY-MM-DD') as date
+      FROM generate_series(
+        (NOW() AT TIME ZONE 'America/New_York')::date - INTERVAL '14 days',
+        (NOW() AT TIME ZONE 'America/New_York')::date,
+        '1 day'
+      ) d ORDER BY d ASC
+    `;
+    for (const row of pageVisitorDateRange) {
+      dateMap.set(row.date, 0);
     }
 
     for (const row of dailyData) {
@@ -2983,15 +2983,16 @@ export async function getViralMetrics(): Promise<ViralMetrics> {
     `;
 
     // Build trend arrays (7 days, oldest to newest)
-    // Calculate dates in EST to match database query results
-    const estFmt = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' });
-    const todayESTStr = estFmt.format(new Date());
-    const [tYear, tMonth, tDay] = todayESTStr.split('-').map(Number);
-    const trendDates: string[] = [];
-    for (let i = 6; i >= 0; i--) {
-      const targetDate = new Date(Date.UTC(tYear, tMonth - 1, tDay - i, 12, 0, 0));
-      trendDates.push(estFmt.format(targetDate));
-    }
+    // Get date range from PostgreSQL to ensure exact match
+    const trendDateRange = await getDb()`
+      SELECT TO_CHAR(d::date, 'YYYY-MM-DD') as date
+      FROM generate_series(
+        (NOW() AT TIME ZONE 'America/New_York')::date - INTERVAL '6 days',
+        (NOW() AT TIME ZONE 'America/New_York')::date,
+        '1 day'
+      ) d ORDER BY d ASC
+    `;
+    const trendDates: string[] = trendDateRange.map(r => r.date);
 
     const visitorMap = new Map(visitorTrends.map(r => [parseDBDateToEST(r.day), Number(r.count)]));
     const shareMap = new Map(shareTrends.map(r => [parseDBDateToEST(r.day), Number(r.count)]));
@@ -3596,13 +3597,17 @@ export async function getFunnelMetrics(): Promise<FunnelMetrics> {
     // Build trend data
     const trendMap = new Map<string, { visitors: number; converted: number }>();
 
-    // Initialize last 14 days in EST to match database query results
-    const estFmt = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' });
-    const todayESTStr = estFmt.format(new Date());
-    const [tYear, tMonth, tDay] = todayESTStr.split('-').map(Number);
-    for (let i = 13; i >= 0; i--) {
-      const targetDate = new Date(Date.UTC(tYear, tMonth - 1, tDay - i, 12, 0, 0));
-      trendMap.set(estFmt.format(targetDate), { visitors: 0, converted: 0 });
+    // Get date range from PostgreSQL to ensure exact match
+    const conversionDateRange = await getDb()`
+      SELECT TO_CHAR(d::date, 'YYYY-MM-DD') as date
+      FROM generate_series(
+        (NOW() AT TIME ZONE 'America/New_York')::date - INTERVAL '13 days',
+        (NOW() AT TIME ZONE 'America/New_York')::date,
+        '1 day'
+      ) d ORDER BY d ASC
+    `;
+    for (const row of conversionDateRange) {
+      trendMap.set(row.date, { visitors: 0, converted: 0 });
     }
 
     for (const row of dailyVisitors) {
