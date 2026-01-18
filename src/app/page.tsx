@@ -1233,24 +1233,6 @@ function HomeContent() {
                     />
                   </label>
 
-                  {/* Surprise Me button */}
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      tracking.trackSurpriseMeClick();
-                      const randomExample = CURATED_EXAMPLES[Math.floor(Math.random() * CURATED_EXAMPLES.length)];
-                      setUrl(randomExample.url);
-                      analyze(randomExample.url);
-                    }}
-                    disabled={loading}
-                    className="flex items-center justify-center gap-2 w-full px-6 py-3 bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-xl font-medium text-sm hover:from-indigo-600 hover:to-purple-600 transition-all active:scale-[0.98] disabled:opacity-50"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    Surprise me
-                  </button>
                 </div>
 
                 {/* Desktop: Original inline design */}
