@@ -836,6 +836,8 @@ function HomeContent() {
 
       const data = await response.json();
       setResult(data);
+      // Scroll to top so users see results from the beginning
+      window.scrollTo({ top: 0, behavior: 'smooth' });
 
       if (data.success && data.score !== undefined) {
         tracking.trackAnalysisCompleted(data.score, data.platform || null, data.llmEnhanced || false);
@@ -877,6 +879,8 @@ function HomeContent() {
 
       const data = await response.json();
       setResult(data);
+      // Scroll to top so users see results from the beginning
+      window.scrollTo({ top: 0, behavior: 'smooth' });
 
       if (data.success && data.score !== undefined) {
         tracking.trackAnalysisCompleted(data.score, data.sourceDomain || null, data.llmEnhanced || false);
@@ -1665,8 +1669,8 @@ function HomeContent() {
                   </div>
                 </BentoCard>
 
-                {/* Email Capture - only show after real analysis, not demo */}
-                {!isDemo && (
+                {/* Email Capture - only show after successful real analysis */}
+                {!isDemo && result?.success && (
                 <div className="bg-zinc-900 dark:bg-zinc-100 rounded-2xl p-6 shadow-lg border border-zinc-800 dark:border-zinc-200">
                   {emailSubscribed ? (
                     <div className="flex items-center gap-3 text-emerald-400 dark:text-emerald-600">
