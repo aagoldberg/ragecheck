@@ -2136,6 +2136,17 @@ export async function getVisitorStats(): Promise<VisitorStats> {
       .sort((a, b) => a[0].localeCompare(b[0]))
       .map(([date, data]) => ({ date, ...data }));
 
+    // Debug: log what we're generating
+    console.log("TimeSeries Debug:", {
+      todayEST,
+      todayYear,
+      todayMonth,
+      todayDay,
+      generatedDates: Array.from(dateMap.keys()),
+      dbVisitorDates: visitorTimeSeries.map(r => ({ raw: r.date, parsed: parseDBDateToEST(r.date) })),
+      finalTimeSeries: timeSeries.map(t => ({ date: t.date, visitors: t.visitors, analyses: t.analyses })),
+    });
+
     // Realtime series - 30 minute buckets for last 3 days (72 hours), excluding bots
     // Use EXTRACT(EPOCH) to get Unix timestamp in seconds - this is unambiguous and avoids timezone parsing issues
     // The bucketing is done in UTC (using date_trunc on created_at directly)
