@@ -220,6 +220,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<AnalyzeRe
         sharingPatterns: cached.sharingPatterns || undefined,
         techniqueExplanations: cached.techniqueExplanations || undefined,
         shareCardSummary: cached.shareCardSummary || undefined,
+        shareCardBullets: cached.shareCardBullets || undefined,
         language: language || undefined,
       });
 
@@ -238,6 +239,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<AnalyzeRe
         sharingPatterns: cached.sharingPatterns,
         techniqueExplanations: cached.techniqueExplanations,
         shareCardSummary: cached.shareCardSummary || undefined,
+        shareCardBullets: cached.shareCardBullets || undefined,
         cached: true,
       });
     }

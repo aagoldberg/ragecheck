@@ -226,6 +226,7 @@ export async function initDB() {
     await getDb()`ALTER TABLE ragecheck_analyses ADD COLUMN IF NOT EXISTS sharing_patterns JSONB`;
     await getDb()`ALTER TABLE ragecheck_analyses ADD COLUMN IF NOT EXISTS technique_explanations JSONB`;
     await getDb()`ALTER TABLE ragecheck_analyses ADD COLUMN IF NOT EXISTS share_card_summary TEXT`;
+    await getDb()`ALTER TABLE ragecheck_analyses ADD COLUMN IF NOT EXISTS share_card_bullets JSONB`;
     await getDb()`ALTER TABLE ragecheck_analyses ADD COLUMN IF NOT EXISTS failed_image_url TEXT`;
     // Content categorization columns
     await getDb()`ALTER TABLE ragecheck_analyses ADD COLUMN IF NOT EXISTS topic TEXT`;
@@ -277,6 +278,7 @@ export interface AnalysisLog {
   sharingPatterns?: string[];
   techniqueExplanations?: string[];
   shareCardSummary?: string;
+  shareCardBullets?: string[];
   failedImageUrl?: string;
   // Content categorization
   topic?: string;
@@ -338,7 +340,7 @@ export async function logAnalysis(data: AnalysisLog) {
           signal_us_vs_them, signal_engagement_bait, success, error,
           ip_address, user_agent, country, is_bot,
           title, reasons, highlights, context_notes, text_preview,
-          sharing_patterns, technique_explanations, share_card_summary, failed_image_url,
+          sharing_patterns, technique_explanations, share_card_summary, share_card_bullets, failed_image_url,
           topic, content_type, source_type, session_id, language
         ) VALUES (
           ${data.url},
@@ -366,6 +368,7 @@ export async function logAnalysis(data: AnalysisLog) {
           ${data.sharingPatterns ? JSON.stringify(data.sharingPatterns) : null},
           ${data.techniqueExplanations ? JSON.stringify(data.techniqueExplanations) : null},
           ${data.shareCardSummary || null},
+          ${data.shareCardBullets ? JSON.stringify(data.shareCardBullets) : null},
           ${data.failedImageUrl || null},
           ${data.topic || null},
           ${data.contentType || null},
@@ -1426,6 +1429,7 @@ export interface CachedAnalysis {
   sharingPatterns: string[];
   techniqueExplanations: string[];
   shareCardSummary: string | null;
+  shareCardBullets: string[];
 }
 
 // Invalidate incomplete cache entries (those without textPreview)
@@ -1504,7 +1508,7 @@ export async function getCachedAnalysis(url: string): Promise<CachedAnalysis | n
           signal_loaded_language, signal_absolutist, signal_threat_panic,
           signal_us_vs_them, signal_engagement_bait, created_at,
           title, reasons, highlights, context_notes, text_preview,
-          sharing_patterns, technique_explanations, share_card_summary
+          sharing_patterns, technique_explanations, share_card_summary, share_card_bullets
         FROM ragecheck_analyses
         WHERE url = ${url}
           AND success = true
@@ -1536,6 +1540,11 @@ export async function getCachedAnalysis(url: string): Promise<CachedAnalysis | n
         techniqueExplanations = typeof result.technique_explanations === 'string' ? JSON.parse(result.technique_explanations) : result.technique_explanations;
       }
 
+      let shareCardBullets: string[] = [];
+      if (result.share_card_bullets) {
+        shareCardBullets = typeof result.share_card_bullets === 'string' ? JSON.parse(result.share_card_bullets) : result.share_card_bullets;
+      }
+
       return {
         url: result.url,
         sourceDomain: result.source_domain || "unknown",
@@ -1558,6 +1567,7 @@ export async function getCachedAnalysis(url: string): Promise<CachedAnalysis | n
         sharingPatterns,
         techniqueExplanations,
         shareCardSummary: result.share_card_summary || null,
+        shareCardBullets,
       };
     }
 
