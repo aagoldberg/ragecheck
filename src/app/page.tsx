@@ -836,8 +836,10 @@ function HomeContent() {
       });
 
       const data = await response.json();
-      // Store that this was an image upload for share tracking
-      data.analyzedUrl = "image-upload";
+      // Use the unique URL from API response for share tracking, fallback to generic if not provided
+      if (!data.analyzedUrl) {
+        data.analyzedUrl = "image-upload";
+      }
       setResult(data);
       // Scroll to top so users see results from the beginning
       window.scrollTo({ top: 0, behavior: 'smooth' });

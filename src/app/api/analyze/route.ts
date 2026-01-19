@@ -45,6 +45,7 @@ export interface AnalyzeResponse {
   shareCardBullets?: string[];
   cached?: boolean;
   uploadedImageUrl?: string;
+  analyzedUrl?: string; // Unique URL for this analysis, used for share tracking
 }
 
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5MB
@@ -92,9 +93,11 @@ export async function POST(request: NextRequest): Promise<NextResponse<AnalyzeRe
       if (!result.success) {
         // Save failed image to blob storage for diagnosis
         const failedImageUrl = await saveFailedImage(image, result.error || "Unknown error");
+        // Use blob URL if available, otherwise generate a unique ID for this upload
+        const uniqueUrl = failedImageUrl || `image-upload-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
         await logAnalysis({
-          url: "image-upload",
+          url: uniqueUrl,
           sourceDomain: "image",
           success: false,
           error: result.error || "Failed to analyze image",
@@ -107,15 +110,16 @@ export async function POST(request: NextRequest): Promise<NextResponse<AnalyzeRe
         });
 
         return jsonResponse(
-          { success: false, error: result.error || "Failed to analyze image" },
+          { success: false, error: result.error || "Failed to analyze image", analyzedUrl: uniqueUrl },
           { status: 422 }
         );
       }
 
       // Check if the image has no analyzable text content
       if (result.platform === "not_social_media" || result.platform === "no_text_content") {
+        const uniqueUrl = `image-upload-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
         await logAnalysis({
-          url: "image-upload",
+          url: uniqueUrl,
           sourceDomain: result.platform,
           success: false,
           error: "Image has no text content to analyze",
@@ -129,7 +133,8 @@ export async function POST(request: NextRequest): Promise<NextResponse<AnalyzeRe
         return jsonResponse(
           {
             success: false,
-            error: "This image doesn't have text content to analyze. Please upload a screenshot of a social media post, meme with text, or news headline."
+            error: "This image doesn't have text content to analyze. Please upload a screenshot of a social media post, meme with text, or news headline.",
+            analyzedUrl: uniqueUrl,
           },
           { status: 422 }
         );
@@ -137,10 +142,12 @@ export async function POST(request: NextRequest): Promise<NextResponse<AnalyzeRe
 
       // Save successful image to blob storage
       const imageUrl = await saveUploadedImage(image, "uploads");
+      // Use blob URL for unique identification, or generate one if save failed
+      const uniqueUrl = imageUrl || `image-upload-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
       // Log successful image analysis
       await logAnalysis({
-        url: "image-upload",
+        url: uniqueUrl,
         sourceDomain: result.platform || "image",
         score: result.score,
         label: result.label,
@@ -171,6 +178,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<AnalyzeRe
         shareCardSummary: result.shareCardSummary,
         shareCardBullets: result.shareCardBullets,
         uploadedImageUrl: imageUrl || undefined,
+        analyzedUrl: uniqueUrl, // For share tracking
       });
     }
 
