@@ -569,8 +569,8 @@ function HomeContent() {
   const searchParams = useSearchParams();
   const [url, setUrl] = useState("");
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<AnalysisResult | null>(null);
-  const [isDemo, setIsDemo] = useState(false);
+  const [result, setResult] = useState<AnalysisResult | null>(DEMO_RESULT);
+  const [isDemo, setIsDemo] = useState(true);
   const [autoAnalyzeTriggered, setAutoAnalyzeTriggered] = useState(false);
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
   const [headlines, setHeadlines] = useState<Headline[]>([]);
