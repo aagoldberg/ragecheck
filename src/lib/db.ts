@@ -194,6 +194,30 @@ export async function initDB() {
     )
   `;
 
+  // Scored headlines table for high-rage feed
+  await getDb()`
+    CREATE TABLE IF NOT EXISTS ragecheck_headlines (
+      id SERIAL PRIMARY KEY,
+      url TEXT UNIQUE NOT NULL,
+      title TEXT NOT NULL,
+      description TEXT,
+      source TEXT NOT NULL,
+      lean TEXT NOT NULL,
+      score INTEGER,
+      summary TEXT,
+      published_at TIMESTAMP,
+      scored_at TIMESTAMP DEFAULT NOW(),
+      created_at TIMESTAMP DEFAULT NOW()
+    )
+  `;
+
+  // Index for efficient querying of top headlines
+  await getDb()`
+    CREATE INDEX IF NOT EXISTS idx_headlines_score_date
+    ON ragecheck_headlines(score DESC, scored_at DESC)
+    WHERE score IS NOT NULL
+  `;
+
   // Add additional columns to shares table for enhanced tracking
   try {
     await getDb()`ALTER TABLE ragecheck_shares ADD COLUMN IF NOT EXISTS score INTEGER`;
@@ -202,6 +226,32 @@ export async function initDB() {
   } catch {
     // Columns may already exist
   }
+
+  // Add rich analysis columns to headlines table
+  try {
+    await getDb()`ALTER TABLE ragecheck_headlines ADD COLUMN IF NOT EXISTS analysis TEXT`;
+    await getDb()`ALTER TABLE ragecheck_headlines ADD COLUMN IF NOT EXISTS topic TEXT`;
+    await getDb()`ALTER TABLE ragecheck_headlines ADD COLUMN IF NOT EXISTS category TEXT`;
+    await getDb()`ALTER TABLE ragecheck_headlines ADD COLUMN IF NOT EXISTS arousal INTEGER`;
+    await getDb()`ALTER TABLE ragecheck_headlines ADD COLUMN IF NOT EXISTS enemy_construction INTEGER`;
+    await getDb()`ALTER TABLE ragecheck_headlines ADD COLUMN IF NOT EXISTS moral_condemnation INTEGER`;
+    await getDb()`ALTER TABLE ragecheck_headlines ADD COLUMN IF NOT EXISTS simplification INTEGER`;
+    await getDb()`ALTER TABLE ragecheck_headlines ADD COLUMN IF NOT EXISTS call_to_conflict INTEGER`;
+    // RSS metadata fields
+    await getDb()`ALTER TABLE ragecheck_headlines ADD COLUMN IF NOT EXISTS author TEXT`;
+    await getDb()`ALTER TABLE ragecheck_headlines ADD COLUMN IF NOT EXISTS image_url TEXT`;
+    await getDb()`ALTER TABLE ragecheck_headlines ADD COLUMN IF NOT EXISTS rss_categories TEXT[]`;
+    await getDb()`ALTER TABLE ragecheck_headlines ADD COLUMN IF NOT EXISTS guid TEXT`;
+  } catch {
+    // Columns may already exist
+  }
+
+  // Index for Clearview topic grouping
+  await getDb()`
+    CREATE INDEX IF NOT EXISTS idx_headlines_topic
+    ON ragecheck_headlines(topic, scored_at DESC)
+    WHERE topic IS NOT NULL
+  `;
 
   // Add columns if they don't exist (for existing tables)
   try {
@@ -5011,5 +5061,256 @@ export async function getLanguageStats(): Promise<LanguageStats | null> {
   } catch (error) {
     console.error("Failed to get language stats:", error);
     return null;
+  }
+}
+
+// ============================================
+// SCORED HEADLINES (High-Rage Feed)
+// ============================================
+
+export interface ScoredHeadline {
+  id?: number;
+  url: string;
+  title: string;
+  description?: string;
+  source: string;
+  lean: string;
+  score?: number;
+  summary?: string;
+  analysis?: string;
+  topic?: string;
+  category?: string;
+  signalBreakdown?: {
+    arousal: number;
+    enemy_construction: number;
+    moral_condemnation: number;
+    simplification: number;
+    call_to_conflict: number;
+  };
+  // RSS metadata
+  author?: string;
+  imageUrl?: string;
+  rssCategories?: string[];
+  guid?: string;
+  publishedAt?: Date;
+  scoredAt?: Date;
+}
+
+// Check which URLs already exist in the database
+export async function getExistingHeadlineUrls(urls: string[]): Promise<Set<string>> {
+  if (!process.env.DATABASE_URL || urls.length === 0) return new Set();
+
+  try {
+    await initDB();
+    const results = await getDb()`
+      SELECT url FROM ragecheck_headlines
+      WHERE url = ANY(${urls})
+    `;
+    return new Set(results.map((r) => r.url as string));
+  } catch (error) {
+    console.error("Failed to check existing headlines:", error);
+    return new Set();
+  }
+}
+
+// Insert a new scored headline
+export async function insertScoredHeadline(headline: ScoredHeadline): Promise<void> {
+  if (!process.env.DATABASE_URL) return;
+
+  try {
+    await initDB();
+    await getDb()`
+      INSERT INTO ragecheck_headlines (
+        url, title, description, source, lean, score, summary, analysis, topic, category,
+        arousal, enemy_construction, moral_condemnation, simplification, call_to_conflict,
+        author, image_url, rss_categories, guid, published_at
+      )
+      VALUES (
+        ${headline.url},
+        ${headline.title},
+        ${headline.description || null},
+        ${headline.source},
+        ${headline.lean},
+        ${headline.score || null},
+        ${headline.summary || null},
+        ${headline.analysis || null},
+        ${headline.topic || null},
+        ${headline.category || null},
+        ${headline.signalBreakdown?.arousal || null},
+        ${headline.signalBreakdown?.enemy_construction || null},
+        ${headline.signalBreakdown?.moral_condemnation || null},
+        ${headline.signalBreakdown?.simplification || null},
+        ${headline.signalBreakdown?.call_to_conflict || null},
+        ${headline.author || null},
+        ${headline.imageUrl || null},
+        ${headline.rssCategories || null},
+        ${headline.guid || null},
+        ${headline.publishedAt || null}
+      )
+      ON CONFLICT (url) DO UPDATE SET
+        score = EXCLUDED.score,
+        summary = EXCLUDED.summary,
+        analysis = EXCLUDED.analysis,
+        topic = EXCLUDED.topic,
+        category = EXCLUDED.category,
+        arousal = EXCLUDED.arousal,
+        enemy_construction = EXCLUDED.enemy_construction,
+        moral_condemnation = EXCLUDED.moral_condemnation,
+        simplification = EXCLUDED.simplification,
+        call_to_conflict = EXCLUDED.call_to_conflict,
+        author = COALESCE(EXCLUDED.author, ragecheck_headlines.author),
+        image_url = COALESCE(EXCLUDED.image_url, ragecheck_headlines.image_url),
+        rss_categories = COALESCE(EXCLUDED.rss_categories, ragecheck_headlines.rss_categories),
+        guid = COALESCE(EXCLUDED.guid, ragecheck_headlines.guid),
+        scored_at = NOW()
+    `;
+  } catch (error) {
+    console.error("Failed to insert headline:", error);
+  }
+}
+
+// Batch insert multiple headlines
+export async function insertScoredHeadlines(headlines: ScoredHeadline[]): Promise<void> {
+  if (!process.env.DATABASE_URL || headlines.length === 0) return;
+
+  try {
+    await initDB();
+    for (const headline of headlines) {
+      await insertScoredHeadline(headline);
+    }
+  } catch (error) {
+    console.error("Failed to batch insert headlines:", error);
+  }
+}
+
+// Get top scored headlines
+export async function getTopScoredHeadlines(limit: number = 20, minScore: number = 0): Promise<ScoredHeadline[]> {
+  if (!process.env.DATABASE_URL) return [];
+
+  try {
+    await initDB();
+    const results = await getDb()`
+      SELECT id, url, title, description, source, lean, score, summary, analysis, topic, category,
+        arousal, enemy_construction, moral_condemnation, simplification, call_to_conflict,
+        author, image_url, rss_categories, guid, published_at, scored_at
+      FROM ragecheck_headlines
+      WHERE score IS NOT NULL AND score >= ${minScore}
+      ORDER BY score DESC, scored_at DESC
+      LIMIT ${limit}
+    `;
+
+    return results.map((r) => ({
+      id: Number(r.id),
+      url: r.url as string,
+      title: r.title as string,
+      description: r.description as string | undefined,
+      source: r.source as string,
+      lean: r.lean as string,
+      score: r.score ? Number(r.score) : undefined,
+      summary: r.summary as string | undefined,
+      analysis: r.analysis as string | undefined,
+      topic: r.topic as string | undefined,
+      category: r.category as string | undefined,
+      signalBreakdown: r.arousal != null ? {
+        arousal: Number(r.arousal),
+        enemy_construction: Number(r.enemy_construction),
+        moral_condemnation: Number(r.moral_condemnation),
+        simplification: Number(r.simplification),
+        call_to_conflict: Number(r.call_to_conflict),
+      } : undefined,
+      author: r.author as string | undefined,
+      imageUrl: r.image_url as string | undefined,
+      rssCategories: r.rss_categories as string[] | undefined,
+      guid: r.guid as string | undefined,
+      publishedAt: r.published_at as Date | undefined,
+      scoredAt: r.scored_at as Date | undefined,
+    }));
+  } catch (error) {
+    console.error("Failed to get top headlines:", error);
+    return [];
+  }
+}
+
+// Get recent headlines (last 24-48 hours, sorted by score)
+export async function getRecentHighRageHeadlines(hours: number = 48, limit: number = 30): Promise<ScoredHeadline[]> {
+  if (!process.env.DATABASE_URL) return [];
+
+  try {
+    await initDB();
+    const results = await getDb()`
+      SELECT id, url, title, description, source, lean, score, summary, analysis, topic, category,
+        arousal, enemy_construction, moral_condemnation, simplification, call_to_conflict,
+        author, image_url, rss_categories, guid, published_at, scored_at
+      FROM ragecheck_headlines
+      WHERE score IS NOT NULL
+        AND scored_at > NOW() - INTERVAL '1 hour' * ${hours}
+      ORDER BY score DESC, scored_at DESC
+      LIMIT ${limit}
+    `;
+
+    return results.map((r) => ({
+      id: Number(r.id),
+      url: r.url as string,
+      title: r.title as string,
+      description: r.description as string | undefined,
+      source: r.source as string,
+      lean: r.lean as string,
+      score: r.score ? Number(r.score) : undefined,
+      summary: r.summary as string | undefined,
+      analysis: r.analysis as string | undefined,
+      topic: r.topic as string | undefined,
+      category: r.category as string | undefined,
+      signalBreakdown: r.arousal != null ? {
+        arousal: Number(r.arousal),
+        enemy_construction: Number(r.enemy_construction),
+        moral_condemnation: Number(r.moral_condemnation),
+        simplification: Number(r.simplification),
+        call_to_conflict: Number(r.call_to_conflict),
+      } : undefined,
+      author: r.author as string | undefined,
+      imageUrl: r.image_url as string | undefined,
+      rssCategories: r.rss_categories as string[] | undefined,
+      guid: r.guid as string | undefined,
+      publishedAt: r.published_at as Date | undefined,
+      scoredAt: r.scored_at as Date | undefined,
+    }));
+  } catch (error) {
+    console.error("Failed to get recent headlines:", error);
+    return [];
+  }
+}
+
+// Get headline count stats
+export async function getHeadlineStats(): Promise<{ total: number; scored: number; last24h: number }> {
+  if (!process.env.DATABASE_URL) return { total: 0, scored: 0, last24h: 0 };
+
+  try {
+    await initDB();
+    const [total] = await getDb()`SELECT COUNT(*) as count FROM ragecheck_headlines`;
+    const [scored] = await getDb()`SELECT COUNT(*) as count FROM ragecheck_headlines WHERE score IS NOT NULL`;
+    const [recent] = await getDb()`SELECT COUNT(*) as count FROM ragecheck_headlines WHERE scored_at > NOW() - INTERVAL '24 hours'`;
+
+    return {
+      total: Number(total?.count) || 0,
+      scored: Number(scored?.count) || 0,
+      last24h: Number(recent?.count) || 0,
+    };
+  } catch (error) {
+    console.error("Failed to get headline stats:", error);
+    return { total: 0, scored: 0, last24h: 0 };
+  }
+}
+
+// Clear all headlines (for fresh start)
+export async function clearAllHeadlines(): Promise<void> {
+  if (!process.env.DATABASE_URL) return;
+
+  try {
+    await initDB();
+    await getDb()`DELETE FROM ragecheck_headlines`;
+    console.log("Cleared all headlines from database");
+  } catch (error) {
+    console.error("Failed to clear headlines:", error);
+    throw error;
   }
 }

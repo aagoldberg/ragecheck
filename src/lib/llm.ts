@@ -372,3 +372,124 @@ export async function analyzeImageWithVision(
     return { success: false, error: `Analysis failed: ${errorMessage}` };
   }
 }
+
+// ============================================
+// HEADLINE SCORING WITH FULL ANALYSIS
+// ============================================
+
+export interface HeadlineScore {
+  score: number;
+  summary: string;
+  analysis: string;
+  signalBreakdown: SignalBreakdown;
+  topic: string;
+  category: string;
+}
+
+const HEADLINE_SCORING_PROMPT = `You are an expert at detecting outrage bait and manipulation in news headlines. Analyze this headline and description for manipulation patterns.
+
+Key signals to score (each 0-100):
+- **Arousal**: Emotional intensity, urgency, alarm
+- **Enemy Construction**: Us-vs-them, vilifying groups/people
+- **Moral Condemnation**: Moral outrage, righteousness, judgment
+- **Simplification**: Black-and-white thinking, ignoring nuance
+- **Call to Conflict**: Inciting action, confrontation, "share this"
+
+Overall score guidelines:
+- 0-30 = informative, balanced journalism
+- 31-60 = some emotional framing but mostly informative
+- 61-100 = primarily designed to provoke emotional reaction
+
+Categories: politics, business, technology, health, science, sports, entertainment, crime, culture_wars, environment, education, world, other
+
+Respond with ONLY this JSON (no other text):
+{
+  "score": <0-100>,
+  "summary": "<10-15 word summary of what makes it rage-bait or not>",
+  "analysis": "<1-2 sentence analysis of the manipulation tactics used, or why it's balanced>",
+  "signalBreakdown": {
+    "arousal": <0-100>,
+    "enemy_construction": <0-100>,
+    "moral_condemnation": <0-100>,
+    "simplification": <0-100>,
+    "call_to_conflict": <0-100>
+  },
+  "topic": "<slug for grouping related stories, e.g. 'minneapolis-ice-shooting', 'trump-venezuela', lowercase-with-dashes>",
+  "category": "<politics|business|technology|health|science|sports|entertainment|crime|culture_wars|environment|education|world|other>"
+}`;
+
+export async function scoreHeadline(
+  title: string,
+  description: string,
+  source: string
+): Promise<HeadlineScore | null> {
+  if (!client) {
+    return null;
+  }
+
+  const userPrompt = `Source: ${source}
+
+HEADLINE: ${title}
+
+DESCRIPTION: ${description.slice(0, 500)}`;
+
+  try {
+    const response = await client.messages.create({
+      model: "claude-sonnet-4-20250514",
+      max_tokens: 350,
+      messages: [
+        {
+          role: "user",
+          content: userPrompt,
+        },
+      ],
+      system: HEADLINE_SCORING_PROMPT,
+    });
+
+    const content = response.content[0];
+    if (content.type !== "text") {
+      return null;
+    }
+
+    const jsonMatch = content.text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      return null;
+    }
+
+    const parsed = JSON.parse(jsonMatch[0]);
+    return {
+      score: Math.min(100, Math.max(0, parsed.score)),
+      summary: parsed.summary || "",
+      analysis: parsed.analysis || "",
+      signalBreakdown: {
+        arousal: Math.min(100, Math.max(0, parsed.signalBreakdown?.arousal || 0)),
+        enemy_construction: Math.min(100, Math.max(0, parsed.signalBreakdown?.enemy_construction || 0)),
+        moral_condemnation: Math.min(100, Math.max(0, parsed.signalBreakdown?.moral_condemnation || 0)),
+        simplification: Math.min(100, Math.max(0, parsed.signalBreakdown?.simplification || 0)),
+        call_to_conflict: Math.min(100, Math.max(0, parsed.signalBreakdown?.call_to_conflict || 0)),
+      },
+      topic: parsed.topic || "general",
+      category: parsed.category || "other",
+    };
+  } catch (error) {
+    console.error("Headline scoring failed:", error);
+    return null;
+  }
+}
+
+// Batch score multiple headlines (with rate limiting)
+export async function scoreHeadlines(
+  headlines: { title: string; description: string; source: string }[]
+): Promise<(HeadlineScore | null)[]> {
+  // Process in batches to avoid rate limits
+  const results: (HeadlineScore | null)[] = [];
+
+  for (const headline of headlines) {
+    const result = await scoreHeadline(headline.title, headline.description, headline.source);
+    results.push(result);
+    // Small delay to avoid rate limits
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+
+  return results;
+}

@@ -7,6 +7,7 @@ import { SIGNAL_LABELS } from "@/lib/shareCard";
 import { copyShareImageToClipboard } from "@/lib/shareImage";
 import * as tracking from "@/lib/tracking";
 import { detectConversationShape, ConversationShape } from "@/lib/conversationShape";
+import { HighRageHeadlines } from "@/components/HighRageHeadlines";
 
 interface Highlight {
   start: number;
@@ -1388,6 +1389,27 @@ function HomeContent() {
                   <p className="text-zinc-500">Could not load live headlines.</p>
                 </div>
               )}
+            </div>
+
+            {/* High Rage Headlines Section */}
+            <div className="mb-12">
+              <div className="flex items-center gap-3 mb-6">
+                <h3 className="text-sm font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 flex items-center gap-2">
+                  <span className="inline-block w-2 h-2 bg-rose-500 rounded-full animate-pulse"></span>
+                  High Rage Headlines
+                </h3>
+                <div className="h-px flex-1 bg-zinc-100 dark:bg-zinc-800"></div>
+              </div>
+              <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-4">
+                Headlines scored by AI for manipulative language. Click to analyze.
+              </p>
+              <HighRageHeadlines
+                limit={10}
+                onHeadlineClick={(headlineUrl) => {
+                  setUrl(headlineUrl);
+                  analyze(headlineUrl);
+                }}
+              />
             </div>
 
             {/* Social Grid */}
