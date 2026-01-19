@@ -110,7 +110,7 @@ IMPORTANT: Write ALL text fields (reasons, contextNotes, sharingPatterns, techni
 
   try {
     const response = await client.messages.create({
-      model: "claude-3-5-haiku-20241022",
+      model: "claude-sonnet-4-20250514",
       max_tokens: 800,
       messages: [
         {
@@ -258,7 +258,7 @@ export async function analyzeImageWithVision(
 
   try {
     const response = await client.messages.create({
-      model: "claude-3-5-haiku-20241022",
+      model: "claude-sonnet-4-20250514",
       max_tokens: 1500,
       messages: [
         {
