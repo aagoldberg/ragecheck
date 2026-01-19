@@ -190,6 +190,25 @@ function stripHtml(html: string): string {
     .trim();
 }
 
+// Decode HTML entities in titles
+function decodeHtmlEntities(text: string): string {
+  return text
+    .replace(/&#(\d+);/g, (_, dec) => String.fromCharCode(dec))
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&amp;/g, "&")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&rsquo;/g, "'")
+    .replace(/&lsquo;/g, "'")
+    .replace(/&rdquo;/g, '"')
+    .replace(/&ldquo;/g, '"')
+    .replace(/&mdash;/g, "—")
+    .replace(/&ndash;/g, "–");
+}
+
 // Extract image URL from various RSS feed formats
 function extractImageUrl(item: Record<string, unknown>): string | undefined {
   // Try enclosure (standard RSS)
@@ -247,7 +266,7 @@ async function fetchFeed(source: FeedSource): Promise<RSSItem[]> {
           }
 
           return {
-            title: item.title || "Untitled",
+            title: decodeHtmlEntities(item.title || "Untitled"),
             description: stripHtml(item.contentSnippet || item.content || item.summary || ""),
             url: item.link || "",
             source: source.name,

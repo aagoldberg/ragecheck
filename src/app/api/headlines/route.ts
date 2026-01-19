@@ -61,6 +61,25 @@ const FEED_SOURCES: FeedSource[] = [
 // Political lean order for display (left to right)
 const LEAN_ORDER: FeedSource["lean"][] = ["Far Left", "Left", "Center", "Right", "Far Right"];
 
+// Decode HTML entities in titles
+function decodeHtmlEntities(text: string): string {
+  return text
+    .replace(/&#(\d+);/g, (_, dec) => String.fromCharCode(dec))
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&amp;/g, "&")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&rsquo;/g, "'")
+    .replace(/&lsquo;/g, "'")
+    .replace(/&rdquo;/g, '"')
+    .replace(/&ldquo;/g, '"')
+    .replace(/&mdash;/g, "—")
+    .replace(/&ndash;/g, "–");
+}
+
 interface HeadlineItem {
   source: string;
   lean: string;
@@ -87,7 +106,7 @@ async function fetchFeed(source: FeedSource): Promise<HeadlineItem[]> {
         source: source.name,
         lean: source.lean,
         color: source.color,
-        title: item.title || "Untitled",
+        title: decodeHtmlEntities(item.title || "Untitled"),
         url: item.link || "",
         publishedAt: item.pubDate || new Date().toISOString(),
       }));
