@@ -12,6 +12,7 @@
     "@anthropic-ai/sdk": "^0.71.2",
     "@mozilla/readability": "^0.6.0",
     "@neondatabase/serverless": "^1.0.2",
+    "@react-email/components": "^1.0.6",
     "@vercel/analytics": "^1.6.1",
     "@vercel/blob": "^2.0.0",
     "@vercel/og": "^0.8.6",
@@ -22,6 +23,7 @@
     "qrcode-generator": "^2.0.4",
     "react": "19.2.3",
     "react-dom": "19.2.3",
+    "resend": "^6.9.1",
     "rss-parser": "^3.13.0"
   },
   "devDependencies": {
