@@ -24,9 +24,9 @@ interface FeedSource {
   fallbackUrls?: string[];
 }
 
-// Expanded feed sources across the political spectrum
+// Comprehensive feed sources across the political spectrum (50+ sources)
 const FEED_SOURCES: FeedSource[] = [
-  // Far Left
+  // ============ FAR LEFT ============
   {
     name: "Jacobin",
     lean: "Far Left",
@@ -42,8 +42,18 @@ const FEED_SOURCES: FeedSource[] = [
     lean: "Far Left",
     feedUrl: "https://www.commondreams.org/rss.xml",
   },
+  {
+    name: "The Nation",
+    lean: "Far Left",
+    feedUrl: "https://www.thenation.com/feed/",
+  },
+  {
+    name: "Democracy Now",
+    lean: "Far Left",
+    feedUrl: "https://www.democracynow.org/democracynow.rss",
+  },
 
-  // Left
+  // ============ LEFT ============
   {
     name: "The Guardian",
     lean: "Left",
@@ -69,8 +79,23 @@ const FEED_SOURCES: FeedSource[] = [
     lean: "Left",
     feedUrl: "https://slate.com/feeds/all.rss",
   },
+  {
+    name: "MSNBC",
+    lean: "Left",
+    feedUrl: "https://www.msnbc.com/feeds/latest",
+  },
+  {
+    name: "The Daily Beast",
+    lean: "Left",
+    feedUrl: "https://feeds.thedailybeast.com/rss/articles",
+  },
+  {
+    name: "Salon",
+    lean: "Left",
+    feedUrl: "https://www.salon.com/feed/",
+  },
 
-  // Center-Left
+  // ============ CENTER-LEFT ============
   {
     name: "NPR",
     lean: "Center-Left",
@@ -81,8 +106,43 @@ const FEED_SOURCES: FeedSource[] = [
     lean: "Center-Left",
     feedUrl: "https://www.theatlantic.com/feed/all/",
   },
+  {
+    name: "CNN",
+    lean: "Center-Left",
+    feedUrl: "http://rss.cnn.com/rss/cnn_topstories.rss",
+  },
+  {
+    name: "NBC News",
+    lean: "Center-Left",
+    feedUrl: "https://feeds.nbcnews.com/nbcnews/public/news",
+  },
+  {
+    name: "CBS News",
+    lean: "Center-Left",
+    feedUrl: "https://www.cbsnews.com/latest/rss/main",
+  },
+  {
+    name: "ABC News",
+    lean: "Center-Left",
+    feedUrl: "https://abcnews.go.com/abcnews/topstories",
+  },
+  {
+    name: "New York Times",
+    lean: "Center-Left",
+    feedUrl: "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml",
+  },
+  {
+    name: "Washington Post",
+    lean: "Center-Left",
+    feedUrl: "https://feeds.washingtonpost.com/rss/politics",
+  },
+  {
+    name: "Politico",
+    lean: "Center-Left",
+    feedUrl: "https://www.politico.com/rss/politicopicks.xml",
+  },
 
-  // Center
+  // ============ CENTER ============
   {
     name: "PBS",
     lean: "Center",
@@ -104,15 +164,50 @@ const FEED_SOURCES: FeedSource[] = [
     lean: "Center",
     feedUrl: "https://thehill.com/feed/",
   },
+  {
+    name: "USA Today",
+    lean: "Center",
+    feedUrl: "https://www.usatoday.com/rss/",
+  },
+  {
+    name: "BBC News",
+    lean: "Center",
+    feedUrl: "https://feeds.bbci.co.uk/news/world/us_and_canada/rss.xml",
+  },
+  {
+    name: "Axios",
+    lean: "Center",
+    feedUrl: "https://api.axios.com/feed/",
+  },
+  {
+    name: "Bloomberg",
+    lean: "Center",
+    feedUrl: "https://feeds.bloomberg.com/politics/news.rss",
+  },
+  {
+    name: "Business Insider",
+    lean: "Center",
+    feedUrl: "https://www.businessinsider.com/rss",
+  },
 
-  // Center-Right
+  // ============ CENTER-RIGHT ============
   {
     name: "Wall Street Journal",
     lean: "Center-Right",
     feedUrl: "https://feeds.a.dj.com/rss/RSSOpinion.xml",
   },
+  {
+    name: "The Economist",
+    lean: "Center-Right",
+    feedUrl: "https://www.economist.com/rss",
+  },
+  {
+    name: "RealClearPolitics",
+    lean: "Center-Right",
+    feedUrl: "https://www.realclearpolitics.com/index.xml",
+  },
 
-  // Right
+  // ============ RIGHT ============
   {
     name: "Fox News",
     lean: "Right",
@@ -139,8 +234,28 @@ const FEED_SOURCES: FeedSource[] = [
     lean: "Right",
     feedUrl: "https://thefederalist.com/feed/",
   },
+  {
+    name: "Washington Times",
+    lean: "Right",
+    feedUrl: "https://www.washingtontimes.com/rss/headlines/news/",
+  },
+  {
+    name: "The Blaze",
+    lean: "Right",
+    feedUrl: "https://www.theblaze.com/feeds/feed.rss",
+  },
+  {
+    name: "American Conservative",
+    lean: "Right",
+    feedUrl: "https://www.theamericanconservative.com/feed/",
+  },
+  {
+    name: "National Review",
+    lean: "Right",
+    feedUrl: "https://www.nationalreview.com/feed/",
+  },
 
-  // Far Right
+  // ============ FAR RIGHT ============
   {
     name: "Breitbart",
     lean: "Far Right",
@@ -160,6 +275,11 @@ const FEED_SOURCES: FeedSource[] = [
     name: "Gateway Pundit",
     lean: "Far Right",
     feedUrl: "https://www.thegatewaypundit.com/feed/",
+  },
+  {
+    name: "Epoch Times",
+    lean: "Far Right",
+    feedUrl: "https://www.theepochtimes.com/c-us/feed",
   },
 ];
 

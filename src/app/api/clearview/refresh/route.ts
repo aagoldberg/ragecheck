@@ -229,23 +229,43 @@ DEEPER ANALYSIS - THE REAL GAME:
 - whatGetsIgnored: What nuance, common ground, or practical solutions get ignored because they don't fit the tribal narrative?
 - Write this section like you're being brutally honest with a friend about how the game really works`;
 
-  const response = await client.messages.create({
-    model: "claude-opus-4-20250514",
-    max_tokens: 8000,
+  // Use streaming to handle long requests
+  let fullText = "";
+  const stream = await client.messages.stream({
+    model: "claude-sonnet-4-20250514",
+    max_tokens: 16000,
     messages: [{ role: "user", content: prompt }],
   });
 
-  const content = response.content[0];
-  if (content.type !== "text") {
-    throw new Error("Unexpected response format");
+  for await (const event of stream) {
+    if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
+      fullText += event.delta.text;
+    }
   }
 
-  const jsonMatch = content.text.match(/\{[\s\S]*\}/);
+  const jsonMatch = fullText.match(/\{[\s\S]*\}/);
   if (!jsonMatch) {
     throw new Error("Failed to parse analysis");
   }
 
-  const parsed = JSON.parse(jsonMatch[0]);
+  let parsed;
+  try {
+    parsed = JSON.parse(jsonMatch[0]);
+  } catch (parseError) {
+    // Try to fix common JSON issues (trailing commas, unescaped quotes)
+    const fixedJson = jsonMatch[0]
+      .replace(/,\s*}/g, '}')  // Remove trailing commas before }
+      .replace(/,\s*]/g, ']')  // Remove trailing commas before ]
+      .replace(/[\x00-\x1F\x7F]/g, ' '); // Remove control characters
+
+    try {
+      parsed = JSON.parse(fixedJson);
+    } catch {
+      console.error("JSON parse failed. First 500 chars:", jsonMatch[0].slice(0, 500));
+      console.error("Last 500 chars:", jsonMatch[0].slice(-500));
+      throw parseError;
+    }
+  }
   const stories = parsed.stories || [];
 
   // Log which stories have whyItMatters
