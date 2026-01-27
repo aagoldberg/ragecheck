@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import Parser from "rss-parser";
 import Anthropic from "@anthropic-ai/sdk";
-import { getClearviewData, saveClearviewData, initClearviewTable, isDBAvailable, getArchivedClearviewData } from "@/lib/db";
+import { getClearviewData, saveClearviewData, initClearviewTable, isDBAvailable, getArchivedClearviewData, ClearviewStory } from "@/lib/db";
+import { extractContent } from "@/lib/extract";
 
 const parser = new Parser({
   timeout: 15000,
@@ -16,77 +17,73 @@ const client = process.env.ANTHROPIC_API_KEY
 
 interface FeedSource {
   name: string;
-  lean: "Far Left" | "Left" | "Center" | "Right" | "Far Right";
+  lean: "Far Left" | "Left" | "Center-Left" | "Center" | "Center-Right" | "Right" | "Far Right";
   feedUrl: string;
 }
 
-// Sources across the political spectrum
+// Expanded sources across the political spectrum (48 total)
 const FEED_SOURCES: FeedSource[] = [
-  // Far Left
-  {
-    name: "Jacobin",
-    lean: "Far Left",
-    feedUrl: "https://jacobin.com/feed",
-  },
-  // Left
-  {
-    name: "NPR",
-    lean: "Left",
-    feedUrl: "https://feeds.npr.org/1001/rss.xml",
-  },
-  {
-    name: "The Guardian",
-    lean: "Left",
-    feedUrl: "https://www.theguardian.com/us-news/rss",
-  },
-  {
-    name: "Vox",
-    lean: "Left",
-    feedUrl: "https://www.vox.com/rss/index.xml",
-  },
-  // Center
-  {
-    name: "PBS",
-    lean: "Center",
-    feedUrl: "https://www.pbs.org/newshour/feeds/rss/headlines",
-  },
-  {
-    name: "AP News",
-    lean: "Center",
-    feedUrl: "https://feedx.net/rss/ap.xml",
-  },
-  {
-    name: "Reuters",
-    lean: "Center",
-    feedUrl: "https://www.reutersagency.com/feed/?taxonomy=best-topics&post_type=best",
-  },
-  // Right
-  {
-    name: "Fox News",
-    lean: "Right",
-    feedUrl: "https://moxie.foxnews.com/google-publisher/politics.xml",
-  },
-  {
-    name: "The Hill",
-    lean: "Right",
-    feedUrl: "https://thehill.com/feed/",
-  },
-  {
-    name: "National Review",
-    lean: "Right",
-    feedUrl: "https://www.nationalreview.com/feed/",
-  },
-  // Far Right
-  {
-    name: "Breitbart",
-    lean: "Far Right",
-    feedUrl: "https://feeds.feedburner.com/breitbart",
-  },
-  {
-    name: "Daily Wire",
-    lean: "Far Right",
-    feedUrl: "https://www.dailywire.com/feeds/rss.xml",
-  },
+  // Far Left (6)
+  { name: "Jacobin", lean: "Far Left", feedUrl: "https://jacobin.com/feed" },
+  { name: "Democracy Now", lean: "Far Left", feedUrl: "https://www.democracynow.org/democracynow.rss" },
+  { name: "The Intercept", lean: "Far Left", feedUrl: "https://theintercept.com/feed/?rss" },
+  { name: "Current Affairs", lean: "Far Left", feedUrl: "https://www.currentaffairs.org/feed" },
+  { name: "Common Dreams", lean: "Far Left", feedUrl: "https://www.commondreams.org/rss.xml" },
+  { name: "Truthout", lean: "Far Left", feedUrl: "https://truthout.org/feed/" },
+
+  // Left (8)
+  { name: "NPR", lean: "Left", feedUrl: "https://feeds.npr.org/1001/rss.xml" },
+  { name: "The Guardian", lean: "Left", feedUrl: "https://www.theguardian.com/us-news/rss" },
+  { name: "Vox", lean: "Left", feedUrl: "https://www.vox.com/rss/index.xml" },
+  { name: "MSNBC", lean: "Left", feedUrl: "https://www.msnbc.com/feeds/latest" },
+  { name: "HuffPost", lean: "Left", feedUrl: "https://www.huffpost.com/section/politics/feed" },
+  { name: "Slate", lean: "Left", feedUrl: "https://slate.com/feeds/all.rss" },
+  { name: "The Atlantic", lean: "Left", feedUrl: "https://www.theatlantic.com/feed/all/" },
+  { name: "New Yorker", lean: "Left", feedUrl: "https://www.newyorker.com/feed/news" },
+
+  // Center-Left (6)
+  { name: "Washington Post", lean: "Center-Left", feedUrl: "https://feeds.washingtonpost.com/rss/politics" },
+  { name: "New York Times", lean: "Center-Left", feedUrl: "https://rss.nytimes.com/services/xml/rss/nyt/Politics.xml" },
+  { name: "CNN", lean: "Center-Left", feedUrl: "http://rss.cnn.com/rss/cnn_allpolitics.rss" },
+  { name: "Politico", lean: "Center-Left", feedUrl: "https://www.politico.com/rss/politics.xml" },
+  { name: "NBC News", lean: "Center-Left", feedUrl: "https://feeds.nbcnews.com/nbcnews/public/politics" },
+  { name: "ABC News", lean: "Center-Left", feedUrl: "https://abcnews.go.com/abcnews/politicsheadlines" },
+
+  // Center (6)
+  { name: "PBS", lean: "Center", feedUrl: "https://www.pbs.org/newshour/feeds/rss/headlines" },
+  { name: "AP News", lean: "Center", feedUrl: "https://feedx.net/rss/ap.xml" },
+  { name: "Reuters", lean: "Center", feedUrl: "https://www.reutersagency.com/feed/?taxonomy=best-topics&post_type=best" },
+  { name: "BBC", lean: "Center", feedUrl: "https://feeds.bbci.co.uk/news/world/us_and_canada/rss.xml" },
+  { name: "The Hill", lean: "Center", feedUrl: "https://thehill.com/feed/" },
+  { name: "RealClearPolitics", lean: "Center", feedUrl: "https://www.realclearpolitics.com/index.xml" },
+
+  // Center-Right (6)
+  { name: "Wall Street Journal", lean: "Center-Right", feedUrl: "https://feeds.a.dj.com/rss/RSSOpinion.xml" },
+  { name: "The Economist", lean: "Center-Right", feedUrl: "https://www.economist.com/united-states/rss.xml" },
+  { name: "Reason", lean: "Center-Right", feedUrl: "https://reason.com/feed/" },
+  { name: "The Dispatch", lean: "Center-Right", feedUrl: "https://thedispatch.com/feed/" },
+  { name: "National Journal", lean: "Center-Right", feedUrl: "https://www.nationaljournal.com/feeds/all" },
+  { name: "Washington Examiner", lean: "Center-Right", feedUrl: "https://www.washingtonexaminer.com/section/news/feed" },
+
+  // Right (8)
+  { name: "Fox News", lean: "Right", feedUrl: "https://moxie.foxnews.com/google-publisher/politics.xml" },
+  { name: "National Review", lean: "Right", feedUrl: "https://www.nationalreview.com/feed/" },
+  { name: "New York Post", lean: "Right", feedUrl: "https://nypost.com/news/feed/" },
+  { name: "Washington Times", lean: "Right", feedUrl: "https://www.washingtontimes.com/rss/headlines/news/politics/" },
+  { name: "Townhall", lean: "Right", feedUrl: "https://townhall.com/rss/political-cartoons/" },
+  { name: "The Federalist", lean: "Right", feedUrl: "https://thefederalist.com/feed/" },
+  { name: "American Spectator", lean: "Right", feedUrl: "https://spectator.org/feed/" },
+  { name: "RedState", lean: "Right", feedUrl: "https://redstate.com/feed" },
+
+  // Far Right (8)
+  { name: "Breitbart", lean: "Far Right", feedUrl: "https://feeds.feedburner.com/breitbart" },
+  { name: "Daily Wire", lean: "Far Right", feedUrl: "https://www.dailywire.com/feeds/rss.xml" },
+  { name: "Gateway Pundit", lean: "Far Right", feedUrl: "https://www.thegatewaypundit.com/feed/" },
+  { name: "Newsmax", lean: "Far Right", feedUrl: "https://www.newsmax.com/rss/Politics/1/" },
+  { name: "One America News", lean: "Far Right", feedUrl: "https://www.oann.com/feed/" },
+  { name: "The Blaze", lean: "Far Right", feedUrl: "https://www.theblaze.com/feeds/feed.rss" },
+  { name: "PJ Media", lean: "Far Right", feedUrl: "https://pjmedia.com/feed" },
+  { name: "Western Journal", lean: "Far Right", feedUrl: "https://www.westernjournal.com/feed/" },
 ];
 
 interface RawHeadline {
@@ -98,83 +95,31 @@ interface RawHeadline {
   publishedAt: string;
 }
 
-interface StoryCluster {
-  id: string;
+interface HeadlineCluster {
   topic: string;
-  summary: string;
-  whatHappened: string;
-  sources: {
-    name: string;
-    lean: string;
-    title: string;
-    url: string;
-    framing: string;
-    manipulationTechniques: string[];
-  }[];
-  perspectives: {
-    lean: string;
-    viewpoint: string;
-  }[];
-  keyTakeaway: string;
-  // Expert consensus across domains
-  expertConsensus?: {
-    type: "scientific" | "legal" | "historical" | "economic" | "intelligence" | "statistical" | "professional" | "international" | "none";
-    exists: boolean;
-    statement?: string;
-    confidenceLevel: "high" | "moderate" | "low" | "contested";
-    sources?: string[];
-    dissent?: string; // Notable dissenting views if any
-  };
-  debateType: "factual" | "policy" | "values" | "mixed";
-  debateQuestion?: string;
-  commonGround?: string[];
-  factualDisputes?: {
-    claim: string;
-    leftPosition: string;
-    rightPosition: string;
-    evidenceStatus: "supported" | "mixed" | "unsupported" | "misleading";
-  }[];
-  // Political psychology context
-  whyItMatters?: {
-    left: {
-      coreValue: string; // The underlying value at stake (e.g., "equality", "protection")
-      motivation: string; // Plain-language explanation of why they care
-      stance: "offensive" | "defensive" | "mobilizing"; // Are they pushing change, defending status quo, or rallying base
-      emotionalAppeal: string; // What emotion this activates (fear, hope, anger, pride)
-    };
-    right: {
-      coreValue: string;
-      motivation: string;
-      stance: "offensive" | "defensive" | "mobilizing";
-      emotionalAppeal: string;
-    };
-    bottomLine: string; // One sentence explaining the real fight
-  };
-  // Deeper analysis - what's really going on
-  deeperAnalysis?: {
-    unstatedConcerns: {
-      left: string[]; // Concerns driving the left that aren't openly discussed
-      right: string[]; // Concerns driving the right that aren't openly discussed
-    };
-    economicDimension?: string; // Economic anxieties/interests at play
-    culturalDimension?: string; // Cultural/identity concerns beneath the surface
-    politicalGame: string; // How politicians/media exploit this for tribal gain
-    whatGetsIgnored?: string; // Solutions or nuances that don't fit the narrative
-  };
+  headlineIndices: number[];
+  sourceCount: number;
+  spectrumSpread: number; // 1-7 scale based on political lean coverage
+  category: "politics" | "economy" | "international" | "tech" | "culture" | "other";
+}
+
+interface TieredClusters {
+  deepDive: HeadlineCluster[];
+  quickTake: HeadlineCluster[];
 }
 
 interface ArchivedBriefing {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  stories: any[];
+  stories: ClearviewStory[];
   generatedAt: string;
 }
 
 interface ClearviewResponse {
   success: boolean;
-  stories: StoryCluster[];
+  stories: ClearviewStory[];
   generatedAt: string;
   archived?: ArchivedBriefing[];
   error?: string;
+  cached?: boolean;
 }
 
 // Cache duration in hours
@@ -211,41 +156,216 @@ async function fetchAllHeadlines(): Promise<RawHeadline[]> {
   return headlines;
 }
 
-async function clusterAndAnalyze(headlines: RawHeadline[]): Promise<StoryCluster[]> {
+// Phase 1: Cluster headlines and determine metrics for tier selection
+async function clusterHeadlines(headlines: RawHeadline[]): Promise<HeadlineCluster[]> {
   if (!client) {
     throw new Error("LLM not available");
   }
 
-  // Create a summary of all headlines for Claude to cluster and analyze
   const headlinesSummary = headlines
     .map((h, i) => `[${i}] ${h.source} (${h.lean}): "${h.title}"`)
     .join("\n");
 
-  const prompt = `You are analyzing today's news headlines from sources across the political spectrum to help readers understand what's actually happening vs how stories are being framed.
+  const prompt = `Analyze these news headlines and cluster them into stories.
 
-Here are today's headlines:
-
+Headlines:
 ${headlinesSummary}
 
-Your task:
-1. Identify the TOP 3-5 major news stories that multiple sources are covering (group related headlines)
-2. For each story, provide:
-   - A neutral, factual summary of what actually happened
-   - How each source is framing/spinning the story
-   - What manipulation techniques (if any) each source is using
-   - The key perspectives from different political viewpoints
-   - CRITICAL: Identify if there's scientific/expert consensus on the underlying facts
-   - Distinguish between factual disputes vs policy/values debates
-   - WHY each side cares about this issue (psychological/political motivations)
+For each story cluster, identify:
+1. The topic (brief name)
+2. Which headline indices belong to this story
+3. Category: politics, economy, international, tech, culture, or other
 
-Respond with this exact JSON structure:
+Return JSON:
+{
+  "clusters": [
+    {
+      "topic": "Brief topic name",
+      "headlineIndices": [0, 5, 12],
+      "category": "politics"
+    }
+  ]
+}
+
+Rules:
+- Only include stories with 2+ headlines from different sources
+- Group headlines about the same underlying story
+- Be specific about topic names`;
+
+  const response = await client.messages.create({
+    model: "claude-sonnet-4-20250514",
+    max_tokens: 4000,
+    messages: [{ role: "user", content: prompt }],
+  });
+
+  const content = response.content[0];
+  if (content.type !== "text") {
+    throw new Error("Unexpected response format");
+  }
+
+  const jsonMatch = content.text.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) {
+    throw new Error("Failed to parse clustering response");
+  }
+
+  const parsed = JSON.parse(jsonMatch[0]);
+  const rawClusters = parsed.clusters || [];
+
+  // Calculate metrics for each cluster
+  const leanOrder = ["Far Left", "Left", "Center-Left", "Center", "Center-Right", "Right", "Far Right"];
+
+  return rawClusters.map((cluster: { topic: string; headlineIndices: number[]; category: string }) => {
+    const clusterHeadlines = cluster.headlineIndices.map((i: number) => headlines[i]).filter(Boolean);
+    const uniqueSources = new Set(clusterHeadlines.map((h: RawHeadline) => h.source));
+    const leans = new Set(clusterHeadlines.map((h: RawHeadline) => h.lean));
+
+    // Calculate spectrum spread (1-7)
+    const leanIndices = Array.from(leans).map(l => leanOrder.indexOf(l as string)).filter(i => i >= 0);
+    const spectrumSpread = leanIndices.length > 0
+      ? Math.max(...leanIndices) - Math.min(...leanIndices) + 1
+      : 1;
+
+    return {
+      topic: cluster.topic,
+      headlineIndices: cluster.headlineIndices,
+      sourceCount: uniqueSources.size,
+      spectrumSpread,
+      category: cluster.category as HeadlineCluster["category"],
+    };
+  });
+}
+
+// Phase 2: Select which stories get Deep Dive vs Quick Take
+function selectTiers(clusters: HeadlineCluster[]): TieredClusters {
+  const deepDive: HeadlineCluster[] = [];
+  const quickTake: HeadlineCluster[] = [];
+
+  // Sort by coverage (sourceCount * spectrumSpread) descending
+  const sorted = [...clusters].sort((a, b) =>
+    (b.sourceCount * b.spectrumSpread) - (a.sourceCount * a.spectrumSpread)
+  );
+
+  // Deep Dive criteria: sourceCount >= 4 AND spectrumSpread >= 3
+  for (const cluster of sorted) {
+    if (cluster.sourceCount >= 4 && cluster.spectrumSpread >= 3) {
+      deepDive.push(cluster);
+    } else {
+      quickTake.push(cluster);
+    }
+  }
+
+  // Category floors: ensure key categories have at least one Deep Dive
+  const keyCategories = ["politics", "economy", "international"];
+  for (const category of keyCategories) {
+    const hasDeepDive = deepDive.some(c => c.category === category);
+    if (!hasDeepDive) {
+      // Promote the best Quick Take in this category
+      const candidateIndex = quickTake.findIndex(c => c.category === category);
+      if (candidateIndex >= 0) {
+        const promoted = quickTake.splice(candidateIndex, 1)[0];
+        deepDive.push(promoted);
+      }
+    }
+  }
+
+  // Cap Deep Dives at 8 for cost control
+  const maxDeepDives = 8;
+  if (deepDive.length > maxDeepDives) {
+    const demoted = deepDive.splice(maxDeepDives);
+    quickTake.unshift(...demoted);
+  }
+
+  return { deepDive, quickTake };
+}
+
+// Phase 3: Extract full articles for Deep Dive stories
+async function extractArticlesForClusters(
+  clusters: HeadlineCluster[],
+  headlines: RawHeadline[]
+): Promise<Map<string, string>> {
+  const articleContent = new Map<string, string>();
+  const urlsToExtract: string[] = [];
+
+  for (const cluster of clusters) {
+    for (const idx of cluster.headlineIndices) {
+      const headline = headlines[idx];
+      if (headline?.url) {
+        urlsToExtract.push(headline.url);
+      }
+    }
+  }
+
+  // Extract in parallel with concurrency limit
+  const concurrency = 5;
+  for (let i = 0; i < urlsToExtract.length; i += concurrency) {
+    const batch = urlsToExtract.slice(i, i + concurrency);
+    const results = await Promise.all(
+      batch.map(async (url) => {
+        const result = await extractContent(url);
+        return { url, result };
+      })
+    );
+
+    for (const { url, result } of results) {
+      if (result.success && result.text) {
+        // Limit to first 3000 chars per article
+        articleContent.set(url, result.text.slice(0, 3000));
+      }
+    }
+  }
+
+  console.log(`Extracted ${articleContent.size}/${urlsToExtract.length} articles`);
+  return articleContent;
+}
+
+// Phase 4a: Deep analysis with full article content
+async function analyzeDeepDive(
+  clusters: HeadlineCluster[],
+  headlines: RawHeadline[],
+  articleContent: Map<string, string>
+): Promise<ClearviewStory[]> {
+  if (!client || clusters.length === 0) return [];
+
+  const clusterData = clusters.map((cluster, idx) => {
+    const clusterHeadlines = cluster.headlineIndices
+      .map(i => headlines[i])
+      .filter(Boolean);
+
+    const headlinesWithContent = clusterHeadlines.map(h => {
+      const content = articleContent.get(h.url);
+      return {
+        source: h.source,
+        lean: h.lean,
+        title: h.title,
+        url: h.url,
+        articleExcerpt: content || h.snippet || "[No content available]",
+      };
+    });
+
+    return {
+      id: `story-${idx + 1}`,
+      topic: cluster.topic,
+      category: cluster.category,
+      headlines: headlinesWithContent,
+    };
+  });
+
+  const prompt = `You are analyzing news stories with FULL ARTICLE CONTENT for deep analysis.
+
+Stories to analyze:
+${JSON.stringify(clusterData, null, 2)}
+
+For each story, provide comprehensive analysis:
+
 {
   "stories": [
     {
       "id": "story-1",
-      "topic": "Brief topic name (e.g., 'Immigration Policy Changes')",
-      "summary": "2-3 sentence neutral summary of what actually happened, just the facts",
-      "whatHappened": "Detailed explanation of the actual events, stripped of spin",
+      "topic": "Topic name",
+      "tier": "deep-dive",
+      "category": "politics",
+      "summary": "2-3 sentence neutral summary of what happened",
+      "whatHappened": "Detailed explanation of actual events, stripped of spin",
       "sources": [
         {
           "name": "Source Name",
@@ -257,122 +377,164 @@ Respond with this exact JSON structure:
         }
       ],
       "perspectives": [
-        {
-          "lean": "Left",
-          "viewpoint": "How the left generally sees this issue and why"
-        },
-        {
-          "lean": "Right",
-          "viewpoint": "How the right generally sees this issue and why"
-        }
+        { "lean": "Left", "viewpoint": "How the left sees this and why" },
+        { "lean": "Right", "viewpoint": "How the right sees this and why" }
       ],
-      "keyTakeaway": "One sentence helping the reader understand the story without the spin",
+      "keyTakeaway": "One sentence helping reader understand without spin",
       "expertConsensus": {
         "type": "scientific|legal|historical|economic|intelligence|statistical|professional|international|none",
-        "exists": true/false,
-        "statement": "What expert consensus says (if applicable)",
+        "exists": true,
+        "statement": "What expert consensus says",
         "confidenceLevel": "high|moderate|low|contested",
-        "sources": ["CDC", "Supreme Court", "Bureau of Labor Statistics", "FBI/CIA", "historians", etc.],
-        "dissent": "Notable minority expert view if relevant"
+        "sources": ["CDC", "Supreme Court", etc.],
+        "dissent": "Notable minority view if relevant"
       },
       "debateType": "factual|policy|values|mixed",
-      "debateQuestion": "The actual question being debated (e.g., 'Should vaccines be mandated?' not 'Are vaccines safe?')",
+      "debateQuestion": "The actual question being debated",
       "commonGround": ["Facts both sides agree on"],
       "factualDisputes": [
         {
           "claim": "The disputed claim",
-          "leftPosition": "What left-leaning sources claim",
-          "rightPosition": "What right-leaning sources claim",
+          "leftPosition": "What left claims",
+          "rightPosition": "What right claims",
           "evidenceStatus": "supported|mixed|unsupported|misleading"
         }
       ],
       "whyItMatters": {
         "left": {
-          "coreValue": "The underlying value at stake (equality, fairness, protection, progress, etc.)",
-          "motivation": "Plain-language explanation of why this matters to them - write like you're explaining to a friend",
+          "coreValue": "equality, fairness, protection, etc.",
+          "motivation": "Plain-language explanation",
           "stance": "offensive|defensive|mobilizing",
-          "emotionalAppeal": "What emotion this activates (fear, hope, anger, pride, moral outrage, etc.)"
+          "emotionalAppeal": "fear, hope, anger, etc."
         },
         "right": {
-          "coreValue": "The underlying value at stake (liberty, tradition, security, order, etc.)",
-          "motivation": "Plain-language explanation of why this matters to them - write like you're explaining to a friend",
+          "coreValue": "liberty, tradition, security, etc.",
+          "motivation": "Plain-language explanation",
           "stance": "offensive|defensive|mobilizing",
           "emotionalAppeal": "What emotion this activates"
         },
-        "bottomLine": "One sentence explaining what this fight is really about at its core"
+        "bottomLine": "One sentence on what this fight is really about"
       },
       "deeperAnalysis": {
         "unstatedConcerns": {
-          "left": ["Concerns driving the left that aren't openly discussed - the quiet parts"],
-          "right": ["Concerns driving the right that aren't openly discussed - the quiet parts"]
+          "left": ["Concerns driving the left not openly discussed"],
+          "right": ["Concerns driving the right not openly discussed"]
         },
-        "economicDimension": "Economic anxieties and interests at play that don't fit neatly into the political framing",
-        "culturalDimension": "Cultural/identity concerns beneath the surface - what people feel but won't say",
-        "politicalGame": "How politicians and media are exploiting this issue for tribal gain - be honest and specific",
-        "whatGetsIgnored": "Nuances, solutions, or common ground that gets ignored because it doesn't fit the narrative"
+        "economicDimension": "Economic anxieties and interests at play",
+        "culturalDimension": "Cultural/identity concerns beneath the surface",
+        "politicalGame": "How politicians/media exploit this for tribal gain",
+        "whatGetsIgnored": "Nuances or solutions ignored because they don't fit the narrative"
       }
     }
   ]
 }
 
 CRITICAL GUIDELINES:
-- Only include stories covered by 2+ sources
-- Be genuinely neutral in your summaries
-- Identify manipulation techniques like: loaded language, fear-mongering, omission of context, false equivalence, appeal to emotion, etc.
-- Include the actual URLs from the headlines data
-- If a story only has one source, skip it
-- REQUIRED: Every story MUST include the expertConsensus object - never omit it
+- Use the FULL ARTICLE CONTENT to understand the complete story
+- Be genuinely neutral in summaries
+- Identify manipulation techniques: loaded language, fear-mongering, omission of context, false equivalence, appeal to emotion
+- REQUIRED: Every story MUST include expertConsensus, whyItMatters, and deeperAnalysis
+- Be empathetic to both sides - help readers understand WHY reasonable people disagree`;
 
-EXPERT CONSENSUS RULES:
-- Identify the most relevant type of expert consensus for each story:
-  - "scientific": Medical, climate, physics, biology (sources: CDC, WHO, peer-reviewed journals)
-  - "legal": Constitutional law, court rulings (sources: Supreme Court, legal scholars, bar associations)
-  - "historical": What historians document happened (sources: historians, archives, documentation)
-  - "economic": Economic effects, trade, fiscal policy (sources: CBO, economists, Federal Reserve)
-  - "intelligence": National security, foreign interference (sources: FBI, CIA, DNI assessments)
-  - "statistical": Crime rates, demographics, measurable data (sources: BLS, Census, FBI UCR)
-  - "professional": Industry standards, best practices (sources: professional associations)
-  - "international": International law, treaties (sources: UN, ICC, international courts)
-  - "none": No clear expert domain applies or genuinely contested among experts
-- If experts broadly agree, set exists to true and state the consensus clearly
-- Include "dissent" only if there's a notable minority expert view worth mentioning
-- debateType should be:
-  - "factual" if the debate is about what happened/is true
-  - "policy" if the facts are agreed but the debate is about what to do
-  - "values" if it's about competing moral/ethical priorities
-  - "mixed" if it involves multiple types
-- For factualDisputes, honestly assess whether claims are supported by evidence
-- evidenceStatus "misleading" means the claim contains some truth but is framed deceptively
-- Don't create false balance: if one side's claims contradict expert consensus, say so
+  const stream = await client.messages.stream({
+    model: "claude-sonnet-4-20250514",
+    max_tokens: 16000,
+    messages: [{ role: "user", content: prompt }],
+  });
 
-WHY IT MATTERS - POLITICAL PSYCHOLOGY RULES:
-- REQUIRED: Every story MUST include the whyItMatters object
-- Write motivations in plain, accessible language - like explaining to a smart friend who doesn't follow politics
-- Use moral foundations theory as a guide:
-  - Left typically prioritizes: Care/Harm, Fairness/Equality, Liberty from oppression
-  - Right typically prioritizes: Loyalty/Tradition, Authority/Stability, Sanctity/Purity, Liberty from government
-- Stance meanings:
-  - "offensive" = They're pushing for change, trying to advance their position
-  - "defensive" = They're protecting something they feel is under threat
-  - "mobilizing" = They're rallying their base, making this a tribal identity issue
-- emotionalAppeal should identify the primary emotion being activated (fear, anger, hope, pride, disgust, moral outrage, anxiety, righteous indignation)
-- bottomLine should cut through the noise and state what this fight is REALLY about in one honest sentence
-- Be empathetic to both sides - help readers understand WHY reasonable people disagree, not just THAT they disagree
+  let fullText = "";
+  for await (const event of stream) {
+    if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
+      fullText += event.delta.text;
+    }
+  }
 
-DEEPER ANALYSIS - THE REAL GAME:
-- REQUIRED: Every story MUST include the deeperAnalysis object
-- unstatedConcerns: What's REALLY driving each side that they won't say openly?
-  - Left example: "Fear that enforcement is selectively racist" or "Worry that cruelty is the point"
-  - Right example: "Anxiety about cultural/demographic change" or "Feeling that elites dismiss their concerns"
-- economicDimension: What economic interests or anxieties are at play? Who gains, who loses economically?
-- culturalDimension: What identity/cultural anxieties exist beneath the policy debate? Be honest about what people feel but won't say
-- politicalGame: Be BLUNT about how politicians and media exploit this issue. Who benefits from keeping the fight going? Why doesn't it get solved?
-- whatGetsIgnored: What nuance, common ground, or practical solutions get ignored because they don't fit the tribal narrative?
-- Write this section like you're being brutally honest with a friend about how the game really works`;
+  const jsonMatch = fullText.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) {
+    throw new Error("Failed to parse deep dive analysis");
+  }
+
+  let parsed;
+  try {
+    parsed = JSON.parse(jsonMatch[0]);
+  } catch {
+    // Try to fix common JSON issues
+    const fixedJson = jsonMatch[0]
+      .replace(/,\s*}/g, '}')
+      .replace(/,\s*]/g, ']')
+      .replace(/[\x00-\x1F\x7F]/g, ' ');
+    parsed = JSON.parse(fixedJson);
+  }
+
+  return (parsed.stories || []).map((s: ClearviewStory) => ({
+    ...s,
+    tier: "deep-dive" as const,
+  }));
+}
+
+// Phase 4b: Quick analysis from headlines only
+async function analyzeQuickTake(
+  clusters: HeadlineCluster[],
+  headlines: RawHeadline[]
+): Promise<ClearviewStory[]> {
+  if (!client || clusters.length === 0) return [];
+
+  const clusterData = clusters.map((cluster, idx) => {
+    const clusterHeadlines = cluster.headlineIndices
+      .map(i => headlines[i])
+      .filter(Boolean);
+
+    return {
+      id: `quick-${idx + 1}`,
+      topic: cluster.topic,
+      category: cluster.category,
+      headlines: clusterHeadlines.map(h => ({
+        source: h.source,
+        lean: h.lean,
+        title: h.title,
+        url: h.url,
+      })),
+    };
+  });
+
+  const prompt = `Provide BRIEF analysis of these stories based on headlines only.
+
+Stories:
+${JSON.stringify(clusterData, null, 2)}
+
+Return concise Quick Take analysis:
+
+{
+  "stories": [
+    {
+      "id": "quick-1",
+      "topic": "Topic name",
+      "tier": "quick-take",
+      "category": "politics",
+      "summary": "1-2 sentence neutral summary",
+      "sources": [
+        {
+          "name": "Source Name",
+          "lean": "Political lean",
+          "title": "Their headline",
+          "url": "article url",
+          "framing": "Brief note on framing"
+        }
+      ],
+      "perspectives": [
+        { "lean": "Left", "viewpoint": "Brief left perspective" },
+        { "lean": "Right", "viewpoint": "Brief right perspective" }
+      ],
+      "keyTakeaway": "One sentence takeaway"
+    }
+  ]
+}
+
+Keep it brief - these are quick summaries, not deep analysis.`;
 
   const response = await client.messages.create({
     model: "claude-sonnet-4-20250514",
-    max_tokens: 8000,
+    max_tokens: 6000,
     messages: [{ role: "user", content: prompt }],
   });
 
@@ -381,20 +543,16 @@ DEEPER ANALYSIS - THE REAL GAME:
     throw new Error("Unexpected response format");
   }
 
-  // Parse JSON from response
   const jsonMatch = content.text.match(/\{[\s\S]*\}/);
   if (!jsonMatch) {
-    throw new Error("Failed to parse analysis");
+    throw new Error("Failed to parse quick take analysis");
   }
 
   const parsed = JSON.parse(jsonMatch[0]);
-  const stories = parsed.stories || [];
-
-  // Log which stories have whyItMatters
-  const storiesWithWhy = stories.filter((s: { whyItMatters?: unknown }) => s.whyItMatters);
-  console.log(`Clearview: ${storiesWithWhy.length}/${stories.length} stories have whyItMatters`);
-
-  return stories;
+  return (parsed.stories || []).map((s: ClearviewStory) => ({
+    ...s,
+    tier: "quick-take" as const,
+  }));
 }
 
 export async function GET() {
@@ -427,7 +585,7 @@ export async function GET() {
       }
     }
 
-    // No cache - need to generate fresh content
+    // No cache - generate fresh content
     if (!client) {
       return NextResponse.json(
         { success: false, error: "Analysis service unavailable" },
@@ -435,24 +593,42 @@ export async function GET() {
       );
     }
 
-    console.log("Generating fresh Clearview analysis...");
+    console.log("Generating fresh Clearview analysis with tiered system...");
 
-    // Fetch all headlines
+    // Phase 1: Fetch and cluster headlines
     const headlines = await fetchAllHeadlines();
+    console.log(`Fetched ${headlines.length} headlines from ${FEED_SOURCES.length} sources`);
 
-    if (headlines.length < 5) {
+    if (headlines.length < 10) {
       return NextResponse.json(
         { success: false, error: "Not enough headlines available" },
         { status: 503 }
       );
     }
 
-    // Cluster and analyze with AI
-    const stories = await clusterAndAnalyze(headlines);
+    const clusters = await clusterHeadlines(headlines);
+    console.log(`Identified ${clusters.length} story clusters`);
 
-    // Save to database for persistence
+    // Phase 2: Select tiers
+    const { deepDive, quickTake } = selectTiers(clusters);
+    console.log(`Tiers: ${deepDive.length} Deep Dive, ${quickTake.length} Quick Take`);
+
+    // Phase 3: Extract articles for Deep Dives
+    const articleContent = await extractArticlesForClusters(deepDive, headlines);
+
+    // Phase 4: Analyze both tiers in parallel
+    const [deepDiveStories, quickTakeStories] = await Promise.all([
+      analyzeDeepDive(deepDive, headlines, articleContent),
+      analyzeQuickTake(quickTake, headlines),
+    ]);
+
+    // Combine stories with Deep Dives first
+    const allStories: ClearviewStory[] = [...deepDiveStories, ...quickTakeStories];
+    console.log(`Generated ${deepDiveStories.length} Deep Dive + ${quickTakeStories.length} Quick Take stories`);
+
+    // Save to database
     if (dbAvailable) {
-      await saveClearviewData(stories);
+      await saveClearviewData(allStories);
       console.log("Saved Clearview data to DB");
 
       // Get archived stories after saving
@@ -465,7 +641,7 @@ export async function GET() {
 
     const response: ClearviewResponse = {
       success: true,
-      stories,
+      stories: allStories,
       generatedAt: new Date().toISOString(),
       archived,
     };
