@@ -46,8 +46,10 @@ interface WhyItMatters {
 interface Story {
   id: string;
   topic: string;
+  tier?: "deep-dive" | "quick-take";
+  category?: "politics" | "economy" | "international" | "tech" | "culture" | "other";
   summary: string;
-  whatHappened: string;
+  whatHappened?: string;
   sources: Source[];
   perspectives: Perspective[];
   keyTakeaway: string;
