@@ -230,7 +230,7 @@ DEEPER ANALYSIS - THE REAL GAME:
 - Write this section like you're being brutally honest with a friend about how the game really works`;
 
   const response = await client.messages.create({
-    model: "claude-sonnet-4-20250514",
+    model: "claude-opus-4-20250514",
     max_tokens: 8000,
     messages: [{ role: "user", content: prompt }],
   });

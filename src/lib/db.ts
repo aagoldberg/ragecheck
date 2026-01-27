@@ -242,6 +242,10 @@ export async function initDB() {
     await getDb()`ALTER TABLE ragecheck_headlines ADD COLUMN IF NOT EXISTS image_url TEXT`;
     await getDb()`ALTER TABLE ragecheck_headlines ADD COLUMN IF NOT EXISTS rss_categories TEXT[]`;
     await getDb()`ALTER TABLE ragecheck_headlines ADD COLUMN IF NOT EXISTS guid TEXT`;
+    // Story clustering columns
+    await getDb()`ALTER TABLE ragecheck_headlines ADD COLUMN IF NOT EXISTS story_slug TEXT`;
+    await getDb()`ALTER TABLE ragecheck_headlines ADD COLUMN IF NOT EXISTS story_label TEXT`;
+    await getDb()`ALTER TABLE ragecheck_headlines ADD COLUMN IF NOT EXISTS clustered_at TIMESTAMP`;
   } catch {
     // Columns may already exist
   }
@@ -251,6 +255,24 @@ export async function initDB() {
     CREATE INDEX IF NOT EXISTS idx_headlines_topic
     ON ragecheck_headlines(topic, scored_at DESC)
     WHERE topic IS NOT NULL
+  `;
+
+  // Index for story grouping
+  await getDb()`
+    CREATE INDEX IF NOT EXISTS idx_headlines_story
+    ON ragecheck_headlines(story_slug, score DESC)
+    WHERE story_slug IS NOT NULL
+  `;
+
+  // Stories table for storing framing examples
+  await getDb()`
+    CREATE TABLE IF NOT EXISTS ragecheck_stories (
+      slug TEXT PRIMARY KEY,
+      label TEXT NOT NULL,
+      framing_examples JSONB,
+      created_at TIMESTAMP DEFAULT NOW(),
+      updated_at TIMESTAMP DEFAULT NOW()
+    )
   `;
 
   // Add columns if they don't exist (for existing tables)
@@ -1298,8 +1320,8 @@ export async function getDashboardStats(): Promise<DashboardStats> {
            a.created_at,
            a.ip_address, a.user_agent, a.country, a.is_bot,
            a.failed_image_url,
-           EXISTS (SELECT 1 FROM ragecheck_shares s WHERE s.url = a.url AND s.share_type NOT LIKE '%_clicked') as shared,
-           (SELECT s.share_type FROM ragecheck_shares s WHERE s.url = a.url AND s.share_type NOT LIKE '%_clicked' ORDER BY s.created_at DESC LIMIT 1) as share_type,
+           EXISTS (SELECT 1 FROM ragecheck_shares s WHERE s.url = a.url AND s.ip_address IS NOT NULL AND a.ip_address IS NOT NULL AND s.ip_address = a.ip_address AND s.share_type NOT LIKE '%_clicked') as shared,
+           (SELECT s.share_type FROM ragecheck_shares s WHERE s.url = a.url AND s.ip_address IS NOT NULL AND a.ip_address IS NOT NULL AND s.ip_address = a.ip_address AND s.share_type NOT LIKE '%_clicked' ORDER BY s.created_at DESC LIMIT 1) as share_type,
            (SELECT COUNT(DISTINCT DATE(a2.created_at)) FROM ragecheck_analyses a2 WHERE a2.ip_address = a.ip_address AND a.ip_address IS NOT NULL) > 1 as is_repeat_user
     FROM ragecheck_analyses a
     WHERE a.created_at > NOW() - INTERVAL '3 days'
@@ -1669,6 +1691,62 @@ export async function subscribeEmail(data: {
   } catch (error) {
     console.error("Failed to subscribe email:", error);
     return { success: false, error: "Failed to subscribe" };
+  }
+}
+
+export interface Subscriber {
+  id: number;
+  email: string;
+  source: string;
+  subscribedAt: string;
+}
+
+export async function getActiveSubscribers(source?: string): Promise<Subscriber[]> {
+  try {
+    await initDB();
+
+    let rows;
+    if (source) {
+      rows = await getDb()`
+        SELECT id, email, source, subscribed_at as "subscribedAt"
+        FROM ragecheck_subscribers
+        WHERE unsubscribed_at IS NULL AND source = ${source}
+        ORDER BY subscribed_at DESC
+      `;
+    } else {
+      rows = await getDb()`
+        SELECT id, email, source, subscribed_at as "subscribedAt"
+        FROM ragecheck_subscribers
+        WHERE unsubscribed_at IS NULL
+        ORDER BY subscribed_at DESC
+      `;
+    }
+
+    return rows as Subscriber[];
+  } catch (error) {
+    console.error("Failed to get subscribers:", error);
+    return [];
+  }
+}
+
+export async function unsubscribeEmail(email: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    await initDB();
+
+    const result = await getDb()`
+      UPDATE ragecheck_subscribers
+      SET unsubscribed_at = NOW()
+      WHERE email = ${email.toLowerCase().trim()} AND unsubscribed_at IS NULL
+    `;
+
+    if (result.count === 0) {
+      return { success: false, error: "Email not found or already unsubscribed" };
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error("Failed to unsubscribe:", error);
+    return { success: false, error: "Failed to unsubscribe" };
   }
 }
 
@@ -5094,6 +5172,10 @@ export interface ScoredHeadline {
   guid?: string;
   publishedAt?: Date;
   scoredAt?: Date;
+  // Story clustering
+  storySlug?: string;
+  storyLabel?: string;
+  clusteredAt?: Date;
 }
 
 // Check which URLs already exist in the database
@@ -5312,5 +5394,265 @@ export async function clearAllHeadlines(): Promise<void> {
   } catch (error) {
     console.error("Failed to clear headlines:", error);
     throw error;
+  }
+}
+
+// Get existing story slugs and labels (for clustering)
+export async function getExistingStories(): Promise<{ slug: string; label: string; count: number }[]> {
+  if (!process.env.DATABASE_URL) return [];
+
+  try {
+    await initDB();
+    const results = await getDb()`
+      SELECT story_slug, story_label, COUNT(*) as count
+      FROM ragecheck_headlines
+      WHERE story_slug IS NOT NULL
+      GROUP BY story_slug, story_label
+      ORDER BY count DESC
+    `;
+    return results.map((r) => ({
+      slug: r.story_slug as string,
+      label: r.story_label as string,
+      count: Number(r.count),
+    }));
+  } catch (error) {
+    console.error("Failed to get existing stories:", error);
+    return [];
+  }
+}
+
+// Get unclustered headlines (no story_slug assigned)
+export async function getUnclusteredHeadlines(limit: number = 200): Promise<ScoredHeadline[]> {
+  if (!process.env.DATABASE_URL) return [];
+
+  try {
+    await initDB();
+    const results = await getDb()`
+      SELECT id, url, title, description, source, lean, score, summary, analysis, topic, category,
+        arousal, enemy_construction, moral_condemnation, simplification, call_to_conflict,
+        author, image_url, rss_categories, guid, published_at, scored_at
+      FROM ragecheck_headlines
+      WHERE story_slug IS NULL AND score IS NOT NULL
+      ORDER BY scored_at DESC
+      LIMIT ${limit}
+    `;
+
+    return results.map((r) => ({
+      id: r.id as number,
+      url: r.url as string,
+      title: r.title as string,
+      description: r.description as string | undefined,
+      source: r.source as string,
+      lean: r.lean as string,
+      score: r.score as number | undefined,
+      summary: r.summary as string | undefined,
+      analysis: r.analysis as string | undefined,
+      topic: r.topic as string | undefined,
+      category: r.category as string | undefined,
+      signalBreakdown: r.arousal !== null ? {
+        arousal: Number(r.arousal) || 0,
+        enemy_construction: Number(r.enemy_construction) || 0,
+        moral_condemnation: Number(r.moral_condemnation) || 0,
+        simplification: Number(r.simplification) || 0,
+        call_to_conflict: Number(r.call_to_conflict) || 0,
+      } : undefined,
+      author: r.author as string | undefined,
+      imageUrl: r.image_url as string | undefined,
+      rssCategories: r.rss_categories as string[] | undefined,
+      guid: r.guid as string | undefined,
+      publishedAt: r.published_at ? new Date(r.published_at as string) : undefined,
+      scoredAt: r.scored_at ? new Date(r.scored_at as string) : undefined,
+    }));
+  } catch (error) {
+    console.error("Failed to get unclustered headlines:", error);
+    return [];
+  }
+}
+
+// Update headlines with story assignments
+export async function updateHeadlineStories(
+  assignments: { id: number; storySlug: string; storyLabel: string }[]
+): Promise<void> {
+  if (!process.env.DATABASE_URL || assignments.length === 0) return;
+
+  try {
+    await initDB();
+    for (const { id, storySlug, storyLabel } of assignments) {
+      await getDb()`
+        UPDATE ragecheck_headlines
+        SET story_slug = ${storySlug},
+            story_label = ${storyLabel},
+            clustered_at = NOW()
+        WHERE id = ${id}
+      `;
+    }
+    console.log(`Updated ${assignments.length} headlines with story assignments`);
+  } catch (error) {
+    console.error("Failed to update headline stories:", error);
+    throw error;
+  }
+}
+
+// Upsert stories with framing examples
+export async function upsertStoriesWithFraming(
+  stories: { slug: string; label: string; framingExamples?: FramingExamples }[]
+): Promise<void> {
+  if (!process.env.DATABASE_URL || stories.length === 0) return;
+
+  try {
+    await initDB();
+    for (const { slug, label, framingExamples } of stories) {
+      await getDb()`
+        INSERT INTO ragecheck_stories (slug, label, framing_examples)
+        VALUES (${slug}, ${label}, ${framingExamples ? JSON.stringify(framingExamples) : null})
+        ON CONFLICT (slug) DO UPDATE SET
+          label = EXCLUDED.label,
+          framing_examples = COALESCE(EXCLUDED.framing_examples, ragecheck_stories.framing_examples),
+          updated_at = NOW()
+      `;
+    }
+    console.log(`Upserted ${stories.length} stories with framing examples`);
+  } catch (error) {
+    console.error("Failed to upsert stories:", error);
+    throw error;
+  }
+}
+
+// Framing examples extracted from headlines
+export interface FramingExamples {
+  divisionWords: string[];       // Words that divide people into opposing sides (enemy_construction)
+  emotionWords: string[];        // Charged language that heightens emotion (arousal)
+  moralWords: string[];          // Words expressing moral judgment/outrage (moral_condemnation)
+  conflictWords: string[];       // Language inciting action or conflict (call_to_conflict)
+  simplificationNote: string;    // How complex situations are reduced (simplification)
+}
+
+// Get headlines grouped by story
+export interface StoryGroup {
+  slug: string;
+  label: string;
+  headlines: ScoredHeadline[];
+  avgScore: number;
+  topSignal: string;
+  framingExamples?: FramingExamples;
+}
+
+export async function getHeadlinesGroupedByStory(hours: number = 48): Promise<StoryGroup[]> {
+  if (!process.env.DATABASE_URL) return [];
+
+  try {
+    await initDB();
+    const results = await getDb()`
+      SELECT id, url, title, description, source, lean, score, summary, analysis, topic, category,
+        arousal, enemy_construction, moral_condemnation, simplification, call_to_conflict,
+        author, image_url, rss_categories, guid, published_at, scored_at,
+        story_slug, story_label
+      FROM ragecheck_headlines
+      WHERE story_slug IS NOT NULL
+        AND scored_at > NOW() - INTERVAL '1 hour' * ${hours}
+        AND score IS NOT NULL
+      ORDER BY story_slug, score DESC
+    `;
+
+    // Group by story
+    const storyMap = new Map<string, ScoredHeadline[]>();
+    const storyLabels = new Map<string, string>();
+
+    for (const r of results) {
+      const slug = r.story_slug as string;
+      const label = r.story_label as string;
+
+      if (!storyMap.has(slug)) {
+        storyMap.set(slug, []);
+        storyLabels.set(slug, label);
+      }
+
+      storyMap.get(slug)!.push({
+        id: r.id as number,
+        url: r.url as string,
+        title: r.title as string,
+        description: r.description as string | undefined,
+        source: r.source as string,
+        lean: r.lean as string,
+        score: r.score as number | undefined,
+        summary: r.summary as string | undefined,
+        analysis: r.analysis as string | undefined,
+        topic: r.topic as string | undefined,
+        category: r.category as string | undefined,
+        signalBreakdown: r.arousal !== null ? {
+          arousal: Number(r.arousal) || 0,
+          enemy_construction: Number(r.enemy_construction) || 0,
+          moral_condemnation: Number(r.moral_condemnation) || 0,
+          simplification: Number(r.simplification) || 0,
+          call_to_conflict: Number(r.call_to_conflict) || 0,
+        } : undefined,
+        author: r.author as string | undefined,
+        imageUrl: r.image_url as string | undefined,
+        storySlug: slug,
+        storyLabel: label,
+      });
+    }
+
+    // Fetch framing examples for all stories
+    const storySlugs = Array.from(storyMap.keys());
+    const framingResults = storySlugs.length > 0 ? await getDb()`
+      SELECT slug, framing_examples
+      FROM ragecheck_stories
+      WHERE slug = ANY(${storySlugs})
+    ` : [];
+
+    const framingMap = new Map<string, FramingExamples>();
+    for (const r of framingResults) {
+      if (r.framing_examples) {
+        const fe = r.framing_examples as { divisionWords?: string[]; emotionWords?: string[]; moralWords?: string[]; conflictWords?: string[]; simplificationNote?: string };
+        framingMap.set(r.slug as string, {
+          divisionWords: fe.divisionWords || [],
+          emotionWords: fe.emotionWords || [],
+          moralWords: fe.moralWords || [],
+          conflictWords: fe.conflictWords || [],
+          simplificationNote: fe.simplificationNote || "",
+        });
+      }
+    }
+
+    // Convert to StoryGroup array with computed metrics
+    const signalNames = ['arousal', 'enemy_construction', 'moral_condemnation', 'simplification', 'call_to_conflict'];
+    const signalLabels: Record<string, string> = {
+      arousal: 'Emotional Intensity',
+      enemy_construction: 'Us vs Them',
+      moral_condemnation: 'Moral Outrage',
+      simplification: 'Black & White',
+      call_to_conflict: 'Call to Action',
+    };
+
+    const groups: StoryGroup[] = [];
+    for (const [slug, headlines] of storyMap) {
+      const avgScore = headlines.reduce((sum, h) => sum + (h.score || 0), 0) / headlines.length;
+
+      // Find dominant signal across all headlines in story
+      const signalTotals: Record<string, number> = {};
+      for (const signal of signalNames) {
+        signalTotals[signal] = headlines.reduce((sum, h) => {
+          const breakdown = h.signalBreakdown as Record<string, number> | undefined;
+          return sum + (breakdown?.[signal] || 0);
+        }, 0);
+      }
+      const topSignalKey = Object.entries(signalTotals).sort((a, b) => b[1] - a[1])[0]?.[0] || 'arousal';
+
+      groups.push({
+        slug,
+        label: storyLabels.get(slug) || slug,
+        headlines,
+        avgScore: Math.round(avgScore),
+        topSignal: signalLabels[topSignalKey] || topSignalKey,
+        framingExamples: framingMap.get(slug),
+      });
+    }
+
+    // Sort by average score descending
+    return groups.sort((a, b) => b.avgScore - a.avgScore);
+  } catch (error) {
+    console.error("Failed to get headlines grouped by story:", error);
+    return [];
   }
 }
