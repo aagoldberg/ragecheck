@@ -4,6 +4,9 @@ import Anthropic from "@anthropic-ai/sdk";
 import { getClearviewData, saveClearviewData, initClearviewTable, isDBAvailable, getArchivedClearviewData, ClearviewStory } from "@/lib/db";
 import { extractContent } from "@/lib/extract";
 
+// Extend function timeout for tiered analysis (Pro plan: up to 300s)
+export const maxDuration = 300;
+
 const parser = new Parser({
   timeout: 15000,
   headers: {

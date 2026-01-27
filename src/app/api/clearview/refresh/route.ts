@@ -7,6 +7,9 @@ import { extractContent } from "@/lib/extract";
 // This endpoint is called by Vercel Cron to refresh Clearview data
 // It bypasses the cache and always generates fresh content
 
+// Extend function timeout for tiered analysis (Pro plan: up to 300s)
+export const maxDuration = 300;
+
 const parser = new Parser({
   timeout: 15000,
   headers: {
