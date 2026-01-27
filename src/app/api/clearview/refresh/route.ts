@@ -568,10 +568,12 @@ export async function GET(request: NextRequest) {
     }
 
     await initClearviewTable();
+    const startTime = Date.now();
 
-    // Phase 1: Fetch and cluster headlines
+    // Phase 1: Fetch headlines
+    console.log(`Cron: [${Date.now() - startTime}ms] Starting Phase 1: Fetch headlines`);
     const headlines = await fetchAllHeadlines();
-    console.log(`Cron: Fetched ${headlines.length} headlines from ${FEED_SOURCES.length} sources`);
+    console.log(`Cron: [${Date.now() - startTime}ms] Phase 1 complete: ${headlines.length} headlines from ${FEED_SOURCES.length} sources`);
 
     if (headlines.length < 10) {
       return NextResponse.json(
@@ -580,25 +582,31 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Phase 2: Cluster headlines
+    console.log(`Cron: [${Date.now() - startTime}ms] Starting Phase 2: Cluster headlines`);
     const clusters = await clusterHeadlines(headlines);
-    console.log(`Cron: Identified ${clusters.length} story clusters`);
+    console.log(`Cron: [${Date.now() - startTime}ms] Phase 2 complete: ${clusters.length} clusters`);
 
-    // Phase 2: Select tiers
+    // Phase 3: Select tiers
     const { deepDive, quickTake } = selectTiers(clusters);
-    console.log(`Cron: Tiers: ${deepDive.length} Deep Dive, ${quickTake.length} Quick Take`);
+    console.log(`Cron: [${Date.now() - startTime}ms] Phase 3: ${deepDive.length} Deep Dive, ${quickTake.length} Quick Take`);
 
-    // Phase 3: Extract articles for Deep Dives
+    // Phase 4: Extract articles for Deep Dives
+    console.log(`Cron: [${Date.now() - startTime}ms] Starting Phase 4: Extract articles`);
     const articleContent = await extractArticlesForClusters(deepDive, headlines);
+    console.log(`Cron: [${Date.now() - startTime}ms] Phase 4 complete: ${articleContent.size} articles extracted`);
 
-    // Phase 4: Analyze both tiers in parallel
+    // Phase 5: Analyze both tiers in parallel
+    console.log(`Cron: [${Date.now() - startTime}ms] Starting Phase 5: LLM analysis`);
     const [deepDiveStories, quickTakeStories] = await Promise.all([
       analyzeDeepDive(deepDive, headlines, articleContent),
       analyzeQuickTake(quickTake, headlines),
     ]);
+    console.log(`Cron: [${Date.now() - startTime}ms] Phase 5 complete`);
 
     // Combine stories
     const allStories: ClearviewStory[] = [...deepDiveStories, ...quickTakeStories];
-    console.log(`Cron: Generated ${deepDiveStories.length} Deep Dive + ${quickTakeStories.length} Quick Take stories`);
+    console.log(`Cron: [${Date.now() - startTime}ms] Generated ${deepDiveStories.length} Deep Dive + ${quickTakeStories.length} Quick Take`);
 
     // Save to database
     await saveClearviewData(allStories);
