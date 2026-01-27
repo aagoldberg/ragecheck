@@ -372,3 +372,424 @@ export async function analyzeImageWithVision(
     return { success: false, error: `Analysis failed: ${errorMessage}` };
   }
 }
+
+// ============================================
+// HEADLINE SCORING WITH FULL ANALYSIS
+// ============================================
+
+export interface HeadlineScore {
+  score: number;
+  summary: string;
+  analysis: string;
+  signalBreakdown: SignalBreakdown;
+  topic: string;
+  category: string;
+}
+
+const HEADLINE_SCORING_PROMPT = `You are an expert at detecting outrage bait and manipulation in news headlines. Analyze this headline and description for manipulation patterns.
+
+Key signals to score (each 0-100):
+- **Arousal**: Emotional intensity, urgency, alarm
+- **Enemy Construction**: Us-vs-them, vilifying groups/people
+- **Moral Condemnation**: Moral outrage, righteousness, judgment
+- **Simplification**: Black-and-white thinking, ignoring nuance
+- **Call to Conflict**: Inciting action, confrontation, "share this"
+
+Overall score guidelines:
+- 0-30 = informative, balanced journalism
+- 31-60 = some emotional framing but mostly informative
+- 61-100 = primarily designed to provoke emotional reaction
+
+Categories: politics, business, technology, health, science, sports, entertainment, crime, culture_wars, environment, education, world, other
+
+Respond with ONLY this JSON (no other text):
+{
+  "score": <0-100>,
+  "summary": "<10-15 word summary of what makes it rage-bait or not>",
+  "analysis": "<1-2 sentence analysis of the manipulation tactics used, or why it's balanced>",
+  "signalBreakdown": {
+    "arousal": <0-100>,
+    "enemy_construction": <0-100>,
+    "moral_condemnation": <0-100>,
+    "simplification": <0-100>,
+    "call_to_conflict": <0-100>
+  },
+  "topic": "<slug for grouping related stories, e.g. 'minneapolis-ice-shooting', 'trump-venezuela', lowercase-with-dashes>",
+  "category": "<politics|business|technology|health|science|sports|entertainment|crime|culture_wars|environment|education|world|other>"
+}`;
+
+export async function scoreHeadline(
+  title: string,
+  description: string,
+  source: string
+): Promise<HeadlineScore | null> {
+  if (!client) {
+    return null;
+  }
+
+  const userPrompt = `Source: ${source}
+
+HEADLINE: ${title}
+
+DESCRIPTION: ${description.slice(0, 500)}`;
+
+  try {
+    const response = await client.messages.create({
+      model: "claude-opus-4-20250514",
+      max_tokens: 350,
+      messages: [
+        {
+          role: "user",
+          content: userPrompt,
+        },
+      ],
+      system: HEADLINE_SCORING_PROMPT,
+    });
+
+    const content = response.content[0];
+    if (content.type !== "text") {
+      return null;
+    }
+
+    const jsonMatch = content.text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      return null;
+    }
+
+    const parsed = JSON.parse(jsonMatch[0]);
+    return {
+      score: Math.min(100, Math.max(0, parsed.score)),
+      summary: parsed.summary || "",
+      analysis: parsed.analysis || "",
+      signalBreakdown: {
+        arousal: Math.min(100, Math.max(0, parsed.signalBreakdown?.arousal || 0)),
+        enemy_construction: Math.min(100, Math.max(0, parsed.signalBreakdown?.enemy_construction || 0)),
+        moral_condemnation: Math.min(100, Math.max(0, parsed.signalBreakdown?.moral_condemnation || 0)),
+        simplification: Math.min(100, Math.max(0, parsed.signalBreakdown?.simplification || 0)),
+        call_to_conflict: Math.min(100, Math.max(0, parsed.signalBreakdown?.call_to_conflict || 0)),
+      },
+      topic: parsed.topic || "general",
+      category: parsed.category || "other",
+    };
+  } catch (error) {
+    console.error("Headline scoring failed:", error);
+    return null;
+  }
+}
+
+// Batch score multiple headlines (with rate limiting)
+export async function scoreHeadlines(
+  headlines: { title: string; description: string; source: string }[]
+): Promise<(HeadlineScore | null)[]> {
+  // Process in batches to avoid rate limits
+  const results: (HeadlineScore | null)[] = [];
+
+  for (const headline of headlines) {
+    const result = await scoreHeadline(headline.title, headline.description, headline.source);
+    results.push(result);
+    // Small delay to avoid rate limits
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+
+  return results;
+}
+
+// ============================================
+// HAIKU STORY CLUSTERING
+// ============================================
+
+export interface HeadlineForClustering {
+  id: number;
+  title: string;
+  source: string;
+  score?: number;
+}
+
+export interface StoryAssignment {
+  headlineId: number;
+  storySlug: string;
+  storyLabel: string;
+  isNewStory: boolean;
+}
+
+export interface FramingExamples {
+  divisionWords: string[];       // Words that divide people into opposing sides (enemy_construction)
+  emotionWords: string[];        // Charged language that heightens emotion (arousal)
+  simplificationNote: string;    // How complex situations are reduced (simplification)
+  moralWords: string[];          // Words expressing moral judgment/outrage (moral_condemnation)
+  conflictWords: string[];       // Language inciting action or conflict (call_to_conflict)
+}
+
+export interface StoryWithFraming {
+  slug: string;
+  label: string;
+  framingExamples?: FramingExamples;
+}
+
+export interface ClusteringResult {
+  success: boolean;
+  assignments: StoryAssignment[];
+  newStories: StoryWithFraming[];
+  error?: string;
+}
+
+const CLUSTERING_SYSTEM_PROMPT = `You are a news clustering expert. Your job is to group news headlines by the underlying story or event they cover, AND extract specific framing examples from the headlines.
+
+CRITICAL RULES:
+1. Headlines about the SAME event/story should get the SAME story_slug
+2. Use existing story slugs when a headline matches an existing story
+3. Only create new stories for genuinely new events
+4. Story slugs should be lowercase-with-dashes, specific but concise
+5. Story labels should be human-readable, 3-6 words
+
+FRAMING EXTRACTION RULES:
+For each story cluster, extract ACTUAL words/phrases from the headlines that show framing patterns:
+- division_words: Words that create us-vs-them framing (e.g., "radicals", "patriots", "extremists", "elites", "socialists")
+- emotion_words: Charged language that heightens emotion (e.g., "chaos", "invade", "storm", "slam", "destroy")
+- moral_words: Words expressing moral judgment or outrage (e.g., "shameful", "disgusting", "unacceptable", "evil", "corrupt")
+- conflict_words: Language inciting action or conflict (e.g., "fight back", "stand up", "take action", "must stop", "demands")
+- simplification_note: A brief note about how coverage reduces complex situations to heroes-vs-villains
+
+ONLY include words that ACTUALLY appear in the headlines. Do not invent examples.
+
+Examples of SAME story (should share slug):
+- "Second Man Dies at ICE Facility" → minnesota-ice-detention-deaths
+- "Anti-ICE Protesters Storm Minneapolis" → minnesota-ice-detention-deaths
+- "Trump Defends Immigration Crackdown After Deaths" → minnesota-ice-detention-deaths
+
+Return ONLY valid JSON, no other text.`;
+
+export async function clusterHeadlinesWithHaiku(
+  headlines: HeadlineForClustering[],
+  existingStories: { slug: string; label: string }[]
+): Promise<ClusteringResult> {
+  if (!client || headlines.length === 0) {
+    return { success: false, assignments: [], newStories: [], error: "No client or headlines" };
+  }
+
+  // Build the prompt with existing stories and headlines to cluster
+  const existingStoriesText = existingStories.length > 0
+    ? `EXISTING STORIES (use these slugs if headlines match):\n${existingStories.map(s => `- "${s.slug}" = ${s.label}`).join("\n")}\n\n`
+    : "";
+
+  const headlinesText = headlines
+    .map((h, i) => `${i + 1}. [${h.source}] "${h.title}" (score: ${h.score || "?"})`)
+    .join("\n");
+
+  const userPrompt = `${existingStoriesText}HEADLINES TO CLUSTER:
+${headlinesText}
+
+Group these headlines by the underlying news story. Assign each headline to either an existing story slug or create a new one.
+
+For each NEW story, extract framing examples from the actual headlines in that cluster.
+
+Return JSON:
+{
+  "assignments": [
+    {"headline_index": 1, "story_slug": "slug-here", "story_label": "Human Label", "is_new": false},
+    ...
+  ],
+  "new_stories": [
+    {
+      "slug": "new-story-slug",
+      "label": "New Story Label",
+      "framing_examples": {
+        "division_words": ["word1", "word2"],
+        "emotion_words": ["word1", "word2"],
+        "moral_words": ["word1", "word2"],
+        "conflict_words": ["word1", "word2"],
+        "simplification_note": "Brief note about heroes-vs-villains framing if present, or empty string"
+      }
+    },
+    ...
+  ]
+}`;
+
+  try {
+    const response = await client.messages.create({
+      model: "claude-3-5-haiku-20241022",
+      max_tokens: 2000,
+      messages: [{ role: "user", content: userPrompt }],
+      system: CLUSTERING_SYSTEM_PROMPT,
+    });
+
+    const content = response.content[0];
+    if (content.type !== "text") {
+      return { success: false, assignments: [], newStories: [], error: "Non-text response" };
+    }
+
+    const jsonMatch = content.text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      console.error("No JSON in clustering response:", content.text.slice(0, 500));
+      return { success: false, assignments: [], newStories: [], error: "No JSON in response" };
+    }
+
+    const parsed = JSON.parse(jsonMatch[0]);
+
+    // Map assignments back to headline IDs
+    const assignments: StoryAssignment[] = (parsed.assignments || []).map((a: {
+      headline_index: number;
+      story_slug: string;
+      story_label: string;
+      is_new: boolean;
+    }) => {
+      const headlineIndex = a.headline_index - 1; // Convert from 1-indexed
+      const headline = headlines[headlineIndex];
+      if (!headline) {
+        console.error(`Invalid headline index: ${a.headline_index}`);
+        return null;
+      }
+      return {
+        headlineId: headline.id,
+        storySlug: a.story_slug,
+        storyLabel: a.story_label,
+        isNewStory: a.is_new || false,
+      };
+    }).filter(Boolean) as StoryAssignment[];
+
+    const newStories: StoryWithFraming[] = (parsed.new_stories || []).map((s: {
+      slug: string;
+      label: string;
+      framing_examples?: {
+        division_words?: string[];
+        emotion_words?: string[];
+        moral_words?: string[];
+        conflict_words?: string[];
+        simplification_note?: string;
+      };
+    }) => ({
+      slug: s.slug,
+      label: s.label,
+      framingExamples: s.framing_examples ? {
+        divisionWords: s.framing_examples.division_words || [],
+        emotionWords: s.framing_examples.emotion_words || [],
+        moralWords: s.framing_examples.moral_words || [],
+        conflictWords: s.framing_examples.conflict_words || [],
+        simplificationNote: s.framing_examples.simplification_note || "",
+      } : undefined,
+    }));
+
+    return { success: true, assignments, newStories };
+  } catch (error) {
+    console.error("Haiku clustering failed:", error);
+    return { success: false, assignments: [], newStories: [], error: String(error) };
+  }
+}
+
+// Cluster headlines in batches (Haiku can handle ~50-100 at a time)
+export async function clusterHeadlinesBatch(
+  headlines: HeadlineForClustering[],
+  existingStories: { slug: string; label: string }[],
+  batchSize: number = 50
+): Promise<ClusteringResult> {
+  if (headlines.length === 0) {
+    return { success: true, assignments: [], newStories: [] };
+  }
+
+  const allAssignments: StoryAssignment[] = [];
+  const allNewStories: { slug: string; label: string }[] = [];
+  let currentStories = [...existingStories];
+
+  // Process in batches
+  for (let i = 0; i < headlines.length; i += batchSize) {
+    const batch = headlines.slice(i, i + batchSize);
+    console.log(`Clustering batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(headlines.length / batchSize)} (${batch.length} headlines)`);
+
+    const result = await clusterHeadlinesWithHaiku(batch, currentStories);
+
+    if (!result.success) {
+      console.error(`Batch ${i / batchSize + 1} failed:`, result.error);
+      continue;
+    }
+
+    allAssignments.push(...result.assignments);
+
+    // Add new stories to the running list so subsequent batches can use them
+    for (const newStory of result.newStories) {
+      if (!currentStories.some(s => s.slug === newStory.slug)) {
+        currentStories.push(newStory);
+        allNewStories.push(newStory);
+      }
+    }
+
+    // Small delay between batches
+    if (i + batchSize < headlines.length) {
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+  }
+
+  return {
+    success: true,
+    assignments: allAssignments,
+    newStories: allNewStories,
+  };
+}
+
+// Extract framing examples from headlines for an existing story
+const FRAMING_EXTRACTION_PROMPT = `You analyze news headlines to identify framing patterns. Extract ONLY words that ACTUALLY appear in the headlines provided.
+
+For the given headlines about a story, extract:
+1. division_words: Words that create us-vs-them framing or divide people into opposing sides (e.g., "radicals", "patriots", "extremists", "elites", "socialists", "traitors")
+2. emotion_words: Charged language that heightens emotion (e.g., "chaos", "invade", "storm", "slam", "destroy", "outrage")
+3. moral_words: Words expressing moral judgment or outrage (e.g., "shameful", "disgusting", "unacceptable", "evil", "corrupt", "wrong")
+4. conflict_words: Language inciting action or conflict (e.g., "fight back", "stand up", "take action", "must stop", "demands", "calls for")
+5. simplification_note: A brief (1 sentence) note about how the coverage reduces complex situations to heroes-vs-villains, if applicable
+
+CRITICAL: Only include words that ACTUALLY appear in the headlines. Do not invent examples.
+Return ONLY valid JSON.`;
+
+export async function extractFramingExamples(
+  headlines: { title: string }[],
+  storyLabel: string
+): Promise<FramingExamples | null> {
+  if (!client || headlines.length === 0) {
+    return null;
+  }
+
+  const headlinesList = headlines.map((h, i) => `${i + 1}. "${h.title}"`).join("\n");
+
+  const userPrompt = `Story: ${storyLabel}
+
+Headlines:
+${headlinesList}
+
+Extract framing patterns from these headlines. Return JSON:
+{
+  "division_words": ["word1", "word2"],
+  "emotion_words": ["word1", "word2"],
+  "moral_words": ["word1", "word2"],
+  "conflict_words": ["word1", "word2"],
+  "simplification_note": "Brief note about heroes-vs-villains framing, or empty string if none"
+}`;
+
+  try {
+    const response = await client.messages.create({
+      model: "claude-3-5-haiku-20241022",
+      max_tokens: 500,
+      messages: [{ role: "user", content: userPrompt }],
+      system: FRAMING_EXTRACTION_PROMPT,
+    });
+
+    const content = response.content[0];
+    if (content.type !== "text") {
+      return null;
+    }
+
+    const jsonMatch = content.text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      return null;
+    }
+
+    const parsed = JSON.parse(jsonMatch[0]);
+    return {
+      divisionWords: parsed.division_words || [],
+      emotionWords: parsed.emotion_words || [],
+      moralWords: parsed.moral_words || [],
+      conflictWords: parsed.conflict_words || [],
+      simplificationNote: parsed.simplification_note || "",
+    };
+  } catch (error) {
+    console.error("Framing extraction failed:", error);
+    return null;
+  }
+}
