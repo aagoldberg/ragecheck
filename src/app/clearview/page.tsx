@@ -336,6 +336,13 @@ function StoryCard({ story }: { story: StoryCluster }) {
           </div>
         )}
 
+        {/* Bottom Line - Promoted to main view */}
+        {story.whyItMatters?.bottomLine && (
+          <p className="text-sm text-zinc-600 dark:text-zinc-400 italic border-l-2 border-amber-400 pl-4">
+            <span className="font-semibold text-amber-600 dark:text-amber-400">Bottom line:</span> {story.whyItMatters.bottomLine}
+          </p>
+        )}
+
         {/* Expert Consensus - In main view */}
         <ExpertConsensusBox consensus={story.expertConsensus} />
       </div>
@@ -386,11 +393,6 @@ function StoryCard({ story }: { story: StoryCluster }) {
                   </p>
                 </div>
               </div>
-              {story.whyItMatters.bottomLine && (
-                <p className="text-sm text-zinc-600 dark:text-zinc-400 italic border-l-2 border-amber-400 pl-4">
-                  <span className="font-semibold text-amber-600 dark:text-amber-400">Bottom line:</span> {story.whyItMatters.bottomLine}
-                </p>
-              )}
             </div>
           )}
 
