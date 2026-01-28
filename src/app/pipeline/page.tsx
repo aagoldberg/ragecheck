@@ -1273,6 +1273,104 @@ Cron job (every 4 hours) or GET request
           </div>
         </section>
 
+        {/* Article Extraction - Working Sources */}
+        <section className="space-y-4">
+          <h2 className="text-xl font-bold text-zinc-800 dark:text-zinc-200">
+            Working Sources (34)
+          </h2>
+          <p className="text-sm text-zinc-600 dark:text-zinc-400">
+            These 34 sources support full article extraction via Mozilla Readability.
+            Deep Dive stories pull complete article text for analysis.
+          </p>
+
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+            {/* Far Left */}
+            <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+              <div className="text-xs font-semibold text-blue-700 dark:text-blue-400 mb-1">Far Left</div>
+              <div className="text-xs text-zinc-600 dark:text-zinc-400 space-y-0.5">
+                <div>Jacobin</div>
+                <div>Democracy Now</div>
+                <div>The Intercept</div>
+                <div>Common Dreams</div>
+                <div>Truthout</div>
+              </div>
+            </div>
+
+            {/* Left */}
+            <div className="p-3 bg-sky-50 dark:bg-sky-900/20 rounded-lg">
+              <div className="text-xs font-semibold text-sky-700 dark:text-sky-400 mb-1">Left</div>
+              <div className="text-xs text-zinc-600 dark:text-zinc-400 space-y-0.5">
+                <div>The Guardian</div>
+                <div>Vox</div>
+                <div>HuffPost</div>
+                <div>Slate</div>
+                <div>New Yorker</div>
+              </div>
+            </div>
+
+            {/* Center-Left */}
+            <div className="p-3 bg-cyan-50 dark:bg-cyan-900/20 rounded-lg">
+              <div className="text-xs font-semibold text-cyan-700 dark:text-cyan-400 mb-1">Center-Left</div>
+              <div className="text-xs text-zinc-600 dark:text-zinc-400 space-y-0.5">
+                <div>NPR</div>
+                <div>The Atlantic</div>
+                <div>CNN</div>
+                <div>NBC News</div>
+                <div>ABC News</div>
+                <div>New York Times</div>
+              </div>
+            </div>
+
+            {/* Center */}
+            <div className="p-3 bg-zinc-100 dark:bg-zinc-800 rounded-lg">
+              <div className="text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Center</div>
+              <div className="text-xs text-zinc-600 dark:text-zinc-400 space-y-0.5">
+                <div>PBS</div>
+                <div>AP News</div>
+                <div>BBC</div>
+              </div>
+            </div>
+
+            {/* Center-Right */}
+            <div className="p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
+              <div className="text-xs font-semibold text-orange-700 dark:text-orange-400 mb-1">Center-Right</div>
+              <div className="text-xs text-zinc-600 dark:text-zinc-400 space-y-0.5">
+                <div>Reason</div>
+                <div>The Dispatch</div>
+              </div>
+            </div>
+
+            {/* Right */}
+            <div className="p-3 bg-rose-50 dark:bg-rose-900/20 rounded-lg">
+              <div className="text-xs font-semibold text-rose-700 dark:text-rose-400 mb-1">Right</div>
+              <div className="text-xs text-zinc-600 dark:text-zinc-400 space-y-0.5">
+                <div>Washington Examiner</div>
+                <div>Fox News</div>
+                <div>New York Post</div>
+                <div>Daily Wire</div>
+                <div>The Blaze</div>
+              </div>
+            </div>
+
+            {/* Far Right */}
+            <div className="p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
+              <div className="text-xs font-semibold text-red-700 dark:text-red-400 mb-1">Far Right</div>
+              <div className="text-xs text-zinc-600 dark:text-zinc-400 space-y-0.5">
+                <div>RedState</div>
+                <div>One America News</div>
+                <div>PJ Media</div>
+                <div>Western Journal</div>
+                <div className="text-zinc-400">(+4 partial)</div>
+              </div>
+            </div>
+          </div>
+
+          <p className="text-xs text-zinc-500 italic">
+            14 sources blocked (paywalls, Cloudflare, 403s). Partial sources: RealClearPolitics,
+            American Spectator, Breitbart, Gateway Pundit.
+          </p>
+        </section>
+
         <footer className="pt-8 border-t border-zinc-200 dark:border-zinc-800 text-center text-xs text-zinc-400">
           <p>Pipeline Documentation - RageCheck / Clearview / Despun / LongView</p>
           <p className="mt-1">Last updated: {new Date().toISOString().split('T')[0]}</p>

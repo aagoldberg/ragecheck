@@ -345,7 +345,7 @@ For each story, provide comprehensive analysis:
       "tier": "deep-dive",
       "category": "politics",
       "summary": "2-3 sentence neutral summary of what happened",
-      "whatHappened": "Detailed explanation of actual events, stripped of spin",
+      "whatHappened": "3-4 clear factual sentences. Each sentence should be a distinct fact. Start each with a concrete detail (who/what/when/where). No spin or interpretation.",
       "sources": [
         {
           "name": "Source Name",
