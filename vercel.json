@@ -2,7 +2,7 @@
   "crons": [
     {
       "path": "/api/clearview/refresh",
-      "schedule": "0 */4 * * *"
+      "schedule": "0 11,23 * * *"
     }
   ]
 }

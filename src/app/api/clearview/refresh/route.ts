@@ -107,6 +107,8 @@ interface HeadlineCluster {
   sourceCount: number;
   spectrumSpread: number;
   category: "politics" | "economy" | "international" | "tech" | "culture" | "other";
+  newestHeadlineAge?: number; // hours since newest headline
+  score?: number; // computed ranking score
 }
 
 interface TieredClusters {
@@ -202,6 +204,8 @@ Rules:
 
   const leanOrder = ["Far Left", "Left", "Center-Left", "Center", "Center-Right", "Right", "Far Right"];
 
+  const now = Date.now();
+
   return rawClusters.map((cluster: { topic: string; headlineIndices: number[]; category: string }) => {
     const clusterHeadlines = cluster.headlineIndices.map((i: number) => headlines[i]).filter(Boolean);
     const uniqueSources = new Set(clusterHeadlines.map((h: RawHeadline) => h.source));
@@ -212,33 +216,71 @@ Rules:
       ? Math.max(...leanIndices) - Math.min(...leanIndices) + 1
       : 1;
 
+    // Calculate age of newest headline in hours
+    const headlineTimes = clusterHeadlines
+      .map((h: RawHeadline) => new Date(h.publishedAt).getTime())
+      .filter((t: number) => !isNaN(t));
+    const newestTime = headlineTimes.length > 0 ? Math.max(...headlineTimes) : now;
+    const newestHeadlineAge = (now - newestTime) / (1000 * 60 * 60); // hours
+
     return {
       topic: cluster.topic,
       headlineIndices: cluster.headlineIndices,
       sourceCount: uniqueSources.size,
       spectrumSpread,
       category: cluster.category as HeadlineCluster["category"],
+      newestHeadlineAge,
     };
   });
 }
 
-// Phase 2: Select tiers
+// Calculate story score for ranking
+function calculateScore(cluster: HeadlineCluster): number {
+  const sourceCount = cluster.sourceCount;
+
+  // Normalize spectrum spread to 1.0-3.0 range
+  // spectrumSpread of 1 = single lean (1.0), 7 = full spectrum (3.0)
+  const spectrumFactor = 1.0 + (Math.min(cluster.spectrumSpread, 7) - 1) * (2.0 / 6);
+
+  // Recency factor: 1.0 if <6hrs, 0.8 if 6-24hrs, 0.5 if 24-48hrs, 0.3 if >48hrs
+  const ageHours = cluster.newestHeadlineAge || 0;
+  let recencyFactor = 1.0;
+  if (ageHours > 48) recencyFactor = 0.3;
+  else if (ageHours > 24) recencyFactor = 0.5;
+  else if (ageHours > 6) recencyFactor = 0.8;
+
+  return sourceCount * spectrumFactor * recencyFactor;
+}
+
+// Phase 2: Select tiers based on scoring
 function selectTiers(clusters: HeadlineCluster[]): TieredClusters {
   const deepDive: HeadlineCluster[] = [];
   const quickTake: HeadlineCluster[] = [];
 
-  const sorted = [...clusters].sort((a, b) =>
-    (b.sourceCount * b.spectrumSpread) - (a.sourceCount * a.spectrumSpread)
-  );
+  // Calculate and attach scores
+  const scored = clusters.map(c => ({ ...c, score: calculateScore(c) }));
 
+  // Sort by score descending
+  const sorted = scored.sort((a, b) => (b.score || 0) - (a.score || 0));
+
+  // Log top scores for debugging
+  console.log("Cluster scores:", sorted.slice(0, 10).map(c =>
+    `${c.topic}: ${c.score?.toFixed(1)} (${c.sourceCount} src, ${c.spectrumSpread} spread, ${c.newestHeadlineAge?.toFixed(1)}h old)`
+  ));
+
+  // Deep Dive threshold: score >= 8 OR (sourceCount >= 4 AND spectrumSpread >= 3)
   for (const cluster of sorted) {
-    if (cluster.sourceCount >= 4 && cluster.spectrumSpread >= 3) {
+    const meetsScoreThreshold = (cluster.score || 0) >= 8;
+    const meetsCoverageThreshold = cluster.sourceCount >= 4 && cluster.spectrumSpread >= 3;
+
+    if (meetsScoreThreshold || meetsCoverageThreshold) {
       deepDive.push(cluster);
     } else {
       quickTake.push(cluster);
     }
   }
 
+  // Ensure key categories have Deep Dive coverage
   const keyCategories = ["politics", "economy", "international"];
   for (const category of keyCategories) {
     const hasDeepDive = deepDive.some(c => c.category === category);
@@ -251,6 +293,7 @@ function selectTiers(clusters: HeadlineCluster[]): TieredClusters {
     }
   }
 
+  // Cap Deep Dives at 8
   const maxDeepDives = 8;
   if (deepDive.length > maxDeepDives) {
     const demoted = deepDive.splice(maxDeepDives);
