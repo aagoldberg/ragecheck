@@ -311,6 +311,9 @@ function StoryCard({ story }: { story: StoryCluster }) {
             </div>
           </div>
         )}
+
+        {/* Expert Consensus - In main view */}
+        <ExpertConsensusBox consensus={story.expertConsensus} />
       </div>
 
       {/* Go Deeper Button */}
@@ -323,7 +326,7 @@ function StoryCard({ story }: { story: StoryCluster }) {
             {deeperExpanded ? "Less" : "Go Deeper"}
           </span>
           <span className="text-sm text-zinc-500 dark:text-zinc-400">
-            Expert consensus, motivations, common ground
+            Motivations, common ground, what gets ignored
           </span>
         </div>
         <svg className={`w-4 h-4 text-indigo-500 transition-transform ${deeperExpanded ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -334,9 +337,6 @@ function StoryCard({ story }: { story: StoryCluster }) {
       {/* Deeper Analysis - Collapsible */}
       {deeperExpanded && (
         <div className="p-6 md:p-8 bg-zinc-50/50 dark:bg-zinc-900/30 border-t border-zinc-100 dark:border-zinc-800 space-y-6 animate-in slide-in-from-top-2">
-
-          {/* Expert Consensus */}
-          <ExpertConsensusBox consensus={story.expertConsensus} />
 
           {/* Why Each Side Cares - Simplified */}
           {story.whyItMatters && (
