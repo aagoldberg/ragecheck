@@ -7,7 +7,7 @@ import { SIGNAL_LABELS } from "@/lib/shareCard";
 import { copyShareImageToClipboard } from "@/lib/shareImage";
 import * as tracking from "@/lib/tracking";
 import { detectConversationShape, ConversationShape } from "@/lib/conversationShape";
-import { HighRageHeadlines } from "@/components/HighRageHeadlines";
+// import { HighRageHeadlines } from "@/components/HighRageHeadlines";
 
 interface Highlight {
   start: number;
@@ -1393,7 +1393,7 @@ function HomeContent() {
               )}
             </div>
 
-            {/* High Rage Headlines Section */}
+            {/* High Rage Headlines Section - Hidden until populated
             <div className="mb-12">
               <div className="flex items-center gap-3 mb-6">
                 <h3 className="text-sm font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 flex items-center gap-2">
@@ -1413,6 +1413,7 @@ function HomeContent() {
                 }}
               />
             </div>
+            */}
 
             {/* Social Grid */}
             <div>
