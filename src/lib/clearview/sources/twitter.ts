@@ -11,6 +11,8 @@ import { TwitterAccount } from "./types";
  *
  * Target: ~100 accounts for Basic tier ($100/mo = 10K tweets/month)
  * At 3 tweets/account/day × 30 days = 9,000 tweets/month
+ *
+ * Handles verified: January 2025
  */
 
 // =============================================================================
@@ -25,7 +27,7 @@ export const PUNDITS_LEFT: TwitterAccount[] = [
     gender: "female",
     politicalLean: "left",
     demographic: "millennial",
-    notes: "Progressive congresswoman, massive engagement",
+    notes: "Progressive congresswoman, massive engagement. Also @RepAOC (staff)",
   },
   {
     handle: "BernieSanders",
@@ -41,23 +43,15 @@ export const PUNDITS_LEFT: TwitterAccount[] = [
     category: "pundit_left",
     gender: "male",
     politicalLean: "left",
-    notes: "Former Labor Secretary, economic commentary",
+    notes: "Former Labor Secretary, economic commentary. 1.4M followers",
   },
   {
-    handle: "JoyAnnReid",
-    name: "Joy Reid",
-    category: "pundit_left",
-    gender: "female",
-    politicalLean: "left",
-    notes: "MSNBC host",
-  },
-  {
-    handle: "MehdiRHasan",
+    handle: "mehdirhasan",
     name: "Mehdi Hasan",
     category: "pundit_left",
     gender: "male",
     politicalLean: "left",
-    notes: "Journalist, former MSNBC",
+    notes: "Journalist, former MSNBC. Still active on X.",
   },
   {
     handle: "chrislhayes",
@@ -65,15 +59,15 @@ export const PUNDITS_LEFT: TwitterAccount[] = [
     category: "pundit_left",
     gender: "male",
     politicalLean: "left",
-    notes: "MSNBC host",
+    notes: "MSNBC host, All In with Chris Hayes",
   },
   {
-    handle: "maborick",
+    handle: "MaryLTrump",
     name: "Mary Trump",
     category: "pundit_left",
     gender: "female",
     politicalLean: "left",
-    notes: "Trump family critic",
+    notes: "Trump family critic, psychologist",
   },
   {
     handle: "IlhanMN",
@@ -82,8 +76,20 @@ export const PUNDITS_LEFT: TwitterAccount[] = [
     gender: "female",
     politicalLean: "left",
     demographic: "millennial",
+    notes: "Personal account. Also @Ilhan (congressional, staff-managed)",
+  },
+  {
+    handle: "RashidaTlaib",
+    name: "Rashida Tlaib",
+    category: "politician",
+    gender: "female",
+    politicalLean: "left",
+    demographic: "gen_x",
+    notes: "Progressive congresswoman",
   },
 ];
+
+// Note: Joy Reid (@JoyAnnReid) left Twitter/X in November 2024
 
 // =============================================================================
 // POLITICAL COMMENTATORS - RIGHT
@@ -96,7 +102,7 @@ export const PUNDITS_RIGHT: TwitterAccount[] = [
     category: "pundit_right",
     gender: "male",
     politicalLean: "right",
-    notes: "Daily Wire founder, high engagement",
+    notes: "Daily Wire founder, ~8M followers",
   },
   {
     handle: "TuckerCarlson",
@@ -104,7 +110,7 @@ export const PUNDITS_RIGHT: TwitterAccount[] = [
     category: "pundit_right",
     gender: "male",
     politicalLean: "right",
-    notes: "Former Fox News host",
+    notes: "Former Fox News host, 16.9M followers",
   },
   {
     handle: "MattWalshBlog",
@@ -120,13 +126,15 @@ export const PUNDITS_RIGHT: TwitterAccount[] = [
     category: "pundit_right",
     gender: "female",
     politicalLean: "right",
+    notes: "Conservative commentator",
   },
   {
-    handle: "megaborick",
+    handle: "MeghanMcCain",
     name: "Meghan McCain",
     category: "pundit_right",
     gender: "female",
     politicalLean: "center_right",
+    notes: "Former The View co-host",
   },
   {
     handle: "TomiLahren",
@@ -135,6 +143,7 @@ export const PUNDITS_RIGHT: TwitterAccount[] = [
     gender: "female",
     politicalLean: "right",
     demographic: "millennial",
+    notes: "Fox News, Outkick host",
   },
   {
     handle: "RonFilipkowski",
@@ -150,7 +159,15 @@ export const PUNDITS_RIGHT: TwitterAccount[] = [
     category: "pundit_right",
     gender: "male",
     politicalLean: "right",
-    notes: "Turning Point USA",
+    notes: "Turning Point USA founder, 6.1M followers",
+  },
+  {
+    handle: "DLoesch",
+    name: "Dana Loesch",
+    category: "pundit_right",
+    gender: "female",
+    politicalLean: "right",
+    notes: "Radio host, former NRA spokesperson",
   },
 ];
 
@@ -168,7 +185,7 @@ export const JOURNALISTS: TwitterAccount[] = [
     notes: "NYT White House correspondent",
   },
   {
-    handle: "kaborke",
+    handle: "KatiePorterOC",
     name: "Katie Porter",
     category: "politician",
     gender: "female",
@@ -181,10 +198,10 @@ export const JOURNALISTS: TwitterAccount[] = [
     category: "journalist",
     gender: "female",
     politicalLean: "center",
-    notes: "CNN host",
+    notes: "CNN host, The Arena. 562K followers.",
   },
   {
-    handle: "jaaborice",
+    handle: "jaketapper",
     name: "Jake Tapper",
     category: "journalist",
     gender: "male",
@@ -200,7 +217,7 @@ export const JOURNALISTS: TwitterAccount[] = [
     notes: "PBS NewsHour",
   },
   {
-    handle: "Nencasusen",
+    handle: "sbg1",
     name: "Susan Glasser",
     category: "journalist",
     gender: "female",
@@ -223,6 +240,13 @@ export const JOURNALISTS: TwitterAccount[] = [
     politicalLean: "center",
     notes: "CNN anchor",
   },
+  {
+    handle: "TaylorLorenz",
+    name: "Taylor Lorenz",
+    category: "journalist",
+    gender: "female",
+    notes: "Tech/culture reporter, often in discourse. User Mag founder.",
+  },
 ];
 
 // =============================================================================
@@ -236,10 +260,10 @@ export const WOMENS_MEDIA: TwitterAccount[] = [
     category: "parenting",
     gender: "org",
     demographic: "millennial",
-    notes: "100M+ social reach, parenting rage central",
+    notes: "100M+ social reach, parenting rage central. 612K Threads followers.",
   },
   {
-    handle: "Romper",
+    handle: "romper",
     name: "Romper",
     category: "parenting",
     gender: "org",
@@ -247,15 +271,15 @@ export const WOMENS_MEDIA: TwitterAccount[] = [
     notes: "BDG property, pregnancy/parenting",
   },
   {
-    handle: "thaborimm",
+    handle: "theSkimm",
     name: "theSkimm",
     category: "womens_media",
     gender: "org",
     demographic: "millennial",
-    notes: "5M subscribers, daily news for women",
+    notes: "5M subscribers, daily news for women. Acquired by Ziff Davis 2025.",
   },
   {
-    handle: "Bustle",
+    handle: "bustle",
     name: "Bustle",
     category: "womens_media",
     gender: "org",
@@ -268,7 +292,7 @@ export const WOMENS_MEDIA: TwitterAccount[] = [
     category: "womens_media",
     gender: "org",
     demographic: "gen_z",
-    notes: "BDG property, Gen Z focus",
+    notes: "BDG property, Gen Z focus. 4M IG followers.",
   },
   {
     handle: "Refinery29",
@@ -276,51 +300,73 @@ export const WOMENS_MEDIA: TwitterAccount[] = [
     category: "womens_media",
     gender: "org",
     demographic: "millennial",
-    notes: "Culture, identity, style",
+    notes: "Culture, identity, style. Owned by Sundial Media.",
   },
   {
-    handle: "Betches",
+    handle: "betchesluvthis",
     name: "Betches",
     category: "womens_media",
     gender: "org",
     demographic: "millennial",
-    notes: "Politics meets group chat, NFL partner",
+    notes: "Politics meets group chat, NFL partner. The Sup newsletter.",
   },
   {
     handle: "TheCut",
     name: "The Cut",
     category: "womens_media",
     gender: "org",
-    notes: "NY Mag women's vertical, high quality",
+    notes: "NY Mag women's vertical, high quality journalism",
   },
   {
-    handle: "Glamour",
+    handle: "glamourmag",
     name: "Glamour",
     category: "womens_media",
     gender: "org",
-    notes: "Traditional magazine, strong digital",
+    notes: "Conde Nast, traditional magazine with strong digital",
   },
   {
     handle: "Cosmopolitan",
     name: "Cosmopolitan",
     category: "womens_media",
     gender: "org",
-    notes: "Lifestyle, relationships, culture",
+    notes: "Hearst. Lifestyle, relationships, culture",
   },
   {
-    handle: "theeverygirl",
+    handle: "TheEverygirl_",
     name: "The Everygirl",
     category: "womens_media",
     gender: "org",
     demographic: "millennial",
-    notes: "Career, lifestyle, aspirational",
+    notes: "Career, lifestyle. Note the underscore in handle.",
   },
   {
-    handle: "WellGood",
+    handle: "iamwellandgood",
     name: "Well+Good",
     category: "health_wellness",
     gender: "org",
-    notes: "Wellness, health, self-care",
+    notes: "Wellness, health, self-care. Owned by Leaf Group.",
+  },
+  {
+    handle: "NylonMag",
+    name: "NYLON",
+    category: "womens_media",
+    gender: "org",
+    demographic: "gen_z",
+    notes: "BDG property, fashion/music/culture",
+  },
+  {
+    handle: "ELLEmagazine",
+    name: "Elle",
+    category: "womens_media",
+    gender: "org",
+    notes: "Hearst. Fashion, beauty, culture, politics.",
+  },
+  {
+    handle: "voguemagazine",
+    name: "Vogue",
+    category: "womens_media",
+    gender: "org",
+    notes: "Conde Nast. Fashion, culture. US edition.",
   },
 ];
 
@@ -345,7 +391,7 @@ export const NEWS_OUTLETS: TwitterAccount[] = [
     politicalLean: "left",
   },
   {
-    handle: "vaboron",
+    handle: "voxdotcom",
     name: "Vox",
     category: "news_outlet_left",
     gender: "org",
@@ -375,7 +421,7 @@ export const NEWS_OUTLETS: TwitterAccount[] = [
     politicalLean: "center",
   },
   {
-    handle: "ABC",
+    handle: "ABCNews",
     name: "ABC News",
     category: "news_outlet",
     gender: "org",
@@ -432,6 +478,14 @@ export const NEWS_OUTLETS: TwitterAccount[] = [
     gender: "org",
     notes: "Tabloid, high engagement",
   },
+  {
+    handle: "realDailyWire",
+    name: "Daily Wire",
+    category: "news_outlet_right",
+    gender: "org",
+    politicalLean: "right",
+    notes: "Conservative media company",
+  },
 ];
 
 // =============================================================================
@@ -444,7 +498,7 @@ export const ENTERTAINMENT: TwitterAccount[] = [
     name: "Pop Crave",
     category: "entertainment",
     gender: "org",
-    notes: "Celebrity news, very high engagement",
+    notes: "Celebrity news, 2.3M followers. 'ESPN of pop music'",
   },
   {
     handle: "DiscussingFilm",
@@ -458,7 +512,7 @@ export const ENTERTAINMENT: TwitterAccount[] = [
     name: "E! News",
     category: "entertainment",
     gender: "org",
-    notes: "Celebrity, entertainment",
+    notes: "Celebrity, entertainment. 3.4M Threads followers.",
   },
   {
     handle: "people",
@@ -468,7 +522,7 @@ export const ENTERTAINMENT: TwitterAccount[] = [
     notes: "Celebrity, human interest",
   },
   {
-    handle: "usaborekly",
+    handle: "usweekly",
     name: "Us Weekly",
     category: "entertainment",
     gender: "org",
@@ -481,6 +535,13 @@ export const ENTERTAINMENT: TwitterAccount[] = [
     gender: "org",
     notes: "Breaking celebrity news, often controversial",
   },
+  {
+    handle: "Deuxmoi",
+    name: "Deuxmoi",
+    category: "entertainment",
+    gender: "org",
+    notes: "Celebrity gossip, anonymous tips",
+  },
 ];
 
 // =============================================================================
@@ -491,26 +552,27 @@ export const VIRAL_ACCOUNTS: TwitterAccount[] = [
   // These are accounts that frequently go viral or are "main characters"
   // This list should be updated regularly based on who's driving discourse
   {
-    handle: "elaboronmusk",
+    handle: "elonmusk",
     name: "Elon Musk",
     category: "viral_account",
     gender: "male",
-    notes: "Platform owner, constant engagement",
+    notes: "Platform owner, 226M followers, constant engagement",
   },
   {
-    handle: "taylorlorenz",
-    name: "Taylor Lorenz",
-    category: "journalist",
-    gender: "female",
-    notes: "Tech/culture reporter, often in discourse",
-  },
-  {
-    handle: "jessaborickelly",
+    handle: "JessaBKelly",
     name: "Jesse Kelly",
     category: "pundit_right",
     gender: "male",
     politicalLean: "right",
     notes: "Radio host, high engagement",
+  },
+  {
+    handle: "catturd2",
+    name: "Catturd",
+    category: "viral_account",
+    gender: "male",
+    politicalLean: "right",
+    notes: "Conservative viral account",
   },
 ];
 
@@ -524,14 +586,14 @@ export const HEALTH_WELLNESS: TwitterAccount[] = [
     name: "Dr. Leana Wen",
     category: "health_wellness",
     gender: "female",
-    notes: "Public health expert, former Planned Parenthood",
+    notes: "Public health expert, former Planned Parenthood president",
   },
   {
-    handle: "dabororsusansho",
-    name: "Dr. Susan Shaw",
+    handle: "DrJenLincoln",
+    name: "Dr. Jennifer Lincoln",
     category: "health_wellness",
     gender: "female",
-    notes: "Women's health advocate",
+    notes: "OB-GYN, women's health advocate. Millions of TikTok followers.",
   },
 ];
 
@@ -541,18 +603,25 @@ export const HEALTH_WELLNESS: TwitterAccount[] = [
 
 export const EDUCATION: TwitterAccount[] = [
   {
-    handle: "TeacherSabrina",
-    name: "Sabrina (Teacher)",
-    category: "activist",
-    gender: "female",
-    notes: "Teacher advocacy, education policy",
-  },
-  {
-    handle: "AForickT",
+    handle: "AFTunion",
     name: "American Federation of Teachers",
     category: "activist",
     gender: "org",
-    notes: "Teachers union",
+    notes: "Teachers union, 1.7M members",
+  },
+  {
+    handle: "NEAToday",
+    name: "NEA",
+    category: "activist",
+    gender: "org",
+    notes: "National Education Association",
+  },
+  {
+    handle: "rweingarten",
+    name: "Randi Weingarten",
+    category: "activist",
+    gender: "female",
+    notes: "AFT President. Also on Bluesky @rweingarten.bsky.social",
   },
 ];
 
@@ -614,3 +683,10 @@ export const TWITTER_STATS = {
       .length,
   },
 };
+
+/**
+ * Handles that need periodic verification (may change or deactivate)
+ */
+export const HANDLES_TO_VERIFY = [
+  "theSkimm", // May have changed after Ziff Davis acquisition
+];
