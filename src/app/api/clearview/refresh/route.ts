@@ -11,7 +11,7 @@ import { extractContent } from "@/lib/extract";
 export const maxDuration = 300;
 
 const parser = new Parser({
-  timeout: 15000,
+  timeout: 10000, // Reduced from 15s
   headers: {
     "User-Agent": "Mozilla/5.0 (compatible; RageCheck/1.0)",
   },
@@ -293,8 +293,8 @@ function selectTiers(clusters: HeadlineCluster[]): TieredClusters {
     }
   }
 
-  // Cap Deep Dives at 8
-  const maxDeepDives = 8;
+  // Cap Deep Dives at 5 to stay within timeout limits
+  const maxDeepDives = 5;
   if (deepDive.length > maxDeepDives) {
     const demoted = deepDive.splice(maxDeepDives);
     quickTake.unshift(...demoted);
@@ -303,7 +303,7 @@ function selectTiers(clusters: HeadlineCluster[]): TieredClusters {
   return { deepDive, quickTake };
 }
 
-// Phase 3: Extract articles for Deep Dives
+// Phase 3: Extract articles for Deep Dives (limit per cluster for speed)
 async function extractArticlesForClusters(
   clusters: HeadlineCluster[],
   headlines: RawHeadline[]
@@ -311,16 +311,20 @@ async function extractArticlesForClusters(
   const articleContent = new Map<string, string>();
   const urlsToExtract: string[] = [];
 
+  // Limit to 3 articles per cluster to stay within timeout
+  const maxArticlesPerCluster = 3;
   for (const cluster of clusters) {
+    const clusterUrls: string[] = [];
     for (const idx of cluster.headlineIndices) {
       const headline = headlines[idx];
-      if (headline?.url) {
-        urlsToExtract.push(headline.url);
+      if (headline?.url && clusterUrls.length < maxArticlesPerCluster) {
+        clusterUrls.push(headline.url);
       }
     }
+    urlsToExtract.push(...clusterUrls);
   }
 
-  const concurrency = 5;
+  const concurrency = 8; // Increased from 5
   for (let i = 0; i < urlsToExtract.length; i += concurrency) {
     const batch = urlsToExtract.slice(i, i + concurrency);
     const results = await Promise.all(
@@ -332,7 +336,8 @@ async function extractArticlesForClusters(
 
     for (const { url, result } of results) {
       if (result.success && result.text) {
-        articleContent.set(url, result.text.slice(0, 3000));
+        // Reduced from 3000 to 2000 chars for speed
+        articleContent.set(url, result.text.slice(0, 2000));
       }
     }
   }
@@ -462,7 +467,7 @@ CRITICAL GUIDELINES:
   let fullText = "";
   const stream = await client.messages.stream({
     model: "claude-sonnet-4-20250514",
-    max_tokens: 16000,
+    max_tokens: 10000, // Reduced from 16000 for speed
     messages: [{ role: "user", content: prompt }],
   });
 
@@ -556,7 +561,7 @@ Keep it brief - these are quick summaries, not deep analysis.`;
 
   const response = await client.messages.create({
     model: "claude-sonnet-4-20250514",
-    max_tokens: 6000,
+    max_tokens: 4000, // Reduced for speed
     messages: [{ role: "user", content: prompt }],
   });
 
