@@ -266,22 +266,46 @@ function StoryCard({ story }: { story: StoryCluster }) {
 
         {/* The Divide - Left | Right */}
         <div className="grid md:grid-cols-2 gap-4">
-          {leftPerspective && (
-            <div className="p-4 bg-blue-50/50 dark:bg-blue-950/20 rounded-xl border border-blue-100 dark:border-blue-900/30">
-              <h4 className="text-[10px] font-bold uppercase tracking-widest text-blue-600 dark:text-blue-400 mb-2">Left View</h4>
-              <p className="text-sm text-zinc-700 dark:text-zinc-300 leading-relaxed">
-                {leftPerspective.viewpoint}
-              </p>
-            </div>
-          )}
-          {rightPerspective && (
-            <div className="p-4 bg-rose-50/50 dark:bg-rose-950/20 rounded-xl border border-rose-100 dark:border-rose-900/30">
-              <h4 className="text-[10px] font-bold uppercase tracking-widest text-rose-600 dark:text-rose-400 mb-2">Right View</h4>
-              <p className="text-sm text-zinc-700 dark:text-zinc-300 leading-relaxed">
-                {rightPerspective.viewpoint}
-              </p>
-            </div>
-          )}
+          {leftPerspective && (() => {
+            const sentences = leftPerspective.viewpoint.split(/(?<=[.!?])\s+/);
+            const thesis = sentences[0] || "";
+            const rest = sentences.slice(1).join(" ");
+            return (
+              <div className="p-4 bg-blue-100 dark:bg-blue-950/40 rounded-xl border-l-4 border-blue-500">
+                <h4 className="text-[10px] font-bold uppercase tracking-widest text-blue-700 dark:text-blue-300 mb-2 flex items-center gap-1.5">
+                  <span>🔵</span> Left View
+                </h4>
+                <p className="text-sm font-semibold text-blue-900 dark:text-blue-100 mb-1">
+                  {thesis}
+                </p>
+                {rest && (
+                  <p className="text-xs text-blue-800/70 dark:text-blue-300/70 leading-relaxed">
+                    {rest}
+                  </p>
+                )}
+              </div>
+            );
+          })()}
+          {rightPerspective && (() => {
+            const sentences = rightPerspective.viewpoint.split(/(?<=[.!?])\s+/);
+            const thesis = sentences[0] || "";
+            const rest = sentences.slice(1).join(" ");
+            return (
+              <div className="p-4 bg-rose-100 dark:bg-rose-950/40 rounded-xl border-l-4 border-rose-500">
+                <h4 className="text-[10px] font-bold uppercase tracking-widest text-rose-700 dark:text-rose-300 mb-2 flex items-center gap-1.5">
+                  <span>🔴</span> Right View
+                </h4>
+                <p className="text-sm font-semibold text-rose-900 dark:text-rose-100 mb-1">
+                  {thesis}
+                </p>
+                {rest && (
+                  <p className="text-xs text-rose-800/70 dark:text-rose-300/70 leading-relaxed">
+                    {rest}
+                  </p>
+                )}
+              </div>
+            );
+          })()}
         </div>
 
         {/* Factual Disputes - Promoted to primary view */}

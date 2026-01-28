@@ -357,8 +357,8 @@ For each story, provide comprehensive analysis:
         }
       ],
       "perspectives": [
-        { "lean": "Left", "viewpoint": "How the left sees this and why" },
-        { "lean": "Right", "viewpoint": "How the right sees this and why" }
+        { "lean": "Left", "viewpoint": "2 sentences max. First sentence is bold thesis, second adds context." },
+        { "lean": "Right", "viewpoint": "2 sentences max. First sentence is bold thesis, second adds context." }
       ],
       "keyTakeaway": "One sentence helping reader understand without spin",
       "expertConsensus": {
