@@ -7,6 +7,49 @@ import { extractContent } from "@/lib/extract";
 // This endpoint is called by Vercel Cron to refresh Clearview data
 // It bypasses the cache and always generates fresh content
 
+// Robust JSON extraction from LLM text output
+function extractJSON(text: string): unknown {
+  // Try direct parse first
+  const jsonMatch = text.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) throw new Error("No JSON found in response");
+
+  const raw = jsonMatch[0];
+
+  // Attempt 1: direct parse
+  try { return JSON.parse(raw); } catch { /* continue */ }
+
+  // Attempt 2: fix trailing commas and control chars
+  try {
+    const fixed = raw
+      .replace(/,\s*}/g, '}')
+      .replace(/,\s*]/g, ']')
+      .replace(/[\x00-\x1F\x7F]/g, ' ');
+    return JSON.parse(fixed);
+  } catch { /* continue */ }
+
+  // Attempt 3: more aggressive cleanup
+  try {
+    const aggressive = raw
+      .replace(/,\s*}/g, '}')
+      .replace(/,\s*]/g, ']')
+      .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
+      .replace(/\n/g, '\\n')
+      .replace(/\r/g, '\\r')
+      .replace(/\t/g, '\\t');
+    return JSON.parse(aggressive);
+  } catch { /* continue */ }
+
+  // Attempt 4: extract just the stories array if present
+  const storiesMatch = text.match(/"stories"\s*:\s*\[([\s\S]*)\]/);
+  if (storiesMatch) {
+    try {
+      return JSON.parse(`{"stories":[${storiesMatch[1]}]}`);
+    } catch { /* continue */ }
+  }
+
+  throw new Error("Failed to parse JSON from LLM response");
+}
+
 // Extend function timeout for tiered analysis (Pro plan: up to 300s)
 export const maxDuration = 300;
 
@@ -194,12 +237,7 @@ Rules:
     throw new Error("Unexpected response format");
   }
 
-  const jsonMatch = content.text.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) {
-    throw new Error("Failed to parse clustering response");
-  }
-
-  const parsed = JSON.parse(jsonMatch[0]);
+  const parsed = extractJSON(content.text) as { clusters?: Array<{ topic: string; headlineIndices: number[]; category: string }> };
   const rawClusters = parsed.clusters || [];
 
   const leanOrder = ["Far Left", "Left", "Center-Left", "Center", "Center-Right", "Right", "Far Right"];
@@ -477,21 +515,7 @@ CRITICAL GUIDELINES:
     }
   }
 
-  const jsonMatch = fullText.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) {
-    throw new Error("Failed to parse deep dive analysis");
-  }
-
-  let parsed;
-  try {
-    parsed = JSON.parse(jsonMatch[0]);
-  } catch {
-    const fixedJson = jsonMatch[0]
-      .replace(/,\s*}/g, '}')
-      .replace(/,\s*]/g, ']')
-      .replace(/[\x00-\x1F\x7F]/g, ' ');
-    parsed = JSON.parse(fixedJson);
-  }
+  const parsed = extractJSON(fullText) as { stories?: ClearviewStory[] };
 
   return (parsed.stories || []).map((s: ClearviewStory) => ({
     ...s,
@@ -570,21 +594,7 @@ Keep it brief - these are quick summaries, not deep analysis.`;
     throw new Error("Unexpected response format");
   }
 
-  const jsonMatch = content.text.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) {
-    throw new Error("Failed to parse quick take analysis");
-  }
-
-  let parsed;
-  try {
-    parsed = JSON.parse(jsonMatch[0]);
-  } catch {
-    const fixedJson = jsonMatch[0]
-      .replace(/,\s*}/g, '}')
-      .replace(/,\s*]/g, ']')
-      .replace(/[\x00-\x1F\x7F]/g, ' ');
-    parsed = JSON.parse(fixedJson);
-  }
+  const parsed = extractJSON(content.text) as { stories?: ClearviewStory[] };
 
   return (parsed.stories || []).map((s: ClearviewStory) => ({
     ...s,
