@@ -207,10 +207,7 @@ Rules:
   const response = await client.messages.create({
     model: "claude-haiku-4-5-20251001",
     max_tokens: 4000,
-    messages: [
-      { role: "user", content: prompt },
-      { role: "assistant", content: '{"clusters":[' },
-    ],
+    messages: [{ role: "user", content: prompt }],
   });
 
   const content = response.content[0];
@@ -218,7 +215,7 @@ Rules:
     throw new Error("Unexpected response format");
   }
 
-  const parsed = extractJSON('{"clusters":[' + content.text) as { clusters?: Array<{ topic: string; headlineIndices: number[]; category: string }> };
+  const parsed = extractJSON(content.text) as { clusters?: Array<{ topic: string; headlineIndices: number[]; category: string }> };
   const rawClusters = parsed.clusters || [];
 
   const leanOrder = ["Far Left", "Left", "Center-Left", "Center", "Center-Right", "Right", "Far Right"];
@@ -493,10 +490,7 @@ CRITICAL GUIDELINES:
   const stream = await client.messages.stream({
     model: "claude-opus-4-5-20251101",
     max_tokens: 10000,
-    messages: [
-      { role: "user", content: prompt },
-      { role: "assistant", content: '{"stories":[' },
-    ],
+    messages: [{ role: "user", content: prompt }],
   });
 
   for await (const event of stream) {
@@ -505,8 +499,7 @@ CRITICAL GUIDELINES:
     }
   }
 
-  // Prepend the prefill since the model continues from it
-  const parsed = extractJSON('{"stories":[' + fullText) as { stories?: ClearviewStory[] };
+  const parsed = extractJSON(fullText) as { stories?: ClearviewStory[] };
 
   return (parsed.stories || []).map((s: ClearviewStory) => ({
     ...s,
@@ -578,10 +571,7 @@ IMPORTANT: Return ONLY valid JSON. No markdown, no code fences.`;
   const response = await client.messages.create({
     model: "claude-sonnet-4-5-20250929",
     max_tokens: 4000,
-    messages: [
-      { role: "user", content: prompt },
-      { role: "assistant", content: '{"stories":[' },
-    ],
+    messages: [{ role: "user", content: prompt }],
   });
 
   const content = response.content[0];
@@ -589,7 +579,7 @@ IMPORTANT: Return ONLY valid JSON. No markdown, no code fences.`;
     throw new Error("Unexpected response format");
   }
 
-  const parsed = extractJSON('{"stories":[' + content.text) as { stories?: ClearviewStory[] };
+  const parsed = extractJSON(content.text) as { stories?: ClearviewStory[] };
 
   return (parsed.stories || []).map((s: ClearviewStory) => ({
     ...s,
