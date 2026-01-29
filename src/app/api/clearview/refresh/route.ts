@@ -312,11 +312,16 @@ function selectTiers(clusters: HeadlineCluster[]): TieredClusters {
     }
   }
 
-  // Cap Deep Dives at 5 to stay within timeout limits
-  const maxDeepDives = 5;
+  // Cap Deep Dives at 3 to stay within timeout limits
+  const maxDeepDives = 3;
   if (deepDive.length > maxDeepDives) {
     const demoted = deepDive.splice(maxDeepDives);
     quickTake.unshift(...demoted);
+  }
+
+  // Cap Quick Takes at 8
+  if (quickTake.length > 8) {
+    quickTake.splice(8);
   }
 
   return { deepDive, quickTake };
