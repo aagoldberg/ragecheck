@@ -203,8 +203,8 @@ function ExpertConsensusBox({ consensus }: { consensus?: ExpertConsensus }) {
             )}
 
             {consensus.dissent && (
-                <div className="mt-2 pt-2 border-t border-indigo-100 dark:border-indigo-900/20">
-                    <p className="text-xs text-zinc-600 dark:text-zinc-400">
+                <div className="mt-3 pt-3 border-t border-indigo-100 dark:border-indigo-900/20">
+                    <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed">
                         <span className="font-bold text-zinc-500 uppercase text-[10px] tracking-wide">Notable Dissent:</span> {consensus.dissent}
                     </p>
                 </div>
@@ -249,15 +249,15 @@ function StoryCard({ story }: { story: StoryCluster }) {
         </h2>
 
         {/* What Happened - Bulleted */}
-        <div className="space-y-3">
+        <div className="space-y-2">
           <h3 className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 flex items-center gap-2">
-            <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
+            <span className="w-1.5 h-1.5 rounded-full bg-zinc-400" />
             What Happened
           </h3>
-          <ul className="space-y-2">
+          <ul className="space-y-1.5">
             {factBullets.map((bullet, i) => (
-              <li key={i} className="flex gap-3 text-sm text-zinc-700 dark:text-zinc-300 leading-relaxed">
-                <span className="text-indigo-400 mt-1 flex-shrink-0">•</span>
+              <li key={i} className="flex gap-2.5 text-[13px] text-zinc-700 dark:text-zinc-300 leading-relaxed">
+                <span className="w-1 h-1 rounded-full bg-zinc-400 mt-[7px] flex-shrink-0" />
                 <span>{bullet}</span>
               </li>
             ))}
@@ -270,10 +270,14 @@ function StoryCard({ story }: { story: StoryCluster }) {
             const sentences = leftPerspective.viewpoint.split(/(?<=[.!?])\s+/);
             const thesis = sentences[0] || "";
             const rest = sentences.slice(1).join(" ");
+            const leftSources = story.sources
+              .filter(s => s.lean.toLowerCase().includes("left"))
+              .map(s => s.name);
             return (
-              <div className="p-4 bg-blue-100 dark:bg-blue-950/40 rounded-xl border-l-4 border-blue-500">
-                <h4 className="text-[10px] font-bold uppercase tracking-widest text-blue-700 dark:text-blue-300 mb-2 flex items-center gap-1.5">
-                  <span>🔵</span> Left View
+              <div className="p-4 bg-blue-50 dark:bg-blue-950/40 rounded-xl border-l-4 border-blue-500">
+                <h4 className="text-[10px] font-bold uppercase tracking-widest text-blue-600 dark:text-blue-300 mb-2 flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                  Left View
                 </h4>
                 <p className="text-sm font-semibold text-blue-900 dark:text-blue-100 mb-1">
                   {thesis}
@@ -283,6 +287,11 @@ function StoryCard({ story }: { story: StoryCluster }) {
                     {rest}
                   </p>
                 )}
+                {leftSources.length > 0 && (
+                  <p className="text-[10px] text-blue-500/70 dark:text-blue-400/50 mt-2">
+                    {leftSources.join(", ")}
+                  </p>
+                )}
               </div>
             );
           })()}
@@ -290,10 +299,14 @@ function StoryCard({ story }: { story: StoryCluster }) {
             const sentences = rightPerspective.viewpoint.split(/(?<=[.!?])\s+/);
             const thesis = sentences[0] || "";
             const rest = sentences.slice(1).join(" ");
+            const rightSources = story.sources
+              .filter(s => s.lean.toLowerCase().includes("right"))
+              .map(s => s.name);
             return (
-              <div className="p-4 bg-rose-100 dark:bg-rose-950/40 rounded-xl border-l-4 border-rose-500">
-                <h4 className="text-[10px] font-bold uppercase tracking-widest text-rose-700 dark:text-rose-300 mb-2 flex items-center gap-1.5">
-                  <span>🔴</span> Right View
+              <div className="p-4 bg-rose-50 dark:bg-rose-950/40 rounded-xl border-l-4 border-rose-500">
+                <h4 className="text-[10px] font-bold uppercase tracking-widest text-rose-600 dark:text-rose-300 mb-2 flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                  Right View
                 </h4>
                 <p className="text-sm font-semibold text-rose-900 dark:text-rose-100 mb-1">
                   {thesis}
@@ -301,6 +314,11 @@ function StoryCard({ story }: { story: StoryCluster }) {
                 {rest && (
                   <p className="text-xs text-rose-800/70 dark:text-rose-300/70 leading-relaxed">
                     {rest}
+                  </p>
+                )}
+                {rightSources.length > 0 && (
+                  <p className="text-[10px] text-rose-500/70 dark:text-rose-400/50 mt-2">
+                    {rightSources.join(", ")}
                   </p>
                 )}
               </div>
@@ -312,7 +330,7 @@ function StoryCard({ story }: { story: StoryCluster }) {
         {story.factualDisputes && story.factualDisputes.length > 0 && (
           <div className="space-y-3">
             <h3 className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 flex items-center gap-2">
-              <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+              <span className="w-1.5 h-1.5 rounded-full bg-zinc-400" />
               Factual Disputes
             </h3>
             <div className="space-y-3">
@@ -323,11 +341,13 @@ function StoryCard({ story }: { story: StoryCluster }) {
                     <EvidenceStatusBadge status={dispute.evidenceStatus} />
                   </div>
                   <div className="grid grid-cols-2 gap-3">
-                    <div className="text-xs text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 p-2.5 rounded-lg">
-                      {dispute.leftPosition}
+                    <div className="bg-blue-50 dark:bg-blue-900/30 p-2.5 rounded-lg">
+                      <span className="block text-[9px] font-bold uppercase tracking-wider text-blue-400 dark:text-blue-500 mb-1">Left</span>
+                      <span className="text-xs text-blue-700 dark:text-blue-400">{dispute.leftPosition}</span>
                     </div>
-                    <div className="text-xs text-rose-700 dark:text-rose-400 bg-rose-50 dark:bg-rose-900/30 p-2.5 rounded-lg">
-                      {dispute.rightPosition}
+                    <div className="bg-rose-50 dark:bg-rose-900/30 p-2.5 rounded-lg">
+                      <span className="block text-[9px] font-bold uppercase tracking-wider text-rose-400 dark:text-rose-500 mb-1">Right</span>
+                      <span className="text-xs text-rose-700 dark:text-rose-400">{dispute.rightPosition}</span>
                     </div>
                   </div>
                 </div>
@@ -338,8 +358,8 @@ function StoryCard({ story }: { story: StoryCluster }) {
 
         {/* Bottom Line - Promoted to main view */}
         {story.whyItMatters?.bottomLine && (
-          <p className="text-sm text-zinc-600 dark:text-zinc-400 italic border-l-2 border-amber-400 pl-4">
-            <span className="font-semibold text-amber-600 dark:text-amber-400">Bottom line:</span> {story.whyItMatters.bottomLine}
+          <p className="text-sm text-zinc-700 dark:text-zinc-300 border-l-2 border-amber-400 pl-4 leading-relaxed">
+            <span className="font-bold text-amber-600 dark:text-amber-400">Bottom line: </span>{story.whyItMatters.bottomLine}
           </p>
         )}
 
