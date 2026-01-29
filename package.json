@@ -17,6 +17,7 @@
     "@vercel/blob": "^2.0.0",
     "@vercel/og": "^0.8.6",
     "cheerio": "^1.1.2",
+    "jsonrepair": "^3.13.2",
     "linkedom": "^0.18.12",
     "next": "16.1.1",
     "posthog-js": "^1.319.0",

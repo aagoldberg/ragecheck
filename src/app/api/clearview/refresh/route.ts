@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import Parser from "rss-parser";
 import Anthropic from "@anthropic-ai/sdk";
+import { jsonrepair } from "jsonrepair";
 import { saveClearviewData, initClearviewTable, isDBAvailable, ClearviewStory } from "@/lib/db";
 import { extractContent } from "@/lib/extract";
 
@@ -9,43 +10,19 @@ import { extractContent } from "@/lib/extract";
 
 // Robust JSON extraction from LLM text output
 function extractJSON(text: string): unknown {
-  // Try direct parse first
   const jsonMatch = text.match(/\{[\s\S]*\}/);
   if (!jsonMatch) throw new Error("No JSON found in response");
 
   const raw = jsonMatch[0];
 
-  // Attempt 1: direct parse
+  // Try direct parse first
   try { return JSON.parse(raw); } catch { /* continue */ }
 
-  // Attempt 2: fix trailing commas and control chars
+  // Use jsonrepair for malformed LLM output
   try {
-    const fixed = raw
-      .replace(/,\s*}/g, '}')
-      .replace(/,\s*]/g, ']')
-      .replace(/[\x00-\x1F\x7F]/g, ' ');
-    return JSON.parse(fixed);
+    const repaired = jsonrepair(raw);
+    return JSON.parse(repaired);
   } catch { /* continue */ }
-
-  // Attempt 3: more aggressive cleanup
-  try {
-    const aggressive = raw
-      .replace(/,\s*}/g, '}')
-      .replace(/,\s*]/g, ']')
-      .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
-      .replace(/\n/g, '\\n')
-      .replace(/\r/g, '\\r')
-      .replace(/\t/g, '\\t');
-    return JSON.parse(aggressive);
-  } catch { /* continue */ }
-
-  // Attempt 4: extract just the stories array if present
-  const storiesMatch = text.match(/"stories"\s*:\s*\[([\s\S]*)\]/);
-  if (storiesMatch) {
-    try {
-      return JSON.parse(`{"stories":[${storiesMatch[1]}]}`);
-    } catch { /* continue */ }
-  }
 
   throw new Error("Failed to parse JSON from LLM response");
 }
