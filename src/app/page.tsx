@@ -1008,11 +1008,7 @@ function HomeContent() {
     setFeedbackGiven(rating);
     tracking.trackFeedbackSubmitted(rating === "up" ? "positive" : "negative", !!comment);
 
-    if (rating === "down") {
-      setShowFeedbackForm(true);
-    } else {
-      setFeedbackSubmitted(true);
-    }
+    setShowFeedbackForm(true);
 
     fetch("/api/feedback", {
       method: "POST",
@@ -1041,7 +1037,7 @@ function HomeContent() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         url,
-        rating: "down",
+        rating: feedbackGiven || "down",
         comment: feedbackComment,
         score: result?.score,
         title: result?.title,
@@ -1984,7 +1980,7 @@ function HomeContent() {
                         type="text"
                         value={feedbackComment}
                         onChange={(e) => setFeedbackComment(e.target.value)}
-                        placeholder="What could be better?"
+                        placeholder={feedbackGiven === "up" ? "What would make this more useful?" : "What could be better?"}
                         className="flex-1 px-3 py-1.5 text-sm rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:ring-1 focus:ring-indigo-500 focus:border-transparent"
                         maxLength={500}
                         autoFocus

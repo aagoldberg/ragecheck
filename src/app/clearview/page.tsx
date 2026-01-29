@@ -250,13 +250,12 @@ function StoryCard({ story }: { story: StoryCluster }) {
 
         {/* What Happened - Bulleted */}
         <div className="space-y-2">
-          <h3 className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 flex items-center gap-2">
-            <span className="w-1.5 h-1.5 rounded-full bg-zinc-400" />
+          <h3 className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">
             What Happened
           </h3>
           <ul className="space-y-1.5">
             {factBullets.map((bullet, i) => (
-              <li key={i} className="flex gap-2.5 text-[13px] text-zinc-700 dark:text-zinc-300 leading-relaxed">
+              <li key={i} className="flex gap-2.5 text-sm text-zinc-700 dark:text-zinc-300 leading-relaxed">
                 <span className="w-1 h-1 rounded-full bg-zinc-400 mt-[7px] flex-shrink-0" />
                 <span>{bullet}</span>
               </li>
@@ -274,9 +273,8 @@ function StoryCard({ story }: { story: StoryCluster }) {
               .filter(s => s.lean.toLowerCase().includes("left"))
               .map(s => s.name);
             return (
-              <div className="p-4 bg-blue-50 dark:bg-blue-950/40 rounded-xl border-l-4 border-blue-500">
-                <h4 className="text-[10px] font-bold uppercase tracking-widest text-blue-600 dark:text-blue-300 mb-2 flex items-center gap-2">
-                  <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+              <div className="pl-4 py-2 border-l-4 border-blue-500">
+                <h4 className="text-[10px] font-bold uppercase tracking-widest text-blue-600 dark:text-blue-300 mb-2">
                   Left View
                 </h4>
                 <p className="text-sm font-semibold text-blue-900 dark:text-blue-100 mb-1">
@@ -303,9 +301,8 @@ function StoryCard({ story }: { story: StoryCluster }) {
               .filter(s => s.lean.toLowerCase().includes("right"))
               .map(s => s.name);
             return (
-              <div className="p-4 bg-rose-50 dark:bg-rose-950/40 rounded-xl border-l-4 border-rose-500">
-                <h4 className="text-[10px] font-bold uppercase tracking-widest text-rose-600 dark:text-rose-300 mb-2 flex items-center gap-2">
-                  <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+              <div className="pl-4 py-2 border-l-4 border-rose-500">
+                <h4 className="text-[10px] font-bold uppercase tracking-widest text-rose-600 dark:text-rose-300 mb-2">
                   Right View
                 </h4>
                 <p className="text-sm font-semibold text-rose-900 dark:text-rose-100 mb-1">
@@ -329,25 +326,24 @@ function StoryCard({ story }: { story: StoryCluster }) {
         {/* Factual Disputes - Promoted to primary view */}
         {story.factualDisputes && story.factualDisputes.length > 0 && (
           <div className="space-y-3">
-            <h3 className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 flex items-center gap-2">
-              <span className="w-1.5 h-1.5 rounded-full bg-zinc-400" />
+            <h3 className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">
               Factual Disputes
             </h3>
             <div className="space-y-3">
               {story.factualDisputes.map((dispute, i) => (
-                <div key={i} className="bg-zinc-50 dark:bg-zinc-900/50 p-4 rounded-xl border border-zinc-200 dark:border-zinc-800">
-                  <div className="flex justify-between items-start gap-3 mb-3">
+                <div key={i} className="bg-zinc-50 dark:bg-zinc-900/50 px-4 py-3 rounded-xl border border-zinc-200 dark:border-zinc-800">
+                  <div className="flex justify-between items-start gap-3 mb-2">
                     <p className="text-sm font-semibold text-zinc-800 dark:text-zinc-200">&ldquo;{dispute.claim}&rdquo;</p>
                     <EvidenceStatusBadge status={dispute.evidenceStatus} />
                   </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="bg-blue-50 dark:bg-blue-900/30 p-2.5 rounded-lg">
-                      <span className="block text-[9px] font-bold uppercase tracking-wider text-blue-400 dark:text-blue-500 mb-1">Left</span>
-                      <span className="text-xs text-blue-700 dark:text-blue-400">{dispute.leftPosition}</span>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="pl-3 border-l-2 border-blue-400">
+                      <span className="block text-[9px] font-bold uppercase tracking-wider text-blue-400 dark:text-blue-500">Left</span>
+                      <span className="text-sm leading-snug text-blue-700 dark:text-blue-400">{dispute.leftPosition}</span>
                     </div>
-                    <div className="bg-rose-50 dark:bg-rose-900/30 p-2.5 rounded-lg">
-                      <span className="block text-[9px] font-bold uppercase tracking-wider text-rose-400 dark:text-rose-500 mb-1">Right</span>
-                      <span className="text-xs text-rose-700 dark:text-rose-400">{dispute.rightPosition}</span>
+                    <div className="pl-3 border-l-2 border-rose-400">
+                      <span className="block text-[9px] font-bold uppercase tracking-wider text-rose-400 dark:text-rose-500">Right</span>
+                      <span className="text-sm leading-snug text-rose-700 dark:text-rose-400">{dispute.rightPosition}</span>
                     </div>
                   </div>
                 </div>
