@@ -224,12 +224,16 @@ Return JSON:
 Rules:
 - Only include stories with 2+ headlines from different sources
 - Group headlines about the same underlying story
-- Be specific about topic names`;
+- Be specific about topic names
+- IMPORTANT: Return ONLY valid JSON. No markdown, no code fences.`;
 
   const response = await client.messages.create({
     model: "claude-haiku-4-5-20251001",
     max_tokens: 4000,
-    messages: [{ role: "user", content: prompt }],
+    messages: [
+      { role: "user", content: prompt },
+      { role: "assistant", content: '{"clusters":[' },
+    ],
   });
 
   const content = response.content[0];
@@ -237,7 +241,7 @@ Rules:
     throw new Error("Unexpected response format");
   }
 
-  const parsed = extractJSON(content.text) as { clusters?: Array<{ topic: string; headlineIndices: number[]; category: string }> };
+  const parsed = extractJSON('{"clusters":[' + content.text) as { clusters?: Array<{ topic: string; headlineIndices: number[]; category: string }> };
   const rawClusters = parsed.clusters || [];
 
   const leanOrder = ["Far Left", "Left", "Center-Left", "Center", "Center-Right", "Right", "Far Right"];
@@ -500,13 +504,17 @@ CRITICAL GUIDELINES:
 - Be genuinely neutral in summaries
 - Identify manipulation techniques: loaded language, fear-mongering, omission of context, false equivalence, appeal to emotion
 - REQUIRED: Every story MUST include expertConsensus, whyItMatters, and deeperAnalysis
-- Be empathetic to both sides - help readers understand WHY reasonable people disagree`;
+- Be empathetic to both sides - help readers understand WHY reasonable people disagree
+- IMPORTANT: Return ONLY valid JSON. No markdown, no code fences, no commentary. Escape all special characters in strings.`;
 
   let fullText = "";
   const stream = await client.messages.stream({
     model: "claude-sonnet-4-5-20250929",
-    max_tokens: 10000, // Reduced from 16000 for speed
-    messages: [{ role: "user", content: prompt }],
+    max_tokens: 10000,
+    messages: [
+      { role: "user", content: prompt },
+      { role: "assistant", content: '{"stories":[' },
+    ],
   });
 
   for await (const event of stream) {
@@ -515,7 +523,8 @@ CRITICAL GUIDELINES:
     }
   }
 
-  const parsed = extractJSON(fullText) as { stories?: ClearviewStory[] };
+  // Prepend the prefill since the model continues from it
+  const parsed = extractJSON('{"stories":[' + fullText) as { stories?: ClearviewStory[] };
 
   return (parsed.stories || []).map((s: ClearviewStory) => ({
     ...s,
@@ -581,12 +590,16 @@ Return concise Quick Take analysis:
   ]
 }
 
-Keep it brief - these are quick summaries, not deep analysis.`;
+Keep it brief - these are quick summaries, not deep analysis.
+IMPORTANT: Return ONLY valid JSON. No markdown, no code fences.`;
 
   const response = await client.messages.create({
     model: "claude-sonnet-4-5-20250929",
-    max_tokens: 4000, // Reduced for speed
-    messages: [{ role: "user", content: prompt }],
+    max_tokens: 4000,
+    messages: [
+      { role: "user", content: prompt },
+      { role: "assistant", content: '{"stories":[' },
+    ],
   });
 
   const content = response.content[0];
@@ -594,7 +607,7 @@ Keep it brief - these are quick summaries, not deep analysis.`;
     throw new Error("Unexpected response format");
   }
 
-  const parsed = extractJSON(content.text) as { stories?: ClearviewStory[] };
+  const parsed = extractJSON('{"stories":[' + content.text) as { stories?: ClearviewStory[] };
 
   return (parsed.stories || []).map((s: ClearviewStory) => ({
     ...s,
