@@ -1,8 +1,13 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import * as tracking from "@/lib/tracking";
+import { SocialShareBar } from "@/components/SocialShareBar";
+import {
+  getClearviewStoryShareText,
+  getClearviewBriefingShareText,
+} from "@/lib/share/clearviewShareText";
 
 // --- Types ---
 
@@ -222,6 +227,16 @@ function StoryCard({ story }: { story: StoryCluster }) {
   const leftPerspective = story.perspectives.find(p => p.lean.toLowerCase().includes("left"));
   const rightPerspective = story.perspectives.find(p => p.lean.toLowerCase().includes("right"));
 
+  const shareUrl = `/clearview/share?story=${story.id}&topic=${encodeURIComponent(story.topic)}`;
+  const shareTexts = getClearviewStoryShareText(
+    {
+      topic: story.topic,
+      leftViewpoint: leftPerspective?.viewpoint,
+      rightViewpoint: rightPerspective?.viewpoint,
+    },
+    typeof window !== "undefined" ? `${window.location.origin}${shareUrl}` : shareUrl
+  );
+
   // Split whatHappened or summary into bullet points (by sentence)
   const factText = story.whatHappened || story.summary || "";
   const factBullets = factText
@@ -230,7 +245,7 @@ function StoryCard({ story }: { story: StoryCluster }) {
     .slice(0, 4);
 
   return (
-    <article className="bg-white dark:bg-zinc-950 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm overflow-hidden transition-shadow hover:shadow-md">
+    <article id={`story-${story.id}`} className="bg-white dark:bg-zinc-950 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm overflow-hidden transition-shadow hover:shadow-md">
 
       {/* Meta Header */}
       <div className="px-6 py-4 bg-zinc-50/50 dark:bg-zinc-900/30 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
@@ -361,6 +376,18 @@ function StoryCard({ story }: { story: StoryCluster }) {
 
         {/* Expert Consensus - In main view */}
         <ExpertConsensusBox consensus={story.expertConsensus} />
+
+        {/* Share Bar */}
+        <div className="pt-4 border-t border-zinc-100 dark:border-zinc-800">
+          <SocialShareBar
+            url={shareUrl}
+            xText={shareTexts.xText}
+            blueskyText={shareTexts.blueskyText}
+            nativeText={shareTexts.nativeText}
+            nativeTitle={shareTexts.nativeTitle}
+            context={`story-${story.id}`}
+          />
+        </div>
       </div>
 
       {/* Go Deeper Button */}
@@ -615,6 +642,24 @@ export default function ClearviewPage() {
     }
   };
 
+  // Scroll to story hash after stories load
+  const scrollToHash = useCallback(() => {
+    if (typeof window === "undefined") return;
+    const hash = window.location.hash;
+    if (hash && stories.length > 0) {
+      const el = document.querySelector(hash);
+      if (el) {
+        setTimeout(() => {
+          el.scrollIntoView({ behavior: "smooth" });
+        }, 100);
+      }
+    }
+  }, [stories]);
+
+  useEffect(() => {
+    scrollToHash();
+  }, [scrollToHash]);
+
   // Track page visit with UTM params
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
@@ -688,11 +733,33 @@ export default function ClearviewPage() {
             </p>
 
             {generatedAt && (
-              <div className="pt-4 flex items-center justify-center gap-2 text-[10px] font-bold text-zinc-400 uppercase tracking-widest">
-                 <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                 </svg>
-                 Updated {new Date(generatedAt).toLocaleDateString()} at {new Date(generatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              <div className="pt-4 space-y-3">
+                <div className="flex items-center justify-center gap-2 text-[10px] font-bold text-zinc-400 uppercase tracking-widest">
+                   <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                   </svg>
+                   Updated {new Date(generatedAt).toLocaleDateString()} at {new Date(generatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </div>
+                {stories.length > 0 && (() => {
+                  const briefingUrl = "/clearview/share?type=briefing";
+                  const briefingTexts = getClearviewBriefingShareText(
+                    stories.length,
+                    typeof window !== "undefined" ? `${window.location.origin}${briefingUrl}` : briefingUrl
+                  );
+                  return (
+                    <div className="flex justify-center">
+                      <SocialShareBar
+                        url={briefingUrl}
+                        xText={briefingTexts.xText}
+                        blueskyText={briefingTexts.blueskyText}
+                        nativeText={briefingTexts.nativeText}
+                        nativeTitle={briefingTexts.nativeTitle}
+                        context="briefing"
+                        compact
+                      />
+                    </div>
+                  );
+                })()}
               </div>
             )}
 

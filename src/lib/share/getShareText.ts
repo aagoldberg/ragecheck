@@ -48,6 +48,24 @@ export function buildBlueskyIntentUrl(text: string): string {
 }
 
 /**
+ * Build the Facebook share URL
+ * Facebook only accepts a URL param - it relies on OG tags for the preview card
+ */
+export function buildFacebookShareUrl(url: string): string {
+  const params = new URLSearchParams({ u: url });
+  return `https://www.facebook.com/sharer/sharer.php?${params.toString()}`;
+}
+
+/**
+ * Build the LinkedIn share URL
+ * LinkedIn only accepts a URL param - it relies on OG tags for the preview card
+ */
+export function buildLinkedInShareUrl(url: string): string {
+  const params = new URLSearchParams({ url });
+  return `https://www.linkedin.com/sharing/share-offsite/?${params.toString()}`;
+}
+
+/**
  * Check if a result is "worth sharing" based on scores
  * Used to show contextual share prompts
  */

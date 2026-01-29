@@ -5,6 +5,12 @@ import { useSearchParams } from "next/navigation";
 import { getScoreBucket } from "@/lib/share";
 import { SIGNAL_LABELS } from "@/lib/shareCard";
 import { copyShareImageToClipboard } from "@/lib/shareImage";
+import {
+  buildXIntentUrl,
+  buildBlueskyIntentUrl,
+  buildFacebookShareUrl,
+  buildLinkedInShareUrl,
+} from "@/lib/share/getShareText";
 import * as tracking from "@/lib/tracking";
 import { detectConversationShape, ConversationShape } from "@/lib/conversationShape";
 // import { HighRageHeadlines } from "@/components/HighRageHeadlines";
@@ -1689,6 +1695,54 @@ function HomeContent() {
                     </button>
                   )}
                 </div>
+                {!isDemo && result?.success && result.score !== undefined && (
+                  <div className="flex items-center gap-2 mt-2">
+                    <button
+                      onClick={() => {
+                        tracking.trackShareToTwitter();
+                        const shareUrl = getShareUrl();
+                        const text = `RageCheck score: ${result.score}/100 for ${result.sourceDomain || "this content"}.\n\nBreakdown:`;
+                        window.open(buildXIntentUrl(text, shareUrl), "_blank");
+                      }}
+                      className="p-2 rounded-lg bg-black text-white hover:opacity-90 transition-opacity"
+                      title="Share to X"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" /></svg>
+                    </button>
+                    <button
+                      onClick={() => {
+                        tracking.trackShareToBluesky();
+                        const shareUrl = getShareUrl();
+                        const text = `Ran this through RageCheck. Score: ${result.score}/100 for ${result.sourceDomain || "this content"}.\n\n${shareUrl}`;
+                        window.open(buildBlueskyIntentUrl(text), "_blank");
+                      }}
+                      className="p-2 rounded-lg bg-blue-500 text-white hover:opacity-90 transition-opacity"
+                      title="Share to Bluesky"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 568 501"><path d="M123.121 33.664C188.241 82.553 258.281 181.68 284 234.873c25.719-53.192 95.759-152.32 160.879-201.21C491.866-1.611 568-28.906 568 57.947c0 17.346-9.945 145.713-15.778 166.555-20.275 72.453-94.155 90.933-159.875 79.748C507.222 323.8 536.444 388.56 503.222 453.32 441.497 574.806 321.895 449.291 295.436 408.682c-4.614-7.08-6.78-10.403-11.436-17.809-4.655 7.406-6.822 10.73-11.435 17.809-26.46 40.609-146.062 166.124-207.787 44.638-33.222-64.76-4-129.52 110.875-149.07C109.933 315.634 36.053 297.154 15.778 224.701 9.945 203.859 0 75.492 0 58.146 0-28.906 76.135-1.612 123.121 33.664Z" /></svg>
+                    </button>
+                    <button
+                      onClick={() => {
+                        tracking.trackShareToFacebook();
+                        window.open(buildFacebookShareUrl(getShareUrl()), "_blank");
+                      }}
+                      className="p-2 rounded-lg bg-[#1877F2] text-white hover:opacity-90 transition-opacity"
+                      title="Share to Facebook"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" /></svg>
+                    </button>
+                    <button
+                      onClick={() => {
+                        tracking.trackShareToLinkedIn();
+                        window.open(buildLinkedInShareUrl(getShareUrl()), "_blank");
+                      }}
+                      className="p-2 rounded-lg bg-[#0A66C2] text-white hover:opacity-90 transition-opacity"
+                      title="Share to LinkedIn"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z" /></svg>
+                    </button>
+                  </div>
+                )}
               </div>
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
 
@@ -1938,7 +1992,51 @@ function HomeContent() {
                       </div>
                     </div>
                     {!isDemo && (
-                      <div className="mt-6 pt-4 border-t border-zinc-100 dark:border-zinc-800 flex justify-end">
+                      <div className="mt-6 pt-4 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-end gap-2">
+                        <button
+                          onClick={() => {
+                            tracking.trackShareToTwitter();
+                            const shareUrl = getShareUrl();
+                            const text = `RageCheck score: ${result.score}/100 for ${result.sourceDomain || "this content"}.\n\nBreakdown:`;
+                            window.open(buildXIntentUrl(text, shareUrl), "_blank");
+                          }}
+                          className="p-1.5 rounded-md bg-black text-white hover:opacity-90 transition-opacity"
+                          title="Share to X"
+                        >
+                          <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" /></svg>
+                        </button>
+                        <button
+                          onClick={() => {
+                            tracking.trackShareToBluesky();
+                            const shareUrl = getShareUrl();
+                            const text = `Ran this through RageCheck. Score: ${result.score}/100 for ${result.sourceDomain || "this content"}.\n\n${shareUrl}`;
+                            window.open(buildBlueskyIntentUrl(text), "_blank");
+                          }}
+                          className="p-1.5 rounded-md bg-blue-500 text-white hover:opacity-90 transition-opacity"
+                          title="Share to Bluesky"
+                        >
+                          <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 568 501"><path d="M123.121 33.664C188.241 82.553 258.281 181.68 284 234.873c25.719-53.192 95.759-152.32 160.879-201.21C491.866-1.611 568-28.906 568 57.947c0 17.346-9.945 145.713-15.778 166.555-20.275 72.453-94.155 90.933-159.875 79.748C507.222 323.8 536.444 388.56 503.222 453.32 441.497 574.806 321.895 449.291 295.436 408.682c-4.614-7.08-6.78-10.403-11.436-17.809-4.655 7.406-6.822 10.73-11.435 17.809-26.46 40.609-146.062 166.124-207.787 44.638-33.222-64.76-4-129.52 110.875-149.07C109.933 315.634 36.053 297.154 15.778 224.701 9.945 203.859 0 75.492 0 58.146 0-28.906 76.135-1.612 123.121 33.664Z" /></svg>
+                        </button>
+                        <button
+                          onClick={() => {
+                            tracking.trackShareToFacebook();
+                            window.open(buildFacebookShareUrl(getShareUrl()), "_blank");
+                          }}
+                          className="p-1.5 rounded-md bg-[#1877F2] text-white hover:opacity-90 transition-opacity"
+                          title="Share to Facebook"
+                        >
+                          <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" /></svg>
+                        </button>
+                        <button
+                          onClick={() => {
+                            tracking.trackShareToLinkedIn();
+                            window.open(buildLinkedInShareUrl(getShareUrl()), "_blank");
+                          }}
+                          className="p-1.5 rounded-md bg-[#0A66C2] text-white hover:opacity-90 transition-opacity"
+                          title="Share to LinkedIn"
+                        >
+                          <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z" /></svg>
+                        </button>
                         <button
                           onClick={onShareImageClick}
                           className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-medium transition-colors ${

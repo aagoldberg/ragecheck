@@ -1,5 +1,5 @@
 import { Metadata } from "next";
-import { redirect } from "next/navigation";
+import { ClientRedirect } from "@/components/ClientRedirect";
 
 interface SharePageProps {
   searchParams: Promise<{
@@ -63,11 +63,11 @@ export async function generateMetadata({ searchParams }: SharePageProps): Promis
 export default async function SharePage({ searchParams }: SharePageProps) {
   const params = await searchParams;
 
-  // If there's a URL param, redirect to main page with that URL pre-filled
-  if (params.url) {
-    redirect(`/?url=${encodeURIComponent(params.url)}`);
-  }
+  // Build redirect URL -- crawlers will read OG tags from the HTML,
+  // humans get redirected client-side via JavaScript
+  const redirectUrl = params.url
+    ? `/?url=${encodeURIComponent(params.url)}`
+    : "/";
 
-  // Otherwise just redirect to home
-  redirect("/");
+  return <ClientRedirect url={redirectUrl} />;
 }

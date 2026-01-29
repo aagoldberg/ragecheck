@@ -2186,6 +2186,38 @@ export async function getArchivedClearviewData(excludeLatestId?: number): Promis
   }
 }
 
+export async function getClearviewStoryById(storyId: string): Promise<{ story: ClearviewStory; generatedAt: string } | null> {
+  try {
+    const result = await withRetry(async () => {
+      // Search across all clearview entries for a story with matching id in the JSONB data
+      const rows = await getDb()`
+        SELECT data, generated_at
+        FROM ragecheck_clearview
+        WHERE data->'stories' @> ${JSON.stringify([{ id: storyId }])}::jsonb
+        ORDER BY generated_at DESC
+        LIMIT 1
+      `;
+      return rows[0] || null;
+    });
+
+    if (!result) return null;
+
+    const data = typeof result.data === "string" ? JSON.parse(result.data) : result.data;
+    const stories: ClearviewStory[] = data.stories || [];
+    const story = stories.find((s: ClearviewStory) => s.id === storyId);
+
+    if (!story) return null;
+
+    return {
+      story,
+      generatedAt: result.generated_at.toISOString(),
+    };
+  } catch (error) {
+    console.error("Failed to get clearview story by id:", error);
+    return null;
+  }
+}
+
 export async function getVisitorStats(): Promise<VisitorStats> {
   try {
     // Use EST timezone for "today" calculations

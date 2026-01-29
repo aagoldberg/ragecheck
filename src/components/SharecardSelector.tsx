@@ -10,6 +10,7 @@ import {
   VARIANT_INFO,
   getRecommendedVariant,
 } from "@/lib/asymmetricValue/SharecardRenderer";
+import { buildFacebookShareUrl, buildLinkedInShareUrl } from "@/lib/share/getShareText";
 import * as tracking from "@/lib/tracking";
 
 interface SharecardSelectorProps {
@@ -74,6 +75,16 @@ export function SharecardSelector({ sharecards, resultUrl }: SharecardSelectorPr
     const { blueskyText } = getSharecardText(selectedContent, resultUrl);
     const url = `https://bsky.app/intent/compose?text=${encodeURIComponent(blueskyText)}`;
     window.open(url, "_blank");
+  };
+
+  const handleShareFacebook = () => {
+    tracking.trackShareToFacebook();
+    window.open(buildFacebookShareUrl(resultUrl), "_blank");
+  };
+
+  const handleShareLinkedIn = () => {
+    tracking.trackShareToLinkedIn();
+    window.open(buildLinkedInShareUrl(resultUrl), "_blank");
   };
 
   return (
@@ -164,6 +175,22 @@ export function SharecardSelector({ sharecards, resultUrl }: SharecardSelectorPr
           Share to Bluesky
         </button>
       </div>
+      <div className="flex gap-2">
+        <button
+          onClick={handleShareFacebook}
+          className="flex-1 px-3 py-2 rounded-lg text-sm font-medium bg-[#1877F2] text-white hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
+        >
+          <FacebookIcon />
+          Share to Facebook
+        </button>
+        <button
+          onClick={handleShareLinkedIn}
+          className="flex-1 px-3 py-2 rounded-lg text-sm font-medium bg-[#0A66C2] text-white hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
+        >
+          <LinkedInIcon />
+          Share to LinkedIn
+        </button>
+      </div>
 
       {/* Text preview */}
       <details className="text-xs">
@@ -213,8 +240,24 @@ function XIcon() {
 
 function BlueskyIcon() {
   return (
+    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 568 501">
+      <path d="M123.121 33.664C188.241 82.553 258.281 181.68 284 234.873c25.719-53.192 95.759-152.32 160.879-201.21C491.866-1.611 568-28.906 568 57.947c0 17.346-9.945 145.713-15.778 166.555-20.275 72.453-94.155 90.933-159.875 79.748C507.222 323.8 536.444 388.56 503.222 453.32 441.497 574.806 321.895 449.291 295.436 408.682c-4.614-7.08-6.78-10.403-11.436-17.809-4.655 7.406-6.822 10.73-11.435 17.809-26.46 40.609-146.062 166.124-207.787 44.638-33.222-64.76-4-129.52 110.875-149.07C109.933 315.634 36.053 297.154 15.778 224.701 9.945 203.859 0 75.492 0 58.146 0-28.906 76.135-1.612 123.121 33.664Z" />
+    </svg>
+  );
+}
+
+function FacebookIcon() {
+  return (
     <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-      <path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm5.5 14.5c-1.5 1.5-4 1.5-5.5 0-1.5-1.5-1.5-4 0-5.5 1.5-1.5 4-1.5 5.5 0 1.5 1.5 1.5 4 0 5.5z" />
+      <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
+    </svg>
+  );
+}
+
+function LinkedInIcon() {
+  return (
+    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+      <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z" />
     </svg>
   );
 }

@@ -271,3 +271,32 @@ export const trackEmailSubscribeSuccess = (location: string) => {
 export const trackLanguageSelected = (language: string) => {
   trackInteraction("language", "selected", language || "English");
 };
+
+// ClearView share tracking
+export const trackShareToFacebook = () => {
+  trackInteraction("share_card", "share_to_facebook");
+};
+
+export const trackShareToLinkedIn = () => {
+  trackInteraction("share_card", "share_to_linkedin");
+};
+
+export const trackShareCopyLink = (context: string) => {
+  trackInteraction("share_card", "copy_link", context);
+};
+
+export const trackClearviewStoryShare = (storyId: string, platform: string) => {
+  trackInteraction("clearview", "story_shared", platform, undefined, { storyId });
+};
+
+export const trackClearviewBriefingShare = (platform: string) => {
+  trackInteraction("clearview", "briefing_shared", platform);
+};
+
+export const trackClearviewShare = (context: string, platform: string) => {
+  if (context.startsWith("story-")) {
+    trackClearviewStoryShare(context, platform);
+  } else {
+    trackClearviewBriefingShare(platform);
+  }
+};
