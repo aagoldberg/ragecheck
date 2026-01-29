@@ -321,7 +321,8 @@ export async function initDB() {
   }
 
   // Performance indexes for common lookups
-  await getDb()`CREATE INDEX IF NOT EXISTS idx_analyses_url ON ragecheck_analyses(url)`;
+  await getDb()`DROP INDEX IF EXISTS idx_analyses_url`;
+  await getDb()`CREATE INDEX IF NOT EXISTS idx_analyses_url_hash ON ragecheck_analyses USING hash(url)`;
   await getDb()`CREATE INDEX IF NOT EXISTS idx_visitors_ip_created ON ragecheck_visitors(ip_address, created_at DESC)`;
   await getDb()`CREATE INDEX IF NOT EXISTS idx_analyses_created ON ragecheck_analyses(created_at DESC)`;
   await getDb()`CREATE INDEX IF NOT EXISTS idx_headlines_story_slug ON ragecheck_headlines(story_slug) WHERE story_slug IS NOT NULL`;
