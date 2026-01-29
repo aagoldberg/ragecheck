@@ -491,7 +491,7 @@ CRITICAL GUIDELINES:
 
   let fullText = "";
   const stream = await client.messages.stream({
-    model: "claude-sonnet-4-5-20250929",
+    model: "claude-opus-4-5-20251101",
     max_tokens: 10000,
     messages: [
       { role: "user", content: prompt },
