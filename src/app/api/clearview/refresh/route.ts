@@ -177,7 +177,7 @@ async function clusterHeadlines(headlines: RawHeadline[]): Promise<HeadlineClust
     .map((h, i) => `[${i}] ${h.source} (${h.lean}): "${h.title}"`)
     .join("\n");
 
-  const prompt = `Analyze these news headlines and cluster them into stories.
+  const prompt = `Analyze these news headlines and cluster them into distinct stories.
 
 Headlines:
 ${headlinesSummary}
@@ -198,14 +198,17 @@ Return JSON:
   ]
 }
 
-Rules:
+CRITICAL CLUSTERING RULES:
 - Only include stories with 2+ headlines from different sources
-- Group headlines about the same underlying story
 - Be specific about topic names
+- A headline can only belong to ONE cluster. Never assign the same headline index to multiple clusters.
+- MERGE related sub-stories into ONE cluster. If a specific event (e.g., a shooting) and the broader political response (e.g., protests, policy debate, political fallout) are about the same underlying situation, they are ONE story, not separate stories. For example: "Alex Pretti shooting", "ICE raids backlash", "DHS turmoil after shooting", and "calls to defund ICE" are all ONE story about the immigration enforcement crisis.
+- Aim for 10-20 clusters total, not 50+. Prefer fewer, broader clusters over many narrow ones.
+- Do NOT create clusters for general ongoing themes (e.g., "Trump administration policies") — only cluster around specific events or developments.
 - IMPORTANT: Return ONLY valid JSON. No markdown, no code fences.`;
 
   const response = await client.messages.create({
-    model: "claude-haiku-4-5-20251001",
+    model: "claude-sonnet-4-5-20250929",
     max_tokens: 4000,
     messages: [{ role: "user", content: prompt }],
   });
