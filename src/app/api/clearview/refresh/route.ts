@@ -16,13 +16,19 @@ function extractJSON(text: string): unknown {
   const raw = jsonMatch[0];
 
   // Try direct parse first
-  try { return JSON.parse(raw); } catch { /* continue */ }
+  try { return JSON.parse(raw); } catch (e) {
+    console.error("Direct JSON parse failed:", (e as Error).message);
+  }
 
   // Use jsonrepair for malformed LLM output
   try {
     const repaired = jsonrepair(raw);
     return JSON.parse(repaired);
-  } catch { /* continue */ }
+  } catch (e) {
+    console.error("jsonrepair failed:", (e as Error).message);
+    console.error("Raw text (first 500 chars):", raw.slice(0, 500));
+    console.error("Raw text (last 500 chars):", raw.slice(-500));
+  }
 
   throw new Error("Failed to parse JSON from LLM response");
 }
@@ -383,7 +389,16 @@ async function analyzeDeepDive(
       .map(i => headlines[i])
       .filter(Boolean);
 
-    const headlinesWithContent = clusterHeadlines.map(h => {
+    // Pick diverse headlines: up to 2 per lean category, max 12 total
+    const seenLeans = new Map<string, number>();
+    const selectedHeadlines = clusterHeadlines.filter(h => {
+      const count = seenLeans.get(h.lean) || 0;
+      if (count >= 2) return false;
+      seenLeans.set(h.lean, count + 1);
+      return true;
+    }).slice(0, 12);
+
+    const headlinesWithContent = selectedHeadlines.map(h => {
       const content = articleContent.get(h.url);
       return {
         source: h.source,
@@ -520,7 +535,8 @@ async function analyzeQuickTake(
   const clusterData = clusters.map((cluster, idx) => {
     const clusterHeadlines = cluster.headlineIndices
       .map(i => headlines[i])
-      .filter(Boolean);
+      .filter(Boolean)
+      .slice(0, 8); // Cap headlines sent to analysis
 
     return {
       id: `quick-${idx + 1}`,
