@@ -622,6 +622,7 @@ export async function GET(request: NextRequest) {
 
     await initClearviewTable();
     const startTime = Date.now();
+    const debugMode = request.nextUrl.searchParams.get("debug");
 
     // Phase 1: Fetch headlines
     console.log(`Cron: [${Date.now() - startTime}ms] Starting Phase 1: Fetch headlines`);
@@ -643,6 +644,31 @@ export async function GET(request: NextRequest) {
     // Phase 3: Select tiers
     const { deepDive, quickTake } = selectTiers(clusters);
     console.log(`Cron: [${Date.now() - startTime}ms] Phase 3: ${deepDive.length} Deep Dive, ${quickTake.length} Quick Take`);
+
+    // Debug mode: return clustering data without running analysis
+    if (debugMode === "clusters") {
+      const clusterDetails = [...deepDive, ...quickTake].map(c => ({
+        topic: c.topic,
+        tier: deepDive.includes(c) ? "deep-dive" : "quick-take",
+        category: c.category,
+        sourceCount: c.sourceCount,
+        spectrumSpread: c.spectrumSpread,
+        score: c.score,
+        headlines: c.headlineIndices.map(i => headlines[i]).filter(Boolean).map(h => ({
+          source: h.source,
+          lean: h.lean,
+          title: h.title,
+        })),
+      }));
+      return NextResponse.json({
+        debug: true,
+        totalHeadlines: headlines.length,
+        totalClusters: clusters.length,
+        deepDiveCount: deepDive.length,
+        quickTakeCount: quickTake.length,
+        clusters: clusterDetails,
+      });
+    }
 
     // Phase 4: Extract articles for Deep Dives
     console.log(`Cron: [${Date.now() - startTime}ms] Starting Phase 4: Extract articles`);
