@@ -184,7 +184,7 @@ Rules:
 - Be specific about topic names`;
 
   const response = await client.messages.create({
-    model: "claude-sonnet-4-20250514",
+    model: "claude-opus-4-20250514",
     max_tokens: 4000,
     messages: [{ role: "user", content: prompt }],
   });
@@ -466,7 +466,7 @@ CRITICAL GUIDELINES:
 
   let fullText = "";
   const stream = await client.messages.stream({
-    model: "claude-sonnet-4-20250514",
+    model: "claude-opus-4-20250514",
     max_tokens: 10000, // Reduced from 16000 for speed
     messages: [{ role: "user", content: prompt }],
   });
@@ -560,7 +560,7 @@ Return concise Quick Take analysis:
 Keep it brief - these are quick summaries, not deep analysis.`;
 
   const response = await client.messages.create({
-    model: "claude-sonnet-4-20250514",
+    model: "claude-opus-4-20250514",
     max_tokens: 4000, // Reduced for speed
     messages: [{ role: "user", content: prompt }],
   });
