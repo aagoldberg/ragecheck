@@ -575,7 +575,17 @@ Keep it brief - these are quick summaries, not deep analysis.`;
     throw new Error("Failed to parse quick take analysis");
   }
 
-  const parsed = JSON.parse(jsonMatch[0]);
+  let parsed;
+  try {
+    parsed = JSON.parse(jsonMatch[0]);
+  } catch {
+    const fixedJson = jsonMatch[0]
+      .replace(/,\s*}/g, '}')
+      .replace(/,\s*]/g, ']')
+      .replace(/[\x00-\x1F\x7F]/g, ' ');
+    parsed = JSON.parse(fixedJson);
+  }
+
   return (parsed.stories || []).map((s: ClearviewStory) => ({
     ...s,
     tier: "quick-take" as const,
