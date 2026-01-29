@@ -43,7 +43,7 @@ function getESTDateString(date: Date = new Date()): string {
 let dbInstance: NeonQueryFunction<false, false> | null = null;
 
 // Lazy initialization - only connect when needed (not at build time)
-function getDb(): NeonQueryFunction<false, false> {
+export function getDb(): NeonQueryFunction<false, false> {
   if (!process.env.DATABASE_URL) {
     throw new Error("DATABASE_URL not configured");
   }
@@ -54,7 +54,7 @@ function getDb(): NeonQueryFunction<false, false> {
 }
 
 // Retry wrapper for database operations with exponential backoff
-async function withRetry<T>(
+export async function withRetry<T>(
   operation: () => Promise<T>,
   maxRetries: number = 3,
   baseDelayMs: number = 100
@@ -319,6 +319,12 @@ export async function initDB() {
   } catch {
     // Columns may already exist
   }
+
+  // Performance indexes for common lookups
+  await getDb()`CREATE INDEX IF NOT EXISTS idx_analyses_url ON ragecheck_analyses(url)`;
+  await getDb()`CREATE INDEX IF NOT EXISTS idx_visitors_ip_created ON ragecheck_visitors(ip_address, created_at DESC)`;
+  await getDb()`CREATE INDEX IF NOT EXISTS idx_analyses_created ON ragecheck_analyses(created_at DESC)`;
+  await getDb()`CREATE INDEX IF NOT EXISTS idx_headlines_story_slug ON ragecheck_headlines(story_slug) WHERE story_slug IS NOT NULL`;
 }
 
 export interface AnalysisLog {
