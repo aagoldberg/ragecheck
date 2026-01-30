@@ -153,52 +153,62 @@ def upsert_daily_metrics(
 def upsert_cluster_assignments(
     assignments: list[dict[str, Any]],
 ) -> None:
-    """Upsert cluster assignments."""
+    """Upsert cluster assignments using batch insert."""
     if not assignments:
         return
     with get_conn() as conn:
         with conn.cursor() as cur:
-            for a in assignments:
-                cur.execute(
-                    """INSERT INTO sidelines_cluster_assignments
-                       (event_id, day, user_id, cluster_id, score)
-                       VALUES (%s, %s, %s, %s, %s)
-                       ON CONFLICT (event_id, day, user_id) DO UPDATE SET
-                         cluster_id = EXCLUDED.cluster_id,
-                         score = EXCLUDED.score""",
-                    (a["event_id"], a["day"], a["user_id"], a["cluster_id"], a["score"]),
-                )
+            values = [
+                (a["event_id"], a["day"], a["user_id"], a["cluster_id"], a["score"])
+                for a in assignments
+            ]
+            psycopg2.extras.execute_values(
+                cur,
+                """INSERT INTO sidelines_cluster_assignments
+                   (event_id, day, user_id, cluster_id, score)
+                   VALUES %s
+                   ON CONFLICT (event_id, day, user_id) DO UPDATE SET
+                     cluster_id = EXCLUDED.cluster_id,
+                     score = EXCLUDED.score""",
+                values,
+                page_size=500,
+            )
         conn.commit()
 
 
 def upsert_user_features(
     features: list[dict[str, Any]],
 ) -> None:
-    """Upsert user features."""
+    """Upsert user features using batch insert."""
     if not features:
         return
     with get_conn() as conn:
         with conn.cursor() as cur:
-            for f in features:
-                cur.execute(
-                    """INSERT INTO sidelines_user_features
-                       (event_id, day, user_id, arousal_mean, arousal_p95,
-                        post_count, in_degree, out_degree, betweenness)
-                       VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-                       ON CONFLICT (event_id, day, user_id) DO UPDATE SET
-                         arousal_mean = EXCLUDED.arousal_mean,
-                         arousal_p95 = EXCLUDED.arousal_p95,
-                         post_count = EXCLUDED.post_count,
-                         in_degree = EXCLUDED.in_degree,
-                         out_degree = EXCLUDED.out_degree,
-                         betweenness = EXCLUDED.betweenness""",
-                    (
-                        f["event_id"], f["day"], f["user_id"],
-                        f["arousal_mean"], f["arousal_p95"],
-                        f["post_count"], f["in_degree"], f["out_degree"],
-                        f["betweenness"],
-                    ),
+            values = [
+                (
+                    f["event_id"], f["day"], f["user_id"],
+                    f["arousal_mean"], f["arousal_p95"],
+                    f["post_count"], f["in_degree"], f["out_degree"],
+                    f["betweenness"],
                 )
+                for f in features
+            ]
+            psycopg2.extras.execute_values(
+                cur,
+                """INSERT INTO sidelines_user_features
+                   (event_id, day, user_id, arousal_mean, arousal_p95,
+                    post_count, in_degree, out_degree, betweenness)
+                   VALUES %s
+                   ON CONFLICT (event_id, day, user_id) DO UPDATE SET
+                     arousal_mean = EXCLUDED.arousal_mean,
+                     arousal_p95 = EXCLUDED.arousal_p95,
+                     post_count = EXCLUDED.post_count,
+                     in_degree = EXCLUDED.in_degree,
+                     out_degree = EXCLUDED.out_degree,
+                     betweenness = EXCLUDED.betweenness""",
+                values,
+                page_size=500,
+            )
         conn.commit()
 
 
