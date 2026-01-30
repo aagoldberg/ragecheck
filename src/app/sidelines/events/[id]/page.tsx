@@ -325,7 +325,7 @@ function TheField({
   // Build interaction arrows from interClusterEdges (all cross-cluster edges)
   const interEdges = metrics.interClusterEdges || [];
   const arrowData = interEdges
-    .filter((e) => summaryMap.has(e.fromCluster) && summaryMap.has(e.toCluster) && e.count >= 2)
+    .filter((e) => summaryMap.has(e.fromCluster) && summaryMap.has(e.toCluster))
     .map((e) => ({
       from: e.fromCluster,
       to: e.toCluster,
