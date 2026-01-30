@@ -576,7 +576,10 @@ def compute_inter_cluster_edges(
         pair_counts[key] = pair_counts.get(key, 0) + 1
 
         # Arousal from source node
-        arousal = float(graph.vs[e.source].get("arousal", 0) or 0)
+        try:
+            arousal = float(graph.vs[e.source]["arousal"])
+        except (KeyError, TypeError):
+            arousal = 0.0
         pair_arousal_sums[key] = pair_arousal_sums.get(key, 0.0) + arousal
 
     result = []
