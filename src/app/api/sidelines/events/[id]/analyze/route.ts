@@ -6,7 +6,8 @@ import {
   updateEventStatus,
 } from "@/lib/db-sidelines";
 
-const WORKER_URL = process.env.SIDELINES_WORKER_URL || "http://localhost:8000";
+const rawWorkerUrl = process.env.SIDELINES_WORKER_URL || "http://localhost:8000";
+const WORKER_URL = rawWorkerUrl.startsWith("http") ? rawWorkerUrl : `https://${rawWorkerUrl}`;
 
 export async function POST(
   request: Request,
