@@ -12,10 +12,46 @@ import { upsertPost, upsertUser, createInteraction } from "@/lib/db-sidelines";
 import { computeArousal } from "./arousal";
 import type { SidelinesEvent, InteractionType } from "./types";
 
-const BSKY_API = "https://public.api.bsky.app/xrpc";
+const BSKY_PUBLIC_API = "https://public.api.bsky.app/xrpc";
+const BSKY_AUTH_API = "https://bsky.social/xrpc";
 const RATE_LIMIT_MS = 120;
 const MAX_POSTS = 10_000;
 const MAX_ELAPSED_MS = 250_000;
+
+let cachedAccessJwt: string | null = null;
+let cachedJwtExpiry = 0;
+
+/**
+ * Authenticate with Bluesky using app password.
+ * Caches the JWT for reuse within its validity period.
+ */
+async function getAccessToken(): Promise<string> {
+  if (cachedAccessJwt && Date.now() < cachedJwtExpiry) {
+    return cachedAccessJwt;
+  }
+
+  const identifier = process.env.BSKY_IDENTIFIER;
+  const password = process.env.BSKY_APP_PASSWORD;
+  if (!identifier || !password) {
+    throw new Error("BSKY_IDENTIFIER and BSKY_APP_PASSWORD env vars required for search");
+  }
+
+  const res = await fetch(`${BSKY_AUTH_API}/com.atproto.server.createSession`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ identifier, password }),
+  });
+
+  if (!res.ok) {
+    throw new Error(`Bluesky auth failed: ${res.status} ${res.statusText}`);
+  }
+
+  const data = await res.json();
+  cachedAccessJwt = data.accessJwt;
+  // Cache for 90 minutes (tokens last ~2 hours)
+  cachedJwtExpiry = Date.now() + 90 * 60 * 1000;
+  return data.accessJwt;
+}
 
 interface BlueskyPost {
   uri: string;
@@ -80,8 +116,10 @@ async function searchPosts(
   });
   if (cursor) params.set("cursor", cursor);
 
+  const accessJwt = await getAccessToken();
   const res = await fetch(
-    `${BSKY_API}/app.bsky.feed.searchPosts?${params.toString()}`
+    `${BSKY_AUTH_API}/app.bsky.feed.searchPosts?${params.toString()}`,
+    { headers: { Authorization: `Bearer ${accessJwt}` } }
   );
   if (!res.ok) {
     if (res.status === 429) {
@@ -109,7 +147,7 @@ async function getPostThread(
     parentHeight: "0",
   });
   const res = await fetch(
-    `${BSKY_API}/app.bsky.feed.getPostThread?${params.toString()}`
+    `${BSKY_PUBLIC_API}/app.bsky.feed.getPostThread?${params.toString()}`
   );
   if (!res.ok) return [];
 
