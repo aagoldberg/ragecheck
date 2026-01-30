@@ -38,6 +38,26 @@ interface FieldPosition {
   y: number;
 }
 
+interface CofollowCommunity {
+  clusterId: number;
+  memberCount: number;
+  llmSummary: string;
+  topFollowedHandles: string[];
+  meanArousal: number;
+  postCount: number;
+  activeOnTopic: boolean;
+}
+
+interface CommunityBreakdown {
+  communityId: number;
+  communityName: string;
+  communityDescription: string;
+  memberCount: number;
+  postCount: number;
+  meanArousal: number;
+  activeOnTopic: boolean;
+}
+
 interface DailyMetrics {
   baseActivation: number;
   crossClusterContact: number;
@@ -58,6 +78,8 @@ interface DailyMetrics {
   bridgeUsers?: BridgeUser[];
   interClusterEdges?: InterClusterEdge[];
   clusterPositions?: FieldPosition[];
+  cofollowCommunities?: CofollowCommunity[];
+  communityBreakdown?: CommunityBreakdown[];
 }
 
 interface InterClusterEdge {
@@ -111,6 +133,8 @@ const STATUS_CONFIG: Record<string, { bg: string; text: string; label: string }>
   draft: { bg: "bg-zinc-100 dark:bg-zinc-800", text: "text-zinc-600 dark:text-zinc-400", label: "Draft" },
   collecting: { bg: "bg-amber-100 dark:bg-amber-900/30", text: "text-amber-700 dark:text-amber-400", label: "Collecting..." },
   collected: { bg: "bg-blue-100 dark:bg-blue-900/30", text: "text-blue-700 dark:text-blue-400", label: "Collected" },
+  fetching_follows: { bg: "bg-cyan-100 dark:bg-cyan-900/30", text: "text-cyan-700 dark:text-cyan-400", label: "Fetching Follows..." },
+  follows_ready: { bg: "bg-teal-100 dark:bg-teal-900/30", text: "text-teal-700 dark:text-teal-400", label: "Follows Ready" },
   analyzing: { bg: "bg-purple-100 dark:bg-purple-900/30", text: "text-purple-700 dark:text-purple-400", label: "Analyzing..." },
   ready: { bg: "bg-emerald-100 dark:bg-emerald-900/30", text: "text-emerald-700 dark:text-emerald-400", label: "Ready" },
   error: { bg: "bg-red-100 dark:bg-red-900/30", text: "text-red-700 dark:text-red-400", label: "Error" },
@@ -159,7 +183,10 @@ function Scoreboard({
   confidence,
   ingesting,
   analyzing,
+  fetchingFollows,
+  followsProgress,
   onIngest,
+  onFetchFollows,
   onAnalyze,
 }: {
   event: EventData;
@@ -167,7 +194,10 @@ function Scoreboard({
   confidence: string;
   ingesting: boolean;
   analyzing: boolean;
+  fetchingFollows: boolean;
+  followsProgress: { fetched: number; total: number } | null;
   onIngest: () => void;
+  onFetchFollows: () => void;
   onAnalyze: () => void;
 }) {
   const statusConfig = STATUS_CONFIG[event.status] || STATUS_CONFIG.draft;
@@ -231,13 +261,24 @@ function Scoreboard({
             </span>
           )}
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-center">
           <button
             onClick={onIngest}
             disabled={ingesting || event.status === "collecting"}
             className="px-3 py-1.5 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 disabled:opacity-50 text-zinc-600 dark:text-zinc-400 rounded-lg text-xs font-medium transition-colors"
           >
             {ingesting ? "Ingesting..." : "Ingest"}
+          </button>
+          <button
+            onClick={onFetchFollows}
+            disabled={fetchingFollows || event.status === "fetching_follows"}
+            className="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-700 disabled:opacity-50 text-white rounded-lg text-xs font-medium transition-colors"
+          >
+            {fetchingFollows
+              ? followsProgress
+                ? `Follows: ${followsProgress.fetched} / ${followsProgress.total}`
+                : "Fetching..."
+              : "Fetch Follows"}
           </button>
           <button
             onClick={onAnalyze}
@@ -280,12 +321,14 @@ function TheField({
   clusterPositions,
   bridgeUsers,
   metrics,
+  cofollowCommunities,
   onSelectTeam,
 }: {
   clusterSummaries: ClusterSummary[];
   clusterPositions: FieldPosition[];
   bridgeUsers: BridgeUser[];
   metrics: DailyMetrics;
+  cofollowCommunities?: CofollowCommunity[];
   onSelectTeam: (clusterId: number | null) => void;
 }) {
   const [hoveredTeam, setHoveredTeam] = useState<number | null>(null);
@@ -479,6 +522,20 @@ function TheField({
               .map((v) => `@${v.handle}`)
               .join(", ");
 
+            // Use co-follow community name if available
+            const cofollowMatch = cofollowCommunities?.find((c) => c.clusterId === summary.clusterId);
+            let displayName = `Team ${label}`;
+            if (cofollowMatch?.llmSummary) {
+              const parts = cofollowMatch.llmSummary.split(":");
+              if (parts.length > 1 && parts[0].length <= 30) {
+                displayName = parts[0].trim();
+              }
+            }
+            // Truncate if too long for SVG bubble
+            if (displayName.length > 20) {
+              displayName = displayName.slice(0, 18) + "...";
+            }
+
             return (
               <g
                 key={summary.clusterId}
@@ -514,12 +571,12 @@ function TheField({
                   x={cx}
                   y={cy - 6}
                   textAnchor="middle"
-                  fontSize={14}
+                  fontSize={cofollowMatch ? 11 : 14}
                   fontWeight="bold"
                   fill={color.fill}
                   className="pointer-events-none"
                 >
-                  Team {label}
+                  {displayName}
                 </text>
                 <text
                   x={cx}
@@ -772,6 +829,162 @@ function TeamRosterCards({
                   {" · "}{densityLabel(summary.edgeDensity)}
                 </div>
               </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// =============================================================================
+// ZONE 2B: WHO'S ON THE FIELD (Co-follow Communities)
+// =============================================================================
+
+function WhosOnTheField({
+  communities,
+  communityBreakdown,
+}: {
+  communities?: CofollowCommunity[];
+  communityBreakdown?: CommunityBreakdown[];
+}) {
+  // Prefer global community breakdown over per-event cofollows
+  if (communityBreakdown && communityBreakdown.length > 0) {
+    const sorted = [...communityBreakdown].sort((a, b) => b.memberCount - a.memberCount);
+
+    return (
+      <div className="mb-6">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-lg font-bold">Who&apos;s On The Field</h2>
+          <span className="text-xs text-zinc-400">
+            {sorted.length} communities from global follow graph
+          </span>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {sorted.map((community) => {
+            const activePercent = community.memberCount > 0
+              ? Math.round((community.postCount > 0 ? community.postCount / community.memberCount : 0) * 100)
+              : 0;
+            const barWidth = Math.min(activePercent, 100);
+
+            return (
+              <div
+                key={community.communityId}
+                className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-4"
+              >
+                <div className="flex items-start justify-between mb-2">
+                  <h3 className="font-semibold text-sm">{community.communityName}</h3>
+                  <span className="text-xs text-zinc-400 flex-shrink-0 ml-2">
+                    {community.memberCount.toLocaleString()} users
+                  </span>
+                </div>
+
+                <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed mb-3">
+                  {community.communityDescription}
+                </p>
+
+                {/* Activity stats */}
+                <div className="flex items-center gap-3 text-[10px] text-zinc-400 pt-2 border-t border-zinc-100 dark:border-zinc-800">
+                  <span>{community.postCount} posts</span>
+                  <span>{(community.meanArousal * 100).toFixed(0)}% avg energy</span>
+                </div>
+
+                {/* Active on topic bar */}
+                {community.activeOnTopic && (
+                  <div className="mt-2">
+                    <div className="flex h-1.5 rounded-full overflow-hidden bg-zinc-100 dark:bg-zinc-800">
+                      <div
+                        className="bg-emerald-500 h-full rounded-full"
+                        style={{ width: `${barWidth}%` }}
+                      />
+                    </div>
+                    <div className="text-[10px] text-zinc-400 mt-0.5">
+                      {barWidth}% active on topic
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
+  // Fall back to per-event cofollows
+  if (!communities || communities.length === 0) return null;
+
+  const sorted = [...communities].sort((a, b) => b.memberCount - a.memberCount);
+
+  return (
+    <div className="mb-6">
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="text-lg font-bold">Who&apos;s On The Field</h2>
+        <span className="text-xs text-zinc-400">
+          {sorted.length} communities detected via shared follows
+        </span>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {sorted.map((community) => {
+          const parts = community.llmSummary.split(":");
+          const communityName = parts.length > 1 ? parts[0].trim() : `Community ${community.clusterId}`;
+          const summary = parts.length > 1 ? parts.slice(1).join(":").trim() : community.llmSummary;
+
+          const activePercent = community.memberCount > 0
+            ? Math.round((community.postCount > 0 ? community.postCount / community.memberCount : 0) * 100)
+            : 0;
+          const barWidth = Math.min(activePercent, 100);
+
+          return (
+            <div
+              key={community.clusterId}
+              className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-4"
+            >
+              <div className="flex items-start justify-between mb-2">
+                <h3 className="font-semibold text-sm">{communityName}</h3>
+                <span className="text-xs text-zinc-400 flex-shrink-0 ml-2">
+                  {community.memberCount.toLocaleString()} users
+                </span>
+              </div>
+
+              <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed mb-3">
+                {summary}
+              </p>
+
+              {community.topFollowedHandles.length > 0 && (
+                <div className="mb-3">
+                  <div className="text-[10px] text-zinc-400 mb-1">Top follows</div>
+                  <div className="flex flex-wrap gap-1">
+                    {community.topFollowedHandles.slice(0, 6).map((handle, i) => (
+                      <span
+                        key={i}
+                        className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400"
+                      >
+                        @{handle}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="flex items-center gap-3 text-[10px] text-zinc-400 pt-2 border-t border-zinc-100 dark:border-zinc-800">
+                <span>{community.postCount} posts</span>
+                <span>{(community.meanArousal * 100).toFixed(0)}% avg energy</span>
+              </div>
+
+              {community.activeOnTopic && (
+                <div className="mt-2">
+                  <div className="flex h-1.5 rounded-full overflow-hidden bg-zinc-100 dark:bg-zinc-800">
+                    <div
+                      className="bg-emerald-500 h-full rounded-full"
+                      style={{ width: `${barWidth}%` }}
+                    />
+                  </div>
+                  <div className="text-[10px] text-zinc-400 mt-0.5">
+                    {barWidth}% active on topic
+                  </div>
+                </div>
+              )}
             </div>
           );
         })}
@@ -1140,6 +1353,8 @@ export default function EventDetailPage({
   const [loading, setLoading] = useState(true);
   const [ingesting, setIngesting] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
+  const [fetchingFollows, setFetchingFollows] = useState(false);
+  const [followsProgress, setFollowsProgress] = useState<{ fetched: number; total: number } | null>(null);
   const [selectedTeam, setSelectedTeam] = useState<number | null>(null);
 
   const fetchAll = useCallback(async () => {
@@ -1186,6 +1401,31 @@ export default function EventDetailPage({
       console.error("Ingest failed:", err);
     } finally {
       setIngesting(false);
+    }
+  }
+
+  async function handleFetchFollows() {
+    setFetchingFollows(true);
+    try {
+      let done = false;
+      while (!done) {
+        const res = await fetch(`/api/sidelines/events/${eventId}/fetch-follows`, {
+          method: "POST",
+        });
+        const data = await res.json();
+        if (!data.success) {
+          console.error("Fetch follows error:", data.error);
+          break;
+        }
+        setFollowsProgress({ fetched: data.processed, total: data.total });
+        done = data.done;
+      }
+      fetchAll();
+    } catch (err) {
+      console.error("Fetch follows failed:", err);
+    } finally {
+      setFetchingFollows(false);
+      setFollowsProgress(null);
     }
   }
 
@@ -1253,7 +1493,10 @@ export default function EventDetailPage({
           confidence={confidence}
           ingesting={ingesting}
           analyzing={analyzing}
+          fetchingFollows={fetchingFollows}
+          followsProgress={followsProgress}
           onIngest={handleIngest}
+          onFetchFollows={handleFetchFollows}
           onAnalyze={handleAnalyze}
         />
 
@@ -1264,9 +1507,18 @@ export default function EventDetailPage({
             clusterPositions={clusterPositions}
             bridgeUsers={bridgeUsers}
             metrics={m}
+            cofollowCommunities={m.cofollowCommunities}
             onSelectTeam={setSelectedTeam}
           />
         )}
+
+        {/* Zone 2B: Who's On The Field (Global Communities or Co-follow) */}
+        {(m?.communityBreakdown?.length || m?.cofollowCommunities?.length) ? (
+          <WhosOnTheField
+            communities={m?.cofollowCommunities}
+            communityBreakdown={m?.communityBreakdown}
+          />
+        ) : null}
 
         {/* Zone 3A: Team Roster Cards */}
         {clusterSummaries.length > 0 && (

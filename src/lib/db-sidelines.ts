@@ -131,6 +131,91 @@ export async function initSidelinesTables() {
       UNIQUE(event_id, day, user_id)
     )
   `;
+
+  // Shared-follows table for co-follow community detection
+  await getDb()`
+    CREATE TABLE IF NOT EXISTS sidelines_user_follows (
+      event_id INTEGER NOT NULL REFERENCES sidelines_events(id) ON DELETE CASCADE,
+      user_did TEXT NOT NULL,
+      follows_did TEXT NOT NULL,
+      follows_handle TEXT DEFAULT '',
+      UNIQUE(event_id, user_did, follows_did)
+    )
+  `;
+  await getDb()`CREATE INDEX IF NOT EXISTS idx_follows_event_user ON sidelines_user_follows(event_id, user_did)`;
+  await getDb()`CREATE INDEX IF NOT EXISTS idx_follows_event_target ON sidelines_user_follows(event_id, follows_did)`;
+
+  // Add follows_fetched_at column to sidelines_users (safe to run multiple times)
+  await getDb()`
+    DO $$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'sidelines_users' AND column_name = 'follows_fetched_at'
+      ) THEN
+        ALTER TABLE sidelines_users ADD COLUMN follows_fetched_at TIMESTAMPTZ;
+      END IF;
+    END $$
+  `;
+
+  // =========================================================================
+  // GLOBAL BLUESKY COMMUNITY MAP TABLES
+  // =========================================================================
+
+  // Global follow relationships (not event-scoped — persists across events)
+  await getDb()`
+    CREATE TABLE IF NOT EXISTS bluesky_follows (
+      user_did TEXT NOT NULL,
+      follows_did TEXT NOT NULL,
+      follows_handle TEXT DEFAULT '',
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      UNIQUE(user_did, follows_did)
+    )
+  `;
+  await getDb()`CREATE INDEX IF NOT EXISTS idx_bf_user ON bluesky_follows(user_did)`;
+  await getDb()`CREATE INDEX IF NOT EXISTS idx_bf_target ON bluesky_follows(follows_did)`;
+
+  // Track which users have had their follows backfilled
+  await getDb()`
+    CREATE TABLE IF NOT EXISTS bluesky_follows_fetched (
+      user_did TEXT PRIMARY KEY,
+      fetched_at TIMESTAMPTZ DEFAULT NOW(),
+      follow_count INTEGER DEFAULT 0
+    )
+  `;
+
+  // Tracked users (starter pack members, event participants, etc.)
+  await getDb()`
+    CREATE TABLE IF NOT EXISTS bluesky_tracked_users (
+      did TEXT PRIMARY KEY,
+      handle TEXT DEFAULT '',
+      source TEXT NOT NULL DEFAULT 'event',
+      added_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `;
+
+  // Global community definitions (from Leiden on full follow graph)
+  await getDb()`
+    CREATE TABLE IF NOT EXISTS bluesky_communities (
+      id SERIAL PRIMARY KEY,
+      name TEXT NOT NULL DEFAULT '',
+      description TEXT NOT NULL DEFAULT '',
+      top_followed_handles TEXT[] DEFAULT '{}',
+      member_count INTEGER DEFAULT 0,
+      computed_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `;
+
+  // Community membership (each user belongs to one community)
+  await getDb()`
+    CREATE TABLE IF NOT EXISTS bluesky_community_members (
+      user_did TEXT NOT NULL,
+      community_id INTEGER NOT NULL REFERENCES bluesky_communities(id) ON DELETE CASCADE,
+      computed_at TIMESTAMPTZ DEFAULT NOW(),
+      UNIQUE(user_did)
+    )
+  `;
+  await getDb()`CREATE INDEX IF NOT EXISTS idx_bcm_community ON bluesky_community_members(community_id)`;
 }
 
 // =============================================================================
@@ -637,5 +722,301 @@ export async function getUserFeatures(
     inDegree: row.in_degree,
     outDegree: row.out_degree,
     betweenness: parseFloat(row.betweenness),
+  }));
+}
+
+// =============================================================================
+// USER FOLLOWS (Shared-follows community detection)
+// =============================================================================
+
+export async function bulkInsertFollows(
+  eventId: number,
+  rows: { userDid: string; followsDid: string; followsHandle: string }[]
+): Promise<void> {
+  if (rows.length === 0) return;
+  // Insert in batches of 500
+  for (let i = 0; i < rows.length; i += 500) {
+    const batch = rows.slice(i, i + 500);
+    const values = batch.map(
+      (r) => `(${eventId}, '${r.userDid.replace(/'/g, "''")}', '${r.followsDid.replace(/'/g, "''")}', '${r.followsHandle.replace(/'/g, "''")}')`
+    );
+    await withRetry(async () => {
+      await getDb().unsafe(
+        `INSERT INTO sidelines_user_follows (event_id, user_did, follows_did, follows_handle)
+         VALUES ${values.join(",")}
+         ON CONFLICT (event_id, user_did, follows_did) DO NOTHING`
+      );
+    });
+  }
+}
+
+export async function markUserFollowsFetched(
+  eventId: number,
+  userDid: string
+): Promise<void> {
+  await withRetry(async () => {
+    await getDb()`
+      UPDATE sidelines_users
+      SET follows_fetched_at = NOW()
+      WHERE event_id = ${eventId} AND did = ${userDid}
+    `;
+  });
+}
+
+export async function getUsersWithoutFollows(
+  eventId: number,
+  limit: number
+): Promise<{ did: string; handle: string }[]> {
+  const rows = await withRetry(async () => {
+    return await getDb()`
+      SELECT did, handle FROM sidelines_users
+      WHERE event_id = ${eventId} AND follows_fetched_at IS NULL
+      ORDER BY id
+      LIMIT ${limit}
+    `;
+  });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return rows.map((row: any) => ({ did: row.did, handle: row.handle }));
+}
+
+export async function getFollowsFetchProgress(
+  eventId: number
+): Promise<{ total: number; fetched: number }> {
+  const [row] = await withRetry(async () => {
+    return await getDb()`
+      SELECT
+        COUNT(*) as total,
+        COUNT(follows_fetched_at) as fetched
+      FROM sidelines_users
+      WHERE event_id = ${eventId}
+    `;
+  });
+  return {
+    total: parseInt(row.total) || 0,
+    fetched: parseInt(row.fetched) || 0,
+  };
+}
+
+// =============================================================================
+// GLOBAL BLUESKY COMMUNITY MAP FUNCTIONS
+// =============================================================================
+
+export async function bulkInsertGlobalFollows(
+  rows: { userDid: string; followsDid: string; followsHandle: string }[]
+): Promise<void> {
+  if (rows.length === 0) return;
+  for (let i = 0; i < rows.length; i += 500) {
+    const batch = rows.slice(i, i + 500);
+    const values = batch.map(
+      (r) =>
+        `('${r.userDid.replace(/'/g, "''")}', '${r.followsDid.replace(/'/g, "''")}', '${r.followsHandle.replace(/'/g, "''")}')`
+    );
+    await withRetry(async () => {
+      await getDb().unsafe(
+        `INSERT INTO bluesky_follows (user_did, follows_did, follows_handle)
+         VALUES ${values.join(",")}
+         ON CONFLICT (user_did, follows_did) DO NOTHING`
+      );
+    });
+  }
+}
+
+export async function markGlobalFollowsFetched(
+  did: string,
+  followCount: number
+): Promise<void> {
+  await withRetry(async () => {
+    await getDb()`
+      INSERT INTO bluesky_follows_fetched (user_did, fetched_at, follow_count)
+      VALUES (${did}, NOW(), ${followCount})
+      ON CONFLICT (user_did) DO UPDATE SET
+        fetched_at = NOW(),
+        follow_count = EXCLUDED.follow_count
+    `;
+  });
+}
+
+export async function getUnfetchedDids(
+  dids: string[],
+  limit: number
+): Promise<string[]> {
+  if (dids.length === 0) return [];
+  const rows = await withRetry(async () => {
+    return await getDb()`
+      SELECT unnest(${dids}::text[]) AS did
+      EXCEPT
+      SELECT user_did FROM bluesky_follows_fetched
+      LIMIT ${limit}
+    `;
+  });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return rows.map((r: any) => r.did);
+}
+
+export async function getGlobalFollowsFetchProgress(
+  dids: string[]
+): Promise<{ total: number; fetched: number }> {
+  if (dids.length === 0) return { total: 0, fetched: 0 };
+  const [row] = await withRetry(async () => {
+    return await getDb()`
+      SELECT
+        ${dids.length} as total,
+        COUNT(*) as fetched
+      FROM bluesky_follows_fetched
+      WHERE user_did = ANY(${dids})
+    `;
+  });
+  return {
+    total: parseInt(row.total) || 0,
+    fetched: parseInt(row.fetched) || 0,
+  };
+}
+
+export async function getAllGlobalFollows(): Promise<
+  { userDid: string; followsDid: string; followsHandle: string }[]
+> {
+  const rows = await withRetry(async () => {
+    return await getDb()`
+      SELECT user_did, follows_did, follows_handle
+      FROM bluesky_follows
+    `;
+  });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return rows.map((r: any) => ({
+    userDid: r.user_did,
+    followsDid: r.follows_did,
+    followsHandle: r.follows_handle,
+  }));
+}
+
+export async function upsertCommunities(
+  communities: {
+    name: string;
+    description: string;
+    topFollowedHandles: string[];
+    memberCount: number;
+  }[]
+): Promise<number[]> {
+  const ids: number[] = [];
+  // Clear old communities first (full recompute)
+  await withRetry(async () => {
+    await getDb()`DELETE FROM bluesky_community_members`;
+    await getDb()`DELETE FROM bluesky_communities`;
+  });
+  for (const c of communities) {
+    const [row] = await withRetry(async () => {
+      return await getDb()`
+        INSERT INTO bluesky_communities (name, description, top_followed_handles, member_count, computed_at)
+        VALUES (${c.name}, ${c.description}, ${c.topFollowedHandles}, ${c.memberCount}, NOW())
+        RETURNING id
+      `;
+    });
+    ids.push(row.id);
+  }
+  return ids;
+}
+
+export async function upsertCommunityMembers(
+  assignments: { userDid: string; communityId: number }[]
+): Promise<void> {
+  if (assignments.length === 0) return;
+  for (let i = 0; i < assignments.length; i += 500) {
+    const batch = assignments.slice(i, i + 500);
+    const values = batch.map(
+      (a) => `('${a.userDid.replace(/'/g, "''")}', ${a.communityId})`
+    );
+    await withRetry(async () => {
+      await getDb().unsafe(
+        `INSERT INTO bluesky_community_members (user_did, community_id, computed_at)
+         VALUES ${values.join(",")}
+         ON CONFLICT (user_did) DO UPDATE SET
+           community_id = EXCLUDED.community_id,
+           computed_at = NOW()`
+      );
+    });
+  }
+}
+
+export async function getCommunityAssignmentsForDids(
+  dids: string[]
+): Promise<
+  {
+    userDid: string;
+    communityId: number;
+    communityName: string;
+    communityDescription: string;
+  }[]
+> {
+  if (dids.length === 0) return [];
+  const rows = await withRetry(async () => {
+    return await getDb()`
+      SELECT
+        m.user_did,
+        m.community_id,
+        c.name AS community_name,
+        c.description AS community_description
+      FROM bluesky_community_members m
+      JOIN bluesky_communities c ON c.id = m.community_id
+      WHERE m.user_did = ANY(${dids})
+    `;
+  });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return rows.map((r: any) => ({
+    userDid: r.user_did,
+    communityId: r.community_id,
+    communityName: r.community_name,
+    communityDescription: r.community_description,
+  }));
+}
+
+export async function addTrackedUsers(
+  users: { did: string; handle: string; source: string }[]
+): Promise<void> {
+  if (users.length === 0) return;
+  for (let i = 0; i < users.length; i += 500) {
+    const batch = users.slice(i, i + 500);
+    const values = batch.map(
+      (u) =>
+        `('${u.did.replace(/'/g, "''")}', '${u.handle.replace(/'/g, "''")}', '${u.source.replace(/'/g, "''")}')`
+    );
+    await withRetry(async () => {
+      await getDb().unsafe(
+        `INSERT INTO bluesky_tracked_users (did, handle, source)
+         VALUES ${values.join(",")}
+         ON CONFLICT (did) DO NOTHING`
+      );
+    });
+  }
+}
+
+export async function getTrackedUserDids(): Promise<string[]> {
+  const rows = await withRetry(async () => {
+    return await getDb()`SELECT did FROM bluesky_tracked_users`;
+  });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return rows.map((r: any) => r.did);
+}
+
+export async function getGlobalCommunities(): Promise<
+  {
+    id: number;
+    name: string;
+    description: string;
+    topFollowedHandles: string[];
+    memberCount: number;
+  }[]
+> {
+  const rows = await withRetry(async () => {
+    return await getDb()`
+      SELECT * FROM bluesky_communities ORDER BY member_count DESC
+    `;
+  });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return rows.map((r: any) => ({
+    id: r.id,
+    name: r.name,
+    description: r.description,
+    topFollowedHandles: r.top_followed_handles,
+    memberCount: r.member_count,
   }));
 }

@@ -4,6 +4,7 @@ import {
   initSidelinesTables,
   getEvent,
   updateEventStatus,
+  getFollowsFetchProgress,
 } from "@/lib/db-sidelines";
 
 export const maxDuration = 300;
@@ -65,6 +66,26 @@ export async function POST(
       }
 
       const result = await workerRes.json();
+
+      // If follows data exists, also run co-follow analysis
+      try {
+        const followsProgress = await getFollowsFetchProgress(eventId);
+        if (followsProgress.fetched > 0) {
+          const followsRes = await fetch(`${WORKER_URL}/analyze-follows`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ event_id: eventId, day }),
+          });
+          if (followsRes.ok) {
+            const followsResult = await followsRes.json();
+            result.cofollowCommunities = followsResult.communities;
+          }
+        }
+      } catch (followsError) {
+        // Co-follow analysis is non-critical — log but don't fail
+        console.error("Co-follow analysis error (non-fatal):", followsError);
+      }
+
       return NextResponse.json({ success: true, ...result });
     } catch (error) {
       await updateEventStatus(eventId, "error");

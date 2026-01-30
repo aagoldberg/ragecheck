@@ -13,6 +13,8 @@ export type EventStatus =
   | "draft"
   | "collecting"
   | "collected"
+  | "fetching_follows"
+  | "follows_ready"
   | "analyzing"
   | "ready"
   | "error";
@@ -131,6 +133,26 @@ export interface InterClusterEdge {
   meanArousal: number;
 }
 
+export interface CofollowCommunity {
+  clusterId: number;
+  memberCount: number;
+  llmSummary: string;
+  topFollowedHandles: string[];
+  meanArousal: number;
+  postCount: number;
+  activeOnTopic: boolean;
+}
+
+export interface CommunityBreakdown {
+  communityId: number;
+  communityName: string;
+  communityDescription: string;
+  memberCount: number;
+  postCount: number;
+  meanArousal: number;
+  activeOnTopic: boolean;
+}
+
 export interface DailyMetrics {
   baseActivation: number;
   crossClusterContact: number;
@@ -151,6 +173,8 @@ export interface DailyMetrics {
   bridgeUsers?: BridgeUser[];
   interClusterEdges?: InterClusterEdge[];
   clusterPositions?: FieldPosition[];
+  cofollowCommunities?: CofollowCommunity[];
+  communityBreakdown?: CommunityBreakdown[];
 }
 
 export interface MetricsPayload {

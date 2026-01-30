@@ -5,6 +5,8 @@ Core graph analysis using igraph + leidenalg.
 Computes all discourse dynamics metrics from interaction graphs.
 """
 
+from __future__ import annotations
+
 from typing import Any
 
 import igraph as ig
@@ -754,3 +756,311 @@ def assess_confidence(
     elif score >= 5:
         return "MED"
     return "LOW"
+
+
+# =============================================================================
+# CO-FOLLOW COMMUNITY DETECTION
+# =============================================================================
+
+
+def build_cofollow_graph(
+    users: list[dict[str, Any]],
+    follows: list[dict[str, Any]],
+    min_shared: int = 3,
+) -> tuple[ig.Graph, dict[int, str]]:
+    """
+    Build a co-follow graph from shared following relationships.
+
+    Algorithm:
+    1. Build user_did -> Set<follows_did> mapping
+    2. Filter to "popular follows" (followed by >= min_shared event users)
+    3. Use inverted index for efficient pairwise Jaccard computation
+    4. Add edge if jaccard >= 0.05 and shared_count >= 2
+
+    Returns:
+        (graph, idx_to_did) — undirected weighted graph and index-to-DID mapping
+    """
+    # Build follow sets per user
+    user_dids = {u["did"] for u in users}
+    user_follows: dict[str, set[str]] = {}
+    for f in follows:
+        if f["user_did"] in user_dids:
+            user_follows.setdefault(f["user_did"], set()).add(f["follows_did"])
+
+    # Only keep users who have follows data
+    active_dids = [did for did in user_dids if did in user_follows and len(user_follows[did]) > 0]
+    if len(active_dids) < 2:
+        g = ig.Graph(directed=False)
+        return g, {}
+
+    # Count how many event users follow each account
+    target_counts: dict[str, int] = {}
+    for did in active_dids:
+        for target in user_follows[did]:
+            target_counts[target] = target_counts.get(target, 0) + 1
+
+    # Popular follows: followed by >= min_shared users, but not by > 50%
+    # (accounts followed by everyone add no discriminating signal)
+    max_followers = len(active_dids) * 0.5
+    popular = {t for t, c in target_counts.items() if min_shared <= c <= max_followers}
+
+    # Filter follow sets to popular targets only
+    filtered_follows: dict[str, set[str]] = {}
+    for did in active_dids:
+        filtered = user_follows[did] & popular
+        if filtered:
+            filtered_follows[did] = filtered
+
+    active_dids = list(filtered_follows.keys())
+    if len(active_dids) < 2:
+        g = ig.Graph(directed=False)
+        return g, {}
+
+    did_to_idx = {did: i for i, did in enumerate(active_dids)}
+    idx_to_did = {i: did for did, i in did_to_idx.items()}
+
+    # Build inverted index: target -> set of user indices
+    inverted: dict[str, set[int]] = {}
+    for did, targets in filtered_follows.items():
+        idx = did_to_idx[did]
+        for t in targets:
+            inverted.setdefault(t, set()).add(idx)
+
+    # Compute pairwise shared counts using inverted index (sparse)
+    n = len(active_dids)
+    # Use a dict for sparse pairwise counts
+    pair_shared: dict[tuple[int, int], int] = {}
+    for target, user_idxs in inverted.items():
+        idxs = sorted(user_idxs)
+        for a_pos in range(len(idxs)):
+            for b_pos in range(a_pos + 1, len(idxs)):
+                key = (idxs[a_pos], idxs[b_pos])
+                pair_shared[key] = pair_shared.get(key, 0) + 1
+
+    # Build edges with Jaccard similarity
+    edges = []
+    weights = []
+    for (i, j), shared in pair_shared.items():
+        if shared < 2:
+            continue
+        size_i = len(filtered_follows[active_dids[i]])
+        size_j = len(filtered_follows[active_dids[j]])
+        union_size = size_i + size_j - shared
+        jaccard = shared / union_size if union_size > 0 else 0.0
+        if jaccard >= 0.05:
+            edges.append((i, j))
+            weights.append(jaccard)
+
+    g = ig.Graph(n=n, edges=edges, directed=False)
+    g.vs["did"] = active_dids
+    if weights:
+        g.es["weight"] = weights
+
+    return g, idx_to_did
+
+
+def build_global_cofollow_graph(
+    follows: list[dict[str, Any]],
+    min_shared: int = 3,
+) -> tuple[ig.Graph, dict[int, str]]:
+    """
+    Build a co-follow graph from the global follow table.
+
+    Same algorithm as build_cofollow_graph but operates on ALL follows
+    without filtering by event users.
+    """
+    # Build follow sets per user
+    user_follows: dict[str, set[str]] = {}
+    for f in follows:
+        user_follows.setdefault(f["user_did"], set()).add(f["follows_did"])
+
+    active_dids = [did for did, targets in user_follows.items() if len(targets) > 0]
+    if len(active_dids) < 2:
+        g = ig.Graph(directed=False)
+        return g, {}
+
+    # Count how many users follow each account
+    target_counts: dict[str, int] = {}
+    for did in active_dids:
+        for target in user_follows[did]:
+            target_counts[target] = target_counts.get(target, 0) + 1
+
+    # Popular follows: followed by >= min_shared users, but not by > 50%
+    max_followers = len(active_dids) * 0.5
+    popular = {t for t, c in target_counts.items() if min_shared <= c <= max_followers}
+
+    # Filter follow sets to popular targets only
+    filtered_follows: dict[str, set[str]] = {}
+    for did in active_dids:
+        filtered = user_follows[did] & popular
+        if filtered:
+            filtered_follows[did] = filtered
+
+    active_dids = list(filtered_follows.keys())
+    if len(active_dids) < 2:
+        g = ig.Graph(directed=False)
+        return g, {}
+
+    did_to_idx = {did: i for i, did in enumerate(active_dids)}
+    idx_to_did = {i: did for did, i in did_to_idx.items()}
+
+    # Build inverted index: target -> set of user indices
+    inverted: dict[str, set[int]] = {}
+    for did, targets in filtered_follows.items():
+        idx = did_to_idx[did]
+        for t in targets:
+            inverted.setdefault(t, set()).add(idx)
+
+    # Compute pairwise shared counts using inverted index (sparse)
+    pair_shared: dict[tuple[int, int], int] = {}
+    for target, user_idxs in inverted.items():
+        idxs = sorted(user_idxs)
+        for a_pos in range(len(idxs)):
+            for b_pos in range(a_pos + 1, len(idxs)):
+                key = (idxs[a_pos], idxs[b_pos])
+                pair_shared[key] = pair_shared.get(key, 0) + 1
+
+    # Build edges with Jaccard similarity
+    edges = []
+    weights = []
+    for (i, j), shared in pair_shared.items():
+        if shared < 2:
+            continue
+        size_i = len(filtered_follows[active_dids[i]])
+        size_j = len(filtered_follows[active_dids[j]])
+        union_size = size_i + size_j - shared
+        jaccard = shared / union_size if union_size > 0 else 0.0
+        if jaccard >= 0.05:
+            edges.append((i, j))
+            weights.append(jaccard)
+
+    g = ig.Graph(n=len(active_dids), edges=edges, directed=False)
+    g.vs["did"] = active_dids
+    if weights:
+        g.es["weight"] = weights
+
+    return g, idx_to_did
+
+
+def characterize_communities(
+    graph: ig.Graph,
+    partition: Any,
+    follows: list[dict[str, Any]],
+    min_size: int = 5,
+) -> list[dict[str, Any]]:
+    """
+    Characterize each co-follow community by their most-followed accounts.
+
+    For each cluster >= min_size:
+    1. Collect all followed accounts of members
+    2. Rank by frequency within cluster
+    3. Return top 10 most-followed handles as the community signature
+
+    Returns list of {clusterId, memberCount, memberDids, topFollowedHandles}
+    """
+    if partition is None or graph.vcount() == 0:
+        return []
+
+    membership = partition.membership
+
+    # Build follows_did -> handle lookup
+    did_to_handle: dict[str, str] = {}
+    for f in follows:
+        if f.get("follows_handle"):
+            did_to_handle[f["follows_did"]] = f["follows_handle"]
+
+    # Build user_did -> follows mapping
+    user_follows: dict[str, set[str]] = {}
+    for f in follows:
+        user_follows.setdefault(f["user_did"], set()).add(f["follows_did"])
+
+    n_clusters = max(membership) + 1 if membership else 0
+    communities = []
+
+    for c in range(n_clusters):
+        members = [i for i, m in enumerate(membership) if m == c]
+        if len(members) < min_size:
+            continue
+
+        member_dids = [graph.vs[i]["did"] for i in members]
+
+        # Count follow frequency within this cluster
+        follow_freq: dict[str, int] = {}
+        for did in member_dids:
+            for target in user_follows.get(did, set()):
+                follow_freq[target] = follow_freq.get(target, 0) + 1
+
+        # Top followed accounts (by frequency within cluster)
+        sorted_follows = sorted(follow_freq.items(), key=lambda x: x[1], reverse=True)
+        top_handles = []
+        for target_did, count in sorted_follows[:10]:
+            handle = did_to_handle.get(target_did, "")
+            if handle:
+                top_handles.append(handle)
+            elif target_did:
+                top_handles.append(target_did[:20])
+
+        communities.append({
+            "clusterId": c,
+            "memberCount": len(members),
+            "memberDids": member_dids,
+            "topFollowedHandles": top_handles,
+        })
+
+    return communities
+
+
+def summarize_community_llm(
+    top_handles: list[str],
+    sample_posts: list[str],
+    member_count: int,
+    mean_arousal: float,
+) -> str:
+    """
+    Call Claude Haiku to generate a one-sentence community summary.
+
+    Uses top-followed accounts and sample posts to characterize the community.
+    Returns a summary string, or a fallback if the API call fails.
+    """
+    import os
+
+    api_key = os.environ.get("ANTHROPIC_API_KEY")
+    if not api_key:
+        return _fallback_summary(top_handles, member_count)
+
+    try:
+        import anthropic
+
+        client = anthropic.Anthropic(api_key=api_key)
+
+        handles_str = ", ".join(f"@{h}" for h in top_handles[:10])
+        posts_str = "\n".join(f"- {p[:200]}" for p in sample_posts[:5]) if sample_posts else "(no posts from this group)"
+        arousal_pct = f"{mean_arousal * 100:.0f}%"
+
+        prompt = f"""You are analyzing a community of {member_count} social media users detected by shared-follow patterns.
+
+Their most-followed accounts are: {handles_str}
+
+Sample posts from this community:
+{posts_str}
+
+Average arousal/energy level: {arousal_pct}
+
+Write ONE sentence (max 20 words) characterizing who these people are and how they engage. Start with a descriptive community name (2-4 words) followed by a colon, then the characterization. Do not use quotes."""
+
+        message = client.messages.create(
+            model="claude-haiku-4-20250414",
+            max_tokens=100,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        return message.content[0].text.strip()
+    except Exception as e:
+        print(f"LLM summary failed: {e}")
+        return _fallback_summary(top_handles, member_count)
+
+
+def _fallback_summary(top_handles: list[str], member_count: int) -> str:
+    """Generate a simple fallback summary without LLM."""
+    if top_handles:
+        return f"Community of {member_count} users following {', '.join(f'@{h}' for h in top_handles[:3])}"
+    return f"Community of {member_count} users"

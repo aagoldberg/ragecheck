@@ -4,6 +4,8 @@ SideLines Database Access (Python worker)
 Read/write functions for Neon PostgreSQL via psycopg2.
 """
 
+from __future__ import annotations
+
 import os
 import json
 from decimal import Decimal
@@ -247,3 +249,161 @@ def update_event_status(event_id: int, status: str) -> None:
                 (status, event_id),
             )
         conn.commit()
+
+
+# =============================================================================
+# FOLLOW-RELATED READ FUNCTIONS
+# =============================================================================
+
+
+def get_follows(event_id: int) -> list[dict[str, Any]]:
+    """Fetch all follow relationships for an event."""
+    with get_conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(
+                """SELECT user_did, follows_did, follows_handle
+                   FROM sidelines_user_follows
+                   WHERE event_id = %s""",
+                (event_id,),
+            )
+            return [dict(r) for r in cur.fetchall()]
+
+
+def get_posts_with_text(event_id: int) -> list[dict[str, Any]]:
+    """Fetch posts with full text for community characterization."""
+    with get_conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(
+                """SELECT id, author_did, author_handle, text,
+                          arousal_score, arousal_breakdown
+                   FROM sidelines_posts
+                   WHERE event_id = %s AND text != ''""",
+                (event_id,),
+            )
+            return [_convert_decimals(dict(r)) for r in cur.fetchall()]
+
+
+def get_existing_metrics(event_id: int, day: str) -> dict[str, Any] | None:
+    """Fetch existing metrics for merging co-follow results."""
+    with get_conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(
+                """SELECT metrics_json, confidence
+                   FROM sidelines_daily_metrics
+                   WHERE event_id = %s AND day = %s""",
+                (event_id, day),
+            )
+            row = cur.fetchone()
+            if not row:
+                return None
+            result = _convert_decimals(dict(row))
+            if isinstance(result["metrics_json"], str):
+                result["metrics_json"] = json.loads(result["metrics_json"])
+            return result
+
+
+# =============================================================================
+# GLOBAL BLUESKY COMMUNITY MAP FUNCTIONS
+# =============================================================================
+
+
+def get_all_global_follows() -> list[dict[str, Any]]:
+    """Fetch all global follow relationships."""
+    with get_conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(
+                "SELECT user_did, follows_did, follows_handle FROM bluesky_follows"
+            )
+            return [dict(r) for r in cur.fetchall()]
+
+
+def get_tracked_user_dids() -> list[str]:
+    """Fetch all tracked user DIDs."""
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT did FROM bluesky_tracked_users")
+            return [r[0] for r in cur.fetchall()]
+
+
+def upsert_communities(
+    communities: list[dict[str, Any]],
+) -> list[int]:
+    """Write community definitions (full recompute — clears old data)."""
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM bluesky_community_members")
+            cur.execute("DELETE FROM bluesky_communities")
+            ids = []
+            for c in communities:
+                cur.execute(
+                    """INSERT INTO bluesky_communities
+                       (name, description, top_followed_handles, member_count, computed_at)
+                       VALUES (%s, %s, %s, %s, NOW())
+                       RETURNING id""",
+                    (
+                        c["name"],
+                        c["description"],
+                        c["top_followed_handles"],
+                        c["member_count"],
+                    ),
+                )
+                ids.append(cur.fetchone()[0])
+        conn.commit()
+    return ids
+
+
+def upsert_community_members(
+    assignments: list[dict[str, Any]],
+) -> None:
+    """Write community membership assignments."""
+    if not assignments:
+        return
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            values = [
+                (a["user_did"], a["community_id"])
+                for a in assignments
+            ]
+            psycopg2.extras.execute_values(
+                cur,
+                """INSERT INTO bluesky_community_members (user_did, community_id, computed_at)
+                   VALUES %s
+                   ON CONFLICT (user_did) DO UPDATE SET
+                     community_id = EXCLUDED.community_id,
+                     computed_at = NOW()""",
+                values,
+                page_size=500,
+            )
+        conn.commit()
+
+
+def get_community_assignments_for_dids(
+    dids: list[str],
+) -> list[dict[str, Any]]:
+    """Look up global community assignments for a list of DIDs."""
+    if not dids:
+        return []
+    with get_conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(
+                """SELECT
+                     m.user_did,
+                     m.community_id,
+                     c.name AS community_name,
+                     c.description AS community_description
+                   FROM bluesky_community_members m
+                   JOIN bluesky_communities c ON c.id = m.community_id
+                   WHERE m.user_did = ANY(%s)""",
+                (dids,),
+            )
+            return [dict(r) for r in cur.fetchall()]
+
+
+def get_global_communities() -> list[dict[str, Any]]:
+    """Fetch all global community definitions."""
+    with get_conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(
+                "SELECT * FROM bluesky_communities ORDER BY member_count DESC"
+            )
+            return [dict(r) for r in cur.fetchall()]
