@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+igraph
+leidenalg
+psycopg2-binary
+numpy
+pydantic
+httpx
+pytest
