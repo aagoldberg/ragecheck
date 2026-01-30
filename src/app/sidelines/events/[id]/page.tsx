@@ -56,7 +56,15 @@ interface DailyMetrics {
   headlineInsight?: string;
   clusterSummaries?: ClusterSummary[];
   bridgeUsers?: BridgeUser[];
+  interClusterEdges?: InterClusterEdge[];
   clusterPositions?: FieldPosition[];
+}
+
+interface InterClusterEdge {
+  fromCluster: number;
+  toCluster: number;
+  count: number;
+  meanArousal: number;
 }
 
 interface AttackMatrixEntry {
@@ -248,8 +256,27 @@ function Scoreboard({
 // ZONE 2: THE FIELD (SVG)
 // =============================================================================
 
+function isRealHandle(handle: string | undefined): boolean {
+  if (!handle) return false;
+  // Filter out numeric-only IDs like "5801"
+  return !/^\d+$/.test(handle);
+}
+
+function formatHandle(v: { handle?: string; userId: number }): string {
+  return isRealHandle(v.handle) ? `@${v.handle}` : `User ${v.userId}`;
+}
+
+function densityLabel(density: number): string {
+  if (density >= 0.5) return "Very tight-knit";
+  if (density >= 0.2) return "Tight-knit";
+  if (density >= 0.05) return "Connected";
+  return "Loosely connected";
+}
+
+const MAX_FIELD_TEAMS = 8;
+
 function TheField({
-  clusterSummaries,
+  clusterSummaries: allSummaries,
   clusterPositions,
   bridgeUsers,
   metrics,
@@ -264,6 +291,12 @@ function TheField({
   const [hoveredTeam, setHoveredTeam] = useState<number | null>(null);
   const [hoveredBridge, setHoveredBridge] = useState<number | null>(null);
   const [hoveredArrow, setHoveredArrow] = useState<string | null>(null);
+
+  // Cap to top N teams by size for readable field
+  const clusterSummaries = [...allSummaries]
+    .sort((a, b) => b.size - a.size)
+    .slice(0, MAX_FIELD_TEAMS);
+  const hiddenCount = allSummaries.length - clusterSummaries.length;
 
   const width = 800;
   const height = 500;
@@ -289,42 +322,24 @@ function TheField({
     };
   }
 
-  // Build interaction arrows between clusters
-  const arrowData: {
-    from: number;
-    to: number;
-    count: number;
-    meanArousal: number;
-  }[] = [];
-  const attackMatrix = metrics.attackMatrix || [];
-  // Use attack matrix for cross-cluster arrows, but also count non-attack cross-cluster edges
-  // For simplicity, show arrows for any pairs that appear in summaries
-  const seenPairs = new Set<string>();
-  for (const entry of attackMatrix) {
-    const key = `${Math.min(entry.src_cluster, entry.dst_cluster)}-${Math.max(entry.src_cluster, entry.dst_cluster)}`;
-    if (!seenPairs.has(key) && summaryMap.has(entry.src_cluster) && summaryMap.has(entry.dst_cluster)) {
-      seenPairs.add(key);
-      // Find reverse
-      const reverse = attackMatrix.find(
-        (e) => e.src_cluster === entry.dst_cluster && e.dst_cluster === entry.src_cluster
-      );
-      const totalCount = entry.edge_count + (reverse?.edge_count || 0);
-      const totalArousal = (entry.mean_arousal + (reverse?.mean_arousal || entry.mean_arousal)) / 2;
-      if (totalCount >= 3) {
-        arrowData.push({
-          from: entry.src_cluster,
-          to: entry.dst_cluster,
-          count: totalCount,
-          meanArousal: totalArousal,
-        });
-      }
-    }
-  }
+  // Build interaction arrows from interClusterEdges (all cross-cluster edges)
+  const interEdges = metrics.interClusterEdges || [];
+  const arrowData = interEdges
+    .filter((e) => summaryMap.has(e.fromCluster) && summaryMap.has(e.toCluster) && e.count >= 2)
+    .map((e) => ({
+      from: e.fromCluster,
+      to: e.toCluster,
+      count: e.count,
+      meanArousal: e.meanArousal,
+    }));
   const maxArrowCount = Math.max(...arrowData.map((a) => a.count), 1);
 
   // Bridge user positions: place along the arrows they bridge
-  const bridgePositions = bridgeUsers.slice(0, 8).map((b, i) => {
-    const spanned = b.clustersSpanned;
+  const validBridges = bridgeUsers
+    .filter((b) => b.clustersSpanned.some((cid) => summaryMap.has(cid)))
+    .slice(0, 8);
+  const bridgePositions = validBridges.map((b, i) => {
+    const spanned = b.clustersSpanned.filter((cid) => summaryMap.has(cid));
     if (spanned.length >= 2) {
       const p1 = posMap.get(spanned[0]);
       const p2 = posMap.get(spanned[1]);
@@ -340,7 +355,7 @@ function TheField({
     // Fallback: place in center area
     return {
       ...b,
-      x: width / 2 + (i - bridgeUsers.length / 2) * 30,
+      x: width / 2 + (i - validBridges.length / 2) * 30,
       y: height / 2 + (i % 2 === 0 ? -15 : 15),
     };
   });
@@ -350,7 +365,10 @@ function TheField({
       <div className="px-6 pt-4 pb-2 flex items-center justify-between">
         <h2 className="text-lg font-bold">The Field</h2>
         <span className="text-xs text-zinc-400">
-          {clusterSummaries.length} teams &middot; {bridgeUsers.length} midfielders
+          {clusterSummaries.length} teams
+          {hiddenCount > 0 && ` (+${hiddenCount} smaller)`}
+          {" · "}
+          {validBridges.length} midfielders
         </span>
       </div>
       <div className="px-4 pb-4 overflow-x-auto">
@@ -396,7 +414,7 @@ function TheField({
             strokeWidth={1}
           />
 
-          {/* Interaction arrows */}
+          {/* Interaction arrows (from inter-cluster edge data) */}
           {arrowData.map((arrow) => {
             const fromPos = posMap.get(arrow.from);
             const toPos = posMap.get(arrow.to);
@@ -411,7 +429,8 @@ function TheField({
             const cpX = midX - dy * 0.15;
             const cpY = midY + dx * 0.15;
             const strokeWidth = 1 + (arrow.count / maxArrowCount) * 4;
-            const opacity = 0.15 + arrow.meanArousal * 0.5;
+            // Use count-based opacity so arrows show even with low arousal
+            const opacity = 0.12 + (arrow.count / maxArrowCount) * 0.45;
             const key = `${arrow.from}-${arrow.to}`;
             const isHovered = hoveredArrow === key;
 
@@ -422,7 +441,7 @@ function TheField({
                   fill="none"
                   stroke="currentColor"
                   strokeWidth={isHovered ? strokeWidth + 1 : strokeWidth}
-                  strokeOpacity={isHovered ? opacity + 0.2 : opacity}
+                  strokeOpacity={isHovered ? Math.min(opacity + 0.2, 0.9) : opacity}
                   strokeLinecap="round"
                   className="transition-all cursor-pointer"
                   onMouseEnter={() => setHoveredArrow(key)}
@@ -438,7 +457,7 @@ function TheField({
                     fillOpacity={0.7}
                     className="pointer-events-none"
                   >
-                    {arrow.count} interactions &middot; {(arrow.meanArousal * 100).toFixed(0)}% energy
+                    {arrow.count} interactions · {(arrow.meanArousal * 100).toFixed(0)}% energy
                   </text>
                 )}
               </g>
@@ -454,6 +473,11 @@ function TheField({
             const color = getTeamColor(i);
             const label = getTeamLabel(i);
             const isHovered = hoveredTeam === summary.clusterId;
+            const voiceLabels = summary.keyVoices
+              .filter((v) => isRealHandle(v.handle))
+              .slice(0, 2)
+              .map((v) => `@${v.handle}`)
+              .join(", ");
 
             return (
               <g
@@ -506,29 +530,31 @@ function TheField({
                   fillOpacity={0.5}
                   className="pointer-events-none"
                 >
-                  {summary.size}
+                  {summary.size} players
                 </text>
 
                 {/* Hover tooltip */}
                 {isHovered && (
                   <g>
                     <rect
-                      x={cx - 90}
+                      x={cx - 95}
                       y={cy + r + 10}
-                      width={180}
-                      height={52}
+                      width={190}
+                      height={voiceLabels ? 52 : 32}
                       rx={8}
                       fill="currentColor"
                       fillOpacity={0.05}
                       stroke="currentColor"
                       strokeOpacity={0.1}
                     />
-                    <text x={cx - 80} y={cy + r + 28} fontSize={10} fill="currentColor" fillOpacity={0.6}>
-                      Energy: {summary.energyLevel} &middot; Density: {summary.edgeDensity.toFixed(3)}
+                    <text x={cx - 85} y={cy + r + 28} fontSize={10} fill="currentColor" fillOpacity={0.6}>
+                      {summary.energyLevel} energy · {densityLabel(summary.edgeDensity)}
                     </text>
-                    <text x={cx - 80} y={cy + r + 44} fontSize={10} fill="currentColor" fillOpacity={0.5}>
-                      {summary.keyVoices.slice(0, 2).map((v) => `@${v.handle || v.userId}`).join(", ")}
-                    </text>
+                    {voiceLabels && (
+                      <text x={cx - 85} y={cy + r + 44} fontSize={10} fill="currentColor" fillOpacity={0.5}>
+                        {voiceLabels}
+                      </text>
+                    )}
                   </g>
                 )}
               </g>
@@ -543,6 +569,7 @@ function TheField({
               .filter(Boolean)
               .map((s) => getTeamColor(s!.colorIndex));
             const color = spannedColors[0] || TEAM_COLORS[0];
+            const handleLabel = formatHandle(bridge);
 
             return (
               <g
@@ -563,9 +590,9 @@ function TheField({
                 {isHovered && (
                   <g>
                     <rect
-                      x={bridge.x - 80}
+                      x={bridge.x - 85}
                       y={bridge.y - 30}
-                      width={160}
+                      width={170}
                       height={20}
                       rx={6}
                       fill="currentColor"
@@ -581,8 +608,9 @@ function TheField({
                       fill="currentColor"
                       fillOpacity={0.7}
                     >
-                      @{bridge.handle || bridge.userId} — Connects Teams{" "}
+                      {handleLabel} — Connects Teams{" "}
                       {bridge.clustersSpanned
+                        .filter((cid) => summaryMap.has(cid))
                         .map((cid) => {
                           const s = summaryMap.get(cid);
                           return s ? getTeamLabel(s.colorIndex) : `?`;
@@ -690,7 +718,7 @@ function TeamRosterCards({
                         key={vi}
                         className="text-xs px-2 py-0.5 rounded-full bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400"
                       >
-                        @{v.handle || v.userId}
+                        {formatHandle(v)}
                       </span>
                     ))}
                   </div>
@@ -741,7 +769,7 @@ function TeamRosterCards({
                 {/* Stat line */}
                 <div className="text-[10px] text-zinc-400 pt-2 border-t border-zinc-100 dark:border-zinc-800">
                   Avg energy: {(summary.meanArousal * 100).toFixed(0)}%
-                  {" | "}Density: {summary.edgeDensity.toFixed(3)}
+                  {" · "}{densityLabel(summary.edgeDensity)}
                 </div>
               </div>
             </div>

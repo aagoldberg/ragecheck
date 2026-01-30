@@ -29,6 +29,7 @@ from analysis import (
     compute_discourse_temperature,
     generate_headline_insight,
     get_bridge_user_details,
+    compute_inter_cluster_edges,
     compute_field_positions,
 )
 from db import (
@@ -216,6 +217,10 @@ async def analyze(request: AnalyzeRequest):
             giant, partition, today_bridges, betweenness,
         )
 
+        inter_cluster_edges = compute_inter_cluster_edges(
+            giant, partition, cluster_summaries,
+        )
+
         field_positions = compute_field_positions(
             cluster_summaries, giant, partition,
         )
@@ -254,6 +259,7 @@ async def analyze(request: AnalyzeRequest):
             "headlineInsight": headline_insight,
             "clusterSummaries": cluster_summaries,
             "bridgeUsers": bridge_user_details,
+            "interClusterEdges": inter_cluster_edges,
             "clusterPositions": field_positions,
         }
 

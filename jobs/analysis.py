@@ -539,6 +539,60 @@ def get_bridge_user_details(
     return bridge_details[:top_n]
 
 
+def compute_inter_cluster_edges(
+    graph: ig.Graph,
+    partition: Any,
+    cluster_summaries: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """
+    Count ALL cross-cluster edges between meaningful clusters.
+
+    Unlike attack_matrix (which only includes high-arousal edges >0.6),
+    this counts every edge crossing cluster boundaries, providing data
+    for the field visualization arrows even in low-arousal discourse.
+
+    Returns list of {fromCluster, toCluster, count, meanArousal}.
+    """
+    if not partition or not cluster_summaries or graph.ecount() == 0:
+        return []
+
+    valid_ids = {s["clusterId"] for s in cluster_summaries}
+    membership = partition.membership
+
+    # Accumulate edge counts and arousal sums between cluster pairs
+    pair_counts: dict[tuple[int, int], int] = {}
+    pair_arousal_sums: dict[tuple[int, int], float] = {}
+
+    for e in graph.es:
+        src_c = membership[e.source]
+        dst_c = membership[e.target]
+        if src_c == dst_c:
+            continue
+        if src_c not in valid_ids or dst_c not in valid_ids:
+            continue
+
+        # Canonical key (smaller cluster id first)
+        key = (min(src_c, dst_c), max(src_c, dst_c))
+        pair_counts[key] = pair_counts.get(key, 0) + 1
+
+        # Arousal from source node
+        arousal = float(graph.vs[e.source].get("arousal", 0) or 0)
+        pair_arousal_sums[key] = pair_arousal_sums.get(key, 0.0) + arousal
+
+    result = []
+    for (c1, c2), count in pair_counts.items():
+        mean_a = pair_arousal_sums.get((c1, c2), 0.0) / max(count, 1)
+        result.append({
+            "fromCluster": c1,
+            "toCluster": c2,
+            "count": count,
+            "meanArousal": round(mean_a, 4),
+        })
+
+    result.sort(key=lambda x: x["count"], reverse=True)
+    return result
+
+
 def compute_field_positions(
     cluster_summaries: list[dict[str, Any]],
     graph: ig.Graph,
@@ -552,7 +606,7 @@ def compute_field_positions(
 
     Algorithm:
     1. Initialize positions on a circle
-    2. Iterate: clusters repel (Coulomb), cross-cluster edges attract (spring)
+    2. Iterate: clusters repel, cross-cluster edges attract, centering force
     3. Normalize to [0.1, 0.9] range (padding from field edges)
     4. Deterministic seed for stable positions
     """
@@ -563,9 +617,7 @@ def compute_field_positions(
     if n == 1:
         return [{"clusterId": cluster_summaries[0]["clusterId"], "x": 0.5, "y": 0.5}]
 
-    rng = np.random.RandomState(42)
-
-    # Initialize on a circle
+    # Initialize on a circle around center
     positions = np.zeros((n, 2))
     for i in range(n):
         angle = 2 * np.pi * i / n
@@ -586,39 +638,49 @@ def compute_field_positions(
                 cross_edges[si][di] += 1
                 cross_edges[di][si] += 1
 
-    # Force-directed iterations
-    for _ in range(100):
+    # Cluster sizes affect repulsion (larger clusters push harder)
+    sizes = np.array([s["size"] for s in cluster_summaries], dtype=float)
+    max_size = max(sizes.max(), 1)
+    size_factor = sizes / max_size  # 0-1
+
+    # Force-directed iterations with decreasing step size
+    for iteration in range(150):
         forces = np.zeros((n, 2))
+        step = 0.3 * (1.0 - iteration / 150)  # Decreasing step size
+
+        # Centering force: pull all clusters toward (0.5, 0.5)
+        center = np.array([0.5, 0.5])
+        for i in range(n):
+            to_center = center - positions[i]
+            forces[i] += to_center * 0.05
 
         for i in range(n):
             for j in range(i + 1, n):
                 diff = positions[i] - positions[j]
-                dist = max(np.linalg.norm(diff), 0.01)
+                dist = max(np.linalg.norm(diff), 0.02)
                 direction = diff / dist
 
-                # Repulsion (Coulomb-like)
-                repulsion = 0.01 / (dist * dist)
+                # Repulsion — proportional to sizes (bigger clusters need more space)
+                repulsion_strength = 0.005 * (1.0 + size_factor[i]) * (1.0 + size_factor[j])
+                repulsion = repulsion_strength / (dist * dist)
                 forces[i] += direction * repulsion
                 forces[j] -= direction * repulsion
 
                 # Attraction (spring) proportional to cross-cluster edges
                 edge_weight = cross_edges[i][j]
                 if edge_weight > 0:
-                    attraction = 0.001 * np.log1p(edge_weight) * dist
+                    attraction = 0.002 * np.log1p(edge_weight) * dist
                     forces[i] -= direction * attraction
                     forces[j] += direction * attraction
 
-        # Apply forces with damping
-        positions += forces * 0.5
+        # Apply forces with step size
+        positions += forces * step
 
-        # Keep within bounds
-        positions = np.clip(positions, 0.1, 0.9)
-
-    # Normalize to [0.1, 0.9]
+    # Normalize to [0.1, 0.9] — do NOT clip during iteration
     for dim in range(2):
         vals = positions[:, dim]
         min_v, max_v = vals.min(), vals.max()
-        if max_v - min_v > 0.01:
+        if max_v - min_v > 0.001:
             positions[:, dim] = 0.1 + 0.8 * (vals - min_v) / (max_v - min_v)
         else:
             positions[:, dim] = 0.5

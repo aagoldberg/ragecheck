@@ -20,6 +20,7 @@ from analysis import (
     compute_middle_attrition,
     extract_giant_component,
     compute_cluster_summaries,
+    compute_inter_cluster_edges,
     compute_discourse_temperature,
     generate_headline_insight,
 )
@@ -331,6 +332,57 @@ class TestClusterSummaries:
         summaries = compute_cluster_summaries(g, partition, betweenness, min_size=1)
         for s in summaries:
             assert len(s["keyVoices"]) <= 3
+
+
+class TestInterClusterEdges:
+    def test_empty(self):
+        g = ig.Graph(directed=True)
+        result = compute_inter_cluster_edges(g, None, [])
+        assert result == []
+
+    def test_cross_edges_counted(self):
+        """All cross-cluster edges should be counted, not just high-arousal."""
+        g = ig.Graph(directed=True)
+        g.add_vertices(4)
+        g.vs["user_id"] = [0, 1, 2, 3]
+        g.vs["arousal"] = [0.1, 0.1, 0.1, 0.1]  # Low arousal
+        g.add_edges([(0, 2), (1, 3), (0, 3)])
+        g.es["weight"] = [1.0, 1.0, 1.0]
+        g.es["type"] = ["reply", "reply", "reply"]
+
+        class FakePartition:
+            membership = [0, 0, 1, 1]
+
+        summaries = [
+            {"clusterId": 0, "size": 2},
+            {"clusterId": 1, "size": 2},
+        ]
+        result = compute_inter_cluster_edges(g, FakePartition(), summaries)
+        assert len(result) == 1
+        assert result[0]["count"] == 3  # All 3 edges cross clusters
+        assert result[0]["fromCluster"] == 0
+        assert result[0]["toCluster"] == 1
+
+    def test_intra_cluster_excluded(self):
+        """Edges within the same cluster should not be counted."""
+        g = ig.Graph(directed=True)
+        g.add_vertices(4)
+        g.vs["user_id"] = [0, 1, 2, 3]
+        g.vs["arousal"] = [0.5, 0.5, 0.5, 0.5]
+        g.add_edges([(0, 1), (2, 3), (0, 2)])
+        g.es["weight"] = [1.0, 1.0, 1.0]
+        g.es["type"] = ["reply", "reply", "reply"]
+
+        class FakePartition:
+            membership = [0, 0, 1, 1]
+
+        summaries = [
+            {"clusterId": 0, "size": 2},
+            {"clusterId": 1, "size": 2},
+        ]
+        result = compute_inter_cluster_edges(g, FakePartition(), summaries)
+        assert len(result) == 1
+        assert result[0]["count"] == 1  # Only 0→2 crosses
 
 
 class TestDiscourseTemperature:

@@ -124,6 +124,13 @@ export interface FieldPosition {
   y: number;
 }
 
+export interface InterClusterEdge {
+  fromCluster: number;
+  toCluster: number;
+  count: number;
+  meanArousal: number;
+}
+
 export interface DailyMetrics {
   baseActivation: number;
   crossClusterContact: number;
@@ -142,6 +149,7 @@ export interface DailyMetrics {
   headlineInsight?: string;
   clusterSummaries?: ClusterSummary[];
   bridgeUsers?: BridgeUser[];
+  interClusterEdges?: InterClusterEdge[];
   clusterPositions?: FieldPosition[];
 }
 
