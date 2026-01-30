@@ -366,7 +366,7 @@ def upsert_community_members(
             ]
             psycopg2.extras.execute_values(
                 cur,
-                """INSERT INTO bluesky_community_members (user_did, community_id, computed_at)
+                """INSERT INTO bluesky_community_members (user_did, community_id)
                    VALUES %s
                    ON CONFLICT (user_did) DO UPDATE SET
                      community_id = EXCLUDED.community_id,

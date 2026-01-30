@@ -1049,7 +1049,7 @@ Average arousal/energy level: {arousal_pct}
 Write ONE sentence (max 20 words) characterizing who these people are and how they engage. Start with a descriptive community name (2-4 words) followed by a colon, then the characterization. Do not use quotes."""
 
         message = client.messages.create(
-            model="claude-haiku-4-20250414",
+            model="claude-3-5-haiku-20241022",
             max_tokens=100,
             messages=[{"role": "user", "content": prompt}],
         )
