@@ -300,3 +300,25 @@ export const trackClearviewShare = (context: string, platform: string) => {
     trackClearviewBriefingShare(platform);
   }
 };
+
+// DefenseCheck tracking
+export const trackDefenseCheckAnalysis = (score: number) => {
+  trackInteraction("defensecheck", "analysis_completed", undefined, score);
+};
+
+export const trackDefenseCheckShare = (platform: string) => {
+  trackInteraction("defensecheck", "share", platform);
+};
+
+export const trackDefenseCheckUrlExtract = () => {
+  trackInteraction("defensecheck", "url_extract");
+};
+
+// Stance tracking
+export const trackStanceAnalysis = (posture: string, defenseScore: number) => {
+  trackInteraction("stance", "analysis_completed", posture, defenseScore);
+};
+
+export const trackStanceShare = (platform: string) => {
+  trackInteraction("stance", "share", platform);
+};

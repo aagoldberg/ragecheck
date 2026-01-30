@@ -615,6 +615,9 @@ interface ApiResponse {
   interactionStats?: InteractionStats;
   clearviewSubscriberStats?: ClearviewSubscriberStats;
   languageStats?: LanguageStats;
+  defenseCheckMetrics?: { totalAnalyses: number; avgScore: number; categoryDistribution: Record<string, number>; analysesPerDay: { date: string; count: number }[] };
+  stanceMetrics?: { totalAnalyses: number; avgDefenseScore: number; postureDistribution: Record<string, number>; analysesPerDay: { date: string; count: number }[] };
+  clearviewAnalytics?: ClearViewAnalytics;
   dbAvailable?: boolean;
 }
 
@@ -1575,7 +1578,7 @@ function PageDailyChart({ data, title }: { data: { date: string; visitors: numbe
   );
 }
 
-type TabType = "overview" | "users" | "conversions" | "funnel" | "retention" | "shares" | "feedback" | "content" | "clearview" | "subscribers" | "interactions" | "languages";
+type TabType = "overview" | "users" | "conversions" | "funnel" | "retention" | "shares" | "feedback" | "content" | "clearview" | "subscribers" | "interactions" | "languages" | "defensecheck" | "stance";
 
 interface ClearviewStats {
   lastGenerated: string | null;
@@ -1646,6 +1649,530 @@ interface LanguageStats {
   topLanguagesToday: { language: string; count: number }[];
 }
 
+interface ClearViewAnalytics {
+  trafficSources: {
+    channels: { channel: string; visitors: number; percentage: number }[];
+    topReferrers: { domain: string; visitors: number; percentage: number }[];
+    utmSources: { source: string; visitors: number }[];
+    utmMediums: { medium: string; visitors: number }[];
+    utmCampaigns: { campaign: string; source: string; visitors: number }[];
+    todayVs7Day: {
+      todayDirect: number; todayReferral: number; todayUtm: number;
+      weekDirect: number; weekReferral: number; weekUtm: number;
+    };
+  };
+  recentVisitors: {
+    createdAt: string; ipAddress: string; country: string | null;
+    device: string; os: string; browser: string;
+    referrer: string | null; utmSource: string | null; isRepeat: boolean;
+  }[];
+  repeatUsers: {
+    newToday: number; returningToday: number; new7Day: number; returning7Day: number;
+    repeatDetails: {
+      ipAddress: string; country: string | null; device: string;
+      firstSeen: string; lastSeen: string; totalVisits: number; daysActive: number;
+    }[];
+    frequencyDistribution: { visits1: number; visits2to3: number; visits4to10: number; visits10plus: number };
+    avgDaysBetweenVisits: number;
+  };
+  retention: {
+    cohortRetention: { cohortDate: string; cohortSize: number; d1: number; d7: number; d14: number; d30: number }[];
+    rollingReturnRate: number;
+    stickiness: { dau: number; wau: number; mau: number; dauWauRatio: number; dauMauRatio: number };
+  };
+  engagement: {
+    sharesByPlatform: { platform: string; count: number }[];
+    shareRate: number; totalShares: number; totalUniqueVisitors: number;
+    topSharedStories: { label: string; count: number }[];
+    interactionBreakdown: { action: string; label: string; count: number }[];
+    recentShares: {
+      createdAt: string; ipAddress: string; country: string | null;
+      device: string; os: string; browser: string;
+      shareType: string; url: string | null; platform: string | null; score: number | null;
+    }[];
+    recentBriefingShares: {
+      createdAt: string; ipAddress: string; country: string | null;
+      device: string; os: string; browser: string; platform: string;
+    }[];
+  };
+  geoDevice: {
+    countries: { country: string; visitors: number; percentage: number }[];
+    devices: { type: string; count: number; percentage: number }[];
+    browsers: { browser: string; count: number; percentage: number }[];
+    operatingSystems: { os: string; count: number; percentage: number }[];
+  };
+  heatmap: {
+    grid: number[][];
+    maxValue: number;
+  };
+}
+
+// ============================================
+// ClearView Insight Generators
+// ============================================
+
+function InsightBlock({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="bg-indigo-50 dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-800/50 rounded-xl p-4 mb-6 text-sm text-zinc-700 dark:text-zinc-300 leading-relaxed">
+      {children}
+    </div>
+  );
+}
+
+function AlertCard({ level, text }: { level: 'green' | 'yellow' | 'red'; text: string }) {
+  const styles = {
+    green: 'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800/50 text-emerald-800 dark:text-emerald-300',
+    yellow: 'bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800/50 text-amber-800 dark:text-amber-300',
+    red: 'bg-rose-50 dark:bg-rose-950/30 border-rose-200 dark:border-rose-800/50 text-rose-800 dark:text-rose-300',
+  };
+  const icons = { green: '+', yellow: '!', red: '-' };
+  return (
+    <div className={`border rounded-lg px-3 py-2 text-xs font-medium ${styles[level]}`}>
+      <span className="font-bold mr-1">{icons[level]}</span>{text}
+    </div>
+  );
+}
+
+function getClearViewExecutiveSummary(a: ClearViewAnalytics): string {
+  const todayTotal = a.trafficSources.todayVs7Day.todayDirect + a.trafficSources.todayVs7Day.todayReferral + a.trafficSources.todayVs7Day.todayUtm;
+  const weekTotal = a.trafficSources.todayVs7Day.weekDirect + a.trafficSources.todayVs7Day.weekReferral + a.trafficSources.todayVs7Day.weekUtm;
+  const weekDailyAvg = weekTotal > 0 ? Math.round(weekTotal / 7) : 0;
+
+  const parts: string[] = [];
+
+  // Visitor volume
+  if (weekDailyAvg > 0) {
+    const pctVsAvg = Math.round(((todayTotal - weekDailyAvg) / weekDailyAvg) * 100);
+    if (pctVsAvg > 10) {
+      parts.push(`ClearView had ${todayTotal} visitors today, ${pctVsAvg}% above the 7-day average of ${weekDailyAvg}/day.`);
+    } else if (pctVsAvg < -10) {
+      parts.push(`ClearView had ${todayTotal} visitors today, ${Math.abs(pctVsAvg)}% below the 7-day average of ${weekDailyAvg}/day.`);
+    } else {
+      parts.push(`ClearView had ${todayTotal} visitors today, in line with the 7-day average of ${weekDailyAvg}/day.`);
+    }
+  } else {
+    parts.push(`ClearView had ${todayTotal} visitors today.`);
+  }
+
+  // New vs returning
+  const todayReturning = a.repeatUsers.returningToday;
+  const todayNew = a.repeatUsers.newToday;
+  const todayAll = todayReturning + todayNew;
+  if (todayAll > 0) {
+    const retPct = Math.round((todayReturning / todayAll) * 100);
+    if (retPct >= 30) {
+      parts.push(`${retPct}% were returning users \u2014 habit formation is progressing.`);
+    } else if (retPct >= 15) {
+      parts.push(`${retPct}% were returning users, with room to grow retention.`);
+    } else {
+      parts.push(`Only ${retPct}% were returning users \u2014 most visitors are new, focus on retention.`);
+    }
+  }
+
+  // Share rate
+  if (a.engagement.totalUniqueVisitors > 0) {
+    if (a.engagement.shareRate >= 5) {
+      parts.push(`Share rate is ${a.engagement.shareRate}%, indicating strong word-of-mouth.`);
+    } else if (a.engagement.shareRate >= 1) {
+      parts.push(`Share rate is ${a.engagement.shareRate}%.`);
+    } else if (a.engagement.totalShares > 0) {
+      parts.push(`Share rate is ${a.engagement.shareRate}% \u2014 consider making sharing more prominent.`);
+    }
+  }
+
+  // Top channel
+  const topChannel = a.trafficSources.channels[0];
+  if (topChannel) {
+    if (topChannel.channel === 'Direct' && topChannel.percentage >= 60) {
+      parts.push(`${topChannel.percentage}% of traffic is Direct, suggesting users are bookmarking or typing the URL.`);
+    } else if (topChannel.channel === 'Social' && topChannel.percentage >= 40) {
+      parts.push(`${topChannel.percentage}% of traffic comes from Social \u2014 your sharing features are driving discovery.`);
+    } else if (topChannel.channel !== 'Direct') {
+      parts.push(`Top channel: ${topChannel.channel} (${topChannel.percentage}%).`);
+    }
+  }
+
+  return parts.join(' ');
+}
+
+function getClearViewAlerts(a: ClearViewAnalytics): { level: 'green' | 'yellow' | 'red'; text: string }[] {
+  const alerts: { level: 'green' | 'yellow' | 'red'; text: string }[] = [];
+
+  // Return rate
+  if (a.retention.rollingReturnRate < 5 && a.retention.stickiness.mau > 10) {
+    alerts.push({ level: 'red', text: `Return rate is only ${a.retention.rollingReturnRate}% \u2014 very few users come back.` });
+  } else if (a.retention.rollingReturnRate >= 20) {
+    alerts.push({ level: 'green', text: `Return rate is ${a.retention.rollingReturnRate}% \u2014 strong retention.` });
+  }
+
+  // Stickiness
+  const dauWau = a.retention.stickiness.dauWauRatio;
+  if (dauWau >= 20) {
+    alerts.push({ level: 'green', text: `DAU/WAU is ${dauWau}% \u2014 daily habit forming.` });
+  } else if (dauWau > 0 && dauWau < 10) {
+    alerts.push({ level: 'yellow', text: `DAU/WAU is ${dauWau}% \u2014 users visit occasionally, not daily yet.` });
+  }
+
+  // No shares
+  const todayTotal = a.trafficSources.todayVs7Day.todayDirect + a.trafficSources.todayVs7Day.todayReferral + a.trafficSources.todayVs7Day.todayUtm;
+  if (a.engagement.totalShares === 0 && a.engagement.totalUniqueVisitors > 20) {
+    alerts.push({ level: 'yellow', text: `No ClearView shares recorded despite ${a.engagement.totalUniqueVisitors} unique visitors.` });
+  }
+
+  // Briefing shares underuse
+  if (a.engagement.recentBriefingShares.length === 0 && todayTotal > 10) {
+    alerts.push({ level: 'yellow', text: 'No briefing shares this period \u2014 feature may be underutilized.' });
+  }
+
+  // Referrer concentration
+  const topRef = a.trafficSources.topReferrers[0];
+  const totalRefVisitors = a.trafficSources.topReferrers.reduce((s, r) => s + r.visitors, 0);
+  if (topRef && totalRefVisitors > 10 && topRef.visitors / totalRefVisitors > 0.8) {
+    alerts.push({ level: 'yellow', text: `${Math.round((topRef.visitors / totalRefVisitors) * 100)}% of referral traffic comes from ${topRef.domain}. Diversification opportunity.` });
+  }
+
+  // Traffic spike from a referrer
+  if (topRef && topRef.visitors > 50) {
+    alerts.push({ level: 'green', text: `Strong referral traffic from ${topRef.domain}: ${topRef.visitors} visitors.` });
+  }
+
+  // Repeat user power base
+  const powerUsers = a.repeatUsers.frequencyDistribution.visits10plus;
+  if (powerUsers > 0) {
+    alerts.push({ level: 'green', text: `${powerUsers} power user${powerUsers > 1 ? 's' : ''} visited 10+ days in the last 30 days.` });
+  }
+
+  return alerts;
+}
+
+function getAcquisitionInsight(a: ClearViewAnalytics): string {
+  const channels = a.trafficSources.channels;
+  if (channels.length === 0) return '';
+
+  const parts: string[] = [];
+  const topChannel = channels[0];
+
+  // Growth mode classification
+  const directPct = channels.find(c => c.channel === 'Direct')?.percentage || 0;
+  const socialPct = channels.find(c => c.channel === 'Social')?.percentage || 0;
+  const searchPct = channels.find(c => c.channel === 'Organic Search')?.percentage || 0;
+  const campaignPct = (channels.find(c => c.channel === 'Campaign')?.percentage || 0) +
+                      (channels.find(c => c.channel === 'Paid')?.percentage || 0);
+
+  if (directPct >= 50) {
+    parts.push(`Growth mode: Organic/Direct. ${directPct}% of visitors arrive with no referrer, indicating bookmarks, direct URL entry, or dark social sharing.`);
+  } else if (socialPct >= 40) {
+    parts.push(`Growth mode: Viral/Social. ${socialPct}% of traffic comes from social platforms \u2014 sharing is your primary growth channel.`);
+  } else if (searchPct >= 30) {
+    parts.push(`Growth mode: SEO-driven. ${searchPct}% of traffic comes from organic search.`);
+  } else if (campaignPct >= 20) {
+    parts.push(`Growth mode: Campaign-driven. ${campaignPct}% of traffic comes from tracked campaigns.`);
+  }
+
+  // Channel mix shift
+  const t = a.trafficSources.todayVs7Day;
+  const todayTotal = t.todayDirect + t.todayReferral + t.todayUtm;
+  const weekTotal = t.weekDirect + t.weekReferral + t.weekUtm;
+  if (todayTotal >= 5 && weekTotal >= 20) {
+    const todayDirectPct = Math.round((t.todayDirect / todayTotal) * 100);
+    const weekDirectPct = Math.round((t.weekDirect / weekTotal) * 100);
+    const diff = todayDirectPct - weekDirectPct;
+    if (Math.abs(diff) >= 15) {
+      parts.push(diff > 0
+        ? `Today's traffic skews ${diff}pp more Direct than the 7-day average \u2014 fewer referrals today.`
+        : `Today's traffic skews ${Math.abs(diff)}pp more Referral/UTM than the 7-day average \u2014 campaign or social spike.`);
+    }
+  }
+
+  return parts.join(' ');
+}
+
+function getHabitInsight(a: ClearViewAnalytics): string {
+  const parts: string[] = [];
+  const freq = a.repeatUsers.frequencyDistribution;
+  const total = freq.visits1 + freq.visits2to3 + freq.visits4to10 + freq.visits10plus;
+
+  if (total > 0) {
+    const oneTimePct = Math.round((freq.visits1 / total) * 100);
+    const repeatPct = 100 - oneTimePct;
+    const corePct = Math.round(((freq.visits4to10 + freq.visits10plus) / total) * 100);
+
+    parts.push(`${oneTimePct}% of users visited once and didn't return. ${repeatPct}% came back at least once.`);
+    if (corePct > 0) {
+      parts.push(`${corePct}% visited 4+ times \u2014 your engaged core audience.`);
+    }
+    if (freq.visits10plus > 0) {
+      parts.push(`${freq.visits10plus} user${freq.visits10plus > 1 ? 's have' : ' has'} visited 10+ days, forming a strong daily habit.`);
+    }
+  }
+
+  if (a.repeatUsers.avgDaysBetweenVisits > 0) {
+    const avg = a.repeatUsers.avgDaysBetweenVisits;
+    if (avg <= 1.5) {
+      parts.push(`Repeat visitors return every ${avg} days on average \u2014 near-daily usage.`);
+    } else if (avg <= 3) {
+      parts.push(`Repeat visitors return every ${avg} days on average \u2014 roughly every other day.`);
+    } else if (avg <= 7) {
+      parts.push(`Repeat visitors return every ${avg} days on average \u2014 roughly weekly.`);
+    } else {
+      parts.push(`Repeat visitors return every ${avg} days on average \u2014 infrequent, consider engagement hooks.`);
+    }
+  }
+
+  return parts.join(' ');
+}
+
+function getRetentionInsight(a: ClearViewAnalytics): string {
+  const parts: string[] = [];
+
+  // DAU/WAU interpretation
+  const dauWau = a.retention.stickiness.dauWauRatio;
+  if (dauWau > 0) {
+    if (dauWau >= 25) {
+      parts.push(`DAU/WAU of ${dauWau}% indicates strong daily engagement \u2014 users are forming a regular habit.`);
+    } else if (dauWau >= 14) {
+      parts.push(`DAU/WAU of ${dauWau}% suggests a weekly habit is forming, with about 1 in ${Math.round(100 / dauWau)} weekly users visiting daily.`);
+    } else {
+      parts.push(`DAU/WAU of ${dauWau}% indicates occasional usage. Most weekly users aren't visiting daily yet.`);
+    }
+  }
+
+  // DAU/MAU
+  const dauMau = a.retention.stickiness.dauMauRatio;
+  if (dauMau > 0) {
+    parts.push(`DAU/MAU is ${dauMau}% (industry benchmark: 10-20% for news/content apps).`);
+  }
+
+  // Best/worst cohort
+  const cohorts = a.retention.cohortRetention;
+  if (cohorts.length >= 3) {
+    const withD1 = cohorts.filter(c => c.d1 > 0);
+    if (withD1.length >= 2) {
+      const best = withD1.reduce((a, b) => a.d1 > b.d1 ? a : b);
+      const worst = withD1.reduce((a, b) => a.d1 < b.d1 ? a : b);
+      if (best.cohortDate !== worst.cohortDate) {
+        parts.push(`Best D1 retention: ${best.cohortDate} cohort at ${best.d1}%. Weakest: ${worst.cohortDate} at ${worst.d1}%.`);
+      }
+    }
+  }
+
+  // Rolling return rate
+  if (a.retention.rollingReturnRate > 0) {
+    parts.push(`${a.retention.rollingReturnRate}% of users who first visited 3+ days ago have returned at least once.`);
+  }
+
+  return parts.join(' ');
+}
+
+function getShareInsight(a: ClearViewAnalytics): string {
+  const parts: string[] = [];
+
+  // Share funnel
+  if (a.engagement.totalUniqueVisitors > 0) {
+    const visitorsPerShare = a.engagement.totalShares > 0 ? Math.round(a.engagement.totalUniqueVisitors / a.engagement.totalShares) : 0;
+    if (visitorsPerShare > 0) {
+      parts.push(`1 in every ${visitorsPerShare} visitors shares ClearView content (${a.engagement.shareRate}% share rate).`);
+    } else {
+      parts.push(`No shares recorded from ${a.engagement.totalUniqueVisitors} unique visitors.`);
+    }
+  }
+
+  // Top platform
+  if (a.engagement.sharesByPlatform.length > 0) {
+    const top = a.engagement.sharesByPlatform[0];
+    const total = a.engagement.totalShares;
+    if (total > 0) {
+      const pct = Math.round((top.count / total) * 100);
+      parts.push(`${top.platform} is the top share channel (${pct}% of shares).`);
+    }
+  }
+
+  // Briefing vs story
+  const briefingCount = a.engagement.recentBriefingShares.length;
+  const storyShares = a.engagement.topSharedStories.reduce((s, st) => s + st.count, 0);
+  if (briefingCount > 0 && storyShares > 0) {
+    if (briefingCount > storyShares) {
+      parts.push(`Briefing shares (${briefingCount}) outpace individual story shares (${storyShares}) \u2014 the daily briefing format resonates more.`);
+    } else {
+      parts.push(`Story shares (${storyShares}) outpace briefing shares (${briefingCount}) \u2014 individual stories drive more sharing.`);
+    }
+  }
+
+  return parts.join(' ');
+}
+
+function getAudienceInsight(a: ClearViewAnalytics): string {
+  const parts: string[] = [];
+  const { devices, browsers, operatingSystems, countries } = a.geoDevice;
+
+  // Persona
+  const topDevice = devices[0];
+  const topOS = operatingSystems[0];
+  const topBrowser = browsers[0];
+  const topCountry = countries[0];
+
+  if (topDevice && topOS && topBrowser && topCountry) {
+    parts.push(`Typical ClearView user: ${topOS.os} on ${topDevice.type} (${topBrowser.browser}), from ${topCountry.country}.`);
+  }
+
+  // Mobile implication
+  const mobilePct = devices.find(d => d.type === 'mobile')?.percentage || 0;
+  const desktopPct = devices.find(d => d.type === 'desktop')?.percentage || 0;
+  if (mobilePct > 60) {
+    parts.push(`${mobilePct}% mobile traffic suggests most users discover ClearView through social media links on their phones.`);
+  } else if (desktopPct > 60) {
+    parts.push(`${desktopPct}% desktop traffic suggests intentional, bookmarked usage \u2014 users seek out ClearView deliberately.`);
+  } else {
+    parts.push(`Balanced mobile/desktop split (${mobilePct}%/${desktopPct}%) \u2014 users access from both contexts.`);
+  }
+
+  // Geographic concentration
+  if (countries.length >= 3) {
+    const top3Pct = countries.slice(0, 3).reduce((s, c) => s + c.percentage, 0);
+    parts.push(`Top 3 countries account for ${Math.round(top3Pct)}% of traffic.`);
+  }
+
+  return parts.join(' ');
+}
+
+function getHeatmapInsight(a: ClearViewAnalytics): string {
+  const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const parts: string[] = [];
+  const { grid, maxValue } = a.heatmap;
+  if (maxValue === 0) return 'No visit data available for heatmap analysis.';
+
+  // Find peak hour/day
+  let peakDay = 0, peakHour = 0, peakVal = 0;
+  for (let d = 0; d < 7; d++) {
+    for (let h = 0; h < 24; h++) {
+      if (grid[d]?.[h] > peakVal) {
+        peakVal = grid[d][h];
+        peakDay = d;
+        peakHour = h;
+      }
+    }
+  }
+
+  const hourLabel = peakHour === 0 ? '12am' : peakHour < 12 ? `${peakHour}am` : peakHour === 12 ? '12pm' : `${peakHour - 12}pm`;
+  parts.push(`Peak usage: ${DAYS[peakDay]}s at ${hourLabel} EST (${peakVal} visits).`);
+
+  // Weekday vs weekend
+  let weekdayTotal = 0, weekendTotal = 0;
+  for (let d = 0; d < 7; d++) {
+    const dayTotal = grid[d]?.reduce((s: number, v: number) => s + v, 0) || 0;
+    if (d === 0 || d === 6) weekendTotal += dayTotal;
+    else weekdayTotal += dayTotal;
+  }
+  const weekdayAvg = weekdayTotal / 5;
+  const weekendAvg = weekendTotal / 2;
+  if (weekendAvg > 0) {
+    const ratio = weekdayAvg / weekendAvg;
+    if (ratio >= 1.5) {
+      parts.push(`Weekday traffic is ${ratio.toFixed(1)}x weekend traffic, consistent with a work-morning news routine.`);
+    } else if (ratio <= 0.7) {
+      parts.push(`Weekend traffic is higher than weekday, suggesting leisure reading behavior.`);
+    } else {
+      parts.push(`Weekday and weekend traffic are comparable, suggesting ClearView fits both routines.`);
+    }
+  }
+
+  // Morning vs evening pattern
+  let morningTotal = 0, eveningTotal = 0;
+  for (let d = 0; d < 7; d++) {
+    for (let h = 6; h < 12; h++) morningTotal += grid[d]?.[h] || 0;
+    for (let h = 18; h < 24; h++) eveningTotal += grid[d]?.[h] || 0;
+  }
+  if (morningTotal > eveningTotal * 1.5) {
+    parts.push('Usage skews morning \u2014 users check ClearView as part of their AM routine.');
+  } else if (eveningTotal > morningTotal * 1.5) {
+    parts.push('Usage skews evening \u2014 users catch up on ClearView after work.');
+  }
+
+  return parts.join(' ');
+}
+
+const HEATMAP_DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const HEATMAP_HOURS = Array.from({ length: 24 }, (_, i) => {
+  if (i === 0) return '12a';
+  if (i < 12) return `${i}a`;
+  if (i === 12) return '12p';
+  return `${i - 12}p`;
+});
+
+function HeatmapChart({ grid, maxValue }: { grid: number[][]; maxValue: number }) {
+  const cellW = 28;
+  const cellH = 20;
+  const labelW = 36;
+  const labelH = 24;
+  const svgW = labelW + cellW * 24 + 2;
+  const svgH = labelH + cellH * 7 + 2;
+
+  // Use CSS custom properties for dark mode compatibility
+  const colorSteps = [
+    { light: '#f4f4f5', dark: '#27272a' }, // 0
+    { light: '#e0e7ff', dark: '#312e81' }, // 0-20%
+    { light: '#c7d2fe', dark: '#3730a3' }, // 20-40%
+    { light: '#a5b4fc', dark: '#4338ca' }, // 40-60%
+    { light: '#818cf8', dark: '#4f46e5' }, // 60-80%
+    { light: '#4f46e5', dark: '#6366f1' }, // 80-100%
+  ];
+
+  function getStepIndex(value: number): number {
+    if (maxValue === 0 || value === 0) return 0;
+    const ratio = value / maxValue;
+    if (ratio < 0.2) return 1;
+    if (ratio < 0.4) return 2;
+    if (ratio < 0.6) return 3;
+    if (ratio < 0.8) return 4;
+    return 5;
+  }
+
+  return (
+    <div className="overflow-x-auto">
+      {/* Grid rendered as divs for proper dark mode support */}
+      <div style={{ width: svgW, minWidth: svgW }}>
+        {/* Hour labels row */}
+        <div className="flex" style={{ paddingLeft: labelW }}>
+          {HEATMAP_HOURS.map((label, h) => (
+            <div key={h} className="text-center text-zinc-400 dark:text-zinc-500" style={{ width: cellW, fontSize: 9 }}>
+              {h % 3 === 0 ? label : ''}
+            </div>
+          ))}
+        </div>
+        {/* Day rows */}
+        {HEATMAP_DAYS.map((day, d) => (
+          <div key={d} className="flex items-center">
+            <div className="text-right text-zinc-500 dark:text-zinc-400 pr-1.5" style={{ width: labelW, fontSize: 10 }}>
+              {day}
+            </div>
+            {grid[d]?.map((val, h) => {
+              const step = getStepIndex(val);
+              return (
+                <div
+                  key={h}
+                  className="rounded-sm transition-colors"
+                  style={{
+                    width: cellW - 1,
+                    height: cellH - 1,
+                    margin: '0.5px',
+                    backgroundColor: colorSteps[step].light,
+                  }}
+                  title={val > 0 ? `${day} ${HEATMAP_HOURS[h]}: ${val} visits` : `${day} ${HEATMAP_HOURS[h]}: 0 visits`}
+                >
+                  <div
+                    className="hidden dark:block w-full h-full rounded-sm"
+                    style={{ backgroundColor: colorSteps[step].dark }}
+                  />
+                </div>
+              );
+            })}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function AdminDashboard() {
   const [key, setKey] = useState("");
   const [authenticated, setAuthenticated] = useState(false);
@@ -1674,6 +2201,9 @@ export default function AdminDashboard() {
   const [interactionStats, setInteractionStats] = useState<InteractionStats | null>(null);
   const [clearviewSubscriberStats, setClearviewSubscriberStats] = useState<ClearviewSubscriberStats | null>(null);
   const [languageStats, setLanguageStats] = useState<LanguageStats | null>(null);
+  const [defenseCheckMetrics, setDefenseCheckMetrics] = useState<{ totalAnalyses: number; avgScore: number; categoryDistribution: Record<string, number>; analysesPerDay: { date: string; count: number }[] } | null>(null);
+  const [stanceMetrics, setStanceMetrics] = useState<{ totalAnalyses: number; avgDefenseScore: number; postureDistribution: Record<string, number>; analysesPerDay: { date: string; count: number }[] } | null>(null);
+  const [clearviewAnalytics, setClearviewAnalytics] = useState<ClearViewAnalytics | null>(null);
 
   const fetchStats = async (adminKey: string) => {
     setLoading(true);
@@ -1709,6 +2239,9 @@ export default function AdminDashboard() {
         setInteractionStats(data.interactionStats || null);
         setClearviewSubscriberStats(data.clearviewSubscriberStats || null);
         setLanguageStats(data.languageStats || null);
+        setDefenseCheckMetrics(data.defenseCheckMetrics || null);
+        setStanceMetrics(data.stanceMetrics || null);
+        setClearviewAnalytics(data.clearviewAnalytics || null);
         setAuthenticated(true);
         // Save key to localStorage
         localStorage.setItem("ragecheck-admin-key", adminKey);
@@ -1870,7 +2403,7 @@ export default function AdminDashboard() {
         {/* Tabs */}
         <div className="max-w-7xl mx-auto px-4">
           <div className="flex gap-6 -mb-px">
-            {(["overview", "users", "conversions", "funnel", "retention", "shares", "feedback", "content", "clearview", "subscribers", "interactions", "languages"] as const).map((tab) => (
+            {(["overview", "users", "conversions", "funnel", "retention", "shares", "feedback", "content", "clearview", "defensecheck", "stance", "subscribers", "interactions", "languages"] as const).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
@@ -1919,6 +2452,631 @@ export default function AdminDashboard() {
                             title="Clearview Daily Visitors (Last 14 Days)"
                           />
                         )}
+                      </>
+                    )}
+
+                    {/* ======= ClearView Comprehensive Analytics ======= */}
+                    {clearviewAnalytics && (
+                      <>
+                        {/* Executive Summary */}
+                        {(() => {
+                          const summary = getClearViewExecutiveSummary(clearviewAnalytics);
+                          const alerts = getClearViewAlerts(clearviewAnalytics);
+                          return (
+                            <div className="mb-8">
+                              {summary && (
+                                <InsightBlock>
+                                  <span className="font-semibold text-zinc-900 dark:text-zinc-100">Summary: </span>
+                                  {summary}
+                                </InsightBlock>
+                              )}
+                              {alerts.length > 0 && (
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 mb-6">
+                                  {alerts.map((alert, i) => (
+                                    <AlertCard key={i} level={alert.level} text={alert.text} />
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
+
+                        {/* Section 1: Traffic Sources & Acquisition */}
+                        <div className="mb-8">
+                          <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-4">
+                            Traffic Sources & Acquisition
+                          </h3>
+                          {(() => {
+                            const insight = getAcquisitionInsight(clearviewAnalytics);
+                            return insight ? <InsightBlock>{insight}</InsightBlock> : null;
+                          })()}
+                          {/* Today vs 7-Day comparison */}
+                          <div className="grid grid-cols-2 md:grid-cols-6 gap-3 mb-6">
+                            <StatCard title="Today Direct" value={clearviewAnalytics.trafficSources.todayVs7Day.todayDirect} accent="indigo" />
+                            <StatCard title="Today Referral" value={clearviewAnalytics.trafficSources.todayVs7Day.todayReferral} accent="emerald" />
+                            <StatCard title="Today UTM" value={clearviewAnalytics.trafficSources.todayVs7Day.todayUtm} accent="purple" />
+                            <StatCard title="7d Direct" value={clearviewAnalytics.trafficSources.todayVs7Day.weekDirect} accent="indigo" />
+                            <StatCard title="7d Referral" value={clearviewAnalytics.trafficSources.todayVs7Day.weekReferral} accent="emerald" />
+                            <StatCard title="7d UTM" value={clearviewAnalytics.trafficSources.todayVs7Day.weekUtm} accent="purple" />
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                            {/* Channel Grouping */}
+                            <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6">
+                              <h4 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-4">
+                                Channel Grouping (30 days)
+                              </h4>
+                              <div className="space-y-3">
+                                {clearviewAnalytics.trafficSources.channels.map((ch) => {
+                                  const maxPct = Math.max(...clearviewAnalytics.trafficSources.channels.map(c => c.percentage), 1);
+                                  return (
+                                    <div key={ch.channel}>
+                                      <div className="flex justify-between items-center text-sm mb-1">
+                                        <span className="text-zinc-600 dark:text-zinc-400">{ch.channel}</span>
+                                        <span className="font-bold text-zinc-900 dark:text-zinc-100">{ch.visitors} <span className="text-xs font-normal text-zinc-400">({ch.percentage}%)</span></span>
+                                      </div>
+                                      <div className="h-1.5 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+                                        <div className="h-full rounded-full bg-indigo-500" style={{ width: `${(ch.percentage / maxPct) * 100}%` }} />
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+
+                            {/* Top Referrers */}
+                            <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6">
+                              <h4 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-4">
+                                Top Referrers (30 days)
+                              </h4>
+                              {clearviewAnalytics.trafficSources.topReferrers.length === 0 ? (
+                                <p className="text-sm text-zinc-400">No referral data yet</p>
+                              ) : (
+                                <div className="space-y-3">
+                                  {clearviewAnalytics.trafficSources.topReferrers.slice(0, 10).map((ref) => {
+                                    const maxPct = Math.max(...clearviewAnalytics.trafficSources.topReferrers.map(r => r.percentage), 1);
+                                    return (
+                                      <div key={ref.domain}>
+                                        <div className="flex justify-between items-center text-sm mb-1">
+                                          <span className="text-zinc-600 dark:text-zinc-400 truncate max-w-[180px]">{ref.domain}</span>
+                                          <span className="font-bold text-zinc-900 dark:text-zinc-100">{ref.visitors} <span className="text-xs font-normal text-zinc-400">({ref.percentage}%)</span></span>
+                                        </div>
+                                        <div className="h-1.5 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+                                          <div className="h-full rounded-full bg-emerald-500" style={{ width: `${(ref.percentage / maxPct) * 100}%` }} />
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* UTM Breakdown */}
+                          {(clearviewAnalytics.trafficSources.utmSources.length > 0 || clearviewAnalytics.trafficSources.utmCampaigns.length > 0) && (
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                              <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6">
+                                <h4 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-3">UTM Sources</h4>
+                                <div className="space-y-2">
+                                  {clearviewAnalytics.trafficSources.utmSources.slice(0, 8).map((s) => (
+                                    <div key={s.source} className="flex justify-between text-sm">
+                                      <span className="text-zinc-600 dark:text-zinc-400">{s.source}</span>
+                                      <span className="font-medium text-zinc-900 dark:text-zinc-100">{s.visitors}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                              <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6">
+                                <h4 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-3">UTM Mediums</h4>
+                                <div className="space-y-2">
+                                  {clearviewAnalytics.trafficSources.utmMediums.slice(0, 8).map((m) => (
+                                    <div key={m.medium} className="flex justify-between text-sm">
+                                      <span className="text-zinc-600 dark:text-zinc-400">{m.medium}</span>
+                                      <span className="font-medium text-zinc-900 dark:text-zinc-100">{m.visitors}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                              <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6">
+                                <h4 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-3">Top Campaigns</h4>
+                                <div className="space-y-2">
+                                  {clearviewAnalytics.trafficSources.utmCampaigns.slice(0, 8).map((c) => (
+                                    <div key={c.campaign} className="flex justify-between text-sm">
+                                      <span className="text-zinc-600 dark:text-zinc-400 truncate max-w-[140px]" title={c.campaign}>{c.campaign}</span>
+                                      <span className="font-medium text-zinc-900 dark:text-zinc-100">{c.visitors}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Section 2: Recent Visitors Table */}
+                        <div className="mb-8">
+                          <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-4">
+                            Recent ClearView Visitors (Last 3 Days)
+                          </h3>
+                          {clearviewAnalytics.recentVisitors.length === 0 ? (
+                            <p className="text-sm text-zinc-400">No visitors in the last 3 days</p>
+                          ) : (
+                            <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6">
+                              <div className="overflow-x-auto max-h-96 border border-zinc-100 dark:border-zinc-800 rounded-lg">
+                                <table className="w-full text-sm">
+                                  <thead className="bg-zinc-50 dark:bg-zinc-800 sticky top-0 z-10">
+                                    <tr className="border-b border-zinc-200 dark:border-zinc-700">
+                                      <th className="text-left py-3 px-3 text-zinc-500 font-medium">Time</th>
+                                      <th className="text-left py-3 px-3 text-zinc-500 font-medium">IP</th>
+                                      <th className="text-left py-3 px-3 text-zinc-500 font-medium">Country</th>
+                                      <th className="text-left py-3 px-3 text-zinc-500 font-medium">Device</th>
+                                      <th className="text-left py-3 px-3 text-zinc-500 font-medium">OS</th>
+                                      <th className="text-left py-3 px-3 text-zinc-500 font-medium">Browser</th>
+                                      <th className="text-left py-3 px-3 text-zinc-500 font-medium">Referrer</th>
+                                      <th className="text-left py-3 px-3 text-zinc-500 font-medium">UTM</th>
+                                      <th className="text-left py-3 px-3 text-zinc-500 font-medium">Repeat?</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {clearviewAnalytics.recentVisitors.map((v, i) => (
+                                      <tr key={i} className={`border-b border-zinc-100 dark:border-zinc-800 last:border-0 ${v.isRepeat ? 'bg-indigo-50/50 dark:bg-indigo-950/20' : ''}`}>
+                                        <td className="py-2 px-3 text-zinc-500 whitespace-nowrap text-xs">{formatDateTimeEST(v.createdAt)}</td>
+                                        <td className="py-2 px-3 text-zinc-600 dark:text-zinc-300 font-mono text-xs">{v.ipAddress?.slice(-8) || '-'}</td>
+                                        <td className="py-2 px-3 text-zinc-500">{v.country || '-'}</td>
+                                        <td className="py-2 px-3 text-zinc-500">{v.device}</td>
+                                        <td className="py-2 px-3 text-zinc-500">{v.os}</td>
+                                        <td className="py-2 px-3 text-zinc-500">{v.browser}</td>
+                                        <td className="py-2 px-3 text-zinc-500 max-w-[120px] truncate" title={v.referrer || ''}>{v.referrer ? (() => { try { return new URL(v.referrer.startsWith('http') ? v.referrer : `https://${v.referrer}`).hostname.replace('www.', ''); } catch { return v.referrer; } })() : '-'}</td>
+                                        <td className="py-2 px-3 text-zinc-500">{v.utmSource || '-'}</td>
+                                        <td className="py-2 px-3">
+                                          {v.isRepeat ? (
+                                            <span className="text-xs font-medium px-2 py-0.5 rounded bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300">Repeat</span>
+                                          ) : (
+                                            <span className="text-xs text-zinc-400">New</span>
+                                          )}
+                                        </td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Section 3: Repeat User / Habit Formation */}
+                        <div className="mb-8">
+                          <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-4">
+                            Repeat Users & Habit Formation
+                          </h3>
+                          {(() => {
+                            const insight = getHabitInsight(clearviewAnalytics);
+                            return insight ? <InsightBlock>{insight}</InsightBlock> : null;
+                          })()}
+                          <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
+                            <StatCard title="New Today" value={clearviewAnalytics.repeatUsers.newToday} accent="emerald" />
+                            <StatCard title="Returning Today" value={clearviewAnalytics.repeatUsers.returningToday} accent="indigo" />
+                            <StatCard title="New (7d)" value={clearviewAnalytics.repeatUsers.new7Day} accent="emerald" />
+                            <StatCard title="Returning (7d)" value={clearviewAnalytics.repeatUsers.returning7Day} accent="indigo" />
+                            <StatCard title="Avg Days Between" value={clearviewAnalytics.repeatUsers.avgDaysBetweenVisits} subtitle="days between repeat visits" accent="purple" />
+                          </div>
+
+                          {/* Frequency Distribution */}
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                            <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6">
+                              <h4 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-4">
+                                Visit Frequency (30 days)
+                              </h4>
+                              {(() => {
+                                const freq = clearviewAnalytics.repeatUsers.frequencyDistribution;
+                                const maxFreq = Math.max(freq.visits1, freq.visits2to3, freq.visits4to10, freq.visits10plus, 1);
+                                const bars = [
+                                  { label: '1 visit', value: freq.visits1, color: 'bg-zinc-400' },
+                                  { label: '2-3 visits', value: freq.visits2to3, color: 'bg-indigo-400' },
+                                  { label: '4-10 visits', value: freq.visits4to10, color: 'bg-indigo-500' },
+                                  { label: '10+ visits', value: freq.visits10plus, color: 'bg-indigo-600' },
+                                ];
+                                return (
+                                  <div className="space-y-3">
+                                    {bars.map((bar) => (
+                                      <div key={bar.label}>
+                                        <div className="flex justify-between items-center text-sm mb-1">
+                                          <span className="text-zinc-600 dark:text-zinc-400">{bar.label}</span>
+                                          <span className="font-bold text-zinc-900 dark:text-zinc-100">{bar.value}</span>
+                                        </div>
+                                        <div className="h-2 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+                                          <div className={`h-full rounded-full ${bar.color}`} style={{ width: `${(bar.value / maxFreq) * 100}%` }} />
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                );
+                              })()}
+                            </div>
+
+                            {/* Repeat Visitor Detail Table */}
+                            {clearviewAnalytics.repeatUsers.repeatDetails.length > 0 && (
+                              <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6">
+                                <h4 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-4">
+                                  Top Repeat Visitors
+                                </h4>
+                                <div className="overflow-x-auto max-h-64 border border-zinc-100 dark:border-zinc-800 rounded-lg">
+                                  <table className="w-full text-xs">
+                                    <thead className="bg-zinc-50 dark:bg-zinc-800 sticky top-0">
+                                      <tr className="border-b border-zinc-200 dark:border-zinc-700">
+                                        <th className="text-left py-2 px-2 text-zinc-500 font-medium">IP</th>
+                                        <th className="text-left py-2 px-2 text-zinc-500 font-medium">Country</th>
+                                        <th className="text-left py-2 px-2 text-zinc-500 font-medium">Device</th>
+                                        <th className="text-left py-2 px-2 text-zinc-500 font-medium">First</th>
+                                        <th className="text-left py-2 px-2 text-zinc-500 font-medium">Last</th>
+                                        <th className="text-right py-2 px-2 text-zinc-500 font-medium">Visits</th>
+                                        <th className="text-right py-2 px-2 text-zinc-500 font-medium">Days</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {clearviewAnalytics.repeatUsers.repeatDetails.slice(0, 20).map((rd, i) => (
+                                        <tr key={i} className="border-b border-zinc-100 dark:border-zinc-800 last:border-0">
+                                          <td className="py-1.5 px-2 font-mono text-zinc-600 dark:text-zinc-300">{rd.ipAddress?.slice(-8)}</td>
+                                          <td className="py-1.5 px-2 text-zinc-500">{rd.country || '-'}</td>
+                                          <td className="py-1.5 px-2 text-zinc-500">{rd.device}</td>
+                                          <td className="py-1.5 px-2 text-zinc-400">{rd.firstSeen}</td>
+                                          <td className="py-1.5 px-2 text-zinc-400">{rd.lastSeen}</td>
+                                          <td className="py-1.5 px-2 text-right font-bold text-zinc-900 dark:text-zinc-100">{rd.totalVisits}</td>
+                                          <td className="py-1.5 px-2 text-right text-zinc-600 dark:text-zinc-300">{rd.daysActive}</td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Section 4: ClearView-Specific Retention */}
+                        <div className="mb-8">
+                          <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-4">
+                            ClearView Retention
+                          </h3>
+                          {(() => {
+                            const insight = getRetentionInsight(clearviewAnalytics);
+                            return insight ? <InsightBlock>{insight}</InsightBlock> : null;
+                          })()}
+                          <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
+                            <StatCard title="Return Rate" value={`${clearviewAnalytics.retention.rollingReturnRate}%`} subtitle="3+ day old users who returned" accent="indigo" />
+                            <StatCard title="DAU" value={clearviewAnalytics.retention.stickiness.dau} accent="emerald" />
+                            <StatCard title="WAU" value={clearviewAnalytics.retention.stickiness.wau} accent="emerald" />
+                            <StatCard title="DAU/WAU" value={`${clearviewAnalytics.retention.stickiness.dauWauRatio}%`} accent="purple" />
+                            <StatCard title="DAU/MAU" value={`${clearviewAnalytics.retention.stickiness.dauMauRatio}%`} accent="purple" />
+                          </div>
+
+                          {/* Cohort Retention Table */}
+                          {clearviewAnalytics.retention.cohortRetention.length > 0 && (
+                            <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6">
+                              <h4 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-4">
+                                Cohort Retention (ClearView Only)
+                              </h4>
+                              <div className="overflow-x-auto border border-zinc-100 dark:border-zinc-800 rounded-lg">
+                                <table className="w-full text-sm">
+                                  <thead className="bg-zinc-50 dark:bg-zinc-800">
+                                    <tr className="border-b border-zinc-200 dark:border-zinc-700">
+                                      <th className="text-left py-3 px-4 text-zinc-500 font-medium">Cohort</th>
+                                      <th className="text-right py-3 px-4 text-zinc-500 font-medium">Size</th>
+                                      <th className="text-right py-3 px-4 text-zinc-500 font-medium">D1</th>
+                                      <th className="text-right py-3 px-4 text-zinc-500 font-medium">D7</th>
+                                      <th className="text-right py-3 px-4 text-zinc-500 font-medium">D14</th>
+                                      <th className="text-right py-3 px-4 text-zinc-500 font-medium">D30</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {clearviewAnalytics.retention.cohortRetention.map((c, i) => (
+                                      <tr key={i} className="border-b border-zinc-100 dark:border-zinc-800 last:border-0">
+                                        <td className="py-2 px-4 text-zinc-600 dark:text-zinc-300">{c.cohortDate}</td>
+                                        <td className="py-2 px-4 text-right text-zinc-900 dark:text-zinc-100 font-medium">{c.cohortSize}</td>
+                                        <td className="py-2 px-4 text-right">
+                                          <span className={c.d1 > 0 ? 'text-emerald-600 dark:text-emerald-400 font-medium' : 'text-zinc-400'}>{c.d1}%</span>
+                                        </td>
+                                        <td className="py-2 px-4 text-right">
+                                          <span className={c.d7 > 0 ? 'text-emerald-600 dark:text-emerald-400 font-medium' : 'text-zinc-400'}>{c.d7}%</span>
+                                        </td>
+                                        <td className="py-2 px-4 text-right">
+                                          <span className={c.d14 > 0 ? 'text-emerald-600 dark:text-emerald-400 font-medium' : 'text-zinc-400'}>{c.d14}%</span>
+                                        </td>
+                                        <td className="py-2 px-4 text-right">
+                                          <span className={c.d30 > 0 ? 'text-emerald-600 dark:text-emerald-400 font-medium' : 'text-zinc-400'}>{c.d30}%</span>
+                                        </td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Section 5: Engagement & Shares */}
+                        <div className="mb-8">
+                          <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-4">
+                            ClearView Engagement & Shares
+                          </h3>
+                          {(() => {
+                            const insight = getShareInsight(clearviewAnalytics);
+                            return insight ? <InsightBlock>{insight}</InsightBlock> : null;
+                          })()}
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+                            <StatCard title="Total Shares" value={clearviewAnalytics.engagement.totalShares} accent="indigo" />
+                            <StatCard title="Unique Visitors (30d)" value={clearviewAnalytics.engagement.totalUniqueVisitors} accent="emerald" />
+                            <StatCard title="Share Rate" value={`${clearviewAnalytics.engagement.shareRate}%`} subtitle="shares / unique visitors" accent="purple" />
+                            <StatCard title="Platforms" value={clearviewAnalytics.engagement.sharesByPlatform.length} accent="amber" />
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                            {/* Shares by Platform */}
+                            <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6">
+                              <h4 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-4">
+                                Shares by Platform
+                              </h4>
+                              {clearviewAnalytics.engagement.sharesByPlatform.length === 0 ? (
+                                <p className="text-sm text-zinc-400">No shares yet</p>
+                              ) : (
+                                <div className="space-y-3">
+                                  {clearviewAnalytics.engagement.sharesByPlatform.map((sp) => {
+                                    const maxShares = Math.max(...clearviewAnalytics.engagement.sharesByPlatform.map(s => s.count), 1);
+                                    return (
+                                      <div key={sp.platform}>
+                                        <div className="flex justify-between items-center text-sm mb-1">
+                                          <span className="text-zinc-600 dark:text-zinc-400">{sp.platform}</span>
+                                          <span className="font-bold text-zinc-900 dark:text-zinc-100">{sp.count}</span>
+                                        </div>
+                                        <div className="h-1.5 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+                                          <div className="h-full rounded-full bg-purple-500" style={{ width: `${(sp.count / maxShares) * 100}%` }} />
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Top Shared Stories */}
+                            <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6">
+                              <h4 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-4">
+                                Top Shared Stories
+                              </h4>
+                              {clearviewAnalytics.engagement.topSharedStories.length === 0 ? (
+                                <p className="text-sm text-zinc-400">No story shares yet</p>
+                              ) : (
+                                <div className="space-y-2">
+                                  {clearviewAnalytics.engagement.topSharedStories.slice(0, 10).map((story, i) => (
+                                    <div key={i} className="flex justify-between text-sm">
+                                      <span className="text-zinc-600 dark:text-zinc-400 truncate max-w-[200px]" title={story.label}>{story.label}</span>
+                                      <span className="font-medium text-zinc-900 dark:text-zinc-100 ml-2">{story.count}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Interaction Breakdown */}
+                          {clearviewAnalytics.engagement.interactionBreakdown.length > 0 && (
+                            <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6">
+                              <h4 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-4">
+                                ClearView Interactions
+                              </h4>
+                              <div className="overflow-x-auto max-h-64 border border-zinc-100 dark:border-zinc-800 rounded-lg">
+                                <table className="w-full text-sm">
+                                  <thead className="bg-zinc-50 dark:bg-zinc-800 sticky top-0">
+                                    <tr className="border-b border-zinc-200 dark:border-zinc-700">
+                                      <th className="text-left py-2 px-4 text-zinc-500 font-medium">Action</th>
+                                      <th className="text-left py-2 px-4 text-zinc-500 font-medium">Label</th>
+                                      <th className="text-right py-2 px-4 text-zinc-500 font-medium">Count</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {clearviewAnalytics.engagement.interactionBreakdown.map((ix, i) => (
+                                      <tr key={i} className="border-b border-zinc-100 dark:border-zinc-800 last:border-0">
+                                        <td className="py-2 px-4 text-zinc-600 dark:text-zinc-300">{ix.action}</td>
+                                        <td className="py-2 px-4 text-zinc-500 max-w-[200px] truncate" title={ix.label}>{ix.label || '-'}</td>
+                                        <td className="py-2 px-4 text-right font-bold text-zinc-900 dark:text-zinc-100">{ix.count}</td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Recent Shares Table */}
+                        {clearviewAnalytics.engagement.recentShares.length > 0 && (
+                          <div className="mb-8">
+                            <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-4">
+                              Recent ClearView Shares
+                            </h3>
+                            <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6">
+                              <div className="overflow-x-auto max-h-96 border border-zinc-100 dark:border-zinc-800 rounded-lg">
+                                <table className="w-full text-sm">
+                                  <thead className="bg-zinc-50 dark:bg-zinc-800 sticky top-0 z-10">
+                                    <tr className="border-b border-zinc-200 dark:border-zinc-700">
+                                      <th className="text-left py-3 px-3 text-zinc-500 font-medium">Time</th>
+                                      <th className="text-left py-3 px-3 text-zinc-500 font-medium">IP</th>
+                                      <th className="text-left py-3 px-3 text-zinc-500 font-medium">Country</th>
+                                      <th className="text-left py-3 px-3 text-zinc-500 font-medium">Device</th>
+                                      <th className="text-left py-3 px-3 text-zinc-500 font-medium">OS</th>
+                                      <th className="text-left py-3 px-3 text-zinc-500 font-medium">Browser</th>
+                                      <th className="text-left py-3 px-3 text-zinc-500 font-medium">Share Type</th>
+                                      <th className="text-left py-3 px-3 text-zinc-500 font-medium">URL</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {clearviewAnalytics.engagement.recentShares.map((s, i) => (
+                                      <tr key={i} className="border-b border-zinc-100 dark:border-zinc-800 last:border-0 hover:bg-zinc-50 dark:hover:bg-zinc-800/50">
+                                        <td className="py-2 px-3 text-zinc-500 whitespace-nowrap text-xs">{formatDateTimeEST(s.createdAt)}</td>
+                                        <td className="py-2 px-3 text-zinc-600 dark:text-zinc-300 font-mono text-xs">{s.ipAddress?.slice(-8) || '-'}</td>
+                                        <td className="py-2 px-3 text-zinc-500">{s.country || '-'}</td>
+                                        <td className="py-2 px-3 text-zinc-500">{s.device}</td>
+                                        <td className="py-2 px-3 text-zinc-500">{s.os}</td>
+                                        <td className="py-2 px-3 text-zinc-500">{s.browser}</td>
+                                        <td className="py-2 px-3">
+                                          <span className="text-xs font-medium px-2 py-0.5 rounded bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300">
+                                            {s.shareType}
+                                          </span>
+                                        </td>
+                                        <td className="py-2 px-3 text-zinc-500 max-w-[200px] truncate text-xs" title={s.url || ''}>
+                                          {s.url ? (() => { try { return new URL(s.url).pathname.slice(0, 40); } catch { return s.url.slice(0, 40); } })() : '-'}
+                                        </td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Briefing Shares Table */}
+                        {clearviewAnalytics.engagement.recentBriefingShares.length > 0 && (
+                          <div className="mb-8">
+                            <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-4">
+                              Briefing Shares
+                            </h3>
+                            <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6">
+                              <div className="overflow-x-auto max-h-96 border border-zinc-100 dark:border-zinc-800 rounded-lg">
+                                <table className="w-full text-sm">
+                                  <thead className="bg-zinc-50 dark:bg-zinc-800 sticky top-0 z-10">
+                                    <tr className="border-b border-zinc-200 dark:border-zinc-700">
+                                      <th className="text-left py-3 px-3 text-zinc-500 font-medium">Time</th>
+                                      <th className="text-left py-3 px-3 text-zinc-500 font-medium">IP</th>
+                                      <th className="text-left py-3 px-3 text-zinc-500 font-medium">Country</th>
+                                      <th className="text-left py-3 px-3 text-zinc-500 font-medium">Device</th>
+                                      <th className="text-left py-3 px-3 text-zinc-500 font-medium">OS</th>
+                                      <th className="text-left py-3 px-3 text-zinc-500 font-medium">Browser</th>
+                                      <th className="text-left py-3 px-3 text-zinc-500 font-medium">Platform</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {clearviewAnalytics.engagement.recentBriefingShares.map((s, i) => (
+                                      <tr key={i} className="border-b border-zinc-100 dark:border-zinc-800 last:border-0 hover:bg-zinc-50 dark:hover:bg-zinc-800/50">
+                                        <td className="py-2 px-3 text-zinc-500 whitespace-nowrap text-xs">{formatDateTimeEST(s.createdAt)}</td>
+                                        <td className="py-2 px-3 text-zinc-600 dark:text-zinc-300 font-mono text-xs">{s.ipAddress?.slice(-8) || '-'}</td>
+                                        <td className="py-2 px-3 text-zinc-500">{s.country || '-'}</td>
+                                        <td className="py-2 px-3 text-zinc-500">{s.device}</td>
+                                        <td className="py-2 px-3 text-zinc-500">{s.os}</td>
+                                        <td className="py-2 px-3 text-zinc-500">{s.browser}</td>
+                                        <td className="py-2 px-3">
+                                          <span className="text-xs font-medium px-2 py-0.5 rounded bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
+                                            {s.platform}
+                                          </span>
+                                        </td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Section 6: Geographic & Device Distribution */}
+                        <div className="mb-8">
+                          <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-4">
+                            Geographic & Device Distribution
+                          </h3>
+                          {(() => {
+                            const insight = getAudienceInsight(clearviewAnalytics);
+                            return insight ? <InsightBlock>{insight}</InsightBlock> : null;
+                          })()}
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                            {/* Country Breakdown */}
+                            <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6">
+                              <h4 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-4">
+                                Top Countries (30 days)
+                              </h4>
+                              {clearviewAnalytics.geoDevice.countries.length === 0 ? (
+                                <p className="text-sm text-zinc-400">No geographic data</p>
+                              ) : (
+                                <div className="space-y-2">
+                                  {clearviewAnalytics.geoDevice.countries.map((c) => {
+                                    const maxPct = Math.max(...clearviewAnalytics.geoDevice.countries.map(x => x.percentage), 1);
+                                    return (
+                                      <div key={c.country}>
+                                        <div className="flex justify-between items-center text-sm mb-0.5">
+                                          <span className="text-zinc-600 dark:text-zinc-400">{c.country}</span>
+                                          <span className="font-medium text-zinc-900 dark:text-zinc-100">{c.visitors} <span className="text-xs text-zinc-400">({c.percentage}%)</span></span>
+                                        </div>
+                                        <div className="h-1 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+                                          <div className="h-full rounded-full bg-emerald-500" style={{ width: `${(c.percentage / maxPct) * 100}%` }} />
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Device / Browser / OS */}
+                            <div className="space-y-6">
+                              <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6">
+                                <h4 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-3">Device Type</h4>
+                                <div className="space-y-2">
+                                  {clearviewAnalytics.geoDevice.devices.map((d) => (
+                                    <div key={d.type} className="flex justify-between text-sm">
+                                      <span className="text-zinc-600 dark:text-zinc-400 capitalize">{d.type}</span>
+                                      <span className="font-medium text-zinc-900 dark:text-zinc-100">{d.count} <span className="text-xs text-zinc-400">({d.percentage}%)</span></span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                              <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6">
+                                <h4 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-3">Browser</h4>
+                                <div className="space-y-2">
+                                  {clearviewAnalytics.geoDevice.browsers.map((b) => (
+                                    <div key={b.browser} className="flex justify-between text-sm">
+                                      <span className="text-zinc-600 dark:text-zinc-400">{b.browser}</span>
+                                      <span className="font-medium text-zinc-900 dark:text-zinc-100">{b.count} <span className="text-xs text-zinc-400">({b.percentage}%)</span></span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                              <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6">
+                                <h4 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-3">Operating System</h4>
+                                <div className="space-y-2">
+                                  {clearviewAnalytics.geoDevice.operatingSystems.map((o) => (
+                                    <div key={o.os} className="flex justify-between text-sm">
+                                      <span className="text-zinc-600 dark:text-zinc-400">{o.os}</span>
+                                      <span className="font-medium text-zinc-900 dark:text-zinc-100">{o.count} <span className="text-xs text-zinc-400">({o.percentage}%)</span></span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Section 7: Time-of-Day / Day-of-Week Heatmap */}
+                        <div className="mb-8">
+                          <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-4">
+                            Visit Heatmap (EST, Last 30 Days)
+                          </h3>
+                          {(() => {
+                            const insight = getHeatmapInsight(clearviewAnalytics);
+                            return insight ? <InsightBlock>{insight}</InsightBlock> : null;
+                          })()}
+                          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6">
+                            <HeatmapChart grid={clearviewAnalytics.heatmap.grid} maxValue={clearviewAnalytics.heatmap.maxValue} />
+                            <div className="flex items-center justify-end gap-2 mt-3">
+                              <span className="text-xs text-zinc-400">Less</span>
+                              {[0, 0.2, 0.4, 0.6, 0.8, 1].map((ratio, i) => (
+                                <div
+                                  key={i}
+                                  className="w-4 h-3 rounded-sm"
+                                  style={{ backgroundColor: ratio === 0 ? '#f4f4f5' : ratio < 0.3 ? '#e0e7ff' : ratio < 0.5 ? '#c7d2fe' : ratio < 0.7 ? '#a5b4fc' : ratio < 0.9 ? '#818cf8' : '#4f46e5' }}
+                                />
+                              ))}
+                              <span className="text-xs text-zinc-400">More</span>
+                            </div>
+                          </div>
+                        </div>
                       </>
                     )}
 
@@ -5096,6 +6254,162 @@ export default function AdminDashboard() {
         {activeTab === "languages" && !languageStats && (
           <p className="text-sm text-zinc-500 text-center py-8">
             Loading language data...
+          </p>
+        )}
+
+        {activeTab === "defensecheck" && defenseCheckMetrics && (
+          <div className="max-w-7xl mx-auto px-4 py-8 space-y-8">
+            <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-100">DefenseCheck Metrics</h2>
+
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              <StatCard title="Total Analyses" value={defenseCheckMetrics.totalAnalyses} />
+              <StatCard title="Avg Score" value={defenseCheckMetrics.avgScore} />
+              <StatCard title="Categories Detected" value={Object.keys(defenseCheckMetrics.categoryDistribution).length} />
+            </div>
+
+            {/* Category Distribution */}
+            {Object.keys(defenseCheckMetrics.categoryDistribution).length > 0 && (
+              <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6">
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-4">
+                  Category Distribution
+                </h3>
+                <div className="space-y-3">
+                  {Object.entries(defenseCheckMetrics.categoryDistribution)
+                    .sort(([, a], [, b]) => b - a)
+                    .map(([category, count]) => {
+                      const maxCount = Math.max(...Object.values(defenseCheckMetrics.categoryDistribution), 1);
+                      const width = (count / maxCount) * 100;
+                      const label = category.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+                      return (
+                        <div key={category} className="flex items-center gap-3">
+                          <span className="text-xs text-zinc-500 w-44 truncate">{label}</span>
+                          <div className="flex-1 h-4 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-teal-500 rounded-full"
+                              style={{ width: `${width}%` }}
+                            />
+                          </div>
+                          <span className="text-xs text-zinc-500 w-8 text-right">{count}</span>
+                        </div>
+                      );
+                    })}
+                </div>
+              </div>
+            )}
+
+            {/* Daily analyses */}
+            {defenseCheckMetrics.analysesPerDay.length > 0 && (
+              <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6">
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-4">
+                  Analyses Per Day (Last 30 Days)
+                </h3>
+                <div className="h-48">
+                  <div className="flex items-end justify-between h-full gap-1">
+                    {defenseCheckMetrics.analysesPerDay.slice().reverse().map((day, i) => {
+                      const maxCount = Math.max(...defenseCheckMetrics.analysesPerDay.map(d => d.count), 1);
+                      const height = (day.count / maxCount) * 100;
+                      return (
+                        <div key={i} className="flex-1 flex flex-col items-center justify-end h-full">
+                          <div
+                            className="w-full bg-teal-500 rounded-t"
+                            style={{ height: `${Math.max(height, 2)}%` }}
+                            title={`${day.date}: ${day.count}`}
+                          />
+                          {i % 5 === 0 && (
+                            <span className="text-[9px] text-zinc-400 mt-1 rotate-[-45deg] origin-top-left whitespace-nowrap">
+                              {new Date(day.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === "defensecheck" && !defenseCheckMetrics && (
+          <p className="text-sm text-zinc-500 text-center py-8">
+            Loading DefenseCheck metrics...
+          </p>
+        )}
+
+        {activeTab === "stance" && stanceMetrics && (
+          <div className="max-w-7xl mx-auto px-4 py-8 space-y-8">
+            <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-100">Stance Metrics</h2>
+
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              <StatCard title="Total Analyses" value={stanceMetrics.totalAnalyses} />
+              <StatCard title="Avg Defense Score" value={stanceMetrics.avgDefenseScore} />
+              <StatCard title="Postures Detected" value={Object.keys(stanceMetrics.postureDistribution).length} />
+            </div>
+
+            {Object.keys(stanceMetrics.postureDistribution).length > 0 && (
+              <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6">
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-4">
+                  Posture Distribution
+                </h3>
+                <div className="space-y-3">
+                  {Object.entries(stanceMetrics.postureDistribution)
+                    .sort(([, a], [, b]) => b - a)
+                    .map(([posture, count]) => {
+                      const maxCount = Math.max(...Object.values(stanceMetrics.postureDistribution), 1);
+                      const width = (count / maxCount) * 100;
+                      const label = posture.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+                      return (
+                        <div key={posture} className="flex items-center gap-3">
+                          <span className="text-xs text-zinc-500 w-44 truncate">{label}</span>
+                          <div className="flex-1 h-4 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-violet-500 rounded-full"
+                              style={{ width: `${width}%` }}
+                            />
+                          </div>
+                          <span className="text-xs text-zinc-500 w-8 text-right">{count}</span>
+                        </div>
+                      );
+                    })}
+                </div>
+              </div>
+            )}
+
+            {stanceMetrics.analysesPerDay.length > 0 && (
+              <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6">
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-4">
+                  Analyses Per Day (Last 30 Days)
+                </h3>
+                <div className="h-48">
+                  <div className="flex items-end justify-between h-full gap-1">
+                    {stanceMetrics.analysesPerDay.slice().reverse().map((day, i) => {
+                      const maxCount = Math.max(...stanceMetrics.analysesPerDay.map(d => d.count), 1);
+                      const height = (day.count / maxCount) * 100;
+                      return (
+                        <div key={i} className="flex-1 flex flex-col items-center justify-end h-full">
+                          <div
+                            className="w-full bg-violet-500 rounded-t"
+                            style={{ height: `${Math.max(height, 2)}%` }}
+                            title={`${day.date}: ${day.count}`}
+                          />
+                          {i % 5 === 0 && (
+                            <span className="text-[9px] text-zinc-400 mt-1 rotate-[-45deg] origin-top-left whitespace-nowrap">
+                              {new Date(day.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === "stance" && !stanceMetrics && (
+          <p className="text-sm text-zinc-500 text-center py-8">
+            Loading Stance metrics...
           </p>
         )}
       </div>

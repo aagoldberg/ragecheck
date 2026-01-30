@@ -326,6 +326,37 @@ export async function initDB() {
   await getDb()`CREATE INDEX IF NOT EXISTS idx_visitors_ip_created ON ragecheck_visitors(ip_address, created_at DESC)`;
   await getDb()`CREATE INDEX IF NOT EXISTS idx_analyses_created ON ragecheck_analyses(created_at DESC)`;
   await getDb()`CREATE INDEX IF NOT EXISTS idx_headlines_story_slug ON ragecheck_headlines(story_slug) WHERE story_slug IS NOT NULL`;
+
+  // DefenseCheck analyses table
+  await getDb()`
+    CREATE TABLE IF NOT EXISTS defensecheck_analyses (
+      id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+      input_hash TEXT NOT NULL,
+      input_text TEXT NOT NULL,
+      input_mode TEXT DEFAULT 'text',
+      result JSONB NOT NULL,
+      score INTEGER NOT NULL,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `;
+  await getDb()`CREATE INDEX IF NOT EXISTS idx_defensecheck_input_hash ON defensecheck_analyses(input_hash)`;
+  await getDb()`CREATE INDEX IF NOT EXISTS idx_defensecheck_created_at ON defensecheck_analyses(created_at DESC)`;
+
+  // Stance analyses table
+  await getDb()`
+    CREATE TABLE IF NOT EXISTS stance_analyses (
+      id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+      input_hash TEXT NOT NULL,
+      input_text TEXT NOT NULL,
+      input_mode TEXT DEFAULT 'text',
+      result JSONB NOT NULL,
+      primary_posture TEXT NOT NULL,
+      defense_score INTEGER NOT NULL DEFAULT 0,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `;
+  await getDb()`CREATE INDEX IF NOT EXISTS idx_stance_input_hash ON stance_analyses(input_hash)`;
+  await getDb()`CREATE INDEX IF NOT EXISTS idx_stance_created_at ON stance_analyses(created_at DESC)`;
 }
 
 export interface AnalysisLog {
@@ -5777,5 +5808,908 @@ export async function getHeadlinesGroupedByStory(hours: number = 48): Promise<St
   } catch (error) {
     console.error("Failed to get headlines grouped by story:", error);
     return [];
+  }
+}
+
+// ==========================================
+// DEFENSECHECK FUNCTIONS
+// ==========================================
+
+export interface DefenseCheckAnalysisRow {
+  id: string;
+  input_hash: string;
+  input_text: string;
+  input_mode: string;
+  result: Record<string, unknown>;
+  score: number;
+  created_at: string;
+}
+
+export async function saveDefenseCheckAnalysis(
+  inputHash: string,
+  inputText: string,
+  inputMode: string,
+  result: Record<string, unknown>,
+  score: number
+): Promise<string> {
+  try {
+    const rows = await getDb()`
+      INSERT INTO defensecheck_analyses (input_hash, input_text, input_mode, result, score)
+      VALUES (${inputHash}, ${inputText}, ${inputMode}, ${JSON.stringify(result)}, ${score})
+      RETURNING id
+    `;
+    return rows[0].id;
+  } catch (error) {
+    console.error("Failed to save DefenseCheck analysis:", error);
+    throw error;
+  }
+}
+
+export async function getDefenseCheckAnalysisById(id: string): Promise<DefenseCheckAnalysisRow | null> {
+  try {
+    const rows = await getDb()`
+      SELECT id, input_hash, input_text, input_mode, result, score, created_at
+      FROM defensecheck_analyses
+      WHERE id = ${id}
+    `;
+    return rows.length > 0 ? (rows[0] as unknown as DefenseCheckAnalysisRow) : null;
+  } catch (error) {
+    console.error("Failed to get DefenseCheck analysis:", error);
+    return null;
+  }
+}
+
+export interface DefenseCheckMetrics {
+  totalAnalyses: number;
+  avgScore: number;
+  categoryDistribution: Record<string, number>;
+  analysesPerDay: { date: string; count: number }[];
+}
+
+export async function getDefenseCheckMetrics(): Promise<DefenseCheckMetrics | null> {
+  try {
+    // Total + avg
+    const summaryRows = await getDb()`
+      SELECT COUNT(*) as total, COALESCE(AVG(score), 0) as avg_score
+      FROM defensecheck_analyses
+    `;
+    const totalAnalyses = Number(summaryRows[0].total);
+    const avgScore = Math.round(Number(summaryRows[0].avg_score));
+
+    // Per day (last 30 days)
+    const dailyRows = await getDb()`
+      SELECT DATE(created_at AT TIME ZONE 'America/New_York') as date, COUNT(*) as count
+      FROM defensecheck_analyses
+      WHERE created_at > NOW() - INTERVAL '30 days'
+      GROUP BY DATE(created_at AT TIME ZONE 'America/New_York')
+      ORDER BY date DESC
+    `;
+    const analysesPerDay = dailyRows.map((r: Record<string, unknown>) => ({
+      date: String(r.date),
+      count: Number(r.count),
+    }));
+
+    // Category distribution: aggregate from JSONB result
+    const catRows = await getDb()`
+      SELECT pattern->>'category' as category, COUNT(*) as count
+      FROM defensecheck_analyses,
+           jsonb_array_elements(result->'patterns') as pattern
+      GROUP BY pattern->>'category'
+      ORDER BY count DESC
+    `;
+    const categoryDistribution: Record<string, number> = {};
+    for (const r of catRows) {
+      categoryDistribution[String(r.category)] = Number(r.count);
+    }
+
+    return { totalAnalyses, avgScore, categoryDistribution, analysesPerDay };
+  } catch (error) {
+    console.error("Failed to get DefenseCheck metrics:", error);
+    return null;
+  }
+}
+
+// ============================================
+// CLEARVIEW COMPREHENSIVE ANALYTICS
+// ============================================
+
+export interface ClearViewAnalytics {
+  trafficSources: {
+    channels: { channel: string; visitors: number; percentage: number }[];
+    topReferrers: { domain: string; visitors: number; percentage: number }[];
+    utmSources: { source: string; visitors: number }[];
+    utmMediums: { medium: string; visitors: number }[];
+    utmCampaigns: { campaign: string; source: string; visitors: number }[];
+    todayVs7Day: {
+      todayDirect: number;
+      todayReferral: number;
+      todayUtm: number;
+      weekDirect: number;
+      weekReferral: number;
+      weekUtm: number;
+    };
+  };
+  recentVisitors: {
+    createdAt: string;
+    ipAddress: string;
+    country: string | null;
+    device: string;
+    os: string;
+    browser: string;
+    referrer: string | null;
+    utmSource: string | null;
+    isRepeat: boolean;
+  }[];
+  repeatUsers: {
+    newToday: number;
+    returningToday: number;
+    new7Day: number;
+    returning7Day: number;
+    repeatDetails: {
+      ipAddress: string;
+      country: string | null;
+      device: string;
+      firstSeen: string;
+      lastSeen: string;
+      totalVisits: number;
+      daysActive: number;
+    }[];
+    frequencyDistribution: {
+      visits1: number;
+      visits2to3: number;
+      visits4to10: number;
+      visits10plus: number;
+    };
+    avgDaysBetweenVisits: number;
+  };
+  retention: {
+    cohortRetention: {
+      cohortDate: string;
+      cohortSize: number;
+      d1: number;
+      d7: number;
+      d14: number;
+      d30: number;
+    }[];
+    rollingReturnRate: number;
+    stickiness: {
+      dau: number;
+      wau: number;
+      mau: number;
+      dauWauRatio: number;
+      dauMauRatio: number;
+    };
+  };
+  engagement: {
+    sharesByPlatform: { platform: string; count: number }[];
+    shareRate: number;
+    totalShares: number;
+    totalUniqueVisitors: number;
+    topSharedStories: { label: string; count: number }[];
+    interactionBreakdown: { action: string; label: string; count: number }[];
+    recentShares: {
+      createdAt: string;
+      ipAddress: string;
+      country: string | null;
+      device: string;
+      os: string;
+      browser: string;
+      shareType: string;
+      url: string | null;
+      platform: string | null;
+      score: number | null;
+    }[];
+    recentBriefingShares: {
+      createdAt: string;
+      ipAddress: string;
+      country: string | null;
+      device: string;
+      os: string;
+      browser: string;
+      platform: string;
+    }[];
+  };
+  geoDevice: {
+    countries: { country: string; visitors: number; percentage: number }[];
+    devices: { type: string; count: number; percentage: number }[];
+    browsers: { browser: string; count: number; percentage: number }[];
+    operatingSystems: { os: string; count: number; percentage: number }[];
+  };
+  heatmap: {
+    grid: number[][]; // 7 rows (days) x 24 cols (hours), EST timezone
+    maxValue: number;
+  };
+}
+
+function classifyChannel(referrer: string | null, utmSource: string | null, utmMedium: string | null): string {
+  if (utmMedium) {
+    const m = utmMedium.toLowerCase();
+    if (m === 'cpc' || m === 'ppc' || m === 'paid') return 'Paid';
+    if (m === 'email') return 'Email';
+    if (m === 'social') return 'Social';
+  }
+  if (utmSource) {
+    const s = utmSource.toLowerCase();
+    if (s === 'newsletter' || s === 'email') return 'Email';
+    if (['twitter', 'x', 'facebook', 'linkedin', 'reddit', 'bluesky', 'bsky', 'threads'].includes(s)) return 'Social';
+    return 'Campaign';
+  }
+  if (!referrer || referrer === '' || referrer === 'null') return 'Direct';
+  const r = referrer.toLowerCase();
+  if (r.includes('google') || r.includes('bing') || r.includes('duckduckgo') || r.includes('yahoo') || r.includes('yandex') || r.includes('baidu')) return 'Organic Search';
+  if (r.includes('twitter') || r.includes('x.com') || r.includes('t.co') || r.includes('facebook') || r.includes('linkedin') || r.includes('reddit') || r.includes('bsky') || r.includes('bluesky') || r.includes('threads')) return 'Social';
+  return 'Referral';
+}
+
+function extractDomain(referrer: string | null): string {
+  if (!referrer) return 'direct';
+  try {
+    const url = new URL(referrer.startsWith('http') ? referrer : `https://${referrer}`);
+    return url.hostname.replace(/^www\./, '');
+  } catch {
+    return referrer.split('/')[0] || 'unknown';
+  }
+}
+
+export async function getClearViewAnalytics(): Promise<ClearViewAnalytics> {
+  try {
+    const pagePath = '/clearview';
+
+    // Run all queries in parallel for performance
+    const [
+      allVisitorsRaw,
+      recentVisitorsRaw,
+      sharesRaw,
+      interactionsRaw,
+      sharedStoriesRaw,
+      heatmapRaw,
+      recentSharesRaw,
+      briefingSharesRaw,
+    ] = await Promise.all([
+      // All ClearView visitors (last 30 days for most analytics)
+      getDb()`
+        SELECT ip_address, user_agent, country, referrer, utm_source, utm_medium, utm_campaign, created_at
+        FROM ragecheck_visitors
+        WHERE page_path = ${pagePath} AND is_bot = false AND created_at > NOW() - INTERVAL '30 days'
+        ORDER BY created_at DESC
+      `,
+      // Recent visitors (last 3 days) for visitor table
+      getDb()`
+        SELECT ip_address, user_agent, country, referrer, utm_source, utm_medium, utm_campaign, created_at
+        FROM ragecheck_visitors
+        WHERE page_path = ${pagePath} AND is_bot = false AND created_at > NOW() - INTERVAL '3 days'
+        ORDER BY created_at DESC
+        LIMIT 200
+      `,
+      // ClearView shares
+      getDb()`
+        SELECT share_type, COUNT(*) as count
+        FROM ragecheck_shares
+        WHERE share_type LIKE 'ClearView%'
+        GROUP BY share_type
+        ORDER BY count DESC
+      `,
+      // ClearView interactions
+      getDb()`
+        SELECT action, label, COUNT(*) as count
+        FROM ragecheck_interactions
+        WHERE category = 'clearview'
+        GROUP BY action, label
+        ORDER BY count DESC
+        LIMIT 50
+      `,
+      // Top shared stories
+      getDb()`
+        SELECT label, COUNT(*) as count
+        FROM ragecheck_interactions
+        WHERE category = 'clearview' AND action = 'story_shared'
+        GROUP BY label
+        ORDER BY count DESC
+        LIMIT 20
+      `,
+      // Heatmap data (day of week x hour of day, EST timezone, last 30 days)
+      getDb()`
+        SELECT
+          EXTRACT(DOW FROM created_at AT TIME ZONE 'America/New_York') as dow,
+          EXTRACT(HOUR FROM created_at AT TIME ZONE 'America/New_York') as hour,
+          COUNT(*) as count
+        FROM ragecheck_visitors
+        WHERE page_path = ${pagePath} AND is_bot = false AND created_at > NOW() - INTERVAL '30 days'
+        GROUP BY 1, 2
+        ORDER BY 1, 2
+      `,
+      // Recent ClearView shares with detail (LEFT JOIN visitors for country)
+      getDb()`
+        SELECT
+          s.created_at, s.ip_address, s.share_type, s.url, s.platform, s.score, s.user_agent,
+          v.country
+        FROM ragecheck_shares s
+        LEFT JOIN LATERAL (
+          SELECT country FROM ragecheck_visitors
+          WHERE ip_address = s.ip_address AND ip_address IS NOT NULL
+          ORDER BY created_at DESC LIMIT 1
+        ) v ON true
+        WHERE s.share_type LIKE 'ClearView%'
+        ORDER BY s.created_at DESC
+        LIMIT 200
+      `,
+      // Recent briefing shares from interactions table
+      getDb()`
+        SELECT
+          i.created_at, i.ip_address, i.user_agent, i.label as platform,
+          v.country
+        FROM ragecheck_interactions i
+        LEFT JOIN LATERAL (
+          SELECT country FROM ragecheck_visitors
+          WHERE ip_address = i.ip_address AND ip_address IS NOT NULL
+          ORDER BY created_at DESC LIMIT 1
+        ) v ON true
+        WHERE i.category = 'clearview' AND i.action = 'briefing_shared' AND i.is_bot = false
+        ORDER BY i.created_at DESC
+        LIMIT 200
+      `,
+    ]);
+
+    // Parse all visitors with JS helpers for UA analysis
+    const nowEST = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' }));
+    const todayEST = getESTDateString();
+    const sevenDaysAgo = new Date(nowEST);
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+    // ---- 1. Traffic Sources & Acquisition ----
+    const channelCounts: Record<string, number> = {};
+    const referrerCounts: Record<string, number> = {};
+    const utmSourceCounts: Record<string, number> = {};
+    const utmMediumCounts: Record<string, number> = {};
+    const utmCampaignMap: Record<string, { source: string; count: number }> = {};
+
+    let todayDirect = 0, todayReferral = 0, todayUtm = 0;
+    let weekDirect = 0, weekReferral = 0, weekUtm = 0;
+
+    // Track IPs for repeat detection and geo/device analysis
+    const ipFirstSeen: Record<string, Date> = {};
+    const ipVisitCount: Record<string, number> = {};
+    const ipVisitDates: Record<string, Set<string>> = {};
+    const ipCountry: Record<string, string | null> = {};
+    const ipUserAgent: Record<string, string | null> = {};
+
+    // Geo/device counters
+    const countryCounts: Record<string, number> = {};
+    const deviceCounts: Record<string, number> = {};
+    const browserCounts: Record<string, number> = {};
+    const osCounts: Record<string, number> = {};
+
+    for (const row of allVisitorsRaw) {
+      const ip = row.ip_address;
+      const ua = row.user_agent;
+      const referrer = row.referrer;
+      const utmSrc = row.utm_source;
+      const utmMed = row.utm_medium;
+      const utmCamp = row.utm_campaign;
+      const createdAt = new Date(row.created_at);
+      const dateStr = getESTDateString(createdAt);
+
+      // Channel classification
+      const channel = classifyChannel(referrer, utmSrc, utmMed);
+      channelCounts[channel] = (channelCounts[channel] || 0) + 1;
+
+      // Referrer domain
+      if (referrer && referrer !== '' && referrer !== 'null') {
+        const domain = extractDomain(referrer);
+        referrerCounts[domain] = (referrerCounts[domain] || 0) + 1;
+      }
+
+      // UTM tracking
+      if (utmSrc) {
+        utmSourceCounts[utmSrc] = (utmSourceCounts[utmSrc] || 0) + 1;
+      }
+      if (utmMed) {
+        utmMediumCounts[utmMed] = (utmMediumCounts[utmMed] || 0) + 1;
+      }
+      if (utmCamp) {
+        if (!utmCampaignMap[utmCamp]) utmCampaignMap[utmCamp] = { source: utmSrc || 'unknown', count: 0 };
+        utmCampaignMap[utmCamp].count++;
+      }
+
+      // Today vs 7-day split
+      const isToday = dateStr === todayEST;
+      const isThisWeek = createdAt >= sevenDaysAgo;
+      const hasUtm = !!utmSrc || !!utmMed || !!utmCamp;
+      const hasReferrer = referrer && referrer !== '' && referrer !== 'null';
+
+      if (isToday) {
+        if (hasUtm) todayUtm++;
+        else if (hasReferrer) todayReferral++;
+        else todayDirect++;
+      }
+      if (isThisWeek) {
+        if (hasUtm) weekUtm++;
+        else if (hasReferrer) weekReferral++;
+        else weekDirect++;
+      }
+
+      // IP tracking for repeat analysis
+      if (ip) {
+        if (!ipFirstSeen[ip] || createdAt < ipFirstSeen[ip]) {
+          ipFirstSeen[ip] = createdAt;
+        }
+        ipVisitCount[ip] = (ipVisitCount[ip] || 0) + 1;
+        if (!ipVisitDates[ip]) ipVisitDates[ip] = new Set();
+        ipVisitDates[ip].add(dateStr);
+        ipCountry[ip] = row.country || ipCountry[ip] || null;
+        ipUserAgent[ip] = ua || ipUserAgent[ip] || null;
+      }
+
+      // Geo/device from UA
+      const country = row.country || 'Unknown';
+      countryCounts[country] = (countryCounts[country] || 0) + 1;
+      deviceCounts[getDeviceType(ua)] = (deviceCounts[getDeviceType(ua)] || 0) + 1;
+      browserCounts[getBrowser(ua)] = (browserCounts[getBrowser(ua)] || 0) + 1;
+      osCounts[getOS(ua)] = (osCounts[getOS(ua)] || 0) + 1;
+    }
+
+    const totalVisitors30d = allVisitorsRaw.length;
+
+    // Build channel breakdown
+    const channels = Object.entries(channelCounts)
+      .map(([channel, visitors]) => ({ channel, visitors, percentage: totalVisitors30d > 0 ? Math.round(1000 * visitors / totalVisitors30d) / 10 : 0 }))
+      .sort((a, b) => b.visitors - a.visitors);
+
+    // Build top referrers
+    const topReferrers = Object.entries(referrerCounts)
+      .map(([domain, visitors]) => ({ domain, visitors, percentage: totalVisitors30d > 0 ? Math.round(1000 * visitors / totalVisitors30d) / 10 : 0 }))
+      .sort((a, b) => b.visitors - a.visitors)
+      .slice(0, 20);
+
+    // UTM breakdowns
+    const utmSources = Object.entries(utmSourceCounts)
+      .map(([source, visitors]) => ({ source, visitors }))
+      .sort((a, b) => b.visitors - a.visitors);
+    const utmMediums = Object.entries(utmMediumCounts)
+      .map(([medium, visitors]) => ({ medium, visitors }))
+      .sort((a, b) => b.visitors - a.visitors);
+    const utmCampaigns = Object.entries(utmCampaignMap)
+      .map(([campaign, data]) => ({ campaign, source: data.source, visitors: data.count }))
+      .sort((a, b) => b.visitors - a.visitors);
+
+    // ---- 2. Recent Visitors Table ----
+    // Determine which IPs have been seen before (globally)
+    const recentIPs = [...new Set(recentVisitorsRaw.map((r: Record<string, unknown>) => r.ip_address).filter(Boolean))];
+    let repeatIPSet = new Set<string>();
+    if (recentIPs.length > 0) {
+      const repeatCheck = await getDb()`
+        SELECT ip_address, COUNT(*) as cnt
+        FROM ragecheck_visitors
+        WHERE page_path = ${pagePath} AND is_bot = false AND ip_address = ANY(${recentIPs as string[]})
+        GROUP BY ip_address
+        HAVING COUNT(*) > 1
+      `;
+      repeatIPSet = new Set(repeatCheck.map((r: Record<string, unknown>) => String(r.ip_address)));
+    }
+
+    const recentVisitors = recentVisitorsRaw.map((row: Record<string, unknown>) => ({
+      createdAt: new Date(row.created_at as string).toISOString(),
+      ipAddress: String(row.ip_address || ''),
+      country: row.country as string | null,
+      device: getDeviceType(row.user_agent as string | null),
+      os: getOS(row.user_agent as string | null),
+      browser: getBrowser(row.user_agent as string | null),
+      referrer: row.referrer as string | null,
+      utmSource: row.utm_source as string | null,
+      isRepeat: repeatIPSet.has(String(row.ip_address)),
+    }));
+
+    // ---- 3. Repeat User / Habit Formation ----
+    const allIPs = Object.keys(ipFirstSeen);
+    let newToday = 0, returningToday = 0, new7Day = 0, returning7Day = 0;
+
+    for (const ip of allIPs) {
+      const firstDate = getESTDateString(ipFirstSeen[ip]);
+      const visitedToday = ipVisitDates[ip]?.has(todayEST);
+      const visitedThisWeek = [...(ipVisitDates[ip] || [])].some(d => new Date(d) >= sevenDaysAgo);
+
+      if (visitedToday) {
+        if (firstDate === todayEST) newToday++;
+        else returningToday++;
+      }
+      if (visitedThisWeek) {
+        // "New" in 7 day = first seen within 7 days
+        if (ipFirstSeen[ip] >= sevenDaysAgo) new7Day++;
+        else returning7Day++;
+      }
+    }
+
+    // Repeat visitor details (IPs with 2+ visits)
+    const repeatDetails = allIPs
+      .filter(ip => (ipVisitDates[ip]?.size || 0) >= 2)
+      .map(ip => {
+        const dates = [...(ipVisitDates[ip] || [])].sort();
+        return {
+          ipAddress: ip,
+          country: ipCountry[ip],
+          device: getDeviceType(ipUserAgent[ip]),
+          firstSeen: dates[0],
+          lastSeen: dates[dates.length - 1],
+          totalVisits: ipVisitCount[ip] || 0,
+          daysActive: dates.length,
+        };
+      })
+      .sort((a, b) => b.totalVisits - a.totalVisits)
+      .slice(0, 50);
+
+    // Frequency distribution
+    let visits1 = 0, visits2to3 = 0, visits4to10 = 0, visits10plus = 0;
+    for (const ip of allIPs) {
+      const days = ipVisitDates[ip]?.size || 1;
+      if (days === 1) visits1++;
+      else if (days <= 3) visits2to3++;
+      else if (days <= 10) visits4to10++;
+      else visits10plus++;
+    }
+
+    // Avg days between visits for repeat visitors
+    let totalDaySpans = 0;
+    let repeatCount = 0;
+    for (const ip of allIPs) {
+      const dates = [...(ipVisitDates[ip] || [])].sort();
+      if (dates.length >= 2) {
+        const firstD = new Date(dates[0]);
+        const lastD = new Date(dates[dates.length - 1]);
+        const daySpan = (lastD.getTime() - firstD.getTime()) / (1000 * 60 * 60 * 24);
+        if (daySpan > 0) {
+          totalDaySpans += daySpan / (dates.length - 1);
+          repeatCount++;
+        }
+      }
+    }
+    const avgDaysBetweenVisits = repeatCount > 0 ? Math.round(10 * totalDaySpans / repeatCount) / 10 : 0;
+
+    // ---- 4. Retention ----
+    // Cohort retention for ClearView-only visitors (last 14 daily cohorts)
+    const cohortData = await getDb()`
+      WITH cohorts AS (
+        SELECT
+          DATE(MIN(created_at) AT TIME ZONE 'America/New_York') as cohort_date,
+          ip_address
+        FROM ragecheck_visitors
+        WHERE is_bot = false AND ip_address IS NOT NULL AND page_path = ${pagePath}
+        GROUP BY ip_address
+        HAVING DATE(MIN(created_at) AT TIME ZONE 'America/New_York') >= CURRENT_DATE - INTERVAL '30 days'
+      ),
+      cohort_sizes AS (
+        SELECT cohort_date, COUNT(*) as cohort_size
+        FROM cohorts
+        GROUP BY cohort_date
+      ),
+      returns AS (
+        SELECT
+          c.cohort_date,
+          c.ip_address,
+          MAX(CASE WHEN DATE(v.created_at AT TIME ZONE 'America/New_York') > c.cohort_date THEN 1 ELSE 0 END) as returned_d1,
+          MAX(CASE WHEN DATE(v.created_at AT TIME ZONE 'America/New_York') >= c.cohort_date + INTERVAL '7 days' THEN 1 ELSE 0 END) as returned_d7,
+          MAX(CASE WHEN DATE(v.created_at AT TIME ZONE 'America/New_York') >= c.cohort_date + INTERVAL '14 days' THEN 1 ELSE 0 END) as returned_d14,
+          MAX(CASE WHEN DATE(v.created_at AT TIME ZONE 'America/New_York') >= c.cohort_date + INTERVAL '30 days' THEN 1 ELSE 0 END) as returned_d30
+        FROM cohorts c
+        LEFT JOIN ragecheck_visitors v ON c.ip_address = v.ip_address AND v.is_bot = false AND v.page_path = ${pagePath}
+        GROUP BY c.cohort_date, c.ip_address
+      ),
+      retention_rates AS (
+        SELECT
+          r.cohort_date,
+          cs.cohort_size,
+          ROUND(100.0 * SUM(r.returned_d1) / NULLIF(cs.cohort_size, 0), 1) as d1,
+          ROUND(100.0 * SUM(r.returned_d7) / NULLIF(cs.cohort_size, 0), 1) as d7,
+          ROUND(100.0 * SUM(r.returned_d14) / NULLIF(cs.cohort_size, 0), 1) as d14,
+          ROUND(100.0 * SUM(r.returned_d30) / NULLIF(cs.cohort_size, 0), 1) as d30
+        FROM returns r
+        JOIN cohort_sizes cs ON r.cohort_date = cs.cohort_date
+        GROUP BY r.cohort_date, cs.cohort_size
+      )
+      SELECT TO_CHAR(cohort_date, 'YYYY-MM-DD') as cohort_date, cohort_size, d1, d7, d14, d30
+      FROM retention_rates
+      ORDER BY cohort_date DESC
+      LIMIT 14
+    `;
+
+    const cohortRetention = cohortData.map((row: Record<string, unknown>) => ({
+      cohortDate: String(row.cohort_date),
+      cohortSize: Number(row.cohort_size),
+      d1: Number(row.d1) || 0,
+      d7: Number(row.d7) || 0,
+      d14: Number(row.d14) || 0,
+      d30: Number(row.d30) || 0,
+    }));
+
+    // Rolling return rate for ClearView
+    const [rollingData] = await getDb()`
+      WITH user_first_visit AS (
+        SELECT
+          ip_address,
+          MIN(created_at) as first_visit,
+          COUNT(DISTINCT DATE(created_at AT TIME ZONE 'America/New_York')) as visit_days
+        FROM ragecheck_visitors
+        WHERE is_bot = false AND ip_address IS NOT NULL AND page_path = ${pagePath}
+        GROUP BY ip_address
+      )
+      SELECT
+        COUNT(*) as eligible_users,
+        SUM(CASE WHEN visit_days >= 2 THEN 1 ELSE 0 END) as returned_users
+      FROM user_first_visit
+      WHERE first_visit < NOW() - INTERVAL '3 days'
+    `;
+
+    const eligibleUsers = Number(rollingData?.eligible_users) || 0;
+    const returnedUsers = Number(rollingData?.returned_users) || 0;
+    const rollingReturnRate = eligibleUsers > 0 ? Math.round(1000 * returnedUsers / eligibleUsers) / 10 : 0;
+
+    // DAU/WAU/MAU for ClearView
+    const [[dauData], [wauData], [mauData]] = await Promise.all([
+      getDb()`
+        WITH daily_users AS (
+          SELECT DATE(created_at AT TIME ZONE 'America/New_York') as day, COUNT(DISTINCT ip_address) as unique_users
+          FROM ragecheck_visitors
+          WHERE is_bot = false AND ip_address IS NOT NULL AND page_path = ${pagePath}
+            AND created_at >= NOW() - INTERVAL '8 days'
+            AND created_at < DATE_TRUNC('day', NOW() AT TIME ZONE 'America/New_York') AT TIME ZONE 'America/New_York'
+          GROUP BY DATE(created_at AT TIME ZONE 'America/New_York')
+        )
+        SELECT COALESCE(ROUND(AVG(unique_users)), 0) as dau FROM daily_users
+      `,
+      getDb()`
+        SELECT COUNT(DISTINCT ip_address) as wau FROM ragecheck_visitors
+        WHERE is_bot = false AND ip_address IS NOT NULL AND page_path = ${pagePath} AND created_at >= NOW() - INTERVAL '7 days'
+      `,
+      getDb()`
+        SELECT COUNT(DISTINCT ip_address) as mau FROM ragecheck_visitors
+        WHERE is_bot = false AND ip_address IS NOT NULL AND page_path = ${pagePath} AND created_at >= NOW() - INTERVAL '30 days'
+      `,
+    ]);
+
+    const dau = Number(dauData?.dau) || 0;
+    const wau = Number(wauData?.wau) || 0;
+    const mau = Number(mauData?.mau) || 0;
+
+    // ---- 5. Engagement & Shares ----
+    const sharesByPlatform = sharesRaw.map((row: Record<string, unknown>) => ({
+      platform: String(row.share_type).replace('ClearView ', ''),
+      count: Number(row.count),
+    }));
+    const totalShares = sharesByPlatform.reduce((s: number, r: { count: number }) => s + r.count, 0);
+    const totalUniqueVisitors = allIPs.length;
+    const shareRate = totalUniqueVisitors > 0 ? Math.round(1000 * totalShares / totalUniqueVisitors) / 10 : 0;
+
+    const topSharedStories = sharedStoriesRaw.map((row: Record<string, unknown>) => ({
+      label: String(row.label || 'Unknown'),
+      count: Number(row.count),
+    }));
+
+    const interactionBreakdown = interactionsRaw.map((row: Record<string, unknown>) => ({
+      action: String(row.action || ''),
+      label: String(row.label || ''),
+      count: Number(row.count),
+    }));
+
+    const recentShares = recentSharesRaw.map((row: Record<string, unknown>) => ({
+      createdAt: new Date(row.created_at as string).toISOString(),
+      ipAddress: String(row.ip_address || ''),
+      country: (row.country as string | null) || null,
+      device: getDeviceType(row.user_agent as string | null),
+      os: getOS(row.user_agent as string | null),
+      browser: getBrowser(row.user_agent as string | null),
+      shareType: String(row.share_type || '').replace('ClearView ', ''),
+      url: (row.url as string | null) || null,
+      platform: (row.platform as string | null) || null,
+      score: row.score != null ? Number(row.score) : null,
+    }));
+
+    const recentBriefingShares = briefingSharesRaw.map((row: Record<string, unknown>) => ({
+      createdAt: new Date(row.created_at as string).toISOString(),
+      ipAddress: String(row.ip_address || ''),
+      country: (row.country as string | null) || null,
+      device: getDeviceType(row.user_agent as string | null),
+      os: getOS(row.user_agent as string | null),
+      browser: getBrowser(row.user_agent as string | null),
+      platform: String(row.platform || 'unknown'),
+    }));
+
+    // ---- 6. Geo & Device ----
+    const toDistribution = (counts: Record<string, number>) => {
+      const total = Object.values(counts).reduce((s, v) => s + v, 0);
+      return Object.entries(counts)
+        .map(([key, count]) => ({ key, count, percentage: total > 0 ? Math.round(1000 * count / total) / 10 : 0 }))
+        .sort((a, b) => b.count - a.count);
+    };
+
+    const countries = toDistribution(countryCounts).slice(0, 20).map(c => ({ country: c.key, visitors: c.count, percentage: c.percentage }));
+    const devices = toDistribution(deviceCounts).map(d => ({ type: d.key, count: d.count, percentage: d.percentage }));
+    const browsers = toDistribution(browserCounts).map(b => ({ browser: b.key, count: b.count, percentage: b.percentage }));
+    const operatingSystems = toDistribution(osCounts).map(o => ({ os: o.key, count: o.count, percentage: o.percentage }));
+
+    // ---- 7. Heatmap ----
+    const grid: number[][] = Array.from({ length: 7 }, () => Array(24).fill(0));
+    let maxValue = 0;
+    for (const row of heatmapRaw) {
+      const dow = Number(row.dow); // 0=Sun, 1=Mon, ..., 6=Sat
+      const hour = Number(row.hour);
+      const count = Number(row.count);
+      grid[dow][hour] = count;
+      if (count > maxValue) maxValue = count;
+    }
+
+    return {
+      trafficSources: {
+        channels,
+        topReferrers,
+        utmSources,
+        utmMediums,
+        utmCampaigns,
+        todayVs7Day: { todayDirect, todayReferral, todayUtm, weekDirect, weekReferral, weekUtm },
+      },
+      recentVisitors,
+      repeatUsers: {
+        newToday,
+        returningToday,
+        new7Day,
+        returning7Day,
+        repeatDetails,
+        frequencyDistribution: { visits1, visits2to3, visits4to10, visits10plus },
+        avgDaysBetweenVisits,
+      },
+      retention: {
+        cohortRetention,
+        rollingReturnRate,
+        stickiness: {
+          dau,
+          wau,
+          mau,
+          dauWauRatio: wau > 0 ? Math.round(1000 * dau / wau) / 10 : 0,
+          dauMauRatio: mau > 0 ? Math.round(1000 * dau / mau) / 10 : 0,
+        },
+      },
+      engagement: {
+        sharesByPlatform,
+        shareRate,
+        totalShares,
+        totalUniqueVisitors,
+        topSharedStories,
+        interactionBreakdown,
+        recentShares,
+        recentBriefingShares,
+      },
+      geoDevice: { countries, devices, browsers, operatingSystems },
+      heatmap: { grid, maxValue },
+    };
+  } catch (error) {
+    console.error("Failed to get ClearView analytics:", error);
+    return {
+      trafficSources: {
+        channels: [],
+        topReferrers: [],
+        utmSources: [],
+        utmMediums: [],
+        utmCampaigns: [],
+        todayVs7Day: { todayDirect: 0, todayReferral: 0, todayUtm: 0, weekDirect: 0, weekReferral: 0, weekUtm: 0 },
+      },
+      recentVisitors: [],
+      repeatUsers: {
+        newToday: 0, returningToday: 0, new7Day: 0, returning7Day: 0,
+        repeatDetails: [],
+        frequencyDistribution: { visits1: 0, visits2to3: 0, visits4to10: 0, visits10plus: 0 },
+        avgDaysBetweenVisits: 0,
+      },
+      retention: {
+        cohortRetention: [],
+        rollingReturnRate: 0,
+        stickiness: { dau: 0, wau: 0, mau: 0, dauWauRatio: 0, dauMauRatio: 0 },
+      },
+      engagement: {
+        sharesByPlatform: [],
+        shareRate: 0,
+        totalShares: 0,
+        totalUniqueVisitors: 0,
+        topSharedStories: [],
+        interactionBreakdown: [],
+        recentShares: [],
+        recentBriefingShares: [],
+      },
+      geoDevice: { countries: [], devices: [], browsers: [], operatingSystems: [] },
+      heatmap: { grid: Array.from({ length: 7 }, () => Array(24).fill(0)), maxValue: 0 },
+    };
+  }
+}
+
+// ==========================================
+// STANCE FUNCTIONS
+// ==========================================
+
+export interface StanceAnalysisRow {
+  id: string;
+  input_hash: string;
+  input_text: string;
+  input_mode: string;
+  result: Record<string, unknown>;
+  primary_posture: string;
+  defense_score: number;
+  created_at: string;
+}
+
+export async function saveStanceAnalysis(
+  inputHash: string,
+  inputText: string,
+  inputMode: string,
+  result: Record<string, unknown>,
+  primaryPosture: string,
+  defenseScore: number
+): Promise<string> {
+  try {
+    const rows = await getDb()`
+      INSERT INTO stance_analyses (input_hash, input_text, input_mode, result, primary_posture, defense_score)
+      VALUES (${inputHash}, ${inputText}, ${inputMode}, ${JSON.stringify(result)}, ${primaryPosture}, ${defenseScore})
+      RETURNING id
+    `;
+    return rows[0].id;
+  } catch (error) {
+    console.error("Failed to save Stance analysis:", error);
+    throw error;
+  }
+}
+
+export async function getStanceAnalysisById(id: string): Promise<StanceAnalysisRow | null> {
+  try {
+    const rows = await getDb()`
+      SELECT id, input_hash, input_text, input_mode, result, primary_posture, defense_score, created_at
+      FROM stance_analyses
+      WHERE id = ${id}
+    `;
+    return rows.length > 0 ? (rows[0] as unknown as StanceAnalysisRow) : null;
+  } catch (error) {
+    console.error("Failed to get Stance analysis:", error);
+    return null;
+  }
+}
+
+export interface StanceMetrics {
+  totalAnalyses: number;
+  avgDefenseScore: number;
+  postureDistribution: Record<string, number>;
+  analysesPerDay: { date: string; count: number }[];
+}
+
+export async function getStanceMetrics(): Promise<StanceMetrics | null> {
+  try {
+    const summaryRows = await getDb()`
+      SELECT COUNT(*) as total, COALESCE(AVG(defense_score), 0) as avg_defense
+      FROM stance_analyses
+    `;
+    const totalAnalyses = Number(summaryRows[0].total);
+    const avgDefenseScore = Math.round(Number(summaryRows[0].avg_defense));
+
+    const dailyRows = await getDb()`
+      SELECT DATE(created_at AT TIME ZONE 'America/New_York') as date, COUNT(*) as count
+      FROM stance_analyses
+      WHERE created_at > NOW() - INTERVAL '30 days'
+      GROUP BY DATE(created_at AT TIME ZONE 'America/New_York')
+      ORDER BY date DESC
+    `;
+    const analysesPerDay = dailyRows.map((r: Record<string, unknown>) => ({
+      date: String(r.date),
+      count: Number(r.count),
+    }));
+
+    const postureRows = await getDb()`
+      SELECT primary_posture, COUNT(*) as count
+      FROM stance_analyses
+      GROUP BY primary_posture
+      ORDER BY count DESC
+    `;
+    const postureDistribution: Record<string, number> = {};
+    for (const r of postureRows) {
+      postureDistribution[String(r.primary_posture)] = Number(r.count);
+    }
+
+    return { totalAnalyses, avgDefenseScore, postureDistribution, analysesPerDay };
+  } catch (error) {
+    console.error("Failed to get Stance metrics:", error);
+    return null;
   }
 }
