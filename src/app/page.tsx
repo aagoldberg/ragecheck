@@ -1113,8 +1113,6 @@ function HomeContent() {
           {/* Desktop nav */}
           <div className="hidden sm:flex gap-6 text-sm font-medium text-zinc-500">
             <a href="/clearview" onClick={() => tracking.trackNavClick("clearview", "header")} className="hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors">Clearview</a>
-            <a href="/defensecheck" onClick={() => tracking.trackNavClick("defensecheck", "header")} className="hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors">DefenseCheck</a>
-            <a href="/stance" onClick={() => tracking.trackNavClick("stance", "header")} className="hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors">Stance</a>
             <a href="/methodology" onClick={() => tracking.trackNavClick("methodology", "header")} className="hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors">Methodology</a>
             <a href="/about" onClick={() => tracking.trackNavClick("about", "header")} className="hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors">About</a>
           </div>
@@ -1140,8 +1138,6 @@ function HomeContent() {
           <div className="sm:hidden border-t border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900">
             <div className="px-4 py-3 space-y-1">
               <a href="/clearview" onClick={() => tracking.trackNavClick("clearview", "menu")} className="block py-2 text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors">Clearview</a>
-              <a href="/defensecheck" onClick={() => tracking.trackNavClick("defensecheck", "menu")} className="block py-2 text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors">DefenseCheck</a>
-              <a href="/stance" onClick={() => tracking.trackNavClick("stance", "menu")} className="block py-2 text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors">Stance</a>
               <a href="/methodology" onClick={() => tracking.trackNavClick("methodology", "menu")} className="block py-2 text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors">Methodology</a>
               <a href="/about" onClick={() => tracking.trackNavClick("about", "menu")} className="block py-2 text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors">About</a>
             </div>
