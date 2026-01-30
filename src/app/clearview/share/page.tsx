@@ -29,7 +29,7 @@ export async function generateMetadata({ searchParams }: ClearviewSharePageProps
         title: ogTitle,
         description: ogDescription,
         type: "website",
-        siteName: "RageCheck",
+        siteName: "ClearView",
         images: [
           {
             url: "/api/og/clearview",
@@ -98,7 +98,7 @@ export async function generateMetadata({ searchParams }: ClearviewSharePageProps
       title: ogTitle,
       description: ogDescription,
       type: "website",
-      siteName: "RageCheck",
+      siteName: "ClearView",
       images: [
         {
           url: ogImageUrl,

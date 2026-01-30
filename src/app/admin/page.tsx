@@ -72,6 +72,38 @@ const SHARE_TYPE_INFO: Record<string, { label: string; description: string }> = 
     label: 'Native Share',
     description: 'User used the native OS share dialog',
   },
+  'Share Facebook': {
+    label: 'Share to Facebook',
+    description: 'User clicked to share on Facebook (opens Facebook sharer)',
+  },
+  'Share LinkedIn': {
+    label: 'Share to LinkedIn',
+    description: 'User clicked to share on LinkedIn (opens LinkedIn share)',
+  },
+  'ClearView X': {
+    label: 'ClearView → X',
+    description: 'User shared a ClearView story or briefing to X/Twitter',
+  },
+  'ClearView Bluesky': {
+    label: 'ClearView → Bluesky',
+    description: 'User shared a ClearView story or briefing to Bluesky',
+  },
+  'ClearView Facebook': {
+    label: 'ClearView → Facebook',
+    description: 'User shared a ClearView story or briefing to Facebook',
+  },
+  'ClearView LinkedIn': {
+    label: 'ClearView → LinkedIn',
+    description: 'User shared a ClearView story or briefing to LinkedIn',
+  },
+  'ClearView Copy Link': {
+    label: 'ClearView → Copy Link',
+    description: 'User copied a ClearView share URL to their clipboard',
+  },
+  'ClearView Web Share': {
+    label: 'ClearView → Native',
+    description: 'User shared a ClearView story using the native share dialog',
+  },
 };
 
 interface DashboardStats {
@@ -396,6 +428,10 @@ interface ShareMetrics {
     qrScansWeek: number;
     twitterReferrals: number;
     twitterReferralsWeek: number;
+    facebookReferrals: number;
+    facebookReferralsWeek: number;
+    linkedinReferrals: number;
+    linkedinReferralsWeek: number;
     totalAttributed: number;
     totalAttributedWeek: number;
     conversionFromQr: number;
@@ -3564,7 +3600,7 @@ export default function AdminDashboard() {
                         Track where visitors come from after seeing shared content
                       </span>
                     </h3>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
                       <div className="text-center p-3 bg-zinc-50 dark:bg-zinc-800/50 rounded-lg">
                         <div className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">
                           {shareMetrics.attribution.qrScans}
@@ -3576,8 +3612,22 @@ export default function AdminDashboard() {
                         <div className="text-2xl font-bold text-sky-600 dark:text-sky-400">
                           {shareMetrics.attribution.twitterReferrals}
                         </div>
-                        <div className="text-xs text-zinc-500">Twitter/X Referrals</div>
+                        <div className="text-xs text-zinc-500">X/Twitter Referrals</div>
                         <div className="text-[10px] text-zinc-400">{shareMetrics.attribution.twitterReferralsWeek} this week</div>
+                      </div>
+                      <div className="text-center p-3 bg-zinc-50 dark:bg-zinc-800/50 rounded-lg">
+                        <div className="text-2xl font-bold text-[#1877F2]">
+                          {shareMetrics.attribution.facebookReferrals}
+                        </div>
+                        <div className="text-xs text-zinc-500">Facebook Referrals</div>
+                        <div className="text-[10px] text-zinc-400">{shareMetrics.attribution.facebookReferralsWeek} this week</div>
+                      </div>
+                      <div className="text-center p-3 bg-zinc-50 dark:bg-zinc-800/50 rounded-lg">
+                        <div className="text-2xl font-bold text-[#0A66C2]">
+                          {shareMetrics.attribution.linkedinReferrals}
+                        </div>
+                        <div className="text-xs text-zinc-500">LinkedIn Referrals</div>
+                        <div className="text-[10px] text-zinc-400">{shareMetrics.attribution.linkedinReferralsWeek} this week</div>
                       </div>
                       <div className="text-center p-3 bg-zinc-50 dark:bg-zinc-800/50 rounded-lg">
                         <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
@@ -3616,10 +3666,18 @@ export default function AdminDashboard() {
                             share_image_success: "bg-emerald-500",
                             'Share X': "bg-sky-500",
                             'Share Bluesky': "bg-blue-600",
+                            'Share Facebook': "bg-[#1877F2]",
+                            'Share LinkedIn': "bg-[#0A66C2]",
                             'Download Image': "bg-purple-500",
                             'Copy Image': "bg-indigo-500",
                             'Web Share': "bg-amber-500",
                             native: "bg-teal-500",
+                            'ClearView X': "bg-sky-500",
+                            'ClearView Bluesky': "bg-blue-600",
+                            'ClearView Facebook': "bg-[#1877F2]",
+                            'ClearView LinkedIn': "bg-[#0A66C2]",
+                            'ClearView Copy Link': "bg-blue-500",
+                            'ClearView Web Share': "bg-amber-500",
                           };
                           const info = SHARE_TYPE_INFO[type.type];
                           return (

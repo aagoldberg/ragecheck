@@ -1700,6 +1700,7 @@ function HomeContent() {
                     <button
                       onClick={() => {
                         tracking.trackShareToTwitter();
+                        trackShareEvent("Share X");
                         const shareUrl = getShareUrl();
                         const text = `RageCheck score: ${result.score}/100 for ${result.sourceDomain || "this content"}.\n\nBreakdown:`;
                         window.open(buildXIntentUrl(text, shareUrl), "_blank");
@@ -1712,6 +1713,7 @@ function HomeContent() {
                     <button
                       onClick={() => {
                         tracking.trackShareToBluesky();
+                        trackShareEvent("Share Bluesky");
                         const shareUrl = getShareUrl();
                         const text = `Ran this through RageCheck. Score: ${result.score}/100 for ${result.sourceDomain || "this content"}.\n\n${shareUrl}`;
                         window.open(buildBlueskyIntentUrl(text), "_blank");
@@ -1724,6 +1726,7 @@ function HomeContent() {
                     <button
                       onClick={() => {
                         tracking.trackShareToFacebook();
+                        trackShareEvent("Share Facebook");
                         window.open(buildFacebookShareUrl(getShareUrl()), "_blank");
                       }}
                       className="p-2 rounded-lg bg-[#1877F2] text-white hover:opacity-90 transition-opacity"
@@ -1734,6 +1737,7 @@ function HomeContent() {
                     <button
                       onClick={() => {
                         tracking.trackShareToLinkedIn();
+                        trackShareEvent("Share LinkedIn");
                         window.open(buildLinkedInShareUrl(getShareUrl()), "_blank");
                       }}
                       className="p-2 rounded-lg bg-[#0A66C2] text-white hover:opacity-90 transition-opacity"
@@ -1996,6 +2000,7 @@ function HomeContent() {
                         <button
                           onClick={() => {
                             tracking.trackShareToTwitter();
+                            trackShareEvent("Share X");
                             const shareUrl = getShareUrl();
                             const text = `RageCheck score: ${result.score}/100 for ${result.sourceDomain || "this content"}.\n\nBreakdown:`;
                             window.open(buildXIntentUrl(text, shareUrl), "_blank");
@@ -2008,6 +2013,7 @@ function HomeContent() {
                         <button
                           onClick={() => {
                             tracking.trackShareToBluesky();
+                            trackShareEvent("Share Bluesky");
                             const shareUrl = getShareUrl();
                             const text = `Ran this through RageCheck. Score: ${result.score}/100 for ${result.sourceDomain || "this content"}.\n\n${shareUrl}`;
                             window.open(buildBlueskyIntentUrl(text), "_blank");
@@ -2020,6 +2026,7 @@ function HomeContent() {
                         <button
                           onClick={() => {
                             tracking.trackShareToFacebook();
+                            trackShareEvent("Share Facebook");
                             window.open(buildFacebookShareUrl(getShareUrl()), "_blank");
                           }}
                           className="p-1.5 rounded-md bg-[#1877F2] text-white hover:opacity-90 transition-opacity"
@@ -2030,6 +2037,7 @@ function HomeContent() {
                         <button
                           onClick={() => {
                             tracking.trackShareToLinkedIn();
+                            trackShareEvent("Share LinkedIn");
                             window.open(buildLinkedInShareUrl(getShareUrl()), "_blank");
                           }}
                           className="p-1.5 rounded-md bg-[#0A66C2] text-white hover:opacity-90 transition-opacity"

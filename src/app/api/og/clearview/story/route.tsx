@@ -27,20 +27,33 @@ export async function GET(request: NextRequest) {
           width: "100%",
           display: "flex",
           flexDirection: "column",
-          backgroundColor: "#fafafa",
+          backgroundColor: "#0c0c12",
           position: "relative",
           fontFamily: "sans-serif",
+          overflow: "hidden",
         }}
       >
-        {/* Indigo accent bar at top */}
+        {/* Gradient accent bar at top */}
         <div
           style={{
             position: "absolute",
             top: 0,
             left: 0,
             right: 0,
-            height: "8px",
-            background: "linear-gradient(90deg, #6366f1, #a855f7)",
+            height: "5px",
+            background: "linear-gradient(90deg, #6366f1, #8b5cf6, #a78bfa)",
+          }}
+        />
+
+        {/* Subtle background glow */}
+        <div
+          style={{
+            position: "absolute",
+            top: "-150px",
+            left: "-100px",
+            width: "500px",
+            height: "500px",
+            background: "radial-gradient(circle, rgba(99,102,241,0.06) 0%, transparent 70%)",
           }}
         />
 
@@ -49,7 +62,7 @@ export async function GET(request: NextRequest) {
           style={{
             display: "flex",
             flexDirection: "column",
-            padding: "56px 64px 48px",
+            padding: "48px 64px 40px",
             height: "100%",
           }}
         >
@@ -59,35 +72,35 @@ export async function GET(request: NextRequest) {
               display: "flex",
               alignItems: "center",
               justifyContent: "space-between",
-              marginBottom: "32px",
+              marginBottom: "28px",
             }}
           >
-            {/* Logo and title */}
+            {/* Brand */}
             <div
               style={{
                 display: "flex",
                 alignItems: "center",
-                gap: "16px",
+                gap: "14px",
               }}
             >
               <div
                 style={{
-                  width: "48px",
-                  height: "48px",
-                  backgroundColor: "#18181b",
-                  borderRadius: "10px",
+                  width: "36px",
+                  height: "36px",
+                  background: "linear-gradient(135deg, #6366f1, #8b5cf6)",
+                  borderRadius: "8px",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
                 }}
               >
                 <svg
-                  width="28"
-                  height="28"
+                  width="20"
+                  height="20"
                   viewBox="0 0 24 24"
                   fill="none"
                   stroke="white"
-                  strokeWidth="2"
+                  strokeWidth="2.5"
                   strokeLinecap="round"
                   strokeLinejoin="round"
                 >
@@ -97,13 +110,14 @@ export async function GET(request: NextRequest) {
               </div>
               <span
                 style={{
-                  fontSize: "28px",
+                  fontSize: "20px",
                   fontWeight: "700",
-                  color: "#18181b",
-                  letterSpacing: "-0.5px",
+                  color: "#a1a1aa",
+                  letterSpacing: "2.5px",
+                  textTransform: "uppercase",
                 }}
               >
-                ClearView by RageCheck
+                ClearView
               </span>
             </div>
 
@@ -111,18 +125,18 @@ export async function GET(request: NextRequest) {
             <div
               style={{
                 display: "flex",
-                alignItems: "center",
-                padding: "8px 20px",
-                backgroundColor: "#e0e7ff",
+                padding: "6px 18px",
+                backgroundColor: "rgba(99,102,241,0.15)",
                 borderRadius: "50px",
+                border: "1px solid rgba(99,102,241,0.3)",
               }}
             >
               <span
                 style={{
-                  fontSize: "16px",
+                  fontSize: "13px",
                   fontWeight: "700",
-                  color: "#4338ca",
-                  letterSpacing: "1px",
+                  color: "#a5b4fc",
+                  letterSpacing: "1.5px",
                   textTransform: "uppercase",
                 }}
               >
@@ -134,13 +148,13 @@ export async function GET(request: NextRequest) {
           {/* Topic headline */}
           <div
             style={{
-              fontSize: "48px",
+              fontSize: "46px",
               fontWeight: "800",
-              color: "#18181b",
+              color: "#ffffff",
               lineHeight: 1.1,
-              letterSpacing: "-1px",
-              marginBottom: "32px",
-              maxHeight: "120px",
+              letterSpacing: "-1.5px",
+              marginBottom: "28px",
+              maxHeight: "115px",
               overflow: "hidden",
             }}
           >
@@ -151,7 +165,7 @@ export async function GET(request: NextRequest) {
           <div
             style={{
               display: "flex",
-              gap: "24px",
+              gap: "20px",
               flex: 1,
             }}
           >
@@ -162,13 +176,15 @@ export async function GET(request: NextRequest) {
                   flex: 1,
                   display: "flex",
                   flexDirection: "column",
+                  backgroundColor: "rgba(59,130,246,0.08)",
                   borderLeft: "4px solid #3b82f6",
-                  paddingLeft: "20px",
+                  borderRadius: "0 12px 12px 0",
+                  padding: "20px 24px",
                 }}
               >
                 <span
                   style={{
-                    fontSize: "14px",
+                    fontSize: "12px",
                     fontWeight: "700",
                     color: "#3b82f6",
                     letterSpacing: "2px",
@@ -176,18 +192,18 @@ export async function GET(request: NextRequest) {
                     marginBottom: "12px",
                   }}
                 >
-                  Left View
+                  Left Perspective
                 </span>
                 <span
                   style={{
-                    fontSize: "22px",
-                    color: "#1e3a5f",
+                    fontSize: "20px",
+                    color: "#93c5fd",
                     lineHeight: 1.4,
-                    maxHeight: "130px",
+                    maxHeight: "120px",
                     overflow: "hidden",
                   }}
                 >
-                  {leftView}
+                  &ldquo;{leftView}&rdquo;
                 </span>
               </div>
             )}
@@ -199,13 +215,15 @@ export async function GET(request: NextRequest) {
                   flex: 1,
                   display: "flex",
                   flexDirection: "column",
+                  backgroundColor: "rgba(239,68,68,0.08)",
                   borderLeft: "4px solid #ef4444",
-                  paddingLeft: "20px",
+                  borderRadius: "0 12px 12px 0",
+                  padding: "20px 24px",
                 }}
               >
                 <span
                   style={{
-                    fontSize: "14px",
+                    fontSize: "12px",
                     fontWeight: "700",
                     color: "#ef4444",
                     letterSpacing: "2px",
@@ -213,18 +231,18 @@ export async function GET(request: NextRequest) {
                     marginBottom: "12px",
                   }}
                 >
-                  Right View
+                  Right Perspective
                 </span>
                 <span
                   style={{
-                    fontSize: "22px",
-                    color: "#5f1e1e",
+                    fontSize: "20px",
+                    color: "#fca5a5",
                     lineHeight: 1.4,
-                    maxHeight: "130px",
+                    maxHeight: "120px",
                     overflow: "hidden",
                   }}
                 >
-                  {rightView}
+                  &ldquo;{rightView}&rdquo;
                 </span>
               </div>
             )}
@@ -237,69 +255,31 @@ export async function GET(request: NextRequest) {
               alignItems: "center",
               justifyContent: "space-between",
               marginTop: "auto",
-              paddingTop: "24px",
+              paddingTop: "20px",
             }}
           >
-            <div
+            <span
               style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "12px",
+                fontSize: "14px",
+                fontWeight: "600",
+                color: "#52525b",
               }}
             >
-              <span
-                style={{
-                  fontSize: "16px",
-                  fontWeight: "600",
-                  color: "#a1a1aa",
-                }}
-              >
-                {sourceCount} sources analyzed
-              </span>
-            </div>
+              {sourceCount} sources analyzed
+            </span>
 
             {/* Spectrum bar */}
             <div
               style={{
                 display: "flex",
-                gap: "6px",
+                gap: "4px",
                 alignItems: "center",
               }}
             >
-              <div
-                style={{
-                  width: "48px",
-                  height: "8px",
-                  background: "#3b82f6",
-                  borderRadius: "4px",
-                }}
-              />
-              <div
-                style={{
-                  width: "48px",
-                  height: "8px",
-                  background: "#94a3b8",
-                  borderRadius: "4px",
-                }}
-              />
-              <div
-                style={{
-                  width: "48px",
-                  height: "8px",
-                  background: "#ef4444",
-                  borderRadius: "4px",
-                }}
-              />
+              <div style={{ width: "40px", height: "4px", background: "#3b82f6", borderRadius: "2px" }} />
+              <div style={{ width: "40px", height: "4px", background: "#52525b", borderRadius: "2px" }} />
+              <div style={{ width: "40px", height: "4px", background: "#ef4444", borderRadius: "2px" }} />
             </div>
-
-            <span
-              style={{
-                fontSize: "16px",
-                color: "#a1a1aa",
-              }}
-            >
-              ragecheck.com/clearview
-            </span>
           </div>
         </div>
       </div>

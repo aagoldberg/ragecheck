@@ -3927,6 +3927,10 @@ export interface ShareMetrics {
     qrScansWeek: number;
     twitterReferrals: number; // visitors from twitter/t.co
     twitterReferralsWeek: number;
+    facebookReferrals: number; // visitors from facebook.com
+    facebookReferralsWeek: number;
+    linkedinReferrals: number; // visitors from linkedin.com
+    linkedinReferralsWeek: number;
     totalAttributed: number; // all visitors attributable to shares
     totalAttributedWeek: number;
     conversionFromQr: number; // % of QR scanners who analyze
@@ -4753,7 +4757,29 @@ export async function getShareMetrics(): Promise<ShareMetrics> {
         AND created_at > NOW() - INTERVAL '7 days'
     `;
 
-    // Total attributable to shares (QR + twitter referrals + other share params)
+    // Facebook referrals
+    const [facebookReferralsTotal] = await getDb()`
+      SELECT COUNT(*) as count FROM ragecheck_visitors
+      WHERE is_bot = false AND (referrer LIKE '%facebook.com%' OR referrer LIKE '%fb.com%' OR referrer LIKE '%l.facebook.com%' OR referrer LIKE '%lm.facebook.com%')
+    `;
+    const [facebookReferralsWeek] = await getDb()`
+      SELECT COUNT(*) as count FROM ragecheck_visitors
+      WHERE is_bot = false AND (referrer LIKE '%facebook.com%' OR referrer LIKE '%fb.com%' OR referrer LIKE '%l.facebook.com%' OR referrer LIKE '%lm.facebook.com%')
+        AND created_at > NOW() - INTERVAL '7 days'
+    `;
+
+    // LinkedIn referrals
+    const [linkedinReferralsTotal] = await getDb()`
+      SELECT COUNT(*) as count FROM ragecheck_visitors
+      WHERE is_bot = false AND (referrer LIKE '%linkedin.com%' OR referrer LIKE '%lnkd.in%')
+    `;
+    const [linkedinReferralsWeek] = await getDb()`
+      SELECT COUNT(*) as count FROM ragecheck_visitors
+      WHERE is_bot = false AND (referrer LIKE '%linkedin.com%' OR referrer LIKE '%lnkd.in%')
+        AND created_at > NOW() - INTERVAL '7 days'
+    `;
+
+    // Total attributable to shares (QR + twitter + facebook + linkedin + bluesky referrals + other share params)
     const [totalAttributed] = await getDb()`
       SELECT COUNT(*) as count FROM ragecheck_visitors
       WHERE is_bot = false AND (
@@ -4762,7 +4788,11 @@ export async function getShareMetrics(): Promise<ShareMetrics> {
         referrer LIKE '%t.co%' OR
         referrer LIKE '%twitter.com%' OR
         referrer LIKE '%x.com%' OR
-        referrer LIKE '%bsky%'
+        referrer LIKE '%bsky%' OR
+        referrer LIKE '%facebook.com%' OR
+        referrer LIKE '%fb.com%' OR
+        referrer LIKE '%linkedin.com%' OR
+        referrer LIKE '%lnkd.in%'
       )
     `;
     const [totalAttributedWeek] = await getDb()`
@@ -4773,7 +4803,11 @@ export async function getShareMetrics(): Promise<ShareMetrics> {
         referrer LIKE '%t.co%' OR
         referrer LIKE '%twitter.com%' OR
         referrer LIKE '%x.com%' OR
-        referrer LIKE '%bsky%'
+        referrer LIKE '%bsky%' OR
+        referrer LIKE '%facebook.com%' OR
+        referrer LIKE '%fb.com%' OR
+        referrer LIKE '%linkedin.com%' OR
+        referrer LIKE '%lnkd.in%'
       ) AND created_at > NOW() - INTERVAL '7 days'
     `;
 
@@ -4815,6 +4849,10 @@ export async function getShareMetrics(): Promise<ShareMetrics> {
         qrScansWeek: Number(qrScansWeek?.count) || 0,
         twitterReferrals: Number(twitterReferralsTotal?.count) || 0,
         twitterReferralsWeek: Number(twitterReferralsWeek?.count) || 0,
+        facebookReferrals: Number(facebookReferralsTotal?.count) || 0,
+        facebookReferralsWeek: Number(facebookReferralsWeek?.count) || 0,
+        linkedinReferrals: Number(linkedinReferralsTotal?.count) || 0,
+        linkedinReferralsWeek: Number(linkedinReferralsWeek?.count) || 0,
         totalAttributed: Number(totalAttributed?.count) || 0,
         totalAttributedWeek: Number(totalAttributedWeek?.count) || 0,
         conversionFromQr,
@@ -4838,7 +4876,7 @@ export async function getShareMetrics(): Promise<ShareMetrics> {
       scoreDistribution: { low: 0, medium: 0, high: 0, unknown: 0 },
       dailyTrend: [],
       kFactor: { shareRate: 0, avgSharesPerSharer: 0, estimatedConversion: 0, kFactorValue: 0 },
-      attribution: { qrScans: 0, qrScansWeek: 0, twitterReferrals: 0, twitterReferralsWeek: 0, totalAttributed: 0, totalAttributedWeek: 0, conversionFromQr: 0 },
+      attribution: { qrScans: 0, qrScansWeek: 0, twitterReferrals: 0, twitterReferralsWeek: 0, facebookReferrals: 0, facebookReferralsWeek: 0, linkedinReferrals: 0, linkedinReferralsWeek: 0, totalAttributed: 0, totalAttributedWeek: 0, conversionFromQr: 0 },
     };
   }
 }

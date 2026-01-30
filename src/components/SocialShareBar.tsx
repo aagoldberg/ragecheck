@@ -39,28 +39,41 @@ export function SocialShareBar({
     ? url
     : `${typeof window !== "undefined" ? window.location.origin : ""}${url}`;
 
+  const logShareToDb = (shareType: string) => {
+    fetch("/api/share", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url: fullUrl, shareType }),
+    }).catch(() => {});
+  };
+
   const handleShareX = () => {
     tracking.trackClearviewShare(context, "x");
+    logShareToDb("ClearView X");
     window.open(buildXIntentUrl(xText, fullUrl), "_blank");
   };
 
   const handleShareBluesky = () => {
     tracking.trackClearviewShare(context, "bluesky");
+    logShareToDb("ClearView Bluesky");
     window.open(buildBlueskyIntentUrl(blueskyText), "_blank");
   };
 
   const handleShareFacebook = () => {
     tracking.trackClearviewShare(context, "facebook");
+    logShareToDb("ClearView Facebook");
     window.open(buildFacebookShareUrl(fullUrl), "_blank");
   };
 
   const handleShareLinkedIn = () => {
     tracking.trackClearviewShare(context, "linkedin");
+    logShareToDb("ClearView LinkedIn");
     window.open(buildLinkedInShareUrl(fullUrl), "_blank");
   };
 
   const handleCopyLink = async () => {
     tracking.trackClearviewShare(context, "copy");
+    logShareToDb("ClearView Copy Link");
     try {
       await navigator.clipboard.writeText(fullUrl);
       setCopied(true);
@@ -80,6 +93,7 @@ export function SocialShareBar({
 
   const handleNativeShare = async () => {
     tracking.trackClearviewShare(context, "native");
+    logShareToDb("ClearView Web Share");
     try {
       await navigator.share({
         title: nativeTitle,
