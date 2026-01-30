@@ -6,10 +6,19 @@ Read/write functions for Neon PostgreSQL via psycopg2.
 
 import os
 import json
+from decimal import Decimal
 from typing import Any
 
 import psycopg2
 import psycopg2.extras
+
+
+def _convert_decimals(row: dict[str, Any]) -> dict[str, Any]:
+    """Convert decimal.Decimal values to float for igraph/numpy compatibility."""
+    return {
+        k: float(v) if isinstance(v, Decimal) else v
+        for k, v in row.items()
+    }
 
 
 def get_conn():
@@ -30,7 +39,7 @@ def get_event(event_id: int) -> dict[str, Any] | None:
                 "SELECT * FROM sidelines_events WHERE id = %s", (event_id,)
             )
             row = cur.fetchone()
-            return dict(row) if row else None
+            return _convert_decimals(dict(row)) if row else None
 
 
 def get_users(event_id: int) -> list[dict[str, Any]]:
@@ -41,7 +50,7 @@ def get_users(event_id: int) -> list[dict[str, Any]]:
                 "SELECT * FROM sidelines_users WHERE event_id = %s ORDER BY id",
                 (event_id,),
             )
-            return [dict(r) for r in cur.fetchall()]
+            return [_convert_decimals(dict(r)) for r in cur.fetchall()]
 
 
 def get_interactions(event_id: int) -> list[dict[str, Any]]:
@@ -52,7 +61,7 @@ def get_interactions(event_id: int) -> list[dict[str, Any]]:
                 "SELECT * FROM sidelines_interactions WHERE event_id = %s ORDER BY created_at",
                 (event_id,),
             )
-            return [dict(r) for r in cur.fetchall()]
+            return [_convert_decimals(dict(r)) for r in cur.fetchall()]
 
 
 def get_posts(event_id: int) -> list[dict[str, Any]]:
@@ -63,7 +72,7 @@ def get_posts(event_id: int) -> list[dict[str, Any]]:
                 "SELECT id, event_id, author_did, arousal_score FROM sidelines_posts WHERE event_id = %s",
                 (event_id,),
             )
-            return [dict(r) for r in cur.fetchall()]
+            return [_convert_decimals(dict(r)) for r in cur.fetchall()]
 
 
 def get_yesterday_metrics(
@@ -79,7 +88,7 @@ def get_yesterday_metrics(
                 (event_id, today),
             )
             row = cur.fetchone()
-            return dict(row) if row else None
+            return _convert_decimals(dict(row)) if row else None
 
 
 def get_yesterday_cluster_assignments(
@@ -96,7 +105,7 @@ def get_yesterday_cluster_assignments(
                    )""",
                 (event_id, event_id, today),
             )
-            return [dict(r) for r in cur.fetchall()]
+            return [_convert_decimals(dict(r)) for r in cur.fetchall()]
 
 
 def get_yesterday_user_features(
@@ -113,7 +122,7 @@ def get_yesterday_user_features(
                    )""",
                 (event_id, event_id, today),
             )
-            return [dict(r) for r in cur.fetchall()]
+            return [_convert_decimals(dict(r)) for r in cur.fetchall()]
 
 
 # =============================================================================
