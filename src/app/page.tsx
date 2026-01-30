@@ -1701,7 +1701,7 @@ function HomeContent() {
                       onClick={() => {
                         tracking.trackShareToTwitter();
                         const shareUrl = getShareUrl();
-                        const text = `RageCheck score: ${result.score}/100 for ${result.sourceDomain || "this content"}.`;
+                        const text = `RageCheck score: ${result.score}/100 for ${result.sourceDomain || "this content"}.\n\nBreakdown:`;
                         window.open(buildXIntentUrl(text, shareUrl), "_blank");
                       }}
                       className="p-2 rounded-lg bg-black text-white hover:opacity-90 transition-opacity"
@@ -1997,7 +1997,7 @@ function HomeContent() {
                           onClick={() => {
                             tracking.trackShareToTwitter();
                             const shareUrl = getShareUrl();
-                            const text = `RageCheck score: ${result.score}/100 for ${result.sourceDomain || "this content"}.`;
+                            const text = `RageCheck score: ${result.score}/100 for ${result.sourceDomain || "this content"}.\n\nBreakdown:`;
                             window.open(buildXIntentUrl(text, shareUrl), "_blank");
                           }}
                           className="p-1.5 rounded-md bg-black text-white hover:opacity-90 transition-opacity"
