@@ -6,6 +6,8 @@ import {
   updateEventStatus,
 } from "@/lib/db-sidelines";
 
+export const maxDuration = 300;
+
 const rawWorkerUrl = process.env.SIDELINES_WORKER_URL || "http://localhost:8000";
 const WORKER_URL = rawWorkerUrl.startsWith("http") ? rawWorkerUrl : `https://${rawWorkerUrl}`;
 
