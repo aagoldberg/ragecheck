@@ -18,6 +18,10 @@ from analysis import (
     compute_bridge_churn,
     compute_attack_matrix,
     compute_middle_attrition,
+    extract_giant_component,
+    compute_cluster_summaries,
+    compute_discourse_temperature,
+    generate_headline_insight,
 )
 
 
@@ -242,3 +246,145 @@ class TestMiddleAttrition:
     def test_growth_ignored(self):
         # Positive deltas (growth) should not reduce attrition
         assert compute_middle_attrition(0.5, 0.5, 0.5) == 0.0
+
+
+class TestExtractGiantComponent:
+    def test_empty_graph(self):
+        g = ig.Graph(directed=True)
+        sub, indices = extract_giant_component(g)
+        assert sub.vcount() == 0
+        assert indices == []
+
+    def test_single_component(self):
+        """A fully connected graph returns itself."""
+        users = make_test_users(4)
+        edges = [(0, 1), (1, 2), (2, 3)]
+        interactions = make_test_interactions(edges)
+        g = build_graph(users, interactions, {i: 0.5 for i in range(4)})
+        sub, indices = extract_giant_component(g)
+        assert sub.vcount() == 4
+        assert len(indices) == 4
+
+    def test_multiple_components(self):
+        """Should extract the largest component."""
+        users = make_test_users(6)
+        # Component 1: 0-1-2-3 (4 nodes)
+        # Component 2: 4-5 (2 nodes)
+        edges = [(0, 1), (1, 2), (2, 3), (4, 5)]
+        interactions = make_test_interactions(edges)
+        g = build_graph(users, interactions, {i: 0.5 for i in range(6)})
+        sub, indices = extract_giant_component(g)
+        assert sub.vcount() == 4
+        assert len(indices) == 4
+        # The giant component should be nodes 0-3
+        giant_user_ids = set(sub.vs["user_id"])
+        assert giant_user_ids == {0, 1, 2, 3}
+
+
+class TestClusterSummaries:
+    def test_empty(self):
+        g = ig.Graph(directed=True)
+        result = compute_cluster_summaries(g, None, {})
+        assert result == []
+
+    def test_min_size_filtering(self):
+        """Clusters below min_size should be excluded."""
+        users = make_test_users(8)
+        # Create a big clique of 6 + small pair of 2
+        edges = [(i, j) for i in range(6) for j in range(6) if i != j]
+        edges += [(6, 7)]
+        interactions = make_test_interactions(edges)
+        g = build_graph(users, interactions, {i: 0.5 for i in range(8)})
+        partition = detect_communities(g)
+        betweenness = compute_betweenness(g)
+        summaries = compute_cluster_summaries(g, partition, betweenness, min_size=5)
+        # Only the big cluster should pass the filter
+        assert all(s["size"] >= 5 for s in summaries)
+
+    def test_energy_level_labels(self):
+        """Energy levels should match arousal thresholds."""
+        users = make_test_users(6)
+        edges = [(i, j) for i in range(6) for j in range(6) if i != j]
+        interactions = make_test_interactions(edges)
+
+        # High arousal
+        g = build_graph(users, interactions, {i: 0.5 for i in range(6)})
+        partition = detect_communities(g)
+        betweenness = compute_betweenness(g)
+        summaries = compute_cluster_summaries(g, partition, betweenness, min_size=1)
+        for s in summaries:
+            if s["meanArousal"] >= 0.40:
+                assert s["energyLevel"] == "High"
+            elif s["meanArousal"] >= 0.15:
+                assert s["energyLevel"] == "Medium"
+            else:
+                assert s["energyLevel"] == "Low"
+
+    def test_key_voices(self):
+        """Key voices should have at most 3 entries."""
+        users = make_test_users(6)
+        edges = [(i, j) for i in range(6) for j in range(6) if i != j]
+        interactions = make_test_interactions(edges)
+        g = build_graph(users, interactions, {i: 0.3 for i in range(6)})
+        partition = detect_communities(g)
+        betweenness = compute_betweenness(g)
+        summaries = compute_cluster_summaries(g, partition, betweenness, min_size=1)
+        for s in summaries:
+            assert len(s["keyVoices"]) <= 3
+
+
+class TestDiscourseTemperature:
+    def test_quiet_range(self):
+        result = compute_discourse_temperature(0, 0, 0, 0, 1)
+        assert result["score"] < 20
+        assert result["label"] == "Quiet"
+        assert result["colorZone"] == "zinc"
+
+    def test_boiling_range(self):
+        result = compute_discourse_temperature(100, 1.0, 100, 500, 10)
+        assert result["score"] >= 80
+        assert result["label"] == "Boiling"
+        assert result["colorZone"] == "red"
+
+    def test_warm_range(self):
+        result = compute_discourse_temperature(50, 0.3, 40, 100, 50)
+        score = result["score"]
+        # Just verify it's a valid result with a label
+        assert 0 <= score <= 100
+        assert result["label"] in ("Quiet", "Simmering", "Warm", "Heated", "Boiling")
+
+    def test_score_clamped(self):
+        """Score should be clamped to 0-100."""
+        result = compute_discourse_temperature(200, 2.0, 200, 1000, 1)
+        assert result["score"] == 100.0
+
+    def test_zero_nodes(self):
+        """Should handle zero nodes without division error."""
+        result = compute_discourse_temperature(0, 0, 0, 0, 0)
+        assert result["score"] >= 0
+
+
+class TestHeadlineInsight:
+    def test_quiet_low(self):
+        result = generate_headline_insight("Quiet", 3, 10, 0.05, 100)
+        assert isinstance(result, str)
+        assert len(result) > 0
+
+    def test_boiling_high(self):
+        result = generate_headline_insight("Boiling", 4, 60, 0.8, 500)
+        assert isinstance(result, str)
+        assert len(result) > 0
+
+    def test_polarized_descriptor(self):
+        result = generate_headline_insight("Warm", 2, 30, 0.3, 200)
+        assert isinstance(result, str)
+
+    def test_fragmented_descriptor(self):
+        result = generate_headline_insight("Heated", 8, 45, 0.5, 1000)
+        assert isinstance(result, str)
+
+    def test_unknown_combo_uses_fallback(self):
+        """Unknown temperature/connectivity combos should use fallback template."""
+        result = generate_headline_insight("Unknown", 5, 35, 0.4, 500)
+        assert isinstance(result, str)
+        assert "5" in result  # Should include cluster count

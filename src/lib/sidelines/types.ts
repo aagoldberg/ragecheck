@@ -89,6 +89,41 @@ export interface ArousalResult {
   breakdown: ArousalBreakdown;
 }
 
+export interface DiscourseTemperature {
+  score: number;
+  label: string;
+  colorZone: string;
+}
+
+export interface ClusterSummary {
+  clusterId: number;
+  size: number;
+  meanArousal: number;
+  energyLevel: string;
+  keyVoices: { userId: number; betweenness: number }[];
+  edgeDensity: number;
+  interactionBreakdown: { reply: number; quote: number; repost: number };
+  topPost?: {
+    text: string;
+    authorHandle: string;
+    arousalScore: number;
+  };
+}
+
+export interface BridgeUser {
+  userId: number;
+  handle?: string;
+  betweenness: number;
+  arousal: number;
+  clustersSpanned: number[];
+}
+
+export interface FieldPosition {
+  clusterId: number;
+  x: number;
+  y: number;
+}
+
 export interface DailyMetrics {
   baseActivation: number;
   crossClusterContact: number;
@@ -98,6 +133,16 @@ export interface DailyMetrics {
   nodeCount: number;
   edgeCount: number;
   meanArousal: number;
+  // New fields (optional for backward compatibility)
+  totalUsers?: number;
+  giantComponentSize?: number;
+  isolatedUsers?: number;
+  meaningfulClusterCount?: number;
+  discourseTemperature?: DiscourseTemperature;
+  headlineInsight?: string;
+  clusterSummaries?: ClusterSummary[];
+  bridgeUsers?: BridgeUser[];
+  clusterPositions?: FieldPosition[];
 }
 
 export interface MetricsPayload {

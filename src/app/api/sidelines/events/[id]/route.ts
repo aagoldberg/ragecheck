@@ -7,6 +7,7 @@ import {
   getUserCount,
   getEdgeCount,
   getLatestDailyMetrics,
+  getUsersByIds,
 } from "@/lib/db-sidelines";
 
 export async function GET(
@@ -48,11 +49,60 @@ export async function GET(
       getLatestDailyMetrics(eventId),
     ]);
 
+    // Resolve bridge user and key voice handles
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let enrichedMetrics: any = latestMetrics;
+    if (latestMetrics?.metrics?.bridgeUsers?.length) {
+      const bridgeUserIds = latestMetrics.metrics.bridgeUsers.map(
+        (b: { userId: number }) => b.userId
+      );
+      const users = await getUsersByIds(eventId, bridgeUserIds);
+      const userMap = new Map(users.map((u) => [u.id, u]));
+      enrichedMetrics = {
+        ...latestMetrics,
+        metrics: {
+          ...latestMetrics.metrics,
+          bridgeUsers: latestMetrics.metrics.bridgeUsers.map(
+            (b: { userId: number }) => ({
+              ...b,
+              handle: userMap.get(b.userId)?.handle || undefined,
+            })
+          ),
+        },
+      };
+    }
+
+    if (enrichedMetrics?.metrics?.clusterSummaries?.length) {
+      const allVoiceIds = enrichedMetrics.metrics.clusterSummaries.flatMap(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (cs: any) => cs.keyVoices?.map((v: any) => v.userId) || []
+      );
+      if (allVoiceIds.length > 0) {
+        const voiceUsers = await getUsersByIds(eventId, allVoiceIds);
+        const voiceMap = new Map(voiceUsers.map((u) => [u.id, u]));
+        enrichedMetrics = {
+          ...enrichedMetrics,
+          metrics: {
+            ...enrichedMetrics.metrics,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            clusterSummaries: enrichedMetrics.metrics.clusterSummaries.map((cs: any) => ({
+              ...cs,
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              keyVoices: cs.keyVoices?.map((v: any) => ({
+                ...v,
+                handle: voiceMap.get(v.userId)?.handle || undefined,
+              })),
+            })),
+          },
+        };
+      }
+    }
+
     return NextResponse.json({
       success: true,
       event,
       counts: { postCount, userCount, edgeCount },
-      latestMetrics,
+      latestMetrics: enrichedMetrics,
     });
   } catch (error) {
     console.error("SideLines event GET error:", error);

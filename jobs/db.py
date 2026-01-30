@@ -75,6 +75,32 @@ def get_posts(event_id: int) -> list[dict[str, Any]]:
             return [_convert_decimals(dict(r)) for r in cur.fetchall()]
 
 
+def get_top_posts_for_users(
+    event_id: int,
+    user_ids: list[int],
+    limit: int = 3,
+) -> list[dict[str, Any]]:
+    """Fetch highest-arousal posts by specific user IDs."""
+    if not user_ids:
+        return []
+    with get_conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(
+                """SELECT p.id, p.text, p.author_did, p.author_handle,
+                          p.arousal_score, p.arousal_breakdown,
+                          u.id as user_id
+                   FROM sidelines_posts p
+                   JOIN sidelines_users u ON u.event_id = p.event_id AND u.did = p.author_did
+                   WHERE p.event_id = %s
+                     AND u.id = ANY(%s)
+                     AND p.arousal_score IS NOT NULL
+                   ORDER BY p.arousal_score DESC
+                   LIMIT %s""",
+                (event_id, user_ids, limit),
+            )
+            return [_convert_decimals(dict(r)) for r in cur.fetchall()]
+
+
 def get_yesterday_metrics(
     event_id: int, today: str
 ) -> dict[str, Any] | None:

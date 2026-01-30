@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import { isDBAvailable } from "@/lib/db";
-import { initSidelinesTables, getClusterAssignments } from "@/lib/db-sidelines";
+import {
+  initSidelinesTables,
+  getClusterAssignments,
+  getLatestDailyMetrics,
+} from "@/lib/db-sidelines";
 
 export async function GET(
   request: Request,
@@ -28,6 +32,7 @@ export async function GET(
 
     const { searchParams } = new URL(request.url);
     const day = searchParams.get("day") || new Date().toISOString().split("T")[0];
+    const minSize = parseInt(searchParams.get("minSize") || "5");
 
     const assignments = await getClusterAssignments(eventId, day);
 
@@ -48,10 +53,23 @@ export async function GET(
       });
     }
 
+    // Filter by minSize
+    const filteredClusters: typeof clusterStats = {};
+    for (const [cid, data] of Object.entries(clusterStats)) {
+      if (data.count >= minSize) {
+        filteredClusters[parseInt(cid)] = data;
+      }
+    }
+
+    // Include cluster summaries from latest metrics if available
+    const latestMetrics = await getLatestDailyMetrics(eventId);
+    const clusterSummaries = latestMetrics?.metrics?.clusterSummaries || [];
+
     return NextResponse.json({
       success: true,
       day,
-      clusters: clusterStats,
+      clusters: filteredClusters,
+      clusterSummaries,
       totalUsers: assignments.length,
     });
   } catch (error) {

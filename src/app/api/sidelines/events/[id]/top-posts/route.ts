@@ -1,6 +1,30 @@
 import { NextResponse } from "next/server";
 import { isDBAvailable } from "@/lib/db";
 import { initSidelinesTables, getTopPostsByArousal } from "@/lib/db-sidelines";
+import type { ArousalBreakdown } from "@/lib/sidelines/types";
+
+const AROUSAL_LABELS: Record<keyof ArousalBreakdown, string> = {
+  emotionAngerFearDisgust: "Emotion",
+  urgency: "Urgency",
+  intensifiers: "Intensifiers",
+  moralJudgment: "Moral Judgment",
+  purityContamination: "Purity",
+  dehumanization: "Dehumanization",
+  absolutist: "Absolutist",
+};
+
+function getDominantArousalType(breakdown: ArousalBreakdown | null): string | null {
+  if (!breakdown) return null;
+  let maxKey: string | null = null;
+  let maxVal = -1;
+  for (const [key, val] of Object.entries(breakdown)) {
+    if (typeof val === "number" && val > maxVal) {
+      maxVal = val;
+      maxKey = key;
+    }
+  }
+  return maxKey ? AROUSAL_LABELS[maxKey as keyof ArousalBreakdown] || maxKey : null;
+}
 
 export async function GET(
   request: Request,
@@ -31,7 +55,12 @@ export async function GET(
 
     const posts = await getTopPostsByArousal(eventId, Math.min(limit, 200));
 
-    return NextResponse.json({ success: true, posts });
+    const enrichedPosts = posts.map((post) => ({
+      ...post,
+      dominantArousalType: getDominantArousalType(post.arousalBreakdown),
+    }));
+
+    return NextResponse.json({ success: true, posts: enrichedPosts });
   } catch (error) {
     console.error("SideLines top-posts error:", error);
     return NextResponse.json(

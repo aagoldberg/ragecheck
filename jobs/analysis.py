@@ -312,6 +312,327 @@ def compute_middle_attrition(
     return min(100.0, raw * 100)
 
 
+def extract_giant_component(
+    graph: ig.Graph,
+) -> tuple[ig.Graph, list[int]]:
+    """
+    Extract the largest weakly connected component from the graph.
+
+    Returns:
+        (subgraph, original_indices) — the giant component subgraph and
+        the original vertex indices of its members in the full graph.
+    """
+    if graph.vcount() == 0:
+        return graph, []
+
+    components = graph.connected_components(mode="weak")
+    if len(components) == 0:
+        return graph, []
+
+    # Find largest component
+    largest_idx = max(range(len(components)), key=lambda i: len(components[i]))
+    original_indices = sorted(components[largest_idx])
+
+    subgraph = graph.subgraph(original_indices)
+    return subgraph, original_indices
+
+
+def compute_cluster_summaries(
+    graph: ig.Graph,
+    partition: Any,
+    betweenness: dict[int, float],
+    min_size: int = 5,
+) -> list[dict[str, Any]]:
+    """
+    Compute summary statistics for each cluster with >= min_size members.
+
+    Returns list of dicts with: clusterId, size, meanArousal, energyLevel,
+    keyVoices, edgeDensity, interactionBreakdown.
+    """
+    if partition is None or graph.vcount() == 0:
+        return []
+
+    membership = partition.membership
+    n_clusters = max(membership) + 1 if membership else 0
+    summaries = []
+
+    for c in range(n_clusters):
+        members = [i for i, m in enumerate(membership) if m == c]
+        if len(members) < min_size:
+            continue
+
+        # Mean arousal
+        arousals = [graph.vs[i]["arousal"] for i in members]
+        mean_arousal = float(np.mean(arousals)) if arousals else 0.0
+
+        # Energy level
+        if mean_arousal >= 0.40:
+            energy_level = "High"
+        elif mean_arousal >= 0.15:
+            energy_level = "Medium"
+        else:
+            energy_level = "Low"
+
+        # Key voices: top 3 by betweenness
+        member_betweenness = [(i, betweenness.get(i, 0.0)) for i in members]
+        member_betweenness.sort(key=lambda x: x[1], reverse=True)
+        key_voices = [
+            {"userId": graph.vs[i]["user_id"], "betweenness": round(b, 4)}
+            for i, b in member_betweenness[:3]
+        ]
+
+        # Edge density
+        subgraph = graph.subgraph(members)
+        possible_edges = len(members) * (len(members) - 1)
+        edge_density = subgraph.ecount() / possible_edges if possible_edges > 0 else 0.0
+
+        # Interaction breakdown
+        edge_types = subgraph.es["type"] if subgraph.ecount() > 0 and "type" in subgraph.es.attributes() else []
+        total_edges = len(edge_types) if edge_types else 1
+        reply_count = sum(1 for t in edge_types if t == "reply")
+        quote_count = sum(1 for t in edge_types if t == "quote")
+        repost_count = sum(1 for t in edge_types if t == "repost")
+
+        summaries.append({
+            "clusterId": c,
+            "size": len(members),
+            "meanArousal": round(mean_arousal, 4),
+            "energyLevel": energy_level,
+            "keyVoices": key_voices,
+            "edgeDensity": round(edge_density, 4),
+            "interactionBreakdown": {
+                "reply": round(reply_count / total_edges, 2) if total_edges > 0 else 0,
+                "quote": round(quote_count / total_edges, 2) if total_edges > 0 else 0,
+                "repost": round(repost_count / total_edges, 2) if total_edges > 0 else 0,
+            },
+        })
+
+    return summaries
+
+
+def compute_discourse_temperature(
+    base_activation: float,
+    mean_arousal: float,
+    cross_cluster_contact: float,
+    edge_count: int,
+    node_count: int,
+) -> dict[str, Any]:
+    """
+    Compute a 0-100 discourse temperature score.
+
+    Formula: 0.35 * base_activation + 0.30 * (mean_arousal * 100)
+             + 0.20 * cross_cluster_contact + 0.15 * connectivity_term
+
+    Returns: { score, label, colorZone }
+    """
+    connectivity = min(100.0, (edge_count / max(node_count, 1)) * 50)
+    score = (
+        0.35 * base_activation
+        + 0.30 * (mean_arousal * 100)
+        + 0.20 * cross_cluster_contact
+        + 0.15 * connectivity
+    )
+    score = max(0.0, min(100.0, score))
+
+    if score < 20:
+        label, color_zone = "Quiet", "zinc"
+    elif score < 40:
+        label, color_zone = "Simmering", "blue"
+    elif score < 60:
+        label, color_zone = "Warm", "amber"
+    elif score < 80:
+        label, color_zone = "Heated", "orange"
+    else:
+        label, color_zone = "Boiling", "red"
+
+    return {
+        "score": round(score, 1),
+        "label": label,
+        "colorZone": color_zone,
+    }
+
+
+def generate_headline_insight(
+    temperature_label: str,
+    cluster_count: int,
+    cross_cluster_contact: float,
+    mean_arousal: float,
+    node_count: int,
+) -> str:
+    """
+    Generate a template-based headline insight (no LLM).
+
+    Keyed on temperature zone + cluster count + connectivity level.
+    """
+    # Connectivity level
+    if cross_cluster_contact >= 50:
+        connectivity = "high"
+    elif cross_cluster_contact >= 20:
+        connectivity = "moderate"
+    else:
+        connectivity = "low"
+
+    # Cluster descriptor
+    if cluster_count <= 2:
+        cluster_desc = "polarized"
+    elif cluster_count <= 5:
+        cluster_desc = "fragmented into a few camps"
+    else:
+        cluster_desc = "highly fragmented"
+
+    templates = {
+        ("Quiet", "low"): "Discourse is quiet — communities are {cluster_desc} with low engagement between them.",
+        ("Quiet", "moderate"): "A calm discussion with some cross-community exchange, but energy remains low across {n} teams.",
+        ("Quiet", "high"): "Teams are talking to each other, but the overall tone is measured and calm.",
+        ("Simmering", "low"): "Tension is building in isolated pockets — {n} teams are active but not yet engaging each other.",
+        ("Simmering", "moderate"): "A simmering debate with moderate cross-team engagement. Energy is rising across {n} communities.",
+        ("Simmering", "high"): "Active debate across team lines with building momentum. Watch for escalation.",
+        ("Warm", "low"): "The discussion is heated within teams but they're mostly talking past each other.",
+        ("Warm", "moderate"): "A warm debate is underway — {n} teams are engaging with moderate intensity.",
+        ("Warm", "high"): "Heated cross-team exchanges are driving the conversation. {n} communities are actively clashing.",
+        ("Heated", "low"): "High-intensity discourse is happening in silos — teams are fired up but not engaging rivals.",
+        ("Heated", "moderate"): "The debate is heated with {n} communities firing across lines. Bridge users are under pressure.",
+        ("Heated", "high"): "Full engagement across all fronts. High-arousal exchanges dominate the discourse between {n} teams.",
+        ("Boiling", "low"): "Extreme intensity within isolated groups. The discourse is boiling but contained.",
+        ("Boiling", "moderate"): "The discourse has reached a boiling point — {n} teams are locked in high-energy conflict.",
+        ("Boiling", "high"): "All-out discursive warfare. Every team is fully engaged with maximum intensity.",
+    }
+
+    key = (temperature_label, connectivity)
+    template = templates.get(key, "The discourse involves {n} communities with {connectivity} cross-team engagement.")
+    return template.format(
+        cluster_desc=cluster_desc,
+        n=cluster_count,
+        connectivity=connectivity,
+    )
+
+
+def get_bridge_user_details(
+    graph: ig.Graph,
+    partition: Any,
+    bridges: set[int],
+    betweenness: dict[int, float],
+    top_n: int = 10,
+) -> list[dict[str, Any]]:
+    """
+    Get details for top-N bridge users by betweenness.
+
+    Returns list of dicts: userId, betweenness, arousal, clustersSpanned.
+    """
+    if not bridges or partition is None:
+        return []
+
+    membership = partition.membership
+
+    bridge_details = []
+    for i in bridges:
+        neighbors = graph.neighbors(i, mode="all")
+        clusters_spanned = sorted({membership[n] for n in neighbors} | {membership[i]})
+        bridge_details.append({
+            "userId": graph.vs[i]["user_id"],
+            "betweenness": round(betweenness.get(i, 0.0), 4),
+            "arousal": round(float(graph.vs[i]["arousal"]), 4),
+            "clustersSpanned": clusters_spanned,
+        })
+
+    bridge_details.sort(key=lambda x: x["betweenness"], reverse=True)
+    return bridge_details[:top_n]
+
+
+def compute_field_positions(
+    cluster_summaries: list[dict[str, Any]],
+    graph: ig.Graph,
+    partition: Any,
+) -> list[dict[str, Any]]:
+    """
+    Compute 2D positions for clusters on the field using a simple
+    force-directed layout.
+
+    Returns list of {clusterId, x, y} in [0,1] coordinate space.
+
+    Algorithm:
+    1. Initialize positions on a circle
+    2. Iterate: clusters repel (Coulomb), cross-cluster edges attract (spring)
+    3. Normalize to [0.1, 0.9] range (padding from field edges)
+    4. Deterministic seed for stable positions
+    """
+    if not cluster_summaries:
+        return []
+
+    n = len(cluster_summaries)
+    if n == 1:
+        return [{"clusterId": cluster_summaries[0]["clusterId"], "x": 0.5, "y": 0.5}]
+
+    rng = np.random.RandomState(42)
+
+    # Initialize on a circle
+    positions = np.zeros((n, 2))
+    for i in range(n):
+        angle = 2 * np.pi * i / n
+        positions[i] = [0.5 + 0.3 * np.cos(angle), 0.5 + 0.3 * np.sin(angle)]
+
+    # Build cross-cluster edge counts between summary clusters
+    cluster_ids = [s["clusterId"] for s in cluster_summaries]
+    id_to_idx = {cid: i for i, cid in enumerate(cluster_ids)}
+
+    cross_edges = np.zeros((n, n))
+    if partition is not None and graph.ecount() > 0:
+        membership = partition.membership
+        for e in graph.es:
+            src_c = membership[e.source]
+            dst_c = membership[e.target]
+            if src_c != dst_c and src_c in id_to_idx and dst_c in id_to_idx:
+                si, di = id_to_idx[src_c], id_to_idx[dst_c]
+                cross_edges[si][di] += 1
+                cross_edges[di][si] += 1
+
+    # Force-directed iterations
+    for _ in range(100):
+        forces = np.zeros((n, 2))
+
+        for i in range(n):
+            for j in range(i + 1, n):
+                diff = positions[i] - positions[j]
+                dist = max(np.linalg.norm(diff), 0.01)
+                direction = diff / dist
+
+                # Repulsion (Coulomb-like)
+                repulsion = 0.01 / (dist * dist)
+                forces[i] += direction * repulsion
+                forces[j] -= direction * repulsion
+
+                # Attraction (spring) proportional to cross-cluster edges
+                edge_weight = cross_edges[i][j]
+                if edge_weight > 0:
+                    attraction = 0.001 * np.log1p(edge_weight) * dist
+                    forces[i] -= direction * attraction
+                    forces[j] += direction * attraction
+
+        # Apply forces with damping
+        positions += forces * 0.5
+
+        # Keep within bounds
+        positions = np.clip(positions, 0.1, 0.9)
+
+    # Normalize to [0.1, 0.9]
+    for dim in range(2):
+        vals = positions[:, dim]
+        min_v, max_v = vals.min(), vals.max()
+        if max_v - min_v > 0.01:
+            positions[:, dim] = 0.1 + 0.8 * (vals - min_v) / (max_v - min_v)
+        else:
+            positions[:, dim] = 0.5
+
+    return [
+        {
+            "clusterId": cluster_summaries[i]["clusterId"],
+            "x": round(float(positions[i][0]), 4),
+            "y": round(float(positions[i][1]), 4),
+        }
+        for i in range(n)
+    ]
+
+
 def assess_confidence(
     node_count: int,
     edge_count: int,

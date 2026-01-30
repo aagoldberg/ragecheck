@@ -283,16 +283,24 @@ export async function getPostsByEvent(
 export async function getTopPostsByArousal(
   eventId: number,
   limit: number = 50
-): Promise<SidelinesPost[]> {
+): Promise<(SidelinesPost & { clusterId?: number })[]> {
   const rows = await withRetry(async () => {
     return await getDb()`
-      SELECT * FROM sidelines_posts
-      WHERE event_id = ${eventId} AND arousal_score IS NOT NULL
-      ORDER BY arousal_score DESC
+      SELECT p.*, ca.cluster_id
+      FROM sidelines_posts p
+      LEFT JOIN sidelines_users u ON u.event_id = p.event_id AND u.did = p.author_did
+      LEFT JOIN sidelines_cluster_assignments ca ON ca.user_id = u.id AND ca.event_id = p.event_id
+        AND ca.day = (SELECT MAX(day) FROM sidelines_cluster_assignments WHERE event_id = p.event_id)
+      WHERE p.event_id = ${eventId} AND p.arousal_score IS NOT NULL
+      ORDER BY p.arousal_score DESC
       LIMIT ${limit}
     `;
   });
-  return rows.map(mapPost);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return rows.map((row: any) => ({
+    ...mapPost(row),
+    clusterId: row.cluster_id != null ? parseInt(row.cluster_id) : undefined,
+  }));
 }
 
 export async function getPostCount(eventId: number): Promise<number> {
@@ -358,6 +366,20 @@ export async function getUsersByEvent(
     return await getDb()`
       SELECT * FROM sidelines_users WHERE event_id = ${eventId}
       ORDER BY id
+    `;
+  });
+  return rows.map(mapUser);
+}
+
+export async function getUsersByIds(
+  eventId: number,
+  userIds: number[]
+): Promise<SidelinesUser[]> {
+  if (userIds.length === 0) return [];
+  const rows = await withRetry(async () => {
+    return await getDb()`
+      SELECT * FROM sidelines_users
+      WHERE event_id = ${eventId} AND id = ANY(${userIds})
     `;
   });
   return rows.map(mapUser);

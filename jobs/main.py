@@ -24,6 +24,12 @@ from analysis import (
     compute_attack_matrix,
     compute_middle_attrition,
     assess_confidence,
+    extract_giant_component,
+    compute_cluster_summaries,
+    compute_discourse_temperature,
+    generate_headline_insight,
+    get_bridge_user_details,
+    compute_field_positions,
 )
 from db import (
     get_event,
@@ -111,24 +117,30 @@ async def analyze(request: AnalyzeRequest):
             for uid, scores in user_arousal.items()
         }
 
-        # Build graph
-        graph = build_graph(users, interactions, post_arousal_mean)
+        # Build full graph
+        full_graph = build_graph(users, interactions, post_arousal_mean)
 
-        # Community detection
-        partition = detect_communities(graph)
+        # Extract giant component (connected users only)
+        giant, giant_indices = extract_giant_component(full_graph)
+        total_users = full_graph.vcount()
+        giant_component_size = giant.vcount()
+        isolated_users = total_users - giant_component_size
 
-        # Betweenness centrality
-        betweenness = compute_betweenness(graph)
+        # Community detection on giant component only
+        partition = detect_communities(giant)
 
-        # Compute metrics
+        # Betweenness centrality on giant component
+        betweenness = compute_betweenness(giant)
+
+        # Compute metrics on giant component
         membership = partition.membership if partition else []
         n_clusters = max(membership) + 1 if membership else 0
 
-        base_activation = compute_base_activation(graph, partition)
-        cross_cluster_contact = compute_cross_cluster_contact(graph, partition)
+        base_activation = compute_base_activation(giant, partition)
+        cross_cluster_contact = compute_cross_cluster_contact(giant, partition)
 
         # Bridge analysis
-        today_bridges = compute_bridge_nodes(graph, partition, betweenness)
+        today_bridges = compute_bridge_nodes(giant, partition, betweenness)
 
         # Get yesterday's data for churn/attrition
         yesterday_metrics = get_yesterday_metrics(request.event_id, today)
@@ -137,7 +149,6 @@ async def analyze(request: AnalyzeRequest):
         # Bridge churn
         yesterday_bridge_ids = set()
         if yesterday_features:
-            # Bridges from yesterday = those with high betweenness
             b_values = [f["betweenness"] for f in yesterday_features if f["betweenness"] > 0]
             if b_values:
                 p75 = float(np.percentile(b_values, 75))
@@ -147,7 +158,7 @@ async def analyze(request: AnalyzeRequest):
                 }
 
         # Map today's bridges to user_ids for comparison
-        today_bridge_user_ids = {graph.vs[i]["user_id"] for i in today_bridges}
+        today_bridge_user_ids = {giant.vs[i]["user_id"] for i in today_bridges}
         bridge_churn = compute_bridge_churn(today_bridge_user_ids, yesterday_bridge_ids)
 
         # Middle attrition
@@ -168,9 +179,9 @@ async def analyze(request: AnalyzeRequest):
             if old_contact > 0:
                 contact_delta = (cross_cluster_contact - old_contact) / old_contact
 
-            old_nodes = ym.get("nodeCount", graph.vcount())
+            old_nodes = ym.get("nodeCount", giant.vcount())
             if old_nodes > 0:
-                participation_delta = (graph.vcount() - old_nodes) / old_nodes
+                participation_delta = (giant.vcount() - old_nodes) / old_nodes
 
         middle_attrition = compute_middle_attrition(
             bridge_delta, contact_delta, participation_delta
@@ -184,54 +195,88 @@ async def analyze(request: AnalyzeRequest):
         ]
         mean_arousal = float(np.mean(all_arousals)) if all_arousals else 0.0
 
+        # New enriched analysis
+        cluster_summaries = compute_cluster_summaries(giant, partition, betweenness)
+        meaningful_cluster_count = len(cluster_summaries)
+
+        discourse_temp = compute_discourse_temperature(
+            base_activation, mean_arousal, cross_cluster_contact,
+            giant.ecount(), giant.vcount(),
+        )
+
+        headline_insight = generate_headline_insight(
+            discourse_temp["label"],
+            meaningful_cluster_count,
+            cross_cluster_contact,
+            mean_arousal,
+            giant.vcount(),
+        )
+
+        bridge_user_details = get_bridge_user_details(
+            giant, partition, today_bridges, betweenness,
+        )
+
+        field_positions = compute_field_positions(
+            cluster_summaries, giant, partition,
+        )
+
         # Confidence assessment
-        # Count days with data
         days_count = 1
         if yesterday_metrics:
-            days_count = 2  # At least 2 days
+            days_count = 2
 
         confidence = assess_confidence(
-            node_count=graph.vcount(),
-            edge_count=graph.ecount(),
+            node_count=giant.vcount(),
+            edge_count=giant.ecount(),
             cluster_count=n_clusters,
             days=days_count,
             sampled=len(posts) >= 10000,
-            platforms=1,  # Phase 1: Bluesky only
+            platforms=1,
         )
 
-        # Assemble metrics
+        # Assemble metrics (original + new fields, additive)
         metrics = {
             "baseActivation": round(base_activation, 2),
             "crossClusterContact": round(cross_cluster_contact, 2),
             "bridgeChurn": round(bridge_churn, 4),
             "middleAttrition": round(middle_attrition, 2),
             "clusterCount": n_clusters,
-            "nodeCount": graph.vcount(),
-            "edgeCount": graph.ecount(),
+            "nodeCount": giant.vcount(),
+            "edgeCount": giant.ecount(),
             "meanArousal": round(mean_arousal, 4),
-            "attackMatrix": compute_attack_matrix(graph, partition),
+            "attackMatrix": compute_attack_matrix(giant, partition),
+            # New fields
+            "totalUsers": total_users,
+            "giantComponentSize": giant_component_size,
+            "isolatedUsers": isolated_users,
+            "meaningfulClusterCount": meaningful_cluster_count,
+            "discourseTemperature": discourse_temp,
+            "headlineInsight": headline_insight,
+            "clusterSummaries": cluster_summaries,
+            "bridgeUsers": bridge_user_details,
+            "clusterPositions": field_positions,
         }
 
         # Write results to DB
         upsert_daily_metrics(request.event_id, today, metrics, confidence)
 
-        # Write cluster assignments
+        # Write cluster assignments (for giant component)
         if partition:
             cluster_data = []
             for i, cluster_id in enumerate(membership):
                 cluster_data.append({
                     "event_id": request.event_id,
                     "day": today,
-                    "user_id": graph.vs[i]["user_id"],
+                    "user_id": giant.vs[i]["user_id"],
                     "cluster_id": cluster_id,
                     "score": betweenness.get(i, 0.0),
                 })
             upsert_cluster_assignments(cluster_data)
 
-        # Write user features
+        # Write user features (for giant component)
         user_feature_data = []
-        for i in range(graph.vcount()):
-            uid = graph.vs[i]["user_id"]
+        for i in range(giant.vcount()):
+            uid = giant.vs[i]["user_id"]
             u_arousals = user_arousal.get(uid, [])
             u_p95 = float(np.percentile(u_arousals, 95)) if len(u_arousals) >= 2 else (
                 u_arousals[0] if u_arousals else 0.0
@@ -243,8 +288,8 @@ async def analyze(request: AnalyzeRequest):
                 "arousal_mean": post_arousal_mean.get(uid, 0.0),
                 "arousal_p95": u_p95,
                 "post_count": len(u_arousals),
-                "in_degree": graph.degree(i, mode="in"),
-                "out_degree": graph.degree(i, mode="out"),
+                "in_degree": giant.degree(i, mode="in"),
+                "out_degree": giant.degree(i, mode="out"),
                 "betweenness": betweenness.get(i, 0.0),
             })
         upsert_user_features(user_feature_data)
@@ -257,8 +302,8 @@ async def analyze(request: AnalyzeRequest):
             metrics=metrics,
             confidence=confidence,
             cluster_count=n_clusters,
-            node_count=graph.vcount(),
-            edge_count=graph.ecount(),
+            node_count=giant.vcount(),
+            edge_count=giant.ecount(),
         )
 
     except HTTPException:
