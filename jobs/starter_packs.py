@@ -25,7 +25,7 @@ from db import get_conn
 import psycopg2.extras
 
 BSKY_PUBLIC_API = "https://public.api.bsky.app/xrpc"
-RATE_LIMIT_MS = 120
+RATE_LIMIT_MS = 50
 FOLLOWS_PER_PAGE = 100
 
 
@@ -323,6 +323,65 @@ def backfill_follows(batch_size: int = 200) -> dict[str, Any]:
         time.sleep(RATE_LIMIT_MS / 1000)
 
     remaining = len(get_unfetched_tracked_dids(limit=1))
+
+    return {
+        "processed": processed,
+        "remaining": remaining,
+        "done": remaining == 0,
+    }
+
+
+def get_stale_tracked_dids(
+    stale_days: int = 7, limit: int = 200
+) -> list[str]:
+    """Get tracked users whose follows are older than stale_days."""
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """SELECT t.did FROM bluesky_tracked_users t
+                   JOIN bluesky_follows_fetched f ON f.user_did = t.did
+                   WHERE f.fetched_at < NOW() - INTERVAL '%s days'
+                   ORDER BY f.fetched_at ASC
+                   LIMIT %s""",
+                (stale_days, limit),
+            )
+            return [r[0] for r in cur.fetchall()]
+
+
+def refresh_stale_follows(
+    stale_days: int = 7, batch_size: int = 200
+) -> dict[str, Any]:
+    """
+    Re-fetch follows for users whose data is older than stale_days.
+
+    Deletes old follows for each user and re-fetches from scratch.
+    Returns: {processed, remaining, done}
+    """
+    stale = get_stale_tracked_dids(stale_days=stale_days, limit=batch_size)
+
+    if not stale:
+        return {"processed": 0, "remaining": 0, "done": True}
+
+    processed = 0
+    for did in stale:
+        # Delete old follows for this user
+        with get_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "DELETE FROM bluesky_follows WHERE user_did = %s", (did,)
+                )
+            conn.commit()
+
+        # Re-fetch
+        follows = fetch_user_follows(did)
+        if follows is not None:
+            store_follows_batch(did, follows)
+        else:
+            store_follows_batch(did, [])
+        processed += 1
+        time.sleep(RATE_LIMIT_MS / 1000)
+
+    remaining = len(get_stale_tracked_dids(stale_days=stale_days, limit=1))
 
     return {
         "processed": processed,

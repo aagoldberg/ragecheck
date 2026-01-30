@@ -87,6 +87,25 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: true, ...(await res.json()) });
     }
 
+    if (action === "refresh-follows") {
+      const res = await fetch(`${WORKER_URL}/refresh-follows`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          stale_days: body.staleDays || 7,
+          batch_size: body.batchSize || 200,
+        }),
+      });
+      if (!res.ok) {
+        const errorText = await res.text();
+        return NextResponse.json(
+          { success: false, error: `Worker error: ${errorText}` },
+          { status: res.status }
+        );
+      }
+      return NextResponse.json({ success: true, ...(await res.json()) });
+    }
+
     if (action === "compute") {
       const res = await fetch(`${WORKER_URL}/compute-communities`, {
         method: "POST",

@@ -58,7 +58,7 @@ from db import (
     get_community_assignments_for_dids,
     get_global_communities,
 )
-from starter_packs import crawl_starter_packs, backfill_follows
+from starter_packs import crawl_starter_packs, backfill_follows, refresh_stale_follows
 
 app = FastAPI(title="SideLines Analysis Worker")
 
@@ -602,6 +602,34 @@ async def backfill_follows_endpoint(request: BackfillFollowsRequest):
     try:
         result = backfill_follows(batch_size=request.batch_size)
         return BackfillFollowsResponse(**result)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class RefreshFollowsRequest(BaseModel):
+    stale_days: int = 7
+    batch_size: int = 200
+
+
+class RefreshFollowsResponse(BaseModel):
+    processed: int
+    remaining: int
+    done: bool
+
+
+@app.post("/refresh-follows", response_model=RefreshFollowsResponse)
+async def refresh_follows_endpoint(request: RefreshFollowsRequest):
+    """
+    Re-fetch follows for users whose data is older than stale_days.
+
+    Call repeatedly until done == True.
+    """
+    try:
+        result = refresh_stale_follows(
+            stale_days=request.stale_days,
+            batch_size=request.batch_size,
+        )
+        return RefreshFollowsResponse(**result)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
