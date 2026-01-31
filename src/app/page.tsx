@@ -1106,10 +1106,10 @@ function HomeContent() {
       {/* Navigation */}
       <nav className="sticky top-0 z-50 border-b border-zinc-200 dark:border-zinc-800 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md">
         <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="w-6 h-6 bg-zinc-900 dark:bg-zinc-100 rounded-lg shadow-sm" />
+          <a href="/clearview" className="flex items-center gap-2.5 group">
+            <div className="w-6 h-6 bg-zinc-900 dark:bg-zinc-100 rounded-lg shadow-sm group-hover:rotate-12 transition-transform" />
             <span className="font-bold text-lg tracking-tight">RageCheck</span>
-          </div>
+          </a>
           {/* Desktop nav */}
           <div className="hidden sm:flex gap-6 text-sm font-medium text-zinc-500">
             <a href="/clearview" onClick={() => tracking.trackNavClick("clearview", "header")} className="hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors">Clearview</a>
