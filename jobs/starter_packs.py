@@ -348,6 +348,69 @@ def get_stale_tracked_dids(
             return [r[0] for r in cur.fetchall()]
 
 
+def snowball_expand(
+    min_followers: int = 50, limit: int = 10000
+) -> dict[str, Any]:
+    """
+    Expand tracked users by adding accounts followed by many existing tracked users.
+
+    Finds accounts in bluesky_follows that are NOT already tracked but are followed
+    by >= min_followers of our tracked users. Adds them to bluesky_tracked_users.
+
+    Returns: {candidates, new_users_added, total_tracked}
+    """
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            # Find popular untracked accounts
+            cur.execute(
+                """SELECT f.follows_did, COUNT(*) as follower_count
+                   FROM bluesky_follows f
+                   LEFT JOIN bluesky_tracked_users t ON t.did = f.follows_did
+                   WHERE t.did IS NULL
+                   GROUP BY f.follows_did
+                   HAVING COUNT(*) >= %s
+                   ORDER BY follower_count DESC
+                   LIMIT %s""",
+                (min_followers, limit),
+            )
+            candidates = cur.fetchall()
+
+            if not candidates:
+                cur.execute("SELECT COUNT(*) FROM bluesky_tracked_users")
+                total = cur.fetchone()[0]
+                return {
+                    "candidates": 0,
+                    "new_users_added": 0,
+                    "total_tracked": total,
+                }
+
+            # Insert as tracked users
+            values = [
+                (did, "", "snowball")
+                for did, _ in candidates
+            ]
+            psycopg2.extras.execute_values(
+                cur,
+                """INSERT INTO bluesky_tracked_users (did, handle, source)
+                   VALUES %s
+                   ON CONFLICT (did) DO NOTHING""",
+                values,
+                page_size=500,
+            )
+            added = cur.rowcount
+
+            cur.execute("SELECT COUNT(*) FROM bluesky_tracked_users")
+            total = cur.fetchone()[0]
+
+        conn.commit()
+
+    return {
+        "candidates": len(candidates),
+        "new_users_added": added,
+        "total_tracked": total,
+    }
+
+
 def refresh_stale_follows(
     stale_days: int = 7, batch_size: int = 200
 ) -> dict[str, Any]:

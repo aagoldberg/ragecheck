@@ -58,7 +58,7 @@ from db import (
     get_community_assignments_for_dids,
     get_global_communities,
 )
-from starter_packs import crawl_starter_packs, backfill_follows, refresh_stale_follows
+from starter_packs import crawl_starter_packs, backfill_follows, refresh_stale_follows, snowball_expand
 
 app = FastAPI(title="SideLines Analysis Worker")
 
@@ -767,6 +767,36 @@ async def compute_communities(request: ComputeCommunitiesRequest):
             communities=response_communities,
         )
 
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class SnowballExpandRequest(BaseModel):
+    min_followers: int = 50
+    limit: int = 10000
+
+
+class SnowballExpandResponse(BaseModel):
+    candidates: int
+    new_users_added: int
+    total_tracked: int
+
+
+@app.post("/expand-tracked", response_model=SnowballExpandResponse)
+async def expand_tracked(request: SnowballExpandRequest):
+    """
+    Expand the tracked user set via snowball sampling.
+
+    Finds accounts followed by >= min_followers of our tracked users
+    and adds them to the tracked set. The Jetstream consumer will
+    pick them up on its next DID refresh cycle (every 5 min).
+    """
+    try:
+        result = snowball_expand(
+            min_followers=request.min_followers,
+            limit=request.limit,
+        )
+        return SnowballExpandResponse(**result)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
