@@ -247,7 +247,7 @@ function StoryCard({ story }: { story: StoryCluster }) {
   // Split whatHappened or summary into bullet points (by sentence)
   const factText = story.whatHappened || story.summary || "";
   const factBullets = factText
-    .split(/(?<=[.!?])\s+/)
+    .split(/(?<=[^A-Z][.!?])\s+(?=[A-Z])/)
     .filter(s => s.trim().length > 10)
     .slice(0, 4);
 
