@@ -2,15 +2,15 @@
 Bluesky Jetstream Consumer
 
 Persistent WebSocket consumer that subscribes to the Bluesky Jetstream
-for real-time follow events. Keeps the global follow graph up to date.
+for real-time follow AND post events from tracked users.
 
 Jetstream endpoint: wss://jetstream2.us-east.bsky.network/subscribe
   ?wantedCollections=app.bsky.graph.follow
+  &wantedCollections=app.bsky.feed.post
 
 No authentication required. Supports cursor-based resume on reconnect.
 
 Run as standalone: python jetstream.py
-Or via FastAPI endpoint for managed start/stop.
 """
 
 from __future__ import annotations
@@ -21,6 +21,7 @@ import logging
 import os
 import signal
 import time
+from datetime import datetime, timezone
 from typing import Any
 
 import psycopg2
@@ -33,13 +34,15 @@ logging.basicConfig(
 log = logging.getLogger(__name__)
 
 JETSTREAM_URL = "wss://jetstream2.us-east.bsky.network/subscribe"
-WANTED_COLLECTIONS = ["app.bsky.graph.follow"]
+WANTED_COLLECTIONS = [
+    "app.bsky.graph.follow",
+    "app.bsky.feed.post",
+]
 FLUSH_INTERVAL_S = 5
 FLUSH_BATCH_SIZE = 500
 RECONNECT_DELAY_S = 5
 MAX_RECONNECT_DELAY_S = 60
 
-# State file for cursor persistence across restarts
 CURSOR_FILE = os.environ.get("JETSTREAM_CURSOR_FILE", "/tmp/jetstream_cursor.txt")
 
 
@@ -56,7 +59,6 @@ def _load_tracked_dids() -> set[str]:
 
 
 def _save_cursor(cursor: int) -> None:
-    """Persist cursor to file for resume on restart."""
     try:
         with open(CURSOR_FILE, "w") as f:
             f.write(str(cursor))
@@ -65,7 +67,6 @@ def _save_cursor(cursor: int) -> None:
 
 
 def _load_cursor() -> int | None:
-    """Load cursor from file."""
     try:
         with open(CURSOR_FILE, "r") as f:
             return int(f.read().strip())
@@ -73,10 +74,8 @@ def _load_cursor() -> int | None:
         return None
 
 
-def _flush_follows(
-    buffer: list[tuple[str, str, str]],
-) -> int:
-    """Flush buffered follow rows to the database. Returns count inserted."""
+def _flush_follows(buffer: list[tuple[str, str, str]]) -> int:
+    """Flush buffered follow rows to the database."""
     if not buffer:
         return 0
     with _get_conn() as conn:
@@ -94,29 +93,85 @@ def _flush_follows(
     return inserted
 
 
-def _flush_unfollows(
-    buffer: list[tuple[str, str]],
-) -> int:
-    """Remove unfollowed relationships. Returns count deleted."""
+def _flush_posts(buffer: list[tuple]) -> int:
+    """Flush buffered post rows to the database."""
     if not buffer:
         return 0
     with _get_conn() as conn:
         with conn.cursor() as cur:
-            deleted = 0
-            for user_did, follows_did in buffer:
-                cur.execute(
-                    "DELETE FROM bluesky_follows WHERE user_did = %s AND follows_did = %s",
-                    (user_did, follows_did),
-                )
-                deleted += cur.rowcount
+            psycopg2.extras.execute_values(
+                cur,
+                """INSERT INTO bluesky_posts
+                   (author_did, uri, text, reply_parent_uri, reply_root_uri,
+                    quote_uri, langs, created_at)
+                   VALUES %s
+                   ON CONFLICT (uri) DO NOTHING""",
+                buffer,
+                page_size=500,
+            )
+            inserted = cur.rowcount
         conn.commit()
-    return deleted
+    return inserted
+
+
+def _parse_post_record(
+    user_did: str, commit: dict
+) -> tuple | None:
+    """Parse a post commit into a DB row tuple."""
+    record = commit.get("record", {})
+    rkey = commit.get("rkey", "")
+    uri = f"at://{user_did}/app.bsky.feed.post/{rkey}"
+
+    text = record.get("text", "")
+    created_at_str = record.get("createdAt", "")
+    langs = record.get("langs", [])
+
+    # Parse reply
+    reply = record.get("reply", {})
+    reply_parent_uri = None
+    reply_root_uri = None
+    if reply:
+        parent = reply.get("parent", {})
+        root = reply.get("root", {})
+        reply_parent_uri = parent.get("uri") if parent else None
+        reply_root_uri = root.get("uri") if root else None
+
+    # Parse quote (embed with record)
+    quote_uri = None
+    embed = record.get("embed", {})
+    if embed:
+        embed_type = embed.get("$type", "")
+        if "record" in embed_type:
+            embedded_record = embed.get("record", {})
+            quote_uri = embedded_record.get("uri")
+
+    # Parse timestamp
+    try:
+        if created_at_str:
+            created_at = datetime.fromisoformat(
+                created_at_str.replace("Z", "+00:00")
+            )
+        else:
+            created_at = datetime.now(timezone.utc)
+    except (ValueError, TypeError):
+        created_at = datetime.now(timezone.utc)
+
+    return (
+        user_did,
+        uri,
+        text,
+        reply_parent_uri,
+        reply_root_uri,
+        quote_uri,
+        langs,
+        created_at,
+    )
 
 
 async def consume_jetstream() -> None:
     """
-    Main consumer loop. Connects to Jetstream, filters follow events
-    for tracked users, and writes to bluesky_follows.
+    Main consumer loop. Connects to Jetstream, filters events
+    for tracked users, writes follows and posts to the database.
     """
     try:
         import websockets
@@ -124,24 +179,21 @@ async def consume_jetstream() -> None:
         log.error("websockets package not installed. Run: pip install websockets")
         return
 
-    # Load tracked DIDs (refresh periodically)
     tracked_dids = _load_tracked_dids()
     log.info(f"Loaded {len(tracked_dids)} tracked DIDs")
 
     last_tracked_refresh = time.time()
-    tracked_refresh_interval = 300  # refresh every 5 min
+    tracked_refresh_interval = 300
 
     follow_buffer: list[tuple[str, str, str]] = []
-    unfollow_buffer: list[tuple[str, str]] = []
+    post_buffer: list[tuple] = []
     last_flush = time.time()
     last_cursor: int | None = _load_cursor()
 
     reconnect_delay = RECONNECT_DELAY_S
-    total_processed = 0
-    total_inserted = 0
+    stats = {"follows": 0, "posts": 0, "skipped": 0}
 
     while True:
-        # Build URL with params
         params = [f"wantedCollections={c}" for c in WANTED_COLLECTIONS]
         if last_cursor:
             params.append(f"cursor={last_cursor}")
@@ -158,80 +210,95 @@ async def consume_jetstream() -> None:
                     except json.JSONDecodeError:
                         continue
 
-                    # Update cursor
                     time_us = msg.get("time_us")
                     if time_us:
                         last_cursor = time_us
 
-                    # Only process commit events
                     if msg.get("kind") != "commit":
                         continue
 
                     commit = msg.get("commit", {})
                     collection = commit.get("collection", "")
-                    if collection != "app.bsky.graph.follow":
-                        continue
-
                     user_did = msg.get("did", "")
                     operation = commit.get("operation", "")
 
-                    # Only track follows from/to tracked users
                     if user_did not in tracked_dids:
+                        stats["skipped"] += 1
                         continue
 
-                    total_processed += 1
+                    # Handle follows
+                    if collection == "app.bsky.graph.follow":
+                        if operation == "create":
+                            record = commit.get("record", {})
+                            follows_did = record.get("subject", "")
+                            if follows_did:
+                                follow_buffer.append(
+                                    (user_did, follows_did, "")
+                                )
+                                stats["follows"] += 1
 
-                    if operation == "create":
-                        record = commit.get("record", {})
-                        follows_did = record.get("subject", "")
-                        if follows_did:
-                            follow_buffer.append((user_did, follows_did, ""))
-                    elif operation == "delete":
-                        # For deletes, we need the rkey to find the target
-                        # Jetstream doesn't include the record on delete,
-                        # so we skip unfollow tracking for now
-                        pass
+                    # Handle posts
+                    elif collection == "app.bsky.feed.post":
+                        if operation == "create":
+                            row = _parse_post_record(user_did, commit)
+                            if row:
+                                post_buffer.append(row)
+                                stats["posts"] += 1
 
                     # Periodic flush
                     now = time.time()
-                    if (
-                        len(follow_buffer) >= FLUSH_BATCH_SIZE
-                        or (follow_buffer and now - last_flush >= FLUSH_INTERVAL_S)
-                    ):
-                        inserted = _flush_follows(follow_buffer)
-                        total_inserted += inserted
+                    needs_flush = (
+                        len(follow_buffer) + len(post_buffer) >= FLUSH_BATCH_SIZE
+                        or (
+                            (follow_buffer or post_buffer)
+                            and now - last_flush >= FLUSH_INTERVAL_S
+                        )
+                    )
+
+                    if needs_flush:
+                        _flush_follows(follow_buffer)
+                        _flush_posts(post_buffer)
                         follow_buffer.clear()
+                        post_buffer.clear()
                         last_flush = now
                         _save_cursor(last_cursor)
 
-                        if total_processed % 1000 == 0:
+                        total = stats["follows"] + stats["posts"]
+                        if total % 500 == 0 and total > 0:
                             log.info(
-                                f"Processed {total_processed} events, "
-                                f"inserted {total_inserted} follows"
+                                f"follows={stats['follows']:,} "
+                                f"posts={stats['posts']:,} "
+                                f"skipped={stats['skipped']:,}"
                             )
 
                     # Refresh tracked DIDs periodically
                     if now - last_tracked_refresh >= tracked_refresh_interval:
                         tracked_dids = _load_tracked_dids()
                         last_tracked_refresh = now
-                        log.info(f"Refreshed tracked DIDs: {len(tracked_dids)}")
+                        log.info(
+                            f"Refreshed tracked DIDs: {len(tracked_dids)}"
+                        )
 
         except Exception as e:
-            # Flush any remaining buffer before reconnect
             if follow_buffer:
                 _flush_follows(follow_buffer)
                 follow_buffer.clear()
+            if post_buffer:
+                _flush_posts(post_buffer)
+                post_buffer.clear()
             if last_cursor:
                 _save_cursor(last_cursor)
 
-            log.warning(f"Disconnected: {e}. Reconnecting in {reconnect_delay}s...")
+            log.warning(
+                f"Disconnected: {e}. Reconnecting in {reconnect_delay}s..."
+            )
             await asyncio.sleep(reconnect_delay)
             reconnect_delay = min(reconnect_delay * 2, MAX_RECONNECT_DELAY_S)
 
 
 def main() -> None:
     """Entry point for standalone execution."""
-    log.info("Starting Jetstream consumer...")
+    log.info("Starting Jetstream consumer (follows + posts)...")
 
     loop = asyncio.new_event_loop()
 

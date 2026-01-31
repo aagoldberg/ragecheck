@@ -216,6 +216,26 @@ export async function initSidelinesTables() {
     )
   `;
   await getDb()`CREATE INDEX IF NOT EXISTS idx_bcm_community ON bluesky_community_members(community_id)`;
+
+  // Global posts from tracked users (collected via Jetstream)
+  await getDb()`
+    CREATE TABLE IF NOT EXISTS bluesky_posts (
+      id BIGSERIAL PRIMARY KEY,
+      author_did TEXT NOT NULL,
+      uri TEXT NOT NULL UNIQUE,
+      text TEXT NOT NULL DEFAULT '',
+      reply_parent_uri TEXT,
+      reply_root_uri TEXT,
+      quote_uri TEXT,
+      langs TEXT[] DEFAULT '{}',
+      created_at TIMESTAMPTZ NOT NULL,
+      indexed_at TIMESTAMPTZ DEFAULT NOW(),
+      arousal_score REAL,
+      arousal_breakdown JSONB
+    )
+  `;
+  await getDb()`CREATE INDEX IF NOT EXISTS idx_bp_author ON bluesky_posts(author_did)`;
+  await getDb()`CREATE INDEX IF NOT EXISTS idx_bp_created ON bluesky_posts(created_at)`;
 }
 
 // =============================================================================
