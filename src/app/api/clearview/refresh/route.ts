@@ -453,7 +453,7 @@ For each story, provide comprehensive analysis:
         "exists": true,
         "statement": "What expert consensus says",
         "confidenceLevel": "high|moderate|low|contested",
-        "sources": ["CDC", "Supreme Court", etc.],
+        "sources": [{ "name": "CDC", "articleUrl": "url of the article that cites this", "articleName": "NPR" }],
         "dissent": "Notable minority view if relevant"
       },
       "debateType": "factual|policy|values|mixed",
@@ -502,6 +502,7 @@ CRITICAL GUIDELINES:
 - Identify manipulation techniques: loaded language, fear-mongering, omission of context, false equivalence, appeal to emotion
 - REQUIRED: Every story MUST include expertConsensus, whyItMatters, and deeperAnalysis
 - Be empathetic to both sides - help readers understand WHY reasonable people disagree
+- expertConsensus.sources: ONLY cite expert/institutional positions that are directly quoted or referenced in the provided article content. Each source must include the articleUrl and articleName of the article where the reference appears. If no article references expert consensus, set type to "none".
 - IMPORTANT: Return ONLY valid JSON. No markdown, no code fences, no commentary. Escape all special characters in strings.`;
 
   let fullText = "";

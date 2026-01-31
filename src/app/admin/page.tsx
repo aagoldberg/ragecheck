@@ -1705,6 +1705,24 @@ interface ClearViewAnalytics {
     grid: number[][];
     maxValue: number;
   };
+  spikeDetection: {
+    dailyCounts: { date: string; unique: number; isSpike: boolean; baseline: number }[];
+    spikes: { date: string; unique: number; multiplier: number; topSource: string }[];
+    surgeCohorts: { spikeDate: string; newVisitors: number; d1Return: number; d3Return: number; d7Return: number }[];
+    organicBaseline: { d1Return: number; d3Return: number; d7Return: number };
+  };
+  attributionResults: { source: string; count: number; percentage: number }[];
+  attributionResponseRate: number;
+  viralityEstimate: {
+    shareRate: number;
+    measuredReferralRate: number;
+    darkSocialMultiplier: number;
+    adjustedReferralRate: number;
+    kFactor: number;
+    dailyGrowthRate: number;
+    virality: 'viral' | 'growing' | 'organic' | 'stalled';
+    trend: number[];
+  };
 }
 
 // ============================================
@@ -1840,6 +1858,21 @@ function getClearViewAlerts(a: ClearViewAnalytics): { level: 'green' | 'yellow' 
   const powerUsers = a.repeatUsers.frequencyDistribution.visits10plus;
   if (powerUsers > 0) {
     alerts.push({ level: 'green', text: `${powerUsers} power user${powerUsers > 1 ? 's' : ''} visited 10+ days in the last 30 days.` });
+  }
+
+  // Traffic spike alerts
+  for (const spike of a.spikeDetection.spikes) {
+    const severity: 'yellow' | 'red' = spike.multiplier >= 5 ? 'red' : 'yellow';
+    alerts.push({ level: severity, text: `Traffic spike detected: ${spike.date} had ${spike.unique} visitors (${spike.multiplier}\u00d7 normal). Top source: ${spike.topSource}.` });
+  }
+
+  // Surge cohort retention alert
+  const latestSurge = a.spikeDetection.surgeCohorts[a.spikeDetection.surgeCohorts.length - 1];
+  const orgBase = a.spikeDetection.organicBaseline;
+  if (latestSurge && orgBase.d7Return > 0) {
+    const comparison = latestSurge.d7Return >= orgBase.d7Return ? 'better' : 'worse';
+    const level: 'green' | 'yellow' = comparison === 'better' ? 'green' : 'yellow';
+    alerts.push({ level, text: `Surge cohort (${latestSurge.spikeDate}) D7 retention is ${latestSurge.d7Return}% \u2014 ${comparison} than ${orgBase.d7Return}% organic baseline.` });
   }
 
   return alerts;
@@ -3077,6 +3110,338 @@ export default function AdminDashboard() {
                             </div>
                           </div>
                         </div>
+
+                        {/* Section 8: Attribution Survey Results */}
+                        {clearviewAnalytics.attributionResults.length > 0 && (
+                          <div className="mb-8">
+                            <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-4">
+                              Attribution Survey Results
+                            </h3>
+                            <InsightBlock>
+                              <span className="font-semibold text-zinc-900 dark:text-zinc-100">Top self-reported source: </span>
+                              {clearviewAnalytics.attributionResults[0].source} ({clearviewAnalytics.attributionResults[0].percentage}%).
+                              {clearviewAnalytics.attributionResults.length > 1 && ` Followed by ${clearviewAnalytics.attributionResults[1].source} (${clearviewAnalytics.attributionResults[1].percentage}%).`}
+                              {' '}Response rate: {clearviewAnalytics.attributionResponseRate}%.
+                            </InsightBlock>
+                            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
+                              <StatCard
+                                title="Total Responses"
+                                value={clearviewAnalytics.attributionResults.reduce((s, r) => s + r.count, 0)}
+                                accent="indigo"
+                              />
+                              <StatCard
+                                title="Response Rate"
+                                value={`${clearviewAnalytics.attributionResponseRate}%`}
+                                accent="emerald"
+                              />
+                              <StatCard
+                                title="Top Source"
+                                value={clearviewAnalytics.attributionResults[0].source}
+                                subtitle={`${clearviewAnalytics.attributionResults[0].count} responses`}
+                                accent="purple"
+                              />
+                            </div>
+                            <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6">
+                              <div className="space-y-3">
+                                {clearviewAnalytics.attributionResults.map((attr) => {
+                                  const maxPct = Math.max(...clearviewAnalytics.attributionResults.map(a => a.percentage), 1);
+                                  return (
+                                    <div key={attr.source} className="flex items-center gap-3">
+                                      <span className="text-xs font-medium text-zinc-700 dark:text-zinc-300 w-36 truncate">{attr.source}</span>
+                                      <div className="flex-1 bg-zinc-100 dark:bg-zinc-800 rounded-full h-5 overflow-hidden">
+                                        <div
+                                          className="bg-indigo-500 h-full rounded-full transition-all"
+                                          style={{ width: `${(attr.percentage / maxPct) * 100}%` }}
+                                        />
+                                      </div>
+                                      <span className="text-xs font-bold text-zinc-500 w-16 text-right">{attr.count} ({attr.percentage}%)</span>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Section 8b: ClearView Virality Estimate */}
+                        {(() => {
+                          const v = clearviewAnalytics.viralityEstimate;
+                          const statusConfig = {
+                            viral: { label: 'Viral', color: 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400' },
+                            growing: { label: 'Growing', color: 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400' },
+                            organic: { label: 'Organic', color: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400' },
+                            stalled: { label: 'Stalled', color: 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400' },
+                          };
+                          const status = statusConfig[v.virality];
+                          return (
+                            <div className="mb-8">
+                              <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-4">
+                                ClearView Virality Estimate
+                              </h3>
+                              <InsightBlock>
+                                <span className="font-semibold text-zinc-900 dark:text-zinc-100">K-factor: {v.kFactor} </span>
+                                <span className={`inline-flex px-1.5 py-0.5 rounded text-[10px] font-bold uppercase ${status.color}`}>{status.label}</span>
+                                {' \u2014 '}
+                                {v.kFactor >= 1
+                                  ? 'Each user is bringing in more than 1 new user. Exponential growth.'
+                                  : v.kFactor >= 0.3
+                                  ? 'Word-of-mouth is contributing meaningful growth. Not yet self-sustaining.'
+                                  : v.kFactor > 0
+                                  ? 'Some organic spread, but growth mainly depends on external discovery.'
+                                  : 'No measurable viral spread yet. Focus on making the product shareable.'}
+                                {v.darkSocialMultiplier > 1.2 && ` Dark social multiplier is ${v.darkSocialMultiplier}\u00d7 \u2014 significant word-of-mouth is hidden in "Direct" traffic.`}
+                              </InsightBlock>
+
+                              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                                <StatCard title="K-Factor (est.)" value={v.kFactor} accent={v.kFactor >= 1 ? 'emerald' : v.kFactor >= 0.3 ? 'amber' : 'indigo'} />
+                                <StatCard title="Share Rate" value={`${v.shareRate}%`} subtitle="of visitors share" accent="purple" />
+                                <StatCard title="Referral Rate" value={`${v.adjustedReferralRate}%`} subtitle={v.darkSocialMultiplier > 1 ? `${v.measuredReferralRate}% measured + dark social` : 'of traffic from referrals'} accent="emerald" />
+                                <StatCard title="Daily Growth" value={`${v.dailyGrowthRate > 0 ? '+' : ''}${v.dailyGrowthRate}%`} subtitle="14-day avg new visitors" accent={v.dailyGrowthRate > 0 ? 'emerald' : 'rose'} />
+                              </div>
+
+                              {/* K-factor trend sparkline */}
+                              {v.trend.length > 2 && (
+                                <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-4">
+                                  <div className="flex items-center justify-between mb-2">
+                                    <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">14-Day K-Factor Trend</span>
+                                    <span className="text-[10px] text-zinc-400">
+                                      {v.kFactor >= 1 ? 'K \u2265 1 = viral' : 'K \u2265 1 needed for viral growth'}
+                                    </span>
+                                  </div>
+                                  {(() => {
+                                    const data = v.trend;
+                                    const w = 500;
+                                    const h = 60;
+                                    const maxK = Math.max(...data, 1, 0.1);
+                                    const xS = (i: number) => (i / (data.length - 1)) * w;
+                                    const yS = (val: number) => h - (val / maxK) * (h - 8) - 4;
+                                    const pts = data.map((val, i) => `${xS(i)},${yS(val)}`).join(' ');
+                                    const kOneLine = yS(1);
+                                    return (
+                                      <svg viewBox={`0 0 ${w} ${h}`} className="w-full" preserveAspectRatio="none">
+                                        {/* K=1 reference line */}
+                                        {maxK >= 1 && (
+                                          <line x1="0" y1={kOneLine} x2={w} y2={kOneLine} stroke="#10b981" strokeWidth="0.5" strokeDasharray="3 3" />
+                                        )}
+                                        <polyline points={pts} fill="none" stroke="#6366f1" strokeWidth="2" strokeLinejoin="round" />
+                                        {data.map((val, i) => (
+                                          <circle key={i} cx={xS(i)} cy={yS(val)} r="2.5" fill={val >= 1 ? '#10b981' : '#6366f1'} />
+                                        ))}
+                                      </svg>
+                                    );
+                                  })()}
+                                  <div className="flex justify-between text-[9px] text-zinc-400 mt-1">
+                                    <span>14 days ago</span>
+                                    <span>Today</span>
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Breakdown */}
+                              <div className="mt-4 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-4">
+                                <h4 className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 mb-3">How This Is Calculated</h4>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-2 text-xs text-zinc-600 dark:text-zinc-400">
+                                  <div className="flex justify-between">
+                                    <span>Measured referral rate</span>
+                                    <span className="font-mono font-bold">{v.measuredReferralRate}%</span>
+                                  </div>
+                                  <div className="flex justify-between">
+                                    <span>Dark social multiplier</span>
+                                    <span className="font-mono font-bold">{v.darkSocialMultiplier}&times;</span>
+                                  </div>
+                                  <div className="flex justify-between">
+                                    <span>Adjusted referral rate</span>
+                                    <span className="font-mono font-bold">{v.adjustedReferralRate}%</span>
+                                  </div>
+                                  <div className="flex justify-between">
+                                    <span>Share rate (unique sharers / visitors)</span>
+                                    <span className="font-mono font-bold">{v.shareRate}%</span>
+                                  </div>
+                                  <div className="flex justify-between border-t border-zinc-100 dark:border-zinc-800 pt-2 mt-1 col-span-1 md:col-span-2">
+                                    <span className="font-semibold text-zinc-900 dark:text-zinc-100">K = share_rate &times; conversion_per_share</span>
+                                    <span className="font-mono font-bold text-zinc-900 dark:text-zinc-100">{v.kFactor}</span>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })()}
+
+                        {/* Section 9: Traffic Spike Detection */}
+                        {clearviewAnalytics.spikeDetection.dailyCounts.length > 0 && (
+                          <div className="mb-8">
+                            <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-4">
+                              Traffic Spike Detection (60 Days)
+                            </h3>
+                            {clearviewAnalytics.spikeDetection.spikes.length > 0 && (
+                              <InsightBlock>
+                                {clearviewAnalytics.spikeDetection.spikes.length} spike{clearviewAnalytics.spikeDetection.spikes.length !== 1 ? 's' : ''} detected.
+                                {' '}Largest: {clearviewAnalytics.spikeDetection.spikes.reduce((max, s) => s.multiplier > max.multiplier ? s : max, clearviewAnalytics.spikeDetection.spikes[0]).date}
+                                {' '}({clearviewAnalytics.spikeDetection.spikes.reduce((max, s) => s.multiplier > max.multiplier ? s : max, clearviewAnalytics.spikeDetection.spikes[0]).multiplier}&times; baseline).
+                              </InsightBlock>
+                            )}
+
+                            {/* Sparkline Chart */}
+                            <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 mb-4">
+                              {(() => {
+                                const data = clearviewAnalytics.spikeDetection.dailyCounts;
+                                const chartW = 720;
+                                const chartH = 120;
+                                const padL = 0;
+                                const maxVal = Math.max(...data.map(d => d.unique), 1);
+
+                                const xScale = (i: number) => padL + (i / (data.length - 1)) * (chartW - padL);
+                                const yScale = (v: number) => chartH - (v / maxVal) * (chartH - 8) - 4;
+
+                                // Area + line for daily counts
+                                const areaPoints = data.map((d, i) => `${xScale(i)},${yScale(d.unique)}`).join(' ');
+                                const areaPath = `M ${xScale(0)},${chartH} L ${areaPoints.split(' ').join(' L ')} L ${xScale(data.length - 1)},${chartH} Z`;
+                                const linePoints = areaPoints;
+
+                                // Baseline dashed line
+                                const baselinePoints = data.map((d, i) => `${xScale(i)},${yScale(d.baseline)}`).join(' ');
+
+                                // Spike dots
+                                const spikeDots = data
+                                  .map((d, i) => d.isSpike ? { x: xScale(i), y: yScale(d.unique), date: d.date, unique: d.unique } : null)
+                                  .filter(Boolean) as { x: number; y: number; date: string; unique: number }[];
+
+                                return (
+                                  <div>
+                                    <svg viewBox={`0 0 ${chartW} ${chartH + 20}`} className="w-full" preserveAspectRatio="none">
+                                      {/* Area fill */}
+                                      <path d={areaPath} fill="#a1a1aa" fillOpacity="0.15" />
+                                      {/* Daily line */}
+                                      <polyline points={linePoints} fill="none" stroke="#a1a1aa" strokeWidth="1.5" strokeLinejoin="round" />
+                                      {/* Baseline dashed line */}
+                                      <polyline points={baselinePoints} fill="none" stroke="#6366f1" strokeWidth="1" strokeDasharray="4 3" strokeLinejoin="round" />
+                                      {/* Spike dots */}
+                                      {spikeDots.map((dot, i) => (
+                                        <g key={i}>
+                                          <circle cx={dot.x} cy={dot.y} r="4" fill="#ef4444" />
+                                          <text x={dot.x} y={dot.y - 8} textAnchor="middle" fontSize="8" fill="#ef4444" fontWeight="bold">
+                                            {dot.unique}
+                                          </text>
+                                        </g>
+                                      ))}
+                                      {/* X-axis labels (every ~10 days) */}
+                                      {data.filter((_, i) => i % Math.max(1, Math.floor(data.length / 6)) === 0 || i === data.length - 1).map((d, i) => (
+                                        <text
+                                          key={i}
+                                          x={xScale(data.indexOf(d))}
+                                          y={chartH + 14}
+                                          textAnchor="middle"
+                                          fontSize="8"
+                                          fill="#a1a1aa"
+                                        >
+                                          {`${parseInt(d.date.slice(5, 7))}/${parseInt(d.date.slice(8, 10))}`}
+                                        </text>
+                                      ))}
+                                    </svg>
+                                    <div className="flex items-center gap-4 mt-2 text-[10px] text-zinc-400">
+                                      <span className="flex items-center gap-1">
+                                        <span className="inline-block w-3 h-px bg-zinc-400" /> Daily
+                                      </span>
+                                      <span className="flex items-center gap-1">
+                                        <span className="inline-block w-3 h-px border-t border-dashed border-indigo-500" /> 7-day avg
+                                      </span>
+                                      <span className="flex items-center gap-1">
+                                        <span className="inline-block w-2 h-2 rounded-full bg-red-500" /> Spike
+                                      </span>
+                                    </div>
+                                  </div>
+                                );
+                              })()}
+                            </div>
+
+                            {/* Spike Summary Cards */}
+                            {clearviewAnalytics.spikeDetection.spikes.length > 0 && (
+                              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
+                                {clearviewAnalytics.spikeDetection.spikes.map((spike) => (
+                                  <div key={spike.date} className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-4">
+                                    <div className="flex items-center justify-between mb-2">
+                                      <span className="text-xs font-bold text-zinc-900 dark:text-zinc-100">{spike.date}</span>
+                                      <span className={`text-xs font-bold px-2 py-0.5 rounded ${spike.multiplier >= 5 ? 'bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-400' : 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400'}`}>
+                                        {spike.multiplier}&times; baseline
+                                      </span>
+                                    </div>
+                                    <div className="text-2xl font-bold text-zinc-900 dark:text-white">{spike.unique}</div>
+                                    <div className="text-xs text-zinc-500 mt-1">Top source: {spike.topSource}</div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Section 10: Surge Cohort Retention */}
+                        {clearviewAnalytics.spikeDetection.surgeCohorts.length > 0 && (
+                          <div className="mb-8">
+                            <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mb-4">
+                              Surge Cohort Retention
+                            </h3>
+                            {(() => {
+                              const latest = clearviewAnalytics.spikeDetection.surgeCohorts[clearviewAnalytics.spikeDetection.surgeCohorts.length - 1];
+                              const org = clearviewAnalytics.spikeDetection.organicBaseline;
+                              if (latest && org.d1Return > 0) {
+                                const d1Comp = latest.d1Return >= org.d1Return ? 'above' : 'below';
+                                return (
+                                  <InsightBlock>
+                                    Visitors from the {latest.spikeDate} spike retained at {latest.d1Return}% on D1 vs {org.d1Return}% organic baseline ({d1Comp}).
+                                    {latest.d7Return > 0 && ` D7: ${latest.d7Return}% vs ${org.d7Return}% organic.`}
+                                  </InsightBlock>
+                                );
+                              }
+                              return null;
+                            })()}
+                            <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-hidden">
+                              <table className="w-full text-xs">
+                                <thead>
+                                  <tr className="border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50">
+                                    <th className="px-4 py-2.5 text-left font-semibold text-zinc-500 uppercase tracking-wider">Spike Date</th>
+                                    <th className="px-4 py-2.5 text-right font-semibold text-zinc-500 uppercase tracking-wider">New Visitors</th>
+                                    <th className="px-4 py-2.5 text-right font-semibold text-zinc-500 uppercase tracking-wider">D1 Return</th>
+                                    <th className="px-4 py-2.5 text-right font-semibold text-zinc-500 uppercase tracking-wider">D3 Return</th>
+                                    <th className="px-4 py-2.5 text-right font-semibold text-zinc-500 uppercase tracking-wider">D7 Return</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {clearviewAnalytics.spikeDetection.surgeCohorts.map((cohort) => {
+                                    const org = clearviewAnalytics.spikeDetection.organicBaseline;
+                                    const cellColor = (val: number, baseline: number) =>
+                                      baseline > 0 && val >= baseline
+                                        ? 'text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/30'
+                                        : baseline > 0
+                                        ? 'text-rose-700 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/30'
+                                        : '';
+                                    return (
+                                      <tr key={cohort.spikeDate} className="border-b border-zinc-100 dark:border-zinc-800/50">
+                                        <td className="px-4 py-2.5 font-medium text-zinc-900 dark:text-zinc-100">{cohort.spikeDate}</td>
+                                        <td className="px-4 py-2.5 text-right font-bold text-zinc-700 dark:text-zinc-300">{cohort.newVisitors}</td>
+                                        <td className={`px-4 py-2.5 text-right font-bold ${cellColor(cohort.d1Return, org.d1Return)}`}>{cohort.d1Return}%</td>
+                                        <td className={`px-4 py-2.5 text-right font-bold ${cellColor(cohort.d3Return, org.d3Return)}`}>{cohort.d3Return}%</td>
+                                        <td className={`px-4 py-2.5 text-right font-bold ${cellColor(cohort.d7Return, org.d7Return)}`}>{cohort.d7Return}%</td>
+                                      </tr>
+                                    );
+                                  })}
+                                  {/* Organic Baseline Row */}
+                                  {(() => {
+                                    const org = clearviewAnalytics.spikeDetection.organicBaseline;
+                                    return (
+                                      <tr className="bg-zinc-50 dark:bg-zinc-900/50 border-t-2 border-zinc-300 dark:border-zinc-600">
+                                        <td className="px-4 py-2.5 font-bold text-zinc-500 uppercase text-[10px] tracking-wider">Organic Baseline</td>
+                                        <td className="px-4 py-2.5 text-right text-zinc-400">&mdash;</td>
+                                        <td className="px-4 py-2.5 text-right font-bold text-zinc-500">{org.d1Return}%</td>
+                                        <td className="px-4 py-2.5 text-right font-bold text-zinc-500">{org.d3Return}%</td>
+                                        <td className="px-4 py-2.5 text-right font-bold text-zinc-500">{org.d7Return}%</td>
+                                      </tr>
+                                    );
+                                  })()}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        )}
                       </>
                     )}
 

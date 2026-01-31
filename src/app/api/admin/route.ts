@@ -6,10 +6,9 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const key = searchParams.get("key");
 
-  // Use env var for admin key, fallback to a default for dev
-  const adminKey = process.env.ADMIN_KEY || "ragecheck-admin-2024";
+  const adminKey = process.env.ADMIN_KEY;
 
-  if (key !== adminKey) {
+  if (!adminKey || key !== adminKey) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -93,9 +92,9 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const key = searchParams.get("key");
-  const adminKey = process.env.ADMIN_KEY || "ragecheck-admin-2024";
+  const adminKey = process.env.ADMIN_KEY;
 
-  if (key !== adminKey) {
+  if (!adminKey || key !== adminKey) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import Link from "next/link";
 import { SocialShareBar } from "@/components/SocialShareBar";
 import { getDefenseCheckShareText } from "@/lib/share/defenseCheckShareText";
@@ -26,6 +26,61 @@ interface DefenseCheckResult {
 
 const MAX_TEXT_LENGTH = 15000;
 
+interface Headline {
+  source: string;
+  lean: string;
+  color: string;
+  title: string;
+  url: string;
+  publishedAt: string;
+}
+
+const LEAN_COLORS: Record<string, string> = {
+  "Far Right": "bg-red-600 text-white",
+  "Right": "bg-red-400 text-white",
+  "Center": "bg-zinc-500 text-white",
+  "Left": "bg-blue-400 text-white",
+  "Far Left": "bg-blue-600 text-white",
+};
+
+const CURATED_TWEETS = [
+  {
+    source: "@TuckerCarlson",
+    lean: "Far Right",
+    title: "\"The U.S. could be on the verge of civil war...\"",
+    url: "https://x.com/TuckerCarlson/status/1976082862878367967",
+    image: "https://unavatar.io/twitter/TuckerCarlson",
+  },
+  {
+    source: "@FoxNews",
+    lean: "Right",
+    title: "\"President Trump reacts to the deadly ICE-involved shooting in Minneapolis...\"",
+    url: "https://x.com/FoxNews/status/2009002750810411250",
+    image: "https://unavatar.io/twitter/FoxNews",
+  },
+  {
+    source: "@MayorFrey",
+    lean: "Center",
+    title: "\"The presence of federal immigration enforcement agents is causing chaos...\"",
+    url: "https://x.com/MayorFrey/status/2008945355925364762",
+    image: "https://unavatar.io/twitter/MayorFrey",
+  },
+  {
+    source: "@AOC",
+    lean: "Left",
+    title: "\"Members of Congress have legal authority to enter ICE facilities...\"",
+    url: "https://x.com/AOC/status/1921269087398765013",
+    image: "https://unavatar.io/twitter/AOC",
+  },
+  {
+    source: "@BernieSanders",
+    lean: "Far Left",
+    title: "\"Trump's authoritarianism in real time: Conduct massive illegal raids...\"",
+    url: "https://x.com/BernieSanders/status/1931727686952526003",
+    image: "https://unavatar.io/twitter/BernieSanders",
+  },
+];
+
 export default function DefenseCheckPage() {
   const [url, setUrl] = useState("");
   const [pasteText, setPasteText] = useState("");
@@ -39,6 +94,20 @@ export default function DefenseCheckPage() {
     new Set()
   );
   const [inputMode, setInputMode] = useState<"url" | "text">("url");
+  const [headlines, setHeadlines] = useState<Headline[]>([]);
+  const [headlinesLoading, setHeadlinesLoading] = useState(true);
+
+  useEffect(() => {
+    fetch("/api/headlines")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success && data.headlines) {
+          setHeadlines(data.headlines);
+        }
+      })
+      .catch(() => {})
+      .finally(() => setHeadlinesLoading(false));
+  }, []);
 
   // ---- Image handling (same patterns as RageCheck) ----
 
@@ -480,6 +549,112 @@ export default function DefenseCheckPage() {
             </div>
           )}
         </form>
+
+        {/* Trending Headlines */}
+        {!result && (
+          <div className="max-w-4xl mx-auto mt-10">
+            <div className="flex items-center gap-3 mb-6">
+              <span className="w-2 h-8 bg-teal-500 rounded-full inline-block"></span>
+              <h3 className="text-lg font-bold text-zinc-100">Analyze Trending Headlines</h3>
+            </div>
+            {headlinesLoading ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <div key={i} className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 h-32 animate-pulse" />
+                ))}
+              </div>
+            ) : headlines.length > 0 ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+                {headlines.map((headline, i) => (
+                  <button
+                    key={i}
+                    onClick={() => {
+                      tracking.trackInteraction("defensecheck", "headline_clicked", headline.title);
+                      setUrl(headline.url);
+                      analyzeUrl(headline.url);
+                    }}
+                    disabled={loading}
+                    className="group flex flex-col justify-between text-left bg-zinc-900 border border-zinc-800 rounded-xl p-4 hover:border-teal-500/50 hover:shadow-md hover:shadow-teal-500/5 transition-all h-full disabled:opacity-50"
+                  >
+                    <div>
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">
+                          {headline.source}
+                        </span>
+                        <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${LEAN_COLORS[headline.lean] || "bg-gray-400 text-white"}`}>
+                          {headline.lean}
+                        </span>
+                      </div>
+                      <p className="text-sm font-semibold text-zinc-200 line-clamp-3 leading-snug group-hover:text-teal-400 transition-colors">
+                        {headline.title}
+                      </p>
+                    </div>
+                    <div className="mt-4 self-start inline-flex items-center gap-1.5 px-3 py-1.5 bg-teal-600 text-white text-xs font-bold rounded-lg group-hover:bg-teal-500 transition-colors shadow-sm">
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                      </svg>
+                      Analyze
+                    </div>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 bg-zinc-900/50 rounded-xl border border-dashed border-zinc-800">
+                <p className="text-zinc-500 text-sm">Could not load live headlines.</p>
+              </div>
+            )}
+
+            {/* Viral on Social Media */}
+            <div className="mt-10">
+              <div className="flex items-center gap-3 mb-6">
+                <h3 className="text-sm font-bold uppercase tracking-wider text-zinc-500">
+                  Viral on Social Media
+                </h3>
+                <div className="h-px flex-1 bg-zinc-800"></div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+                {CURATED_TWEETS.map((tweet, i) => (
+                  <button
+                    key={i}
+                    onClick={() => {
+                      tracking.trackInteraction("defensecheck", "tweet_clicked", tweet.source);
+                      setUrl(tweet.url);
+                      analyzeUrl(tweet.url);
+                    }}
+                    disabled={loading}
+                    className="group text-left bg-zinc-900 border border-zinc-800 rounded-xl p-4 hover:border-teal-500/50 hover:shadow-md hover:shadow-teal-500/5 transition-all disabled:opacity-50"
+                  >
+                    <div className="flex items-center gap-3 mb-3">
+                      <img
+                        src={tweet.image}
+                        alt={tweet.source}
+                        className="w-8 h-8 rounded-full object-cover ring-2 ring-zinc-800"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${tweet.source.slice(1)}&background=random`;
+                        }}
+                      />
+                      <div className="flex flex-col">
+                        <span className="text-xs font-bold text-zinc-100">{tweet.source}</span>
+                        <span className={`text-[9px] w-fit font-medium px-1.5 py-px rounded ${LEAN_COLORS[tweet.lean] || "bg-gray-400 text-white"}`}>
+                          {tweet.lean}
+                        </span>
+                      </div>
+                    </div>
+                    <p className="text-sm text-zinc-300 line-clamp-2 leading-relaxed group-hover:text-teal-400 transition-colors">
+                      {tweet.title}
+                    </p>
+                    <div className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 bg-teal-600 text-white text-xs font-bold rounded-lg group-hover:bg-teal-500 transition-colors shadow-sm">
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                      </svg>
+                      Analyze
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Error */}
         {error && (

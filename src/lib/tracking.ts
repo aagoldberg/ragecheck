@@ -301,6 +301,15 @@ export const trackClearviewShare = (context: string, platform: string) => {
   }
 };
 
+// ClearView attribution tracking
+export const trackClearviewAttribution = (source: string) => {
+  trackInteraction("clearview", "attribution", source);
+};
+
+export const trackClearviewAttributionDismissed = () => {
+  trackInteraction("clearview", "attribution_dismissed");
+};
+
 // DefenseCheck tracking
 export const trackDefenseCheckAnalysis = (score: number) => {
   trackInteraction("defensecheck", "analysis_completed", undefined, score);

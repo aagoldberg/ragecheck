@@ -6019,6 +6019,24 @@ export interface ClearViewAnalytics {
     grid: number[][]; // 7 rows (days) x 24 cols (hours), EST timezone
     maxValue: number;
   };
+  spikeDetection: {
+    dailyCounts: { date: string; unique: number; isSpike: boolean; baseline: number }[];
+    spikes: { date: string; unique: number; multiplier: number; topSource: string }[];
+    surgeCohorts: { spikeDate: string; newVisitors: number; d1Return: number; d3Return: number; d7Return: number }[];
+    organicBaseline: { d1Return: number; d3Return: number; d7Return: number };
+  };
+  attributionResults: { source: string; count: number; percentage: number }[];
+  attributionResponseRate: number;
+  viralityEstimate: {
+    shareRate: number;               // % of unique visitors who shared
+    measuredReferralRate: number;     // % of new visitors from tracked referrals
+    darkSocialMultiplier: number;     // multiplier from attribution survey (word-of-mouth %)
+    adjustedReferralRate: number;     // referral rate adjusted for dark social
+    kFactor: number;                  // estimated viral coefficient
+    dailyGrowthRate: number;          // avg day-over-day new visitor growth (last 14d)
+    virality: 'viral' | 'growing' | 'organic' | 'stalled';
+    trend: number[];                  // 14-day K-factor trend
+  };
 }
 
 function classifyChannel(referrer: string | null, utmSource: string | null, utmMedium: string | null): string {
@@ -6065,6 +6083,13 @@ export async function getClearViewAnalytics(): Promise<ClearViewAnalytics> {
       heatmapRaw,
       recentSharesRaw,
       briefingSharesRaw,
+      dailyUniquesRaw,
+      attributionRaw,
+      attributionDismissRaw,
+      dailySourcesRaw,
+      surgeCohortRaw,
+      dailySharesRaw,
+      dailyNewVisitorsRaw,
     ] = await Promise.all([
       // All ClearView visitors (last 30 days for most analytics)
       getDb()`
@@ -6147,6 +6172,116 @@ export async function getClearViewAnalytics(): Promise<ClearViewAnalytics> {
         WHERE i.category = 'clearview' AND i.action = 'briefing_shared' AND i.is_bot = false
         ORDER BY i.created_at DESC
         LIMIT 200
+      `,
+      // Daily unique visitors (60 days) for sparkline + spike detection
+      getDb()`
+        SELECT
+          DATE(created_at AT TIME ZONE 'America/New_York') as day,
+          COUNT(DISTINCT ip_address) as unique_count
+        FROM ragecheck_visitors
+        WHERE page_path = ${pagePath} AND is_bot = false AND created_at > NOW() - INTERVAL '60 days'
+        GROUP BY DATE(created_at AT TIME ZONE 'America/New_York')
+        ORDER BY day
+      `,
+      // Attribution responses
+      getDb()`
+        SELECT label, COUNT(*) as count
+        FROM ragecheck_interactions
+        WHERE category = 'clearview' AND action = 'attribution' AND label IS NOT NULL
+        GROUP BY label
+        ORDER BY count DESC
+      `,
+      // Attribution dismissals (count only)
+      getDb()`
+        SELECT COUNT(*) as count
+        FROM ragecheck_interactions
+        WHERE category = 'clearview' AND action = 'attribution_dismissed'
+      `,
+      // Daily top referrer source per day (60 days) for spike top source
+      getDb()`
+        SELECT
+          DATE(created_at AT TIME ZONE 'America/New_York') as day,
+          COALESCE(
+            CASE
+              WHEN referrer ILIKE '%twitter%' OR referrer ILIKE '%t.co%' OR referrer ILIKE '%x.com%' THEN 'Twitter/X'
+              WHEN referrer ILIKE '%reddit%' THEN 'Reddit'
+              WHEN referrer ILIKE '%bsky%' OR referrer ILIKE '%bluesky%' THEN 'Bluesky'
+              WHEN referrer ILIKE '%google%' THEN 'Google'
+              WHEN referrer ILIKE '%facebook%' THEN 'Facebook'
+              WHEN referrer ILIKE '%linkedin%' THEN 'LinkedIn'
+              WHEN referrer ILIKE '%news.ycombinator%' OR referrer ILIKE '%hn.algolia%' THEN 'Hacker News'
+              WHEN referrer IS NULL OR referrer = '' THEN 'Direct'
+              ELSE 'Other Referral'
+            END,
+            'Direct'
+          ) as source,
+          COUNT(*) as count
+        FROM ragecheck_visitors
+        WHERE page_path = ${pagePath} AND is_bot = false AND created_at > NOW() - INTERVAL '60 days'
+        GROUP BY 1, 2
+        ORDER BY 1, 3 DESC
+      `,
+      // Surge cohort retention: for each day, new visitors and their return on D1/D3/D7
+      getDb()`
+        WITH first_visits AS (
+          SELECT
+            ip_address,
+            DATE(MIN(created_at) AT TIME ZONE 'America/New_York') as first_day
+          FROM ragecheck_visitors
+          WHERE page_path = ${pagePath} AND is_bot = false AND ip_address IS NOT NULL
+            AND created_at > NOW() - INTERVAL '60 days'
+          GROUP BY ip_address
+        ),
+        cohort_returns AS (
+          SELECT
+            fv.first_day,
+            fv.ip_address,
+            MAX(CASE WHEN DATE(v.created_at AT TIME ZONE 'America/New_York') = fv.first_day + 1 THEN 1 ELSE 0 END) as d1,
+            MAX(CASE WHEN DATE(v.created_at AT TIME ZONE 'America/New_York') BETWEEN fv.first_day + 1 AND fv.first_day + 3 THEN 1 ELSE 0 END) as d3,
+            MAX(CASE WHEN DATE(v.created_at AT TIME ZONE 'America/New_York') BETWEEN fv.first_day + 1 AND fv.first_day + 7 THEN 1 ELSE 0 END) as d7
+          FROM first_visits fv
+          LEFT JOIN ragecheck_visitors v ON fv.ip_address = v.ip_address AND v.is_bot = false AND v.page_path = ${pagePath}
+            AND DATE(v.created_at AT TIME ZONE 'America/New_York') > fv.first_day
+          GROUP BY fv.first_day, fv.ip_address
+        )
+        SELECT
+          TO_CHAR(first_day, 'YYYY-MM-DD') as cohort_date,
+          COUNT(*) as new_visitors,
+          ROUND(100.0 * SUM(d1) / NULLIF(COUNT(*), 0), 1) as d1_pct,
+          ROUND(100.0 * SUM(d3) / NULLIF(COUNT(*), 0), 1) as d3_pct,
+          ROUND(100.0 * SUM(d7) / NULLIF(COUNT(*), 0), 1) as d7_pct
+        FROM cohort_returns
+        GROUP BY first_day
+        ORDER BY first_day
+      `,
+      // Daily ClearView share count (30 days) for virality estimate
+      getDb()`
+        SELECT
+          DATE(created_at AT TIME ZONE 'America/New_York') as day,
+          COUNT(*) as count
+        FROM ragecheck_interactions
+        WHERE category = 'clearview'
+          AND (action = 'story_shared' OR action = 'briefing_shared')
+          AND is_bot = false
+          AND created_at > NOW() - INTERVAL '30 days'
+        GROUP BY 1
+        ORDER BY 1
+      `,
+      // Daily new visitors (first-time) for virality growth rate
+      getDb()`
+        WITH first_visits AS (
+          SELECT
+            ip_address,
+            DATE(MIN(created_at) AT TIME ZONE 'America/New_York') as first_day
+          FROM ragecheck_visitors
+          WHERE page_path = ${pagePath} AND is_bot = false AND ip_address IS NOT NULL
+            AND created_at > NOW() - INTERVAL '30 days'
+          GROUP BY ip_address
+        )
+        SELECT first_day as day, COUNT(*) as count
+        FROM first_visits
+        GROUP BY first_day
+        ORDER BY first_day
       `,
     ]);
 
@@ -6536,6 +6671,211 @@ export async function getClearViewAnalytics(): Promise<ClearViewAnalytics> {
       if (count > maxValue) maxValue = count;
     }
 
+    // ---- 8. Spike Detection ----
+    // Build daily unique counts map
+    const dailyMap: Record<string, number> = {};
+    for (const row of dailyUniquesRaw) {
+      dailyMap[String(row.day).slice(0, 10)] = Number(row.unique_count);
+    }
+
+    // Build daily top source map
+    const dailyTopSource: Record<string, string> = {};
+    for (const row of dailySourcesRaw) {
+      const day = String(row.day).slice(0, 10);
+      if (!dailyTopSource[day]) {
+        dailyTopSource[day] = String(row.source); // first row per day is the top source (ORDER BY count DESC)
+      }
+    }
+
+    // Sort dates
+    const sortedDays = Object.keys(dailyMap).sort();
+
+    // Compute 7-day rolling average and detect spikes
+    const dailyCounts: { date: string; unique: number; isSpike: boolean; baseline: number }[] = [];
+    const spikeDates: string[] = [];
+
+    for (let i = 0; i < sortedDays.length; i++) {
+      const date = sortedDays[i];
+      const unique = dailyMap[date];
+
+      // 7-day rolling average (use days i-7 to i-1)
+      let sum = 0;
+      let cnt = 0;
+      for (let j = Math.max(0, i - 7); j < i; j++) {
+        sum += dailyMap[sortedDays[j]];
+        cnt++;
+      }
+      const baseline = cnt > 0 ? sum / cnt : unique;
+      const isSpike = baseline > 0 && unique >= 2 * baseline && unique >= 5; // at least 5 visitors to qualify
+
+      dailyCounts.push({ date, unique, isSpike, baseline: Math.round(baseline * 10) / 10 });
+      if (isSpike) spikeDates.push(date);
+    }
+
+    const spikes = spikeDates.map(date => {
+      const entry = dailyCounts.find(d => d.date === date)!;
+      return {
+        date,
+        unique: entry.unique,
+        multiplier: entry.baseline > 0 ? Math.round(10 * entry.unique / entry.baseline) / 10 : 0,
+        topSource: dailyTopSource[date] || 'Unknown',
+      };
+    });
+
+    // Build surge cohort retention from pre-computed query
+    const surgeCohortMap: Record<string, { newVisitors: number; d1: number; d3: number; d7: number }> = {};
+    for (const row of surgeCohortRaw) {
+      surgeCohortMap[String(row.cohort_date)] = {
+        newVisitors: Number(row.new_visitors),
+        d1: Number(row.d1_pct) || 0,
+        d3: Number(row.d3_pct) || 0,
+        d7: Number(row.d7_pct) || 0,
+      };
+    }
+
+    const surgeCohorts = spikeDates
+      .filter(d => surgeCohortMap[d])
+      .map(d => ({
+        spikeDate: d,
+        newVisitors: surgeCohortMap[d].newVisitors,
+        d1Return: surgeCohortMap[d].d1,
+        d3Return: surgeCohortMap[d].d3,
+        d7Return: surgeCohortMap[d].d7,
+      }));
+
+    // Organic baseline: average retention on non-spike days
+    const nonSpikeDays = Object.keys(surgeCohortMap).filter(d => !spikeDates.includes(d));
+    let orgD1 = 0, orgD3 = 0, orgD7 = 0;
+    if (nonSpikeDays.length > 0) {
+      for (const d of nonSpikeDays) {
+        orgD1 += surgeCohortMap[d].d1;
+        orgD3 += surgeCohortMap[d].d3;
+        orgD7 += surgeCohortMap[d].d7;
+      }
+      orgD1 = Math.round(10 * orgD1 / nonSpikeDays.length) / 10;
+      orgD3 = Math.round(10 * orgD3 / nonSpikeDays.length) / 10;
+      orgD7 = Math.round(10 * orgD7 / nonSpikeDays.length) / 10;
+    }
+    const organicBaseline = { d1Return: orgD1, d3Return: orgD3, d7Return: orgD7 };
+
+    // ---- 9. Attribution Results ----
+    const totalAttributionResponses = attributionRaw.reduce((s: number, r: Record<string, unknown>) => s + Number(r.count), 0);
+    const attributionResults = attributionRaw.map((row: Record<string, unknown>) => ({
+      source: String(row.label),
+      count: Number(row.count),
+      percentage: totalAttributionResponses > 0 ? Math.round(1000 * Number(row.count) / totalAttributionResponses) / 10 : 0,
+    }));
+    const totalDismissals = Number(attributionDismissRaw[0]?.count) || 0;
+    const totalAttributionInteractions = totalAttributionResponses + totalDismissals;
+    const attributionResponseRate = totalAttributionInteractions > 0
+      ? Math.round(1000 * totalAttributionResponses / totalAttributionInteractions) / 10
+      : 0;
+
+    // ---- 10. Virality Estimate ----
+    // Build daily share map
+    const dailyShareMap: Record<string, number> = {};
+    for (const row of dailySharesRaw) {
+      dailyShareMap[String(row.day).slice(0, 10)] = Number(row.count);
+    }
+
+    // Build daily new visitor map
+    const dailyNewMap: Record<string, number> = {};
+    for (const row of dailyNewVisitorsRaw) {
+      dailyNewMap[String(row.day).slice(0, 10)] = Number(row.count);
+    }
+
+    // Share rate: unique sharers / unique visitors (30d)
+    const uniqueSharerIPs = new Set<string>();
+    for (const s of recentSharesRaw) {
+      if (s.ip_address) uniqueSharerIPs.add(String(s.ip_address));
+    }
+    for (const s of briefingSharesRaw) {
+      if (s.ip_address) uniqueSharerIPs.add(String(s.ip_address));
+    }
+    const viralShareRate = totalUniqueVisitors > 0
+      ? Math.round(1000 * uniqueSharerIPs.size / totalUniqueVisitors) / 10
+      : 0;
+
+    // Measured referral rate: non-Direct, non-Search traffic as % of total
+    const referralVisitors = (channelCounts['Social'] || 0) + (channelCounts['Referral'] || 0);
+    const measuredReferralRate = totalVisitors30d > 0
+      ? Math.round(1000 * referralVisitors / totalVisitors30d) / 10
+      : 0;
+
+    // Dark social multiplier from attribution survey
+    // If survey says X% found via "Friend/Word of Mouth", those are hidden referrals
+    // showing up as "Direct" — scale up the measured referral rate accordingly
+    const womAttribution = attributionResults.find(a => a.source.toLowerCase().includes('word of mouth') || a.source.toLowerCase().includes('friend'));
+    const womPct = womAttribution ? womAttribution.percentage : 0;
+    // Dark social multiplier: if 30% say WoM and only 10% show as referral, true referral ~= measured + (direct × wom%)
+    const directVisitors = channelCounts['Direct'] || 0;
+    const estimatedDarkSocialReferrals = womPct > 0 ? Math.round(directVisitors * (womPct / 100)) : 0;
+    const adjustedReferralVisitors = referralVisitors + estimatedDarkSocialReferrals;
+    const adjustedReferralRate = totalVisitors30d > 0
+      ? Math.round(1000 * adjustedReferralVisitors / totalVisitors30d) / 10
+      : 0;
+    const darkSocialMultiplier = measuredReferralRate > 0
+      ? Math.round(10 * adjustedReferralRate / measuredReferralRate) / 10
+      : 1;
+
+    // K-factor estimate: share_rate × conversion_per_share
+    // conversion_per_share ≈ (adjusted referral visitors) / total shares
+    const totalShareActions = Object.values(dailyShareMap).reduce((s, v) => s + v, 0);
+    const conversionPerShare = totalShareActions > 0
+      ? Math.min(adjustedReferralVisitors / totalShareActions, 3) // cap at 3 to avoid noise with low data
+      : 0;
+    const kFactor = Math.round(1000 * (viralShareRate / 100) * conversionPerShare) / 1000;
+
+    // Daily growth rate (14-day avg of day-over-day new visitor growth)
+    const last14Days = sortedDays.slice(-14);
+    let growthSum = 0;
+    let growthCount = 0;
+    for (let i = 1; i < last14Days.length; i++) {
+      const prev = dailyNewMap[last14Days[i - 1]] || 0;
+      const curr = dailyNewMap[last14Days[i]] || 0;
+      if (prev > 0) {
+        growthSum += (curr - prev) / prev;
+        growthCount++;
+      }
+    }
+    const dailyGrowthRate = growthCount > 0
+      ? Math.round(1000 * growthSum / growthCount) / 10
+      : 0;
+
+    // 14-day K-factor trend (daily K estimate)
+    const kFactorTrend = last14Days.map((day, i) => {
+      if (i === 0) return 0;
+      const prevDay = last14Days[i - 1];
+      const sharesYesterday = dailyShareMap[prevDay] || 0;
+      const newToday = dailyNewMap[day] || 0;
+      const uniqueToday = dailyMap[day] || 0;
+      if (sharesYesterday === 0 || uniqueToday === 0) return 0;
+      // daily K ≈ (new visitors attributable to shares) / unique visitors
+      // approximate: if no ads/posts, new visitors are from shares or organic
+      // use ratio of shares-yesterday to new-today as proxy
+      const dailyConv = Math.min(newToday / sharesYesterday, 3);
+      const dailyShareRateEst = uniqueToday > 0 ? (dailyShareMap[day] || 0) / uniqueToday : 0;
+      return Math.round(1000 * dailyShareRateEst * dailyConv) / 1000;
+    });
+
+    // Classify virality
+    const virality: 'viral' | 'growing' | 'organic' | 'stalled' =
+      kFactor >= 1 ? 'viral' :
+      kFactor >= 0.3 ? 'growing' :
+      dailyGrowthRate > 0 ? 'organic' :
+      'stalled';
+
+    const viralityEstimate = {
+      shareRate: viralShareRate,
+      measuredReferralRate,
+      darkSocialMultiplier,
+      adjustedReferralRate,
+      kFactor,
+      dailyGrowthRate,
+      virality,
+      trend: kFactorTrend,
+    };
+
     return {
       trafficSources: {
         channels,
@@ -6578,6 +6918,10 @@ export async function getClearViewAnalytics(): Promise<ClearViewAnalytics> {
       },
       geoDevice: { countries, devices, browsers, operatingSystems },
       heatmap: { grid, maxValue },
+      spikeDetection: { dailyCounts, spikes, surgeCohorts, organicBaseline },
+      attributionResults,
+      attributionResponseRate,
+      viralityEstimate,
     };
   } catch (error) {
     console.error("Failed to get ClearView analytics:", error);
@@ -6614,6 +6958,10 @@ export async function getClearViewAnalytics(): Promise<ClearViewAnalytics> {
       },
       geoDevice: { countries: [], devices: [], browsers: [], operatingSystems: [] },
       heatmap: { grid: Array.from({ length: 7 }, () => Array(24).fill(0)), maxValue: 0 },
+      spikeDetection: { dailyCounts: [], spikes: [], surgeCohorts: [], organicBaseline: { d1Return: 0, d3Return: 0, d7Return: 0 } },
+      attributionResults: [],
+      attributionResponseRate: 0,
+      viralityEstimate: { shareRate: 0, measuredReferralRate: 0, darkSocialMultiplier: 1, adjustedReferralRate: 0, kFactor: 0, dailyGrowthRate: 0, virality: 'stalled', trend: [] },
     };
   }
 }

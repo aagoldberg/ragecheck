@@ -4,6 +4,8 @@ Tests for confidence level assessment.
 Run with: cd jobs && pytest tests/test_confidence.py -v
 """
 
+from __future__ import annotations
+
 import pytest
 
 from analysis import assess_confidence

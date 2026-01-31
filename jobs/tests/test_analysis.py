@@ -4,6 +4,8 @@ Tests for SideLines graph analysis module.
 Run with: cd jobs && pytest tests/test_analysis.py -v
 """
 
+from __future__ import annotations
+
 import igraph as ig
 import leidenalg
 import pytest

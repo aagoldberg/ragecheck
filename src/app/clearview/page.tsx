@@ -8,6 +8,7 @@ import {
   getClearviewStoryShareText,
   getClearviewBriefingShareText,
 } from "@/lib/share/clearviewShareText";
+import AttributionSurvey from "@/components/AttributionSurvey";
 
 // --- Types ---
 
@@ -30,7 +31,7 @@ interface ExpertConsensus {
   exists: boolean;
   statement?: string;
   confidenceLevel: "high" | "moderate" | "low" | "contested";
-  sources?: string[];
+  sources?: (string | { name: string; articleUrl: string; articleName: string })[];
   dissent?: string;
 }
 
@@ -200,9 +201,15 @@ function ExpertConsensusBox({ consensus }: { consensus?: ExpertConsensus }) {
                 <div className="flex flex-wrap gap-1.5 pt-1">
                     <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wide self-center mr-1">Sources:</span>
                     {consensus.sources.map((src, i) => (
-                        <span key={i} className="px-1.5 py-0.5 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded text-[10px] font-medium text-zinc-600 dark:text-zinc-400">
-                            {src}
-                        </span>
+                        typeof src === "string" ? (
+                            <span key={i} className="px-1.5 py-0.5 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded text-[10px] font-medium text-zinc-600 dark:text-zinc-400">
+                                {src}
+                            </span>
+                        ) : (
+                            <a key={i} href={src.articleUrl} target="_blank" rel="noopener noreferrer" title={src.articleName} className="px-1.5 py-0.5 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded text-[10px] font-medium text-indigo-600 dark:text-indigo-400 hover:border-indigo-300 dark:hover:border-indigo-600 transition-colors">
+                                {src.name}
+                            </a>
+                        )
                     ))}
                 </div>
             )}
@@ -907,6 +914,8 @@ export default function ClearviewPage() {
         </footer>
 
       </main>
+
+      <AttributionSurvey />
     </div>
   );
 }
