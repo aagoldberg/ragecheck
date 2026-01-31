@@ -231,8 +231,8 @@ function StoryCard({ story }: { story: StoryCluster }) {
   const [deeperExpanded, setDeeperExpanded] = useState(false);
   const [sourcesExpanded, setSourcesExpanded] = useState(false);
 
-  const leftPerspective = story.perspectives.find(p => p.lean.toLowerCase().includes("left"));
-  const rightPerspective = story.perspectives.find(p => p.lean.toLowerCase().includes("right"));
+  const leftPerspective = (story.perspectives || []).find(p => p.lean.toLowerCase().includes("left"));
+  const rightPerspective = (story.perspectives || []).find(p => p.lean.toLowerCase().includes("right"));
 
   const shareUrl = `/clearview/share?story=${story.id}&topic=${encodeURIComponent(story.topic)}`;
   const shareTexts = getClearviewStoryShareText(
