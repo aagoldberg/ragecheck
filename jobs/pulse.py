@@ -139,10 +139,11 @@ def compute_pulse() -> int:
             and baseline > 0
         )
 
-        # Top terms from high-arousal posts (arousal > 0.5)
+        # Top terms from higher-arousal posts (arousal > 0.1)
+        # Threshold lowered from 0.5 to surface terms during normal activity
         high_arousal_texts = [
             p["text"] for p in posts
-            if float(p["arousal_score"]) > 0.5 and p.get("text")
+            if float(p["arousal_score"]) > 0.1 and p.get("text")
         ]
         term_counts: Counter[str] = Counter()
         for text in high_arousal_texts:

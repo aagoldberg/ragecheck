@@ -506,3 +506,29 @@ def get_pulse_global_stats() -> dict[str, Any]:
         "mean_arousal": float(post_stats["mean_arousal"]),
         "tracked_users": int(tracked["total"]),
     }
+
+
+def get_community_recent_posts(
+    community_id: int, limit: int = 20
+) -> list[dict[str, Any]]:
+    """Get recent high-arousal posts from a community."""
+    with get_conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(
+                """SELECT
+                     p.text,
+                     p.author_did,
+                     p.uri,
+                     p.arousal_score,
+                     p.arousal_breakdown,
+                     p.created_at
+                   FROM bluesky_posts p
+                   JOIN bluesky_community_members m ON m.user_did = p.author_did
+                   WHERE m.community_id = %s
+                     AND p.arousal_score IS NOT NULL
+                     AND p.created_at > NOW() - INTERVAL '1 hour'
+                   ORDER BY p.arousal_score DESC
+                   LIMIT %s""",
+                (community_id, limit),
+            )
+            return [_convert_decimals(dict(r)) for r in cur.fetchall()]

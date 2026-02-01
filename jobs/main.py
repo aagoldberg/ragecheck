@@ -60,6 +60,7 @@ from db import (
     get_latest_snapshots,
     get_snapshot_history,
     get_pulse_global_stats,
+    get_community_recent_posts,
 )
 from starter_packs import crawl_starter_packs, backfill_follows, refresh_stale_follows, snowball_expand
 
@@ -845,5 +846,17 @@ async def get_pulse():
             "global_stats": global_stats,
             "spikes": spikes,
         }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/pulse/community/{community_id}")
+async def get_pulse_community(community_id: int, limit: int = 20):
+    """
+    Get detail for a single community: recent high-arousal posts.
+    """
+    try:
+        posts = get_community_recent_posts(community_id, limit=limit)
+        return {"community_id": community_id, "posts": posts}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

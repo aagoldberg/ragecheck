@@ -44,6 +44,14 @@ interface PulseData {
   spikes: CommunitySnapshot[];
 }
 
+interface CommunityPost {
+  text: string;
+  author_did: string;
+  uri: string;
+  arousal_score: number;
+  created_at: string;
+}
+
 // =============================================================================
 // HELPER COMPONENTS
 // =============================================================================
@@ -64,15 +72,21 @@ function ArousalBar({ value }: { value: number }) {
   );
 }
 
-function Sparkline({ history }: { history: HistoryPoint[] }) {
+function Sparkline({
+  history,
+  large,
+}: {
+  history: HistoryPoint[];
+  large?: boolean;
+}) {
   if (!history || history.length < 2) {
     return <div className="h-8 text-xs text-zinc-400">No history</div>;
   }
 
   const values = history.map((h) => h.mean_arousal);
-  const max = Math.max(...values, 0.1);
-  const width = 120;
-  const height = 32;
+  const max = Math.max(...values, 0.01);
+  const width = large ? 400 : 120;
+  const height = large ? 64 : 32;
   const step = width / (values.length - 1);
 
   const points = values
@@ -80,7 +94,14 @@ function Sparkline({ history }: { history: HistoryPoint[] }) {
     .join(" ");
 
   return (
-    <svg width={width} height={height} className="overflow-visible">
+    <svg
+      width={width}
+      height={height}
+      className="overflow-visible"
+      viewBox={`0 0 ${width} ${height}`}
+      preserveAspectRatio="none"
+      style={{ width: "100%", height: large ? 64 : 32 }}
+    >
       <polyline
         points={points}
         fill="none"
@@ -94,7 +115,7 @@ function Sparkline({ history }: { history: HistoryPoint[] }) {
             key={i}
             cx={i * step}
             cy={height - (h.mean_arousal / max) * height}
-            r="2.5"
+            r="3"
             className="fill-red-500"
           />
         ) : null
@@ -103,7 +124,13 @@ function Sparkline({ history }: { history: HistoryPoint[] }) {
   );
 }
 
-function DeltaBadge({ current, baseline }: { current: number; baseline: number }) {
+function DeltaBadge({
+  current,
+  baseline,
+}: {
+  current: number;
+  baseline: number;
+}) {
   if (!baseline || baseline === 0) return null;
   const delta = ((current - baseline) / baseline) * 100;
   const isUp = delta > 0;
@@ -135,6 +162,181 @@ function TemperatureLabel({ value }: { value: number }) {
     color = "text-amber-600 dark:text-amber-400";
   }
   return <span className={`text-xs font-medium ${color}`}>{label}</span>;
+}
+
+function PostArousalDot({ score }: { score: number }) {
+  let color = "bg-emerald-400";
+  if (score >= 0.5) color = "bg-red-400";
+  else if (score >= 0.3) color = "bg-amber-400";
+  else if (score >= 0.1) color = "bg-yellow-400";
+  return <span className={`inline-block w-2 h-2 rounded-full ${color}`} />;
+}
+
+function timeAgo(dateStr: string): string {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  return `${hours}h ago`;
+}
+
+// =============================================================================
+// COMMUNITY CARD (expandable)
+// =============================================================================
+
+function CommunityCard({ snapshot }: { snapshot: CommunitySnapshot }) {
+  const [expanded, setExpanded] = useState(false);
+  const [posts, setPosts] = useState<CommunityPost[]>([]);
+  const [loadingPosts, setLoadingPosts] = useState(false);
+
+  const fetchPosts = useCallback(async () => {
+    if (posts.length > 0) return; // already loaded
+    setLoadingPosts(true);
+    try {
+      const res = await fetch(
+        `/api/sidelines/pulse/community?id=${snapshot.community_id}`
+      );
+      const json = await res.json();
+      if (json.success && json.posts) {
+        setPosts(json.posts);
+      }
+    } catch {
+      // silent
+    } finally {
+      setLoadingPosts(false);
+    }
+  }, [snapshot.community_id, posts.length]);
+
+  function handleClick() {
+    const next = !expanded;
+    setExpanded(next);
+    if (next) fetchPosts();
+  }
+
+  return (
+    <div
+      className={`bg-white dark:bg-zinc-900 border rounded-xl transition-colors cursor-pointer ${
+        snapshot.spike
+          ? "border-red-300 dark:border-red-700"
+          : "border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700"
+      } ${expanded ? "md:col-span-2" : ""}`}
+      onClick={handleClick}
+    >
+      <div className="p-5">
+        {/* Community name + description */}
+        <div className="mb-3">
+          <div className="flex items-center gap-2 mb-1">
+            <h3 className="font-bold text-sm">{snapshot.community_name}</h3>
+            {snapshot.spike && (
+              <span className="text-xs bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-400 px-1.5 py-0.5 rounded font-medium">
+                SPIKE
+              </span>
+            )}
+          </div>
+          {snapshot.community_description && (
+            <p
+              className={`text-xs text-zinc-500 ${expanded ? "" : "line-clamp-1"}`}
+            >
+              {snapshot.community_description}
+            </p>
+          )}
+        </div>
+
+        {/* Arousal bar */}
+        <div className="mb-3">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-xs text-zinc-500">Arousal</span>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-mono font-semibold">
+                {(snapshot.mean_arousal * 100).toFixed(1)}
+              </span>
+              <DeltaBadge
+                current={snapshot.mean_arousal}
+                baseline={snapshot.baseline_arousal}
+              />
+            </div>
+          </div>
+          <ArousalBar value={snapshot.mean_arousal} />
+        </div>
+
+        {/* Stats row */}
+        <div className="flex gap-4 text-xs text-zinc-500 mb-3">
+          <span>{snapshot.post_count} posts (30m)</span>
+          <span>
+            {snapshot.community_member_count?.toLocaleString()} members
+          </span>
+          {expanded && (
+            <>
+              <span>p95: {(snapshot.p95_arousal * 100).toFixed(1)}</span>
+              <span>max: {(snapshot.max_arousal * 100).toFixed(1)}</span>
+            </>
+          )}
+        </div>
+
+        {/* Top terms */}
+        {snapshot.top_terms && snapshot.top_terms.length > 0 && (
+          <div className="flex gap-1.5 flex-wrap mb-3">
+            {snapshot.top_terms
+              .slice(0, expanded ? 10 : 5)
+              .map((term) => (
+                <span
+                  key={term}
+                  className="px-1.5 py-0.5 bg-zinc-100 dark:bg-zinc-800 rounded text-xs text-zinc-600 dark:text-zinc-400"
+                >
+                  {term}
+                </span>
+              ))}
+          </div>
+        )}
+
+        {/* Sparkline */}
+        <div className="text-zinc-400">
+          <Sparkline history={snapshot.history} large={expanded} />
+        </div>
+      </div>
+
+      {/* Expanded: recent posts */}
+      {expanded && (
+        <div
+          className="border-t border-zinc-100 dark:border-zinc-800 px-5 py-4"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <h4 className="text-xs font-semibold text-zinc-500 uppercase tracking-wide mb-3">
+            Highest-arousal posts (last hour)
+          </h4>
+          {loadingPosts && (
+            <p className="text-xs text-zinc-400">Loading posts...</p>
+          )}
+          {!loadingPosts && posts.length === 0 && (
+            <p className="text-xs text-zinc-400">
+              No scored posts in the last hour.
+            </p>
+          )}
+          <div className="space-y-3">
+            {posts.slice(0, 10).map((post, i) => (
+              <div key={i} className="flex gap-2 items-start">
+                <PostArousalDot score={post.arousal_score} />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm text-zinc-700 dark:text-zinc-300 break-words">
+                    {post.text.length > 280
+                      ? post.text.slice(0, 280) + "..."
+                      : post.text}
+                  </p>
+                  <div className="flex gap-3 mt-1 text-xs text-zinc-400">
+                    <span className="font-mono">
+                      {(post.arousal_score * 100).toFixed(1)}
+                    </span>
+                    <span>{timeAgo(post.created_at)}</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 // =============================================================================
@@ -189,13 +391,43 @@ export default function PulsePage() {
             <span className="font-bold text-lg tracking-tight">SideLines</span>
           </Link>
           <div className="flex gap-4 text-sm font-medium text-zinc-500">
-            <Link href="/" className="hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors">Analyzer</Link>
-            <Link href="/clearview" className="hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors">ClearView</Link>
-            <Link href="/sidelines" className="hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors">SideLines</Link>
+            <Link
+              href="/"
+              className="hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors"
+            >
+              Analyzer
+            </Link>
+            <Link
+              href="/clearview"
+              className="hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors"
+            >
+              ClearView
+            </Link>
+            <Link
+              href="/sidelines"
+              className="hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors"
+            >
+              SideLines
+            </Link>
             <span className="text-zinc-300 dark:text-zinc-700">|</span>
-            <Link href="/sidelines/pulse" className="text-zinc-900 dark:text-zinc-100">Pulse</Link>
-            <Link href="/sidelines/methodology" className="hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors">Methodology</Link>
-            <Link href="/sidelines/about" className="hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors">About</Link>
+            <Link
+              href="/sidelines/pulse"
+              className="text-zinc-900 dark:text-zinc-100"
+            >
+              Pulse
+            </Link>
+            <Link
+              href="/sidelines/methodology"
+              className="hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors"
+            >
+              Methodology
+            </Link>
+            <Link
+              href="/sidelines/about"
+              className="hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors"
+            >
+              About
+            </Link>
           </div>
         </div>
       </nav>
@@ -203,9 +435,12 @@ export default function PulsePage() {
       <div className="max-w-5xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold tracking-tight mb-2">Community Pulse</h1>
+          <h1 className="text-3xl font-bold tracking-tight mb-2">
+            Community Pulse
+          </h1>
           <p className="text-zinc-600 dark:text-zinc-400 mb-4">
-            Real-time arousal monitoring across political communities on Bluesky.
+            Real-time arousal monitoring across political communities on
+            Bluesky.
           </p>
 
           {/* Stats pills */}
@@ -227,7 +462,7 @@ export default function PulsePage() {
                 <span className="text-zinc-500">Temperature</span>{" "}
                 <TemperatureLabel value={data.global_stats.mean_arousal} />
                 <span className="ml-1 text-zinc-400 font-mono text-xs">
-                  {(data.global_stats.mean_arousal * 100).toFixed(0)}
+                  {(data.global_stats.mean_arousal * 100).toFixed(1)}
                 </span>
               </div>
               {lastUpdated && (
@@ -248,7 +483,9 @@ export default function PulsePage() {
 
         {/* Loading */}
         {loading && (
-          <div className="text-center py-12 text-zinc-500">Loading pulse data...</div>
+          <div className="text-center py-12 text-zinc-500">
+            Loading pulse data...
+          </div>
         )}
 
         {/* Spike Alerts */}
@@ -268,7 +505,8 @@ export default function PulsePage() {
                       {spike.community_name}
                     </span>
                     <span className="ml-2 text-sm text-red-600 dark:text-red-400">
-                      {(spike.mean_arousal * 100).toFixed(0)} vs {(spike.baseline_arousal * 100).toFixed(0)} baseline
+                      {(spike.mean_arousal * 100).toFixed(1)} vs{" "}
+                      {(spike.baseline_arousal * 100).toFixed(1)} baseline
                     </span>
                   </div>
                   <span className="text-xs bg-red-200 dark:bg-red-800 text-red-800 dark:text-red-200 px-2 py-0.5 rounded-full font-medium">
@@ -277,7 +515,10 @@ export default function PulsePage() {
                 </div>
                 <div className="flex gap-4 text-sm text-red-600 dark:text-red-400">
                   <span>{spike.post_count} posts</span>
-                  <DeltaBadge current={spike.mean_arousal} baseline={spike.baseline_arousal} />
+                  <DeltaBadge
+                    current={spike.mean_arousal}
+                    baseline={spike.baseline_arousal}
+                  />
                 </div>
                 {spike.top_terms.length > 0 && (
                   <div className="flex gap-1.5 mt-2 flex-wrap">
@@ -304,73 +545,10 @@ export default function PulsePage() {
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {data.snapshots.map((snapshot) => (
-                <div
+                <CommunityCard
                   key={snapshot.community_id}
-                  className={`p-5 bg-white dark:bg-zinc-900 border rounded-xl transition-colors ${
-                    snapshot.spike
-                      ? "border-red-300 dark:border-red-700"
-                      : "border-zinc-200 dark:border-zinc-800"
-                  }`}
-                >
-                  {/* Community name + description */}
-                  <div className="mb-3">
-                    <div className="flex items-center gap-2 mb-1">
-                      <h3 className="font-bold text-sm">{snapshot.community_name}</h3>
-                      {snapshot.spike && (
-                        <span className="text-xs bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-400 px-1.5 py-0.5 rounded font-medium">
-                          SPIKE
-                        </span>
-                      )}
-                    </div>
-                    {snapshot.community_description && (
-                      <p className="text-xs text-zinc-500 line-clamp-1">
-                        {snapshot.community_description}
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Arousal bar */}
-                  <div className="mb-3">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-xs text-zinc-500">Arousal</span>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-mono font-semibold">
-                          {(snapshot.mean_arousal * 100).toFixed(0)}
-                        </span>
-                        <DeltaBadge
-                          current={snapshot.mean_arousal}
-                          baseline={snapshot.baseline_arousal}
-                        />
-                      </div>
-                    </div>
-                    <ArousalBar value={snapshot.mean_arousal} />
-                  </div>
-
-                  {/* Stats row */}
-                  <div className="flex gap-4 text-xs text-zinc-500 mb-3">
-                    <span>{snapshot.post_count} posts (30m)</span>
-                    <span>{snapshot.community_member_count?.toLocaleString()} members</span>
-                  </div>
-
-                  {/* Top terms */}
-                  {snapshot.top_terms && snapshot.top_terms.length > 0 && (
-                    <div className="flex gap-1.5 flex-wrap mb-3">
-                      {snapshot.top_terms.slice(0, 5).map((term) => (
-                        <span
-                          key={term}
-                          className="px-1.5 py-0.5 bg-zinc-100 dark:bg-zinc-800 rounded text-xs text-zinc-600 dark:text-zinc-400"
-                        >
-                          {term}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Sparkline */}
-                  <div className="text-zinc-400">
-                    <Sparkline history={snapshot.history} />
-                  </div>
-                </div>
+                  snapshot={snapshot}
+                />
               ))}
             </div>
           </div>
