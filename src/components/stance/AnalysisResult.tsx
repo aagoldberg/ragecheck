@@ -28,13 +28,13 @@ export function AnalysisResult({ result }: AnalysisResultProps) {
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
       {/* 1. HERO SUMMARY & SCORE */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-stretch">
         <StanceSection
           title="Analysis Summary"
           variant="hero"
-          className="md:col-span-2 h-full"
+          className="md:col-span-2 flex flex-col justify-center"
         >
-          <div className="space-y-4">
+          <div className="space-y-6">
             <div className="flex flex-wrap items-center gap-3">
               <PostureBadge posture={a.posture.primary} />
               {a.posture.secondary
@@ -42,50 +42,42 @@ export function AnalysisResult({ result }: AnalysisResultProps) {
                 .map((s, i) => (
                   <span
                     key={i}
-                    className="text-xs px-2.5 py-1 rounded-full border bg-zinc-900/50"
-                    style={{
-                      borderColor:
-                        POSTURE_META[s.label as Posture]?.color || "#8b5cf6",
-                      color:
-                        POSTURE_META[s.label as Posture]?.color || "#8b5cf6",
-                    }}
+                    className="text-xs px-2.5 py-1 rounded-full border border-zinc-700 bg-zinc-900/40 text-zinc-400"
                   >
                     {POSTURE_META[s.label as Posture]?.label || s.label} (
                     {Math.round(s.weight * 100)}%)
                   </span>
                 ))}
-              <span className="text-xs text-zinc-400 bg-zinc-800/80 border border-zinc-700 px-2.5 py-1 rounded-full ml-auto">
+              <span className="text-[10px] font-bold text-zinc-500 bg-zinc-800/80 border border-zinc-700/50 px-2 py-0.5 rounded uppercase tracking-widest ml-auto">
                 {a.summary.primary_mode}
               </span>
             </div>
             
-            <p className="text-base text-zinc-200 leading-relaxed">
+            <p className="text-lg text-zinc-100 leading-relaxed font-medium">
               {a.summary.neutral_summary}
             </p>
 
             {a.summary.top_claims.length > 0 && (
-              <div className="pt-2">
-                <p className="text-[10px] uppercase tracking-wider text-zinc-500 mb-2 font-bold">
-                  Core Claims
+              <div className="pt-4 border-t border-zinc-700/30">
+                <p className="text-[10px] uppercase tracking-widest text-zinc-500 mb-3 font-black">
+                  Core Claims Detected
                 </p>
-                <ul className="space-y-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {a.summary.top_claims.map((c, i) => (
-                    <li key={i} className="text-sm text-zinc-300 flex gap-2 leading-relaxed">
-                      <span className="text-violet-400 mt-1.5 text-xs">●</span>
+                    <div key={i} className="text-sm text-zinc-300 flex gap-3 leading-snug bg-zinc-900/30 p-2 rounded-lg border border-zinc-800/50">
+                      <span className="text-violet-500 font-bold shrink-0">#</span>
                       <span>{c}</span>
-                    </li>
+                    </div>
                   ))}
-                </ul>
+                </div>
               </div>
             )}
           </div>
         </StanceSection>
 
-        <div className="space-y-6">
-          <StanceSection title="Defense Score" className="h-full flex flex-col items-center justify-center">
+        <StanceSection title="Defense Score" className="flex flex-col items-center justify-center bg-zinc-900/50">
              <DefenseScoreGauge score={a.defense_module.overall_defense_score_raw} />
-          </StanceSection>
-        </div>
+        </StanceSection>
       </div>
 
        {/* 2. PREDICTED EFFECTS */}

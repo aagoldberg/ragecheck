@@ -194,7 +194,7 @@ export const trackInteraction = async (
 };
 
 // Navigation tracking
-export const trackNavClick = (destination: string, location: "header" | "footer" | "menu") => {
+export const trackNavClick = (destination: string, location: string) => {
   trackInteraction("navigation", "click", destination, undefined, { location });
 };
 

@@ -171,24 +171,39 @@ export default function StancePage() {
       {/* Header */}
       <header className="border-b border-zinc-800/50 sticky top-0 z-50 bg-[#0a0a10]/80 backdrop-blur-md">
         <div className="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 sm:gap-8">
             <Link href="/stance" onClick={() => setResult(null)} className="flex items-center gap-3 group">
-                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500 to-violet-600 flex items-center justify-center group-hover:scale-105 transition-transform">
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500 to-violet-600 flex items-center justify-center group-hover:scale-105 transition-transform">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="12" cy="12" r="10" /><path d="M12 16v-4M12 8h.01" />
+                  <circle cx="12" cy="12" r="10" /><path d="M12 16v-4M12 8h.01" />
                 </svg>
-                </div>
-                <h1 className="text-lg font-bold tracking-wide">
+              </div>
+              <h1 className="text-lg font-bold tracking-wide">
                 <span className="text-violet-400">Stance</span>
-                </h1>
+              </h1>
             </Link>
-            <span className="text-[10px] font-bold bg-violet-500/15 text-violet-400 border border-violet-500/30 px-2 py-0.5 rounded-full uppercase tracking-widest">
-              Experimental
-            </span>
+
+            {/* Desktop Lens Toggle */}
+            <div className="hidden sm:flex items-center p-1 bg-zinc-900 rounded-lg border border-zinc-800">
+              <button 
+                className="px-3 py-1.5 text-[10px] font-black text-violet-400 bg-violet-500/10 rounded-md border border-violet-500/20 shadow-sm transition-all flex items-center gap-1.5"
+                disabled
+              >
+                <div className="w-1.5 h-1.5 rounded-full bg-violet-500 animate-pulse"></div>
+                CHECK
+              </button>
+              <a 
+                href="/clearview" 
+                onClick={() => tracking.trackNavClick("clearview", "lens_toggle_stance")}
+                className="px-3 py-1.5 text-[10px] font-black text-zinc-500 hover:text-zinc-300 transition-all flex items-center gap-1.5"
+              >
+                READ
+              </a>
+            </div>
           </div>
+          
           <nav className="flex items-center gap-4 text-xs text-zinc-500">
             <Link href="/" className="hover:text-zinc-300 transition-colors">RageCheck</Link>
-            <Link href="/defensecheck" className="hover:text-zinc-300 transition-colors">DefenseCheck</Link>
             <Link href="/stance/about" className="hover:text-zinc-300 transition-colors">About</Link>
           </nav>
         </div>
