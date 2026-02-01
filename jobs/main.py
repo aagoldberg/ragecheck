@@ -859,18 +859,31 @@ async def get_pulse_community(community_id: int, limit: int = 20):
     Get detail for a single community: recent high-arousal posts
     with topic grouping and thread structure.
     """
+    import logging
+    log = logging.getLogger(__name__)
+
     try:
         from pulse import group_posts_by_topic
 
         posts = get_community_recent_posts(community_id, limit=limit)
+        log.info(f"Community {community_id}: fetched {len(posts)} posts")
+
         top_terms = get_latest_snapshot_terms(community_id)
+        log.info(f"Community {community_id}: top_terms={top_terms}")
+
         topics = group_posts_by_topic(posts, top_terms)
+        log.info(
+            f"Community {community_id}: {len(topics)} topics, "
+            f"total topic posts={sum(t['post_count'] for t in topics)}"
+        )
+
         return {
             "community_id": community_id,
             "posts": posts,
             "topics": topics,
         }
     except Exception as e:
+        log.exception(f"Community {community_id}: topic grouping failed")
         raise HTTPException(status_code=500, detail=str(e))
 
 
