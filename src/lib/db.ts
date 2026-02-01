@@ -289,6 +289,7 @@ export async function initDB() {
     await getDb()`ALTER TABLE ragecheck_visitors ADD COLUMN IF NOT EXISTS utm_campaign TEXT`;
     await getDb()`ALTER TABLE ragecheck_visitors ADD COLUMN IF NOT EXISTS utm_content TEXT`;
     await getDb()`ALTER TABLE ragecheck_visitors ADD COLUMN IF NOT EXISTS utm_term TEXT`;
+    await getDb()`ALTER TABLE ragecheck_visitors ADD COLUMN IF NOT EXISTS duration_seconds INTEGER`;
     // Add columns for full analysis caching
     await getDb()`ALTER TABLE ragecheck_analyses ADD COLUMN IF NOT EXISTS title TEXT`;
     await getDb()`ALTER TABLE ragecheck_analyses ADD COLUMN IF NOT EXISTS reasons JSONB`;
@@ -1976,11 +1977,11 @@ export interface VisitorLog {
   utmTerm?: string;
 }
 
-export async function logVisitor(data: VisitorLog) {
+export async function logVisitor(data: VisitorLog): Promise<number | null> {
   try {
     const isBotUser = isBot(data.userAgent);
-    await withRetry(async () => {
-      await getDb()`
+    const rows = await withRetry(async () => {
+      return await getDb()`
         INSERT INTO ragecheck_visitors (
           ip_address, user_agent, country, referrer, is_bot, page_path,
           utm_source, utm_medium, utm_campaign, utm_content, utm_term
@@ -1998,11 +1999,100 @@ export async function logVisitor(data: VisitorLog) {
           ${data.utmContent || null},
           ${data.utmTerm || null}
         )
+        RETURNING id
+      `;
+    });
+    return rows?.[0]?.id ?? null;
+  } catch (error) {
+    console.error("Failed to log visitor:", error);
+    return null;
+  }
+}
+
+export async function updateVisitorDuration(visitorId: number, durationSeconds: number) {
+  try {
+    await withRetry(async () => {
+      await getDb()`
+        UPDATE ragecheck_visitors
+        SET duration_seconds = ${Math.round(durationSeconds)}
+        WHERE id = ${visitorId}
       `;
     });
   } catch (error) {
-    console.error("Failed to log visitor:", error);
+    console.error("Failed to update visitor duration:", error);
   }
+}
+
+export interface SessionDurationStats {
+  avgDuration: number | null;
+  medianDuration: number | null;
+  totalWithDuration: number;
+  distribution: { bucket: string; count: number }[];
+  perPage: { pagePath: string; avgDuration: number; visits: number }[];
+}
+
+export async function getSessionDurationStats(): Promise<SessionDurationStats> {
+  const db = getDb();
+
+  // Average and count
+  const avgRows = await db`
+    SELECT
+      ROUND(AVG(duration_seconds)) as avg_duration,
+      COUNT(*) as total_with_duration
+    FROM ragecheck_visitors
+    WHERE duration_seconds IS NOT NULL AND is_bot = false
+  `;
+
+  // Median
+  const medianRows = await db`
+    SELECT PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY duration_seconds) as median_duration
+    FROM ragecheck_visitors
+    WHERE duration_seconds IS NOT NULL AND is_bot = false
+  `;
+
+  // Distribution buckets
+  const distRows = await db`
+    SELECT
+      CASE
+        WHEN duration_seconds < 5 THEN '0-5s'
+        WHEN duration_seconds < 15 THEN '5-15s'
+        WHEN duration_seconds < 30 THEN '15-30s'
+        WHEN duration_seconds < 60 THEN '30-60s'
+        WHEN duration_seconds < 120 THEN '1-2m'
+        WHEN duration_seconds < 300 THEN '2-5m'
+        ELSE '5m+'
+      END as bucket,
+      COUNT(*) as count
+    FROM ragecheck_visitors
+    WHERE duration_seconds IS NOT NULL AND is_bot = false
+    GROUP BY bucket
+    ORDER BY MIN(duration_seconds)
+  `;
+
+  // Per-page breakdown
+  const pageRows = await db`
+    SELECT
+      COALESCE(page_path, '/') as page_path,
+      ROUND(AVG(duration_seconds)) as avg_duration,
+      COUNT(*) as visits
+    FROM ragecheck_visitors
+    WHERE duration_seconds IS NOT NULL AND is_bot = false
+    GROUP BY page_path
+    ORDER BY visits DESC
+    LIMIT 10
+  `;
+
+  return {
+    avgDuration: avgRows[0]?.avg_duration ? Number(avgRows[0].avg_duration) : null,
+    medianDuration: medianRows[0]?.median_duration ? Number(medianRows[0].median_duration) : null,
+    totalWithDuration: Number(avgRows[0]?.total_with_duration || 0),
+    distribution: distRows.map(r => ({ bucket: r.bucket, count: Number(r.count) })),
+    perPage: pageRows.map(r => ({
+      pagePath: r.page_path,
+      avgDuration: Number(r.avg_duration),
+      visits: Number(r.visits),
+    })),
+  };
 }
 
 export interface VisitorStats {
@@ -2024,6 +2114,7 @@ export interface VisitorStats {
     isRepeatUser: boolean;
     startedCount: number;
     abandonedCount: number;
+    durationSeconds: number | null;
   }[];
   timeSeries: {
     date: string;
@@ -2288,7 +2379,7 @@ export async function getVisitorStats(): Promise<VisitorStats> {
 
     const recentRows = await getDb()`
       SELECT v.ip_address, v.user_agent, v.country, v.referrer, v.page_path,
-             v.created_at, v.is_bot,
+             v.created_at, v.is_bot, v.duration_seconds,
              EXISTS (
                SELECT 1 FROM ragecheck_analyses a
                WHERE a.ip_address = v.ip_address AND a.llm_enhanced = true
@@ -2317,6 +2408,7 @@ export async function getVisitorStats(): Promise<VisitorStats> {
       isRepeatUser: row.is_repeat_user || false,
       startedCount: Number(row.started_count) || 0,
       abandonedCount: Number(row.abandoned_count) || 0,
+      durationSeconds: row.duration_seconds != null ? Number(row.duration_seconds) : null,
     }));
 
     // Time series for last 14 days (grouped by EST date, excluding bots)
@@ -5939,6 +6031,7 @@ export interface ClearViewAnalytics {
     referrer: string | null;
     utmSource: string | null;
     isRepeat: boolean;
+    durationSeconds: number | null;
   }[];
   repeatUsers: {
     newToday: number;
@@ -6100,7 +6193,7 @@ export async function getClearViewAnalytics(): Promise<ClearViewAnalytics> {
       `,
       // Recent visitors (last 3 days) for visitor table
       getDb()`
-        SELECT ip_address, user_agent, country, referrer, utm_source, utm_medium, utm_campaign, created_at
+        SELECT ip_address, user_agent, country, referrer, utm_source, utm_medium, utm_campaign, created_at, duration_seconds
         FROM ragecheck_visitors
         WHERE page_path = ${pagePath} AND is_bot = false AND created_at > NOW() - INTERVAL '3 days'
         ORDER BY created_at DESC
@@ -6432,6 +6525,7 @@ export async function getClearViewAnalytics(): Promise<ClearViewAnalytics> {
       referrer: row.referrer as string | null,
       utmSource: row.utm_source as string | null,
       isRepeat: repeatIPSet.has(String(row.ip_address)),
+      durationSeconds: row.duration_seconds != null ? Number(row.duration_seconds) : null,
     }));
 
     // ---- 3. Repeat User / Habit Formation ----

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Analytics } from "@vercel/analytics/react";
 import { PostHogProvider } from "@/components/PostHogProvider";
+import VisitDurationProvider from "@/components/VisitDurationProvider";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -137,7 +138,9 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <PostHogProvider>
-          {children}
+          <VisitDurationProvider>
+            {children}
+          </VisitDurationProvider>
         </PostHogProvider>
         <Analytics />
       </body>

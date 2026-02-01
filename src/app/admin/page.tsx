@@ -195,6 +195,7 @@ interface VisitorStats {
     isRepeatUser: boolean;
     startedCount: number;
     abandonedCount: number;
+    durationSeconds: number | null;
   }[];
   timeSeries: {
     date: string;
@@ -618,6 +619,7 @@ interface ApiResponse {
   defenseCheckMetrics?: { totalAnalyses: number; avgScore: number; categoryDistribution: Record<string, number>; analysesPerDay: { date: string; count: number }[] };
   stanceMetrics?: { totalAnalyses: number; avgDefenseScore: number; postureDistribution: Record<string, number>; analysesPerDay: { date: string; count: number }[] };
   clearviewAnalytics?: ClearViewAnalytics;
+  sessionDurationStats?: SessionDurationStats;
   dbAvailable?: boolean;
 }
 
@@ -1578,6 +1580,14 @@ function PageDailyChart({ data, title }: { data: { date: string; visitors: numbe
   );
 }
 
+interface SessionDurationStats {
+  avgDuration: number | null;
+  medianDuration: number | null;
+  totalWithDuration: number;
+  distribution: { bucket: string; count: number }[];
+  perPage: { pagePath: string; avgDuration: number; visits: number }[];
+}
+
 type TabType = "overview" | "users" | "conversions" | "funnel" | "retention" | "shares" | "feedback" | "content" | "clearview" | "subscribers" | "interactions" | "languages" | "defensecheck" | "stance";
 
 interface ClearviewStats {
@@ -1665,6 +1675,7 @@ interface ClearViewAnalytics {
     createdAt: string; ipAddress: string; country: string | null;
     device: string; os: string; browser: string;
     referrer: string | null; utmSource: string | null; isRepeat: boolean;
+    durationSeconds: number | null;
   }[];
   repeatUsers: {
     newToday: number; returningToday: number; new7Day: number; returning7Day: number;
@@ -2237,6 +2248,7 @@ export default function AdminDashboard() {
   const [defenseCheckMetrics, setDefenseCheckMetrics] = useState<{ totalAnalyses: number; avgScore: number; categoryDistribution: Record<string, number>; analysesPerDay: { date: string; count: number }[] } | null>(null);
   const [stanceMetrics, setStanceMetrics] = useState<{ totalAnalyses: number; avgDefenseScore: number; postureDistribution: Record<string, number>; analysesPerDay: { date: string; count: number }[] } | null>(null);
   const [clearviewAnalytics, setClearviewAnalytics] = useState<ClearViewAnalytics | null>(null);
+  const [sessionDurationStats, setSessionDurationStats] = useState<SessionDurationStats | null>(null);
 
   const fetchStats = async (adminKey: string) => {
     setLoading(true);
@@ -2275,6 +2287,7 @@ export default function AdminDashboard() {
         setDefenseCheckMetrics(data.defenseCheckMetrics || null);
         setStanceMetrics(data.stanceMetrics || null);
         setClearviewAnalytics(data.clearviewAnalytics || null);
+        setSessionDurationStats(data.sessionDurationStats || null);
         setAuthenticated(true);
         // Save key to localStorage
         localStorage.setItem("ragecheck-admin-key", adminKey);
@@ -2646,6 +2659,7 @@ export default function AdminDashboard() {
                                       <th className="text-left py-3 px-3 text-zinc-500 font-medium">Browser</th>
                                       <th className="text-left py-3 px-3 text-zinc-500 font-medium">Referrer</th>
                                       <th className="text-left py-3 px-3 text-zinc-500 font-medium">UTM</th>
+                                      <th className="text-left py-3 px-3 text-zinc-500 font-medium">Duration</th>
                                       <th className="text-left py-3 px-3 text-zinc-500 font-medium">Repeat?</th>
                                     </tr>
                                   </thead>
@@ -2660,6 +2674,13 @@ export default function AdminDashboard() {
                                         <td className="py-2 px-3 text-zinc-500">{v.browser}</td>
                                         <td className="py-2 px-3 text-zinc-500 max-w-[120px] truncate" title={v.referrer || ''}>{v.referrer ? (() => { try { return new URL(v.referrer.startsWith('http') ? v.referrer : `https://${v.referrer}`).hostname.replace('www.', ''); } catch { return v.referrer; } })() : '-'}</td>
                                         <td className="py-2 px-3 text-zinc-500">{v.utmSource || '-'}</td>
+                                        <td className="py-2 px-3 text-zinc-500 text-xs whitespace-nowrap">
+                                          {v.durationSeconds != null
+                                            ? v.durationSeconds >= 60
+                                              ? `${Math.floor(v.durationSeconds / 60)}m ${v.durationSeconds % 60}s`
+                                              : `${v.durationSeconds}s`
+                                            : '-'}
+                                        </td>
                                         <td className="py-2 px-3">
                                           {v.isRepeat ? (
                                             <span className="text-xs font-medium px-2 py-0.5 rounded bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300">Repeat</span>
@@ -3895,6 +3916,7 @@ export default function AdminDashboard() {
                         <th className="text-left py-3 px-3 text-zinc-500 font-medium">Country</th>
                         <th className="text-left py-3 px-3 text-zinc-500 font-medium">Referrer</th>
                         <th className="text-left py-3 px-3 text-zinc-500 font-medium">IP</th>
+                        <th className="text-left py-3 px-3 text-zinc-500 font-medium">Duration</th>
                         <th className="text-left py-3 px-3 text-zinc-500 font-medium">Started</th>
                         <th className="text-left py-3 px-3 text-zinc-500 font-medium">Abandoned</th>
                         <th className="text-left py-3 px-3 text-zinc-500 font-medium">Bot</th>
@@ -3904,7 +3926,7 @@ export default function AdminDashboard() {
                     <tbody>
                       {visitorStats.recentVisitors.length === 0 ? (
                         <tr>
-                          <td colSpan={12} className="py-4 text-zinc-500 text-center">No visitors yet</td>
+                          <td colSpan={13} className="py-4 text-zinc-500 text-center">No visitors yet</td>
                         </tr>
                       ) : (
                         visitorStats.recentVisitors.map((v, i) => (
@@ -3938,6 +3960,13 @@ export default function AdminDashboard() {
                                 )}
                               </span>
                             </td>
+                            <td className="py-2 px-3 text-zinc-600 dark:text-zinc-400 text-xs whitespace-nowrap">
+                              {v.durationSeconds != null
+                                ? v.durationSeconds >= 60
+                                  ? `${Math.floor(v.durationSeconds / 60)}m ${v.durationSeconds % 60}s`
+                                  : `${v.durationSeconds}s`
+                                : <span className="text-zinc-400">-</span>}
+                            </td>
                             <td className="py-2 px-3 text-zinc-600 dark:text-zinc-400 text-xs text-center">
                               {v.startedCount > 0 ? v.startedCount : "-"}
                             </td>
@@ -3964,6 +3993,84 @@ export default function AdminDashboard() {
                     </tbody>
                   </table>
                 </div>
+              </div>
+            )}
+
+            {/* Session Duration Stats */}
+            {sessionDurationStats && sessionDurationStats.totalWithDuration > 0 && (
+              <div className="mb-8">
+                <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100 mb-4">
+                  Session Duration
+                </h2>
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 mb-4">
+                  <StatCard
+                    title="Avg Duration"
+                    value={sessionDurationStats.avgDuration != null ? `${Math.floor(sessionDurationStats.avgDuration / 60)}m ${sessionDurationStats.avgDuration % 60}s` : "-"}
+                    accent="indigo"
+                  />
+                  <StatCard
+                    title="Median Duration"
+                    value={sessionDurationStats.medianDuration != null ? `${Math.floor(sessionDurationStats.medianDuration / 60)}m ${Math.round(sessionDurationStats.medianDuration % 60)}s` : "-"}
+                    accent="emerald"
+                  />
+                  <StatCard
+                    title="Sessions Tracked"
+                    value={sessionDurationStats.totalWithDuration.toLocaleString()}
+                    accent="purple"
+                  />
+                </div>
+
+                {/* Duration Distribution */}
+                {sessionDurationStats.distribution.length > 0 && (
+                  <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 p-4 mb-4">
+                    <h3 className="text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-3">Duration Distribution</h3>
+                    <div className="flex items-end gap-2 h-32">
+                      {sessionDurationStats.distribution.map((d) => {
+                        const maxCount = Math.max(...sessionDurationStats.distribution.map(b => b.count), 1);
+                        const height = (d.count / maxCount) * 100;
+                        return (
+                          <div key={d.bucket} className="flex-1 flex flex-col items-center gap-1">
+                            <span className="text-xs text-zinc-500">{d.count}</span>
+                            <div
+                              className="w-full bg-indigo-500 dark:bg-indigo-400 rounded-t"
+                              style={{ height: `${Math.max(height, 2)}%` }}
+                            />
+                            <span className="text-xs text-zinc-500 whitespace-nowrap">{d.bucket}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Per-Page Breakdown */}
+                {sessionDurationStats.perPage.length > 0 && (
+                  <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 p-4">
+                    <h3 className="text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-3">Duration by Page</h3>
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="text-left text-zinc-500 dark:text-zinc-400 border-b border-zinc-100 dark:border-zinc-800">
+                          <th className="py-2 px-3 font-medium">Page</th>
+                          <th className="py-2 px-3 font-medium text-right">Avg Duration</th>
+                          <th className="py-2 px-3 font-medium text-right">Visits</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {sessionDurationStats.perPage.map((p) => (
+                          <tr key={p.pagePath} className="border-b border-zinc-50 dark:border-zinc-800/50">
+                            <td className="py-2 px-3 font-mono text-xs">{p.pagePath}</td>
+                            <td className="py-2 px-3 text-right text-zinc-600 dark:text-zinc-400">
+                              {Math.floor(p.avgDuration / 60)}m {p.avgDuration % 60}s
+                            </td>
+                            <td className="py-2 px-3 text-right text-zinc-600 dark:text-zinc-400">
+                              {p.visits.toLocaleString()}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
             )}
             </>

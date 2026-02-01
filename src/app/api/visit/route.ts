@@ -62,7 +62,7 @@ export async function POST(request: NextRequest) {
     const userAgent = request.headers.get("user-agent") || null;
     const country = request.headers.get("x-vercel-ip-country") || null;
 
-    await logVisitor({
+    const visitorId = await logVisitor({
       ipAddress: ipAddress || undefined,
       userAgent: userAgent || undefined,
       country: country || undefined,
@@ -75,7 +75,7 @@ export async function POST(request: NextRequest) {
       utmTerm: utmTerm || undefined,
     });
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, visitorId });
   } catch (error) {
     console.error("Visit tracking error:", error);
     return NextResponse.json({ success: false });

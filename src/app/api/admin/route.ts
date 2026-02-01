@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { initDB, getDashboardStats, getVisitorStats, getPageVisitorStats, getViralMetrics, isDBAvailable, invalidateIncompleteCache, recomputeBotFlags, getFeedbackStats, initFeedbackTable, getTimeToAnalysisMetrics, getConversionMetrics, getConversionInsights, getFunnelMetrics, getRetentionMetrics, getShareMetrics, getContentInsights, getAcquisitionMetrics, getAnalysisCompletionMetrics, getAbandonmentDiagnostics, getSubscriberStats, getInteractionStats, getClearviewSubscriberStats, getLanguageStats, getDefenseCheckMetrics, getClearViewAnalytics, getStanceMetrics } from "@/lib/db";
+import { initDB, getDashboardStats, getVisitorStats, getPageVisitorStats, getViralMetrics, isDBAvailable, invalidateIncompleteCache, recomputeBotFlags, getFeedbackStats, initFeedbackTable, getTimeToAnalysisMetrics, getConversionMetrics, getConversionInsights, getFunnelMetrics, getRetentionMetrics, getShareMetrics, getContentInsights, getAcquisitionMetrics, getAnalysisCompletionMetrics, getAbandonmentDiagnostics, getSubscriberStats, getInteractionStats, getClearviewSubscriberStats, getLanguageStats, getDefenseCheckMetrics, getClearViewAnalytics, getStanceMetrics, getSessionDurationStats } from "@/lib/db";
 
 export async function GET(request: NextRequest) {
   // Simple password protection via query param
@@ -49,6 +49,7 @@ export async function GET(request: NextRequest) {
     const defenseCheckMetrics = await getDefenseCheckMetrics();
     const stanceMetrics = await getStanceMetrics();
     const clearviewAnalytics = await getClearViewAnalytics();
+    const sessionDurationStats = await getSessionDurationStats();
 
     return NextResponse.json({
       success: true,
@@ -75,6 +76,7 @@ export async function GET(request: NextRequest) {
       defenseCheckMetrics,
       stanceMetrics,
       clearviewAnalytics,
+      sessionDurationStats,
     }, {
       headers: {
         'Cache-Control': 'no-store, no-cache, must-revalidate',
