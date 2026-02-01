@@ -63,6 +63,7 @@ from db import (
     get_pulse_global_stats,
     get_community_recent_posts,
     get_network_graph_data,
+    get_latest_snapshot_terms,
 )
 from starter_packs import crawl_starter_packs, backfill_follows, refresh_stale_follows, snowball_expand
 
@@ -855,11 +856,20 @@ async def get_pulse():
 @app.get("/pulse/community/{community_id}")
 async def get_pulse_community(community_id: int, limit: int = 20):
     """
-    Get detail for a single community: recent high-arousal posts.
+    Get detail for a single community: recent high-arousal posts
+    with topic grouping and thread structure.
     """
     try:
+        from pulse import group_posts_by_topic
+
         posts = get_community_recent_posts(community_id, limit=limit)
-        return {"community_id": community_id, "posts": posts}
+        top_terms = get_latest_snapshot_terms(community_id)
+        topics = group_posts_by_topic(posts, top_terms)
+        return {
+            "community_id": community_id,
+            "posts": posts,
+            "topics": topics,
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

@@ -53,6 +53,24 @@ interface CommunityPost {
   uri: string;
   arousal_score: number;
   created_at: string;
+  reply_parent_uri?: string;
+  reply_root_uri?: string;
+  quote_uri?: string;
+  post_type?: "original" | "reply";
+}
+
+interface TopicThread {
+  root: CommunityPost;
+  replies: CommunityPost[];
+}
+
+interface TopicGroup {
+  topic_label: string;
+  topic_keywords: string[];
+  threads: TopicThread[];
+  standalone: CommunityPost[];
+  post_count: number;
+  mean_arousal: number;
 }
 
 // =============================================================================
@@ -191,25 +209,28 @@ function timeAgo(dateStr: string): string {
 function CommunityCard({ snapshot }: { snapshot: CommunitySnapshot }) {
   const [expanded, setExpanded] = useState(false);
   const [posts, setPosts] = useState<CommunityPost[]>([]);
+  const [topics, setTopics] = useState<TopicGroup[]>([]);
   const [loadingPosts, setLoadingPosts] = useState(false);
+  const [expandedTopics, setExpandedTopics] = useState<Set<string>>(new Set());
 
   const fetchPosts = useCallback(async () => {
-    if (posts.length > 0) return; // already loaded
+    if (posts.length > 0 || topics.length > 0) return; // already loaded
     setLoadingPosts(true);
     try {
       const res = await fetch(
         `/api/sidelines/pulse/community?id=${snapshot.community_id}`
       );
       const json = await res.json();
-      if (json.success && json.posts) {
-        setPosts(json.posts);
+      if (json.success) {
+        if (json.posts) setPosts(json.posts);
+        if (json.topics) setTopics(json.topics);
       }
     } catch {
       // silent
     } finally {
       setLoadingPosts(false);
     }
-  }, [snapshot.community_id, posts.length]);
+  }, [snapshot.community_id, posts.length, topics.length]);
 
   function handleClick() {
     const next = !expanded;
@@ -299,43 +320,197 @@ function CommunityCard({ snapshot }: { snapshot: CommunitySnapshot }) {
         </div>
       </div>
 
-      {/* Expanded: recent posts */}
+      {/* Expanded: topic-grouped or flat posts */}
       {expanded && (
         <div
           className="border-t border-zinc-100 dark:border-zinc-800 px-5 py-4"
           onClick={(e) => e.stopPropagation()}
         >
-          <h4 className="text-xs font-semibold text-zinc-500 uppercase tracking-wide mb-3">
-            Highest-arousal posts (last hour)
-          </h4>
           {loadingPosts && (
             <p className="text-xs text-zinc-400">Loading posts...</p>
           )}
-          {!loadingPosts && posts.length === 0 && (
+          {!loadingPosts && posts.length === 0 && topics.length === 0 && (
             <p className="text-xs text-zinc-400">
               No scored posts in the last hour.
             </p>
           )}
-          <div className="space-y-3">
-            {posts.slice(0, 10).map((post, i) => (
-              <div key={i} className="flex gap-2 items-start">
-                <PostArousalDot score={post.arousal_score} />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm text-zinc-700 dark:text-zinc-300 break-words">
-                    {post.text.length > 280
-                      ? post.text.slice(0, 280) + "..."
-                      : post.text}
-                  </p>
-                  <div className="flex gap-3 mt-1 text-xs text-zinc-400">
-                    <span className="font-mono">
-                      {(post.arousal_score * 100).toFixed(1)}
-                    </span>
-                    <span>{timeAgo(post.created_at)}</span>
+
+          {/* Topic-grouped view */}
+          {!loadingPosts && topics.length > 0 && (
+            <div className="space-y-4">
+              <h4 className="text-xs font-semibold text-zinc-500 uppercase tracking-wide">
+                Topics (last hour)
+              </h4>
+              {topics.map((topic) => {
+                const isTopicExpanded = expandedTopics.has(topic.topic_label);
+                return (
+                  <div
+                    key={topic.topic_label}
+                    className="border border-zinc-200 dark:border-zinc-800 rounded-lg overflow-hidden"
+                  >
+                    {/* Topic header */}
+                    <button
+                      className="w-full flex items-center gap-2 px-3 py-2.5 text-left hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors"
+                      onClick={() => {
+                        setExpandedTopics((prev) => {
+                          const next = new Set(prev);
+                          if (next.has(topic.topic_label)) {
+                            next.delete(topic.topic_label);
+                          } else {
+                            next.add(topic.topic_label);
+                          }
+                          return next;
+                        });
+                      }}
+                    >
+                      <span className="text-xs text-zinc-400">
+                        {isTopicExpanded ? "\u25BC" : "\u25B6"}
+                      </span>
+                      <span className="px-2 py-0.5 bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 rounded text-xs font-semibold">
+                        {topic.topic_label}
+                      </span>
+                      <span className="text-xs text-zinc-500">
+                        {topic.post_count} posts
+                      </span>
+                      <span className="text-xs font-mono text-zinc-400">
+                        {(topic.mean_arousal * 100).toFixed(1)}
+                      </span>
+                      {topic.topic_keywords.length > 0 && (
+                        <div className="flex gap-1 ml-auto">
+                          {topic.topic_keywords.slice(0, 3).map((kw) => (
+                            <span
+                              key={kw}
+                              className="px-1 py-0.5 bg-zinc-100 dark:bg-zinc-800 rounded text-[10px] text-zinc-500"
+                            >
+                              {kw}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </button>
+
+                    {/* Topic posts (expanded) */}
+                    {isTopicExpanded && (
+                      <div className="px-3 pb-3 space-y-2.5">
+                        {/* Threads */}
+                        {topic.threads.map((thread, ti) => (
+                          <div key={ti} className="space-y-1">
+                            {/* Root post */}
+                            <div className="flex gap-2 items-start">
+                              <PostArousalDot score={thread.root.arousal_score} />
+                              <div
+                                className={`flex-1 min-w-0 ${
+                                  thread.root.quote_uri
+                                    ? "border-l-2 border-blue-300 dark:border-blue-700 pl-2"
+                                    : ""
+                                }`}
+                              >
+                                <p className="text-sm text-zinc-700 dark:text-zinc-300 break-words">
+                                  {thread.root.text.length > 280
+                                    ? thread.root.text.slice(0, 280) + "..."
+                                    : thread.root.text}
+                                </p>
+                                <div className="flex gap-3 mt-0.5 text-xs text-zinc-400">
+                                  <span className="font-mono">
+                                    {(thread.root.arousal_score * 100).toFixed(1)}
+                                  </span>
+                                  <span>{timeAgo(thread.root.created_at)}</span>
+                                </div>
+                              </div>
+                            </div>
+                            {/* Replies */}
+                            {thread.replies.map((reply, ri) => (
+                              <div
+                                key={ri}
+                                className="flex gap-2 items-start ml-4 pl-3 border-l border-zinc-200 dark:border-zinc-700"
+                              >
+                                <span className="text-zinc-400 text-xs mt-0.5">&crarr;</span>
+                                <PostArousalDot score={reply.arousal_score} />
+                                <div
+                                  className={`flex-1 min-w-0 ${
+                                    reply.quote_uri
+                                      ? "border-l-2 border-blue-300 dark:border-blue-700 pl-2"
+                                      : ""
+                                  }`}
+                                >
+                                  <p className="text-sm text-zinc-500 dark:text-zinc-400 break-words">
+                                    {reply.text.length > 280
+                                      ? reply.text.slice(0, 280) + "..."
+                                      : reply.text}
+                                  </p>
+                                  <div className="flex gap-3 mt-0.5 text-xs text-zinc-400">
+                                    <span className="font-mono">
+                                      {(reply.arousal_score * 100).toFixed(1)}
+                                    </span>
+                                    <span>{timeAgo(reply.created_at)}</span>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ))}
+
+                        {/* Standalone posts */}
+                        {topic.standalone.map((post, si) => (
+                          <div key={`s-${si}`} className="flex gap-2 items-start">
+                            <PostArousalDot score={post.arousal_score} />
+                            <div
+                              className={`flex-1 min-w-0 ${
+                                post.quote_uri
+                                  ? "border-l-2 border-blue-300 dark:border-blue-700 pl-2"
+                                  : ""
+                              }`}
+                            >
+                              <p className="text-sm text-zinc-700 dark:text-zinc-300 break-words">
+                                {post.text.length > 280
+                                  ? post.text.slice(0, 280) + "..."
+                                  : post.text}
+                              </p>
+                              <div className="flex gap-3 mt-0.5 text-xs text-zinc-400">
+                                <span className="font-mono">
+                                  {(post.arousal_score * 100).toFixed(1)}
+                                </span>
+                                <span>{timeAgo(post.created_at)}</span>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Flat post list fallback (when no topics) */}
+          {!loadingPosts && topics.length === 0 && posts.length > 0 && (
+            <div>
+              <h4 className="text-xs font-semibold text-zinc-500 uppercase tracking-wide mb-3">
+                Highest-arousal posts (last hour)
+              </h4>
+              <div className="space-y-3">
+                {posts.slice(0, 10).map((post, i) => (
+                  <div key={i} className="flex gap-2 items-start">
+                    <PostArousalDot score={post.arousal_score} />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-zinc-700 dark:text-zinc-300 break-words">
+                        {post.text.length > 280
+                          ? post.text.slice(0, 280) + "..."
+                          : post.text}
+                      </p>
+                      <div className="flex gap-3 mt-1 text-xs text-zinc-400">
+                        <span className="font-mono">
+                          {(post.arousal_score * 100).toFixed(1)}
+                        </span>
+                        <span>{timeAgo(post.created_at)}</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
+            </div>
+          )}
         </div>
       )}
     </div>

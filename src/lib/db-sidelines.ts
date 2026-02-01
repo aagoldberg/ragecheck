@@ -255,6 +255,16 @@ export async function initSidelinesTables() {
     )
   `;
   await getDb()`CREATE INDEX IF NOT EXISTS idx_bcs_community_time ON bluesky_community_snapshots(community_id, window_end DESC)`;
+
+  // Topic label cache (keyword-set → Haiku-generated label)
+  await getDb()`
+    CREATE TABLE IF NOT EXISTS bluesky_topic_labels (
+      id BIGSERIAL PRIMARY KEY,
+      keywords_key TEXT NOT NULL UNIQUE,
+      label TEXT NOT NULL,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `;
 }
 
 // =============================================================================

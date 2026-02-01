@@ -17,9 +17,12 @@ from typing import Any
 import psycopg2
 import psycopg2.extras
 
-from db import get_conn, insert_community_snapshots
+from db import get_conn, insert_community_snapshots, get_topic_label, upsert_topic_label
 
 log = logging.getLogger(__name__)
+
+# In-memory topic label cache: keywords_key → label
+_topic_label_cache: dict[str, str] = {}
 
 # Common English stop words to exclude from top terms
 STOP_WORDS = frozenset({
@@ -169,3 +172,382 @@ def compute_pulse() -> int:
         f"Pulse: wrote {inserted} snapshots for {len(snapshots)} communities"
     )
     return inserted
+
+
+# =============================================================================
+# TOPIC GROUPING
+# =============================================================================
+
+
+def _make_keywords_key(keywords: list[str]) -> str:
+    """Create a canonical cache key from a list of keywords."""
+    return ",".join(sorted(k.lower() for k in keywords))
+
+
+def group_posts_by_topic(
+    posts: list[dict[str, Any]],
+    top_terms: list[str],
+) -> list[dict[str, Any]]:
+    """
+    Group posts by topic using top_terms as keyword buckets.
+
+    1. Build threads by reply_root_uri
+    2. Assign posts/threads to the best-matching top_term
+    3. Merge co-occurring terms
+    4. Label via Haiku (cached)
+
+    Returns list of topic dicts with threads, standalone posts, and metadata.
+    """
+    if not posts or not top_terms:
+        return []
+
+    # --- Step 1: Build threads ---
+    # A thread is a group of posts sharing the same reply_root_uri.
+    # Posts with no reply_root_uri are standalone originals, unless
+    # their URI is referenced as a thread root by other posts.
+    threads: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    standalone: list[dict[str, Any]] = []
+
+    # First pass: collect all reply_root_uris
+    root_uris_referenced: set[str] = set()
+    for post in posts:
+        root_uri = post.get("reply_root_uri")
+        if root_uri:
+            root_uris_referenced.add(root_uri)
+
+    # Build URI index for matching root posts
+    uri_to_post: dict[str, dict[str, Any]] = {}
+    for post in posts:
+        if post.get("uri"):
+            uri_to_post[post["uri"]] = post
+
+    for post in posts:
+        root_uri = post.get("reply_root_uri")
+        if root_uri:
+            threads[root_uri].append(post)
+        elif post.get("uri") in root_uris_referenced:
+            # This post is a root post referenced by replies
+            threads[post["uri"]].append(post)
+        else:
+            standalone.append(post)
+
+    # --- Step 2: Assign topics via keyword matching ---
+    term_set = {t.lower() for t in top_terms}
+
+    def _best_term(texts: list[str]) -> str | None:
+        """Find the top_term with the highest match count across texts."""
+        counts: Counter[str] = Counter()
+        for text in texts:
+            tokens = set(_tokenize_simple(text))
+            for term in term_set:
+                if term in tokens:
+                    counts[term] += 1
+        if counts:
+            return counts.most_common(1)[0][0]
+        return None
+
+    # Map: term -> list of (type, data)
+    # type is "thread" or "standalone"
+    topic_buckets: dict[str, list[tuple[str, Any]]] = defaultdict(list)
+    other_bucket: list[tuple[str, Any]] = []
+
+    # Assign threads
+    for root_uri, thread_posts in threads.items():
+        texts = [p.get("text", "") for p in thread_posts]
+        term = _best_term(texts)
+        item = ("thread", {"root_uri": root_uri, "posts": thread_posts})
+        if term:
+            topic_buckets[term].append(item)
+        else:
+            other_bucket.append(item)
+
+    # Assign standalone posts
+    for post in standalone:
+        term = _best_term([post.get("text", "")])
+        item = ("standalone", post)
+        if term:
+            topic_buckets[term].append(item)
+        else:
+            other_bucket.append(item)
+
+    # --- Step 3: Merge co-occurring terms ---
+    # If two terms appear together in >50% of their posts, merge them.
+    term_post_sets: dict[str, set[int]] = defaultdict(set)
+    for idx, post in enumerate(posts):
+        tokens = set(_tokenize_simple(post.get("text", "")))
+        for term in term_set:
+            if term in tokens:
+                term_post_sets[term].add(idx)
+
+    active_terms = [t for t in top_terms if t.lower() in topic_buckets]
+    merged: dict[str, str] = {}  # secondary_term -> primary_term
+
+    for i, t1 in enumerate(active_terms):
+        k1 = t1.lower()
+        if k1 in merged:
+            continue
+        for t2 in active_terms[i + 1:]:
+            k2 = t2.lower()
+            if k2 in merged:
+                continue
+            s1, s2 = term_post_sets.get(k1, set()), term_post_sets.get(k2, set())
+            if not s1 or not s2:
+                continue
+            overlap = len(s1 & s2)
+            if overlap > 0.5 * min(len(s1), len(s2)):
+                # Merge: keep the one with more posts as primary
+                if len(s1) >= len(s2):
+                    merged[k2] = k1
+                else:
+                    merged[k1] = k2
+
+    # Apply merges to topic_buckets
+    for secondary, primary in merged.items():
+        if secondary in topic_buckets:
+            topic_buckets[primary].extend(topic_buckets.pop(secondary))
+
+    # --- Step 4: Build result with labels ---
+    # Prepare keyword groups for labeling
+    keyword_groups: dict[str, list[str]] = {}
+    for term_key in topic_buckets:
+        keywords = [term_key]
+        # Add any terms that were merged into this one
+        for sec, pri in merged.items():
+            if pri == term_key:
+                keywords.append(sec)
+        keyword_groups[term_key] = keywords
+
+    # Get labels (Haiku or fallback)
+    labels = _resolve_topic_labels(keyword_groups, posts)
+
+    # Build final topic list
+    result: list[dict[str, Any]] = []
+    for term_key, items in topic_buckets.items():
+        topic_threads = []
+        topic_standalone = []
+
+        for item_type, data in items:
+            if item_type == "thread":
+                thread_posts = data["posts"]
+                # Find root post (no reply_parent_uri or reply_parent_uri == reply_root_uri)
+                root = None
+                replies = []
+                for p in sorted(thread_posts, key=lambda x: x.get("created_at", "")):
+                    if not p.get("reply_parent_uri"):
+                        root = {**p, "post_type": "original"}
+                    else:
+                        replies.append({**p, "post_type": "reply"})
+                if root is None and thread_posts:
+                    # If root not in our set, use earliest post as pseudo-root
+                    root = {**thread_posts[0], "post_type": "original"}
+                    replies = [{**p, "post_type": "reply"} for p in thread_posts[1:]]
+                if root:
+                    topic_threads.append({"root": root, "replies": replies})
+            else:
+                post = data
+                post_type = "original"
+                if post.get("reply_parent_uri"):
+                    post_type = "reply"
+                topic_standalone.append({**post, "post_type": post_type})
+
+        all_posts_in_topic = []
+        for t in topic_threads:
+            all_posts_in_topic.append(t["root"])
+            all_posts_in_topic.extend(t["replies"])
+        all_posts_in_topic.extend(topic_standalone)
+
+        post_count = len(all_posts_in_topic)
+        scores = [
+            float(p.get("arousal_score", 0))
+            for p in all_posts_in_topic
+            if p.get("arousal_score") is not None
+        ]
+        mean_arousal = sum(scores) / len(scores) if scores else 0.0
+
+        result.append({
+            "topic_label": labels.get(term_key, term_key.title()),
+            "topic_keywords": keyword_groups.get(term_key, [term_key]),
+            "threads": topic_threads,
+            "standalone": topic_standalone,
+            "post_count": post_count,
+            "mean_arousal": round(mean_arousal, 4),
+        })
+
+    # Add "Other" bucket if non-empty
+    if other_bucket:
+        other_threads = []
+        other_standalone = []
+        for item_type, data in other_bucket:
+            if item_type == "thread":
+                thread_posts = data["posts"]
+                root = None
+                replies = []
+                for p in sorted(thread_posts, key=lambda x: x.get("created_at", "")):
+                    if not p.get("reply_parent_uri"):
+                        root = {**p, "post_type": "original"}
+                    else:
+                        replies.append({**p, "post_type": "reply"})
+                if root is None and thread_posts:
+                    root = {**thread_posts[0], "post_type": "original"}
+                    replies = [{**p, "post_type": "reply"} for p in thread_posts[1:]]
+                if root:
+                    other_threads.append({"root": root, "replies": replies})
+            else:
+                post = data
+                post_type = "original" if not post.get("reply_parent_uri") else "reply"
+                other_standalone.append({**post, "post_type": post_type})
+
+        all_other = []
+        for t in other_threads:
+            all_other.append(t["root"])
+            all_other.extend(t["replies"])
+        all_other.extend(other_standalone)
+
+        scores = [
+            float(p.get("arousal_score", 0))
+            for p in all_other
+            if p.get("arousal_score") is not None
+        ]
+        mean_arousal = sum(scores) / len(scores) if scores else 0.0
+
+        result.append({
+            "topic_label": "Other",
+            "topic_keywords": [],
+            "threads": other_threads,
+            "standalone": other_standalone,
+            "post_count": len(all_other),
+            "mean_arousal": round(mean_arousal, 4),
+        })
+
+    # Sort by post count descending
+    result.sort(key=lambda t: t["post_count"], reverse=True)
+    return result
+
+
+def _resolve_topic_labels(
+    keyword_groups: dict[str, list[str]],
+    posts: list[dict[str, Any]],
+) -> dict[str, str]:
+    """
+    Resolve labels for topic keyword groups.
+
+    Check in-memory cache → DB cache → call Haiku for unseen groups.
+    Returns dict of term_key → label.
+    """
+    labels: dict[str, str] = {}
+    uncached_groups: dict[str, list[str]] = {}
+
+    for term_key, keywords in keyword_groups.items():
+        kk = _make_keywords_key(keywords)
+
+        # Check in-memory cache
+        if kk in _topic_label_cache:
+            labels[term_key] = _topic_label_cache[kk]
+            continue
+
+        # Check DB cache
+        db_label = get_topic_label(kk)
+        if db_label:
+            _topic_label_cache[kk] = db_label
+            labels[term_key] = db_label
+            continue
+
+        uncached_groups[term_key] = keywords
+
+    if uncached_groups:
+        # Call Haiku for all uncached groups at once
+        llm_labels = label_topics_llm(uncached_groups, posts)
+        for term_key, label in llm_labels.items():
+            keywords = uncached_groups[term_key]
+            kk = _make_keywords_key(keywords)
+            _topic_label_cache[kk] = label
+            try:
+                upsert_topic_label(kk, label)
+            except Exception as e:
+                log.warning(f"Failed to persist topic label: {e}")
+            labels[term_key] = label
+
+    return labels
+
+
+def label_topics_llm(
+    keyword_groups: dict[str, list[str]],
+    posts: list[dict[str, Any]],
+) -> dict[str, str]:
+    """
+    Call Claude Haiku to generate 2-4 word topic labels for keyword groups.
+
+    Single LLM call per community with all keyword buckets.
+    Falls back to title-cased primary keyword on failure.
+    """
+    import os
+
+    api_key = os.environ.get("ANTHROPIC_API_KEY")
+    if not api_key:
+        return {k: k.title() for k in keyword_groups}
+
+    # Build sample snippets per group
+    group_descriptions = []
+    for term_key, keywords in keyword_groups.items():
+        # Find sample posts matching this group
+        samples = []
+        kw_set = set(keywords)
+        for post in posts:
+            tokens = set(_tokenize_simple(post.get("text", "")))
+            if tokens & kw_set:
+                snippet = post.get("text", "")[:150]
+                if snippet:
+                    samples.append(snippet)
+                if len(samples) >= 3:
+                    break
+        kw_str = ", ".join(keywords)
+        sample_str = "\n  ".join(f"- {s}" for s in samples) if samples else "(no samples)"
+        group_descriptions.append(
+            f'Group "{kw_str}":\n  {sample_str}'
+        )
+
+    prompt = f"""Given these keyword groups from recent social media posts, provide a short (2-4 word) topic label for each group.
+
+{chr(10).join(group_descriptions)}
+
+Return ONLY a JSON object mapping each keyword group (use the first keyword as key) to its label.
+Example: {{"tariff": "Trade Policy", "ukraine": "Ukraine Conflict"}}"""
+
+    try:
+        import anthropic
+        import json as json_mod
+
+        client = anthropic.Anthropic(api_key=api_key)
+        message = client.messages.create(
+            model="claude-3-5-haiku-20241022",
+            max_tokens=300,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        response_text = message.content[0].text.strip()
+
+        # Extract JSON from response (handle markdown code blocks)
+        if "```" in response_text:
+            # Extract content between code fences
+            parts = response_text.split("```")
+            for part in parts[1:]:
+                # Skip the language tag line if present
+                lines = part.strip().split("\n")
+                if lines[0].strip() in ("json", ""):
+                    lines = lines[1:]
+                json_str = "\n".join(lines).strip()
+                if json_str:
+                    response_text = json_str
+                    break
+
+        parsed = json_mod.loads(response_text)
+        result = {}
+        for term_key in keyword_groups:
+            if term_key in parsed:
+                result[term_key] = str(parsed[term_key])
+            else:
+                result[term_key] = term_key.title()
+        return result
+
+    except Exception as e:
+        log.warning(f"Topic label LLM call failed: {e}")
+        return {k: k.title() for k in keyword_groups}

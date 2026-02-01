@@ -369,6 +369,89 @@ export default function SideLinesMethodology() {
           </p>
         </section>
 
+        {/* Topic Grouping */}
+        <section className="mb-12">
+          <h2 className="text-2xl font-bold mb-4">Topic Grouping</h2>
+          <p className="text-zinc-600 dark:text-zinc-400 leading-relaxed mb-6">
+            Within each community, posts are grouped into topics and organized into conversation
+            threads. This provides structure beyond a flat list of high-arousal posts, revealing
+            what specific subjects are driving engagement.
+          </p>
+
+          <div className="space-y-4">
+            <div className="flex gap-4 items-start">
+              <div className="w-8 h-8 bg-purple-100 dark:bg-purple-900/30 rounded-full flex items-center justify-center text-purple-600 dark:text-purple-400 font-bold text-sm flex-shrink-0">1</div>
+              <div>
+                <h3 className="font-bold text-lg mb-1">Top-Term Extraction</h3>
+                <p className="text-zinc-600 dark:text-zinc-400">
+                  Every 10 minutes, the pulse cycle tokenizes high-arousal posts per community,
+                  removes stopwords, and selects the top 10 terms by frequency. These serve as the
+                  keyword buckets for topic assignment. Tokenization uses simple whitespace splitting
+                  with punctuation removal and a curated stopword list.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-4 items-start">
+              <div className="w-8 h-8 bg-purple-100 dark:bg-purple-900/30 rounded-full flex items-center justify-center text-purple-600 dark:text-purple-400 font-bold text-sm flex-shrink-0">2</div>
+              <div>
+                <h3 className="font-bold text-lg mb-1">Thread Detection</h3>
+                <p className="text-zinc-600 dark:text-zinc-400">
+                  Posts are grouped into conversation threads using
+                  the <code className="text-xs bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded">reply_root_uri</code> field.
+                  Posts sharing the same root URI form a thread. Posts with no root URI are standalone
+                  originals. Within each thread, the root post (no <code className="text-xs bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded">reply_parent_uri</code>)
+                  is highlighted and replies are displayed indented beneath it.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-4 items-start">
+              <div className="w-8 h-8 bg-purple-100 dark:bg-purple-900/30 rounded-full flex items-center justify-center text-purple-600 dark:text-purple-400 font-bold text-sm flex-shrink-0">3</div>
+              <div>
+                <h3 className="font-bold text-lg mb-1">Topic Assignment</h3>
+                <p className="text-zinc-600 dark:text-zinc-400">
+                  Each post or thread is assigned to the top-term with the highest keyword match
+                  count. Threads are assigned based on the aggregate keyword matches across all posts
+                  in the thread. Posts matching no top-terms are placed in an &ldquo;Other&rdquo; bucket.
+                  Co-occurring terms (appearing together in &gt;50% of their posts) are merged into
+                  a single topic bucket to prevent redundant categories.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-4 items-start">
+              <div className="w-8 h-8 bg-purple-100 dark:bg-purple-900/30 rounded-full flex items-center justify-center text-purple-600 dark:text-purple-400 font-bold text-sm flex-shrink-0">4</div>
+              <div>
+                <h3 className="font-bold text-lg mb-1">Topic Labeling</h3>
+                <p className="text-zinc-600 dark:text-zinc-400">
+                  Each keyword group is labeled with a readable 2&ndash;4 word topic name generated
+                  by Claude Haiku. Labels are cached in
+                  the <code className="text-xs bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded">bluesky_topic_labels</code> table
+                  (keyed by sorted, comma-joined keyword sets) to avoid redundant LLM calls. An
+                  in-memory cache provides a first-level lookup. Fallback: the primary keyword,
+                  title-cased.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-4 items-start">
+              <div className="w-8 h-8 bg-purple-100 dark:bg-purple-900/30 rounded-full flex items-center justify-center text-purple-600 dark:text-purple-400 font-bold text-sm flex-shrink-0">5</div>
+              <div>
+                <h3 className="font-bold text-lg mb-1">Original vs. Reply Distinction</h3>
+                <p className="text-zinc-600 dark:text-zinc-400">
+                  Posts are classified as originals or replies using
+                  the <code className="text-xs bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded">reply_parent_uri</code> and <code className="text-xs bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded">reply_root_uri</code> fields
+                  from the Bluesky AT Protocol. Original posts are displayed at full opacity, while
+                  replies are indented and slightly muted. Quote posts
+                  (with <code className="text-xs bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded">quote_uri</code>)
+                  are given a blockquote-style left border accent.
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+
         {/* Technical Stack */}
         <section className="mb-12">
           <h2 className="text-2xl font-bold mb-6">Technical Stack</h2>

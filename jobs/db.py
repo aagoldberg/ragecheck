@@ -630,7 +630,10 @@ def get_community_recent_posts(
                      p.uri,
                      p.arousal_score,
                      p.arousal_breakdown,
-                     p.created_at
+                     p.created_at,
+                     p.reply_parent_uri,
+                     p.reply_root_uri,
+                     p.quote_uri
                    FROM bluesky_posts p
                    JOIN bluesky_community_members m ON m.user_did = p.author_did
                    WHERE m.community_id = %s
@@ -641,3 +644,45 @@ def get_community_recent_posts(
                 (community_id, limit),
             )
             return [_convert_decimals(dict(r)) for r in cur.fetchall()]
+
+
+def get_latest_snapshot_terms(community_id: int) -> list[str]:
+    """Fetch the current top_terms for a community from the latest snapshot."""
+    with get_conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(
+                """SELECT top_terms FROM bluesky_community_snapshots
+                   WHERE community_id = %s
+                   ORDER BY window_end DESC LIMIT 1""",
+                (community_id,),
+            )
+            row = cur.fetchone()
+            if row and row["top_terms"]:
+                return list(row["top_terms"])
+            return []
+
+
+def get_topic_label(keywords_key: str) -> str | None:
+    """Look up an existing topic label by keywords_key."""
+    with get_conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(
+                "SELECT label FROM bluesky_topic_labels WHERE keywords_key = %s",
+                (keywords_key,),
+            )
+            row = cur.fetchone()
+            return row["label"] if row else None
+
+
+def upsert_topic_label(keywords_key: str, label: str) -> None:
+    """Store a new keyword→label mapping."""
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """INSERT INTO bluesky_topic_labels (keywords_key, label)
+                   VALUES (%s, %s)
+                   ON CONFLICT (keywords_key) DO UPDATE SET
+                     label = EXCLUDED.label""",
+                (keywords_key, label),
+            )
+        conn.commit()
