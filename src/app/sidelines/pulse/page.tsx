@@ -2,6 +2,9 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
+
+const NetworkGraph = dynamic(() => import("./NetworkGraph"), { ssr: false });
 
 // =============================================================================
 // TYPES
@@ -472,6 +475,11 @@ export default function PulsePage() {
               )}
             </div>
           )}
+        </div>
+
+        {/* Network Graph */}
+        <div className="mb-8">
+          <NetworkGraph />
         </div>
 
         {/* Error */}

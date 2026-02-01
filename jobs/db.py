@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import os
 import json
+import random
 from decimal import Decimal
 from typing import Any
 
@@ -505,6 +506,114 @@ def get_pulse_global_stats() -> dict[str, Any]:
         "posts_last_hour": int(post_stats["posts_last_hour"]),
         "mean_arousal": float(post_stats["mean_arousal"]),
         "tracked_users": int(tracked["total"]),
+    }
+
+
+def get_network_graph_data(
+    nodes_per_community: int = 100,
+    max_total_nodes: int = 1500,
+    max_edges: int = 10000,
+    sampled_edges: int = 8000,
+) -> dict[str, Any]:
+    """Build sampled network graph data for the force-directed visualization."""
+    with get_conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            # 1. Select top-N most-followed nodes per community
+            cur.execute(
+                """
+                WITH in_degrees AS (
+                    SELECT follows_did AS user_did, COUNT(*) AS in_degree
+                    FROM bluesky_follows
+                    WHERE follows_did IN (SELECT user_did FROM bluesky_community_members)
+                    GROUP BY follows_did
+                ),
+                ranked AS (
+                    SELECT m.user_did, m.community_id, c.name AS community_name,
+                           COALESCE(d.in_degree, 0) AS in_degree,
+                           COALESCE(t.handle, '') AS handle,
+                           ROW_NUMBER() OVER (
+                               PARTITION BY m.community_id
+                               ORDER BY COALESCE(d.in_degree, 0) DESC
+                           ) AS rn
+                    FROM bluesky_community_members m
+                    JOIN bluesky_communities c ON c.id = m.community_id
+                    LEFT JOIN in_degrees d ON d.user_did = m.user_did
+                    LEFT JOIN bluesky_tracked_users t ON t.did = m.user_did
+                )
+                SELECT user_did, community_id, community_name, in_degree, handle
+                FROM ranked WHERE rn <= %(nodes_per_community)s
+                LIMIT %(max_total_nodes)s
+                """,
+                {
+                    "nodes_per_community": nodes_per_community,
+                    "max_total_nodes": max_total_nodes,
+                },
+            )
+            nodes = [dict(r) for r in cur.fetchall()]
+
+            if not nodes:
+                return {"nodes": [], "edges": [], "communities": []}
+
+            dids = [n["user_did"] for n in nodes]
+            did_set = set(dids)
+
+            # 2. Select edges between sampled nodes
+            cur.execute(
+                """
+                SELECT user_did AS source, follows_did AS target
+                FROM bluesky_follows
+                WHERE user_did = ANY(%(dids)s) AND follows_did = ANY(%(dids)s)
+                """,
+                {"dids": dids},
+            )
+            edges = [dict(r) for r in cur.fetchall()]
+            total_edges_before_sample = len(edges)
+
+            # 3. Supplement handles for unlabeled high-degree nodes
+            missing_handle_dids = [
+                n["user_did"] for n in nodes if not n["handle"]
+            ]
+            if missing_handle_dids:
+                cur.execute(
+                    """
+                    SELECT DISTINCT ON (follows_did) follows_did, follows_handle
+                    FROM bluesky_follows
+                    WHERE follows_did = ANY(%(dids)s)
+                      AND follows_handle IS NOT NULL
+                      AND follows_handle != ''
+                    """,
+                    {"dids": missing_handle_dids},
+                )
+                handle_map = {r["follows_did"]: r["follows_handle"] for r in cur.fetchall()}
+                for node in nodes:
+                    if not node["handle"] and node["user_did"] in handle_map:
+                        node["handle"] = handle_map[node["user_did"]]
+
+            # 4. Get community metadata
+            cur.execute(
+                """
+                SELECT id, name, member_count
+                FROM bluesky_communities
+                ORDER BY member_count DESC
+                """
+            )
+            communities = [dict(r) for r in cur.fetchall()]
+
+    # 5. Sample edges down if too many
+    if len(edges) > max_edges:
+        edges = random.sample(edges, sampled_edges)
+
+    # Count total nodes in the full graph for stats
+    total_nodes_in_graph = len(did_set)
+
+    return {
+        "nodes": nodes,
+        "edges": edges,
+        "communities": communities,
+        "stats": {
+            "sampled_from_nodes": total_nodes_in_graph,
+            "sampled_from_edges": total_edges_before_sample,
+        },
     }
 
 

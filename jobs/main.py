@@ -8,6 +8,7 @@ Deployed on Railway, triggered by Vercel API routes.
 from __future__ import annotations
 
 import os
+import time
 from datetime import date, datetime
 from typing import Any
 
@@ -61,6 +62,7 @@ from db import (
     get_snapshot_history,
     get_pulse_global_stats,
     get_community_recent_posts,
+    get_network_graph_data,
 )
 from starter_packs import crawl_starter_packs, backfill_follows, refresh_stale_follows, snowball_expand
 
@@ -858,5 +860,127 @@ async def get_pulse_community(community_id: int, limit: int = 20):
     try:
         posts = get_community_recent_posts(community_id, limit=limit)
         return {"community_id": community_id, "posts": posts}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# =============================================================================
+# NETWORK GRAPH ENDPOINT
+# =============================================================================
+
+_network_cache: dict[str, Any] = {}
+_network_cache_time: float = 0.0
+NETWORK_CACHE_TTL = 300  # 5 minutes
+
+
+@app.get("/pulse/network")
+async def get_pulse_network():
+    """
+    Get force-directed network graph data.
+
+    Returns pre-computed node positions (igraph Fruchterman-Reingold),
+    edges, community metadata, and stats. Cached for 5 minutes.
+    """
+    global _network_cache, _network_cache_time
+
+    now = time.time()
+    if _network_cache and (now - _network_cache_time) < NETWORK_CACHE_TTL:
+        return _network_cache
+
+    try:
+        import igraph as ig
+
+        raw = get_network_graph_data()
+
+        nodes = raw["nodes"]
+        edges = raw["edges"]
+        communities_meta = raw["communities"]
+
+        if not nodes:
+            return {
+                "nodes": [],
+                "edges": [],
+                "communities": [],
+                "stats": {"total_nodes": 0, "total_edges": 0,
+                          "sampled_from_nodes": 0, "sampled_from_edges": 0},
+            }
+
+        # Build igraph for layout
+        did_to_idx = {n["user_did"]: i for i, n in enumerate(nodes)}
+
+        g = ig.Graph(directed=True)
+        g.add_vertices(len(nodes))
+
+        valid_edges = []
+        for e in edges:
+            src = did_to_idx.get(e["source"])
+            tgt = did_to_idx.get(e["target"])
+            if src is not None and tgt is not None:
+                valid_edges.append((src, tgt))
+        g.add_edges(valid_edges)
+
+        # Run Fruchterman-Reingold layout
+        layout = g.layout_fruchterman_reingold(niter=500)
+        coords = layout.coords
+
+        # Normalize to [0, 1]
+        if coords:
+            xs = [c[0] for c in coords]
+            ys = [c[1] for c in coords]
+            min_x, max_x = min(xs), max(xs)
+            min_y, max_y = min(ys), max(ys)
+            range_x = max_x - min_x if max_x != min_x else 1
+            range_y = max_y - min_y if max_y != min_y else 1
+
+            for i, node in enumerate(nodes):
+                node["x"] = (coords[i][0] - min_x) / range_x
+                node["y"] = (coords[i][1] - min_y) / range_y
+
+        # Build community color index
+        community_id_order = [c["id"] for c in communities_meta]
+        community_color_map = {
+            cid: idx for idx, cid in enumerate(community_id_order)
+        }
+        community_list = []
+        for c in communities_meta:
+            community_list.append({
+                "id": c["id"],
+                "name": c["name"],
+                "member_count": c["member_count"],
+                "color_index": community_color_map[c["id"]],
+            })
+
+        result = {
+            "nodes": [
+                {
+                    "id": n["user_did"],
+                    "handle": n["handle"],
+                    "community_id": n["community_id"],
+                    "community_name": n["community_name"],
+                    "in_degree": n["in_degree"],
+                    "x": n.get("x", 0.5),
+                    "y": n.get("y", 0.5),
+                }
+                for n in nodes
+            ],
+            "edges": [
+                {"source": e["source"], "target": e["target"]}
+                for e in edges
+                if e["source"] in did_to_idx and e["target"] in did_to_idx
+            ],
+            "communities": community_list,
+            "stats": {
+                "total_nodes": len(nodes),
+                "total_edges": len(valid_edges),
+                "sampled_from_nodes": raw["stats"]["sampled_from_nodes"],
+                "sampled_from_edges": raw["stats"]["sampled_from_edges"],
+            },
+        }
+
+        _network_cache = result
+        _network_cache_time = now
+
+        return result
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
