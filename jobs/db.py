@@ -627,6 +627,7 @@ def get_community_recent_posts(
                 """SELECT
                      p.text,
                      p.author_did,
+                     COALESCE(t.handle, '') AS author_handle,
                      p.uri,
                      p.arousal_score,
                      p.arousal_breakdown,
@@ -636,6 +637,7 @@ def get_community_recent_posts(
                      p.quote_uri
                    FROM bluesky_posts p
                    JOIN bluesky_community_members m ON m.user_did = p.author_did
+                   LEFT JOIN bluesky_tracked_users t ON t.did = p.author_did
                    WHERE m.community_id = %s
                      AND p.arousal_score IS NOT NULL
                      AND p.created_at > NOW() - INTERVAL '1 hour'

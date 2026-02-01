@@ -50,6 +50,7 @@ interface PulseData {
 interface CommunityPost {
   text: string;
   author_did: string;
+  author_handle?: string;
   uri: string;
   arousal_score: number;
   created_at: string;
@@ -411,6 +412,9 @@ function CommunityCard({ snapshot }: { snapshot: CommunitySnapshot }) {
                                     : thread.root.text}
                                 </p>
                                 <div className="flex gap-3 mt-0.5 text-xs text-zinc-400">
+                                  {thread.root.author_handle && (
+                                    <span className="text-zinc-500 font-medium">@{thread.root.author_handle}</span>
+                                  )}
                                   <span className="font-mono">
                                     {(thread.root.arousal_score * 100).toFixed(1)}
                                   </span>
@@ -439,6 +443,9 @@ function CommunityCard({ snapshot }: { snapshot: CommunitySnapshot }) {
                                       : reply.text}
                                   </p>
                                   <div className="flex gap-3 mt-0.5 text-xs text-zinc-400">
+                                    {reply.author_handle && (
+                                      <span className="text-zinc-500 font-medium">@{reply.author_handle}</span>
+                                    )}
                                     <span className="font-mono">
                                       {(reply.arousal_score * 100).toFixed(1)}
                                     </span>
@@ -467,6 +474,9 @@ function CommunityCard({ snapshot }: { snapshot: CommunitySnapshot }) {
                                   : post.text}
                               </p>
                               <div className="flex gap-3 mt-0.5 text-xs text-zinc-400">
+                                {post.author_handle && (
+                                  <span className="text-zinc-500 font-medium">@{post.author_handle}</span>
+                                )}
                                 <span className="font-mono">
                                   {(post.arousal_score * 100).toFixed(1)}
                                 </span>
@@ -500,6 +510,9 @@ function CommunityCard({ snapshot }: { snapshot: CommunitySnapshot }) {
                           : post.text}
                       </p>
                       <div className="flex gap-3 mt-1 text-xs text-zinc-400">
+                        {post.author_handle && (
+                          <span className="text-zinc-500 font-medium">@{post.author_handle}</span>
+                        )}
                         <span className="font-mono">
                           {(post.arousal_score * 100).toFixed(1)}
                         </span>
