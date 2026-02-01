@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { initDB, getDashboardStats, getVisitorStats, getPageVisitorStats, getViralMetrics, isDBAvailable, invalidateIncompleteCache, recomputeBotFlags, getFeedbackStats, initFeedbackTable, getTimeToAnalysisMetrics, getConversionMetrics, getConversionInsights, getFunnelMetrics, getRetentionMetrics, getShareMetrics, getContentInsights, getAcquisitionMetrics, getAnalysisCompletionMetrics, getAbandonmentDiagnostics, getSubscriberStats, getInteractionStats, getClearviewSubscriberStats, getLanguageStats, getDefenseCheckMetrics, getClearViewAnalytics, getStanceMetrics, getSessionDurationStats } from "@/lib/db";
+import { initDB, getDashboardStats, getVisitorStats, getPageVisitorStats, getViralMetrics, isDBAvailable, invalidateIncompleteCache, recomputeBotFlags, getFeedbackStats, initFeedbackTable, getTimeToAnalysisMetrics, getConversionMetrics, getConversionInsights, getFunnelMetrics, getRetentionMetrics, getShareMetrics, getContentInsights, getAcquisitionMetrics, getAnalysisCompletionMetrics, getAbandonmentDiagnostics, getSubscriberStats, getInteractionStats, getClearviewSubscriberStats, getLanguageStats, getDefenseCheckMetrics, getClearViewAnalytics, getStanceMetrics, getSessionDurationStats, backfillVisitorPagePaths } from "@/lib/db";
 
 export async function GET(request: NextRequest) {
   // Simple password protection via query param
@@ -121,6 +121,16 @@ export async function POST(request: NextRequest) {
         action,
         ...result,
         message: `Updated ${result.analysesUpdated} analyses and ${result.visitorsUpdated} visitors`,
+      });
+    }
+
+    if (action === "backfill_page_paths") {
+      const result = await backfillVisitorPagePaths();
+      return NextResponse.json({
+        success: true,
+        action,
+        ...result,
+        message: `Backfilled page_path on ${result.updated} visitor rows`,
       });
     }
 

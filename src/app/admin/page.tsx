@@ -3902,7 +3902,28 @@ export default function AdminDashboard() {
                   <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
                     Recent Visitors
                   </h3>
-                  <span className="text-xs text-zinc-400">Last {visitorStats.recentVisitors.length}</span>
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={async () => {
+                        try {
+                          const res = await fetch(`/api/admin?key=${encodeURIComponent(key)}`, {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ action: "backfill_page_paths" }),
+                          });
+                          const data = await res.json();
+                          alert(data.message || "Done");
+                          fetchStats(key);
+                        } catch {
+                          alert("Failed to backfill");
+                        }
+                      }}
+                      className="text-xs text-indigo-600 hover:text-indigo-700 font-medium"
+                    >
+                      Backfill Pages
+                    </button>
+                    <span className="text-xs text-zinc-400">Last {visitorStats.recentVisitors.length}</span>
+                  </div>
                 </div>
                 <div className="overflow-x-auto max-h-[500px] overflow-y-auto border border-zinc-100 dark:border-zinc-800 rounded-lg">
                   <table className="w-full text-sm">

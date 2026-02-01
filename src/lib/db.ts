@@ -2010,6 +2010,54 @@ export async function logVisitor(data: VisitorLog): Promise<number | null> {
   }
 }
 
+// Backfill page_path on visitor rows by matching navigation click interactions.
+// When a user clicks "methodology" in the nav, the next visitor row for that IP
+// (within 30s) is the landing on /methodology. We also tag rows where page_path
+// is NULL but the IP only ever visited one page — that must be the page.
+export async function backfillVisitorPagePaths(): Promise<{ updated: number }> {
+  const db = getDb();
+
+  // 1. Match navigation interactions to the next visitor row for the same IP
+  //    A nav click to "about" at time T means the visitor row created within
+  //    30 seconds after T for the same IP landed on /about (or /clearview/about etc).
+  //    We use label directly since destinations like "clearview", "methodology",
+  //    "about" map to /<label>.
+  const result = await db`
+    WITH nav_clicks AS (
+      SELECT
+        ip_address,
+        label as destination,
+        created_at as click_time
+      FROM ragecheck_interactions
+      WHERE category = 'navigation'
+        AND action = 'click'
+        AND ip_address IS NOT NULL
+        AND label IS NOT NULL
+        AND NOT is_bot
+    ),
+    matched AS (
+      SELECT DISTINCT ON (v.id)
+        v.id as visitor_id,
+        '/' || nc.destination as new_page_path
+      FROM ragecheck_visitors v
+      JOIN nav_clicks nc
+        ON nc.ip_address = v.ip_address
+        AND v.created_at BETWEEN nc.click_time - INTERVAL '5 seconds' AND nc.click_time + INTERVAL '30 seconds'
+      WHERE (v.page_path IS NULL OR v.page_path = '/')
+        AND nc.destination NOT IN ('analyzer')
+      ORDER BY v.id, ABS(EXTRACT(EPOCH FROM (v.created_at - nc.click_time)))
+    )
+    UPDATE ragecheck_visitors
+    SET page_path = matched.new_page_path
+    FROM matched
+    WHERE ragecheck_visitors.id = matched.visitor_id
+      AND (ragecheck_visitors.page_path IS NULL OR ragecheck_visitors.page_path = '/')
+    RETURNING ragecheck_visitors.id
+  `;
+
+  return { updated: result.length };
+}
+
 export async function updateVisitorDuration(visitorId: number, durationSeconds: number) {
   try {
     await withRetry(async () => {
