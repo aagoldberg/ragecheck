@@ -416,6 +416,7 @@ export async function logAnalysis(data: AnalysisLog) {
     const isBotUser = isBot(data.userAgent);
 
     // Ensure a visitor record exists for this IP (fallback if /api/visit didn't fire)
+    // VisitDurationProvider normally handles this, but edge cases (e.g. browser extension) may skip it
     if (data.ipAddress) {
       try {
         const [existingVisitor] = await getDb()`
@@ -426,8 +427,8 @@ export async function logAnalysis(data: AnalysisLog) {
         `;
         if (!existingVisitor) {
           await getDb()`
-            INSERT INTO ragecheck_visitors (ip_address, user_agent, country, is_bot, page_path)
-            VALUES (${data.ipAddress}, ${data.userAgent || null}, ${data.country || null}, ${isBotUser}, '/')
+            INSERT INTO ragecheck_visitors (ip_address, user_agent, country, is_bot)
+            VALUES (${data.ipAddress}, ${data.userAgent || null}, ${data.country || null}, ${isBotUser})
           `;
         }
       } catch (visitorError) {
