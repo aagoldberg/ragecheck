@@ -57,6 +57,9 @@ from db import (
     upsert_community_members,
     get_community_assignments_for_dids,
     get_global_communities,
+    get_latest_snapshots,
+    get_snapshot_history,
+    get_pulse_global_stats,
 )
 from starter_packs import crawl_starter_packs, backfill_follows, refresh_stale_follows, snowball_expand
 
@@ -807,5 +810,40 @@ async def list_communities():
     try:
         communities = get_global_communities()
         return {"communities": communities, "count": len(communities)}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/pulse")
+async def get_pulse():
+    """
+    Get community pulse data.
+
+    Returns:
+    - latest snapshot per community (name, arousal, post_count, spike, top_terms)
+    - global stats: total posts last hour, tracked users, overall mean arousal
+    - active spikes list
+    - per-community 24h sparkline history
+    """
+    try:
+        snapshots = get_latest_snapshots()
+        global_stats = get_pulse_global_stats()
+
+        # Enrich each snapshot with 24h history for sparklines
+        for snapshot in snapshots:
+            history = get_snapshot_history(snapshot["community_id"], hours=24)
+            snapshot["history"] = history
+
+        # Extract active spikes
+        spikes = [s for s in snapshots if s.get("spike")]
+
+        # Sort by current mean arousal descending
+        snapshots.sort(key=lambda s: s.get("mean_arousal", 0), reverse=True)
+
+        return {
+            "snapshots": snapshots,
+            "global_stats": global_stats,
+            "spikes": spikes,
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

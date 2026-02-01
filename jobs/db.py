@@ -407,3 +407,102 @@ def get_global_communities() -> list[dict[str, Any]]:
                 "SELECT * FROM bluesky_communities ORDER BY member_count DESC"
             )
             return [dict(r) for r in cur.fetchall()]
+
+
+# =============================================================================
+# COMMUNITY PULSE SNAPSHOT FUNCTIONS
+# =============================================================================
+
+
+def insert_community_snapshots(snapshots: list[dict[str, Any]]) -> int:
+    """Batch insert community pulse snapshots."""
+    if not snapshots:
+        return 0
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            values = [
+                (
+                    s["community_id"],
+                    s["window_start"],
+                    s["window_end"],
+                    s["post_count"],
+                    s["mean_arousal"],
+                    s["max_arousal"],
+                    s["p95_arousal"],
+                    s["baseline_arousal"],
+                    s["spike"],
+                    s["top_terms"],
+                )
+                for s in snapshots
+            ]
+            psycopg2.extras.execute_values(
+                cur,
+                """INSERT INTO bluesky_community_snapshots
+                   (community_id, window_start, window_end, post_count,
+                    mean_arousal, max_arousal, p95_arousal, baseline_arousal,
+                    spike, top_terms)
+                   VALUES %s""",
+                values,
+                page_size=500,
+            )
+            inserted = cur.rowcount
+        conn.commit()
+    return inserted
+
+
+def get_latest_snapshots() -> list[dict[str, Any]]:
+    """Get the latest snapshot per community (DISTINCT ON)."""
+    with get_conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(
+                """SELECT DISTINCT ON (s.community_id)
+                     s.*,
+                     c.name AS community_name,
+                     c.description AS community_description,
+                     c.member_count AS community_member_count
+                   FROM bluesky_community_snapshots s
+                   JOIN bluesky_communities c ON c.id = s.community_id
+                   ORDER BY s.community_id, s.window_end DESC"""
+            )
+            return [_convert_decimals(dict(r)) for r in cur.fetchall()]
+
+
+def get_snapshot_history(
+    community_id: int, hours: int = 24
+) -> list[dict[str, Any]]:
+    """Get snapshot time series for a community (for sparklines)."""
+    with get_conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(
+                """SELECT window_end, mean_arousal, post_count, spike
+                   FROM bluesky_community_snapshots
+                   WHERE community_id = %s
+                     AND window_end > NOW() - INTERVAL '%s hours'
+                   ORDER BY window_end ASC""",
+                (community_id, hours),
+            )
+            return [_convert_decimals(dict(r)) for r in cur.fetchall()]
+
+
+def get_pulse_global_stats() -> dict[str, Any]:
+    """Get global stats: total posts last hour, tracked users, overall mean arousal."""
+    with get_conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(
+                """SELECT
+                     COUNT(*) AS posts_last_hour,
+                     COALESCE(AVG(arousal_score), 0) AS mean_arousal
+                   FROM bluesky_posts
+                   WHERE created_at > NOW() - INTERVAL '1 hour'
+                     AND arousal_score IS NOT NULL"""
+            )
+            post_stats = dict(cur.fetchone())
+
+            cur.execute("SELECT COUNT(*) AS total FROM bluesky_tracked_users")
+            tracked = dict(cur.fetchone())
+
+    return {
+        "posts_last_hour": int(post_stats["posts_last_hour"]),
+        "mean_arousal": float(post_stats["mean_arousal"]),
+        "tracked_users": int(tracked["total"]),
+    }

@@ -117,6 +117,7 @@ export default function SideLinesPage() {
             <Link href="/clearview" className="hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors">ClearView</Link>
             <Link href="/sidelines" className="text-zinc-900 dark:text-zinc-100">SideLines</Link>
             <span className="text-zinc-300 dark:text-zinc-700">|</span>
+            <Link href="/sidelines/pulse" className="hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors">Pulse</Link>
             <Link href="/sidelines/methodology" className="hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors">Methodology</Link>
             <Link href="/sidelines/about" className="hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors">About</Link>
           </div>

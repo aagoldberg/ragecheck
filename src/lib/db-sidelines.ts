@@ -236,6 +236,25 @@ export async function initSidelinesTables() {
   `;
   await getDb()`CREATE INDEX IF NOT EXISTS idx_bp_author ON bluesky_posts(author_did)`;
   await getDb()`CREATE INDEX IF NOT EXISTS idx_bp_created ON bluesky_posts(created_at)`;
+
+  // Community pulse snapshots (rolling arousal windows per community)
+  await getDb()`
+    CREATE TABLE IF NOT EXISTS bluesky_community_snapshots (
+      id BIGSERIAL PRIMARY KEY,
+      community_id INTEGER NOT NULL REFERENCES bluesky_communities(id) ON DELETE CASCADE,
+      window_start TIMESTAMPTZ NOT NULL,
+      window_end TIMESTAMPTZ NOT NULL,
+      post_count INTEGER DEFAULT 0,
+      mean_arousal REAL DEFAULT 0,
+      max_arousal REAL DEFAULT 0,
+      p95_arousal REAL DEFAULT 0,
+      baseline_arousal REAL DEFAULT 0,
+      spike BOOLEAN DEFAULT FALSE,
+      top_terms TEXT[] DEFAULT '{}',
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `;
+  await getDb()`CREATE INDEX IF NOT EXISTS idx_bcs_community_time ON bluesky_community_snapshots(community_id, window_end DESC)`;
 }
 
 // =============================================================================

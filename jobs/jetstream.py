@@ -27,6 +27,9 @@ from typing import Any
 import psycopg2
 import psycopg2.extras
 
+from arousal import compute_arousal
+from pulse import compute_pulse
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(levelname)s %(message)s",
@@ -44,6 +47,7 @@ RECONNECT_DELAY_S = 5
 MAX_RECONNECT_DELAY_S = 60
 
 CURSOR_FILE = os.environ.get("JETSTREAM_CURSOR_FILE", "/tmp/jetstream_cursor.txt")
+PULSE_INTERVAL_S = 600  # 10 minutes
 
 
 def _get_conn():
@@ -103,7 +107,7 @@ def _flush_posts(buffer: list[tuple]) -> int:
                 cur,
                 """INSERT INTO bluesky_posts
                    (author_did, uri, text, reply_parent_uri, reply_root_uri,
-                    quote_uri, langs, created_at)
+                    quote_uri, langs, created_at, arousal_score, arousal_breakdown)
                    VALUES %s
                    ON CONFLICT (uri) DO NOTHING""",
                 buffer,
@@ -156,6 +160,11 @@ def _parse_post_record(
     except (ValueError, TypeError):
         created_at = datetime.now(timezone.utc)
 
+    # Compute arousal score inline
+    arousal_result = compute_arousal(text)
+    arousal_score = arousal_result["score"]
+    arousal_breakdown = json.dumps(arousal_result["breakdown"])
+
     return (
         user_did,
         uri,
@@ -165,6 +174,8 @@ def _parse_post_record(
         quote_uri,
         langs,
         created_at,
+        arousal_score,
+        arousal_breakdown,
     )
 
 
@@ -184,6 +195,7 @@ async def consume_jetstream() -> None:
 
     last_tracked_refresh = time.time()
     tracked_refresh_interval = 300
+    last_pulse_run = time.time()
 
     follow_buffer: list[tuple[str, str, str]] = []
     post_buffer: list[tuple] = []
@@ -278,6 +290,15 @@ async def consume_jetstream() -> None:
                         log.info(
                             f"Refreshed tracked DIDs: {len(tracked_dids)}"
                         )
+
+                    # Run pulse computation periodically
+                    if now - last_pulse_run >= PULSE_INTERVAL_S:
+                        try:
+                            compute_pulse()
+                            log.info("Pulse computation completed")
+                        except Exception as pulse_err:
+                            log.warning(f"Pulse computation failed: {pulse_err}")
+                        last_pulse_run = now
 
         except Exception as e:
             if follow_buffer:

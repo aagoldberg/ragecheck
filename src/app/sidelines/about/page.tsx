@@ -11,6 +11,7 @@ export default function SideLinesAbout() {
             <span className="font-bold text-lg tracking-tight">SideLines</span>
           </Link>
           <div className="flex gap-4 text-sm font-medium text-zinc-500">
+            <Link href="/sidelines/pulse" className="hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors">Pulse</Link>
             <Link href="/sidelines/methodology" className="hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors">Methodology</Link>
             <Link href="/sidelines/about" className="text-zinc-900 dark:text-zinc-100">About</Link>
           </div>
