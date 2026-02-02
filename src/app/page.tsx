@@ -1515,39 +1515,6 @@ function HomeContent() {
               </div>
             </div>
 
-            {/* ClearView cross-promo */}
-            <a
-              href="/clearview"
-              onClick={() => tracking.trackNavClick("clearview", "homepage_promo")}
-              className="block mt-12 max-w-2xl mx-auto group animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-500"
-            >
-              <div className="relative flex items-center gap-5 px-6 py-5 bg-emerald-50/40 dark:bg-emerald-900/10 border border-emerald-200/60 dark:border-emerald-800/50 rounded-2xl hover:border-emerald-300 dark:hover:border-emerald-700 hover:shadow-lg hover:shadow-emerald-900/5 transition-all duration-300">
-                <div className="w-12 h-12 bg-white dark:bg-zinc-800 rounded-xl flex items-center justify-center flex-shrink-0 border border-emerald-100 dark:border-emerald-900/30 shadow-sm group-hover:scale-105 transition-transform duration-300">
-                  <svg className="w-6 h-6 text-emerald-600 dark:text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" />
-                  </svg>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1.5">
-                    <div className="text-base font-bold text-zinc-900 dark:text-zinc-100 tracking-tight">
-                      ClearView Daily Briefing
-                    </div>
-                    <span className="px-2 py-0.5 bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 text-[10px] font-bold rounded-md uppercase tracking-wider border border-emerald-200 dark:border-emerald-800/50">
-                      Today
-                    </span>
-                  </div>
-                  <p className="text-sm font-medium text-zinc-600 dark:text-zinc-400 leading-snug group-hover:text-zinc-900 dark:group-hover:text-zinc-200 transition-colors">
-                    Get today&apos;s balanced news. Fact-first reporting across the spectrum.
-                  </p>
-                </div>
-                <div className="flex items-center justify-center w-8 h-8 rounded-full text-emerald-400 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 group-hover:translate-x-1 transition-all">
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                  </svg>
-                </div>
-              </div>
-            </a>
-
             {/* Email Subscription CTA */}
             <div className="max-w-md mx-auto mt-12">
               {subscribeStatus === "success" ? (
