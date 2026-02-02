@@ -590,14 +590,18 @@ export async function copyShareImageToClipboard(
       return true;
     }
 
-    // Desktop: try clipboard API
+    // Desktop: try clipboard API, fall through to download on failure
     if (await canWriteImageToClipboard()) {
-      await navigator.clipboard.write([
-        new ClipboardItem({
-          "image/png": blob,
-        }),
-      ]);
-      return true;
+      try {
+        await navigator.clipboard.write([
+          new ClipboardItem({
+            "image/png": blob,
+          }),
+        ]);
+        return true;
+      } catch (clipboardError) {
+        console.warn("Clipboard write failed, falling back to download:", clipboardError);
+      }
     }
 
     // Fallback: download the image
