@@ -206,11 +206,24 @@ Return JSON:
 
 CRITICAL CLUSTERING RULES:
 - Only include stories with 2+ headlines from different sources
-- Be specific about topic names
 - A headline can only belong to ONE cluster. Never assign the same headline index to multiple clusters.
 - MERGE related sub-stories into ONE cluster. If a specific event (e.g., a shooting) and the broader political response (e.g., protests, policy debate, political fallout) are about the same underlying situation, they are ONE story, not separate stories. For example: "Alex Pretti shooting", "ICE raids backlash", "DHS turmoil after shooting", and "calls to defund ICE" are all ONE story about the immigration enforcement crisis.
 - Aim for 10-20 clusters total, not 50+. Prefer fewer, broader clusters over many narrow ones.
 - Do NOT create clusters for general ongoing themes (e.g., "Trump administration policies") — only cluster around specific events or developments.
+
+TOPIC NAMING RULES (the topic is the headline readers see — it must make them want to read):
+- Describe what HAPPENED, not the subject area.
+  BAD: "Government Shutdown and Funding Standoff"
+  GOOD: "Partial Shutdown Drags On as Democrats Demand ICE Reforms"
+  BAD: "Grammy Awards 2026 and ICE Protests"
+  GOOD: "Bad Bunny Makes Grammy History as Artists Protest ICE"
+  BAD: "Trump Administration Policy Actions and Analysis"
+  GOOD: "Trump Moves to Replace Fed Chair with Kevin Warsh"
+- No editorial or loaded words: crisis, chaos, bombshell, slams, standoff, fallout, rips, blasts, fury, firestorm
+- Include at least one concrete detail: a person, place, number, or specific action
+- 6-14 words. Never use the "[Noun] and [Noun]" compound format.
+- Neutral but vivid — factual language that conveys what is new today
+
 - IMPORTANT: Return ONLY valid JSON. No markdown, no code fences.`;
 
   const response = await client.messages.create({

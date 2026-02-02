@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { trackClearviewAttribution, trackClearviewAttributionDismissed } from "@/lib/tracking";
+import { trackAttribution, trackAttributionDismissed } from "@/lib/tracking";
 
 const ATTRIBUTION_SOURCES = [
   "Twitter/X",
@@ -14,24 +14,45 @@ const ATTRIBUTION_SOURCES = [
   "Other",
 ];
 
-const LS_ANSWERED = "clearview-attribution-answered";
-const LS_DISMISSED = "clearview-attribution-dismissed";
+interface AttributionSurveyProps {
+  /** Prefix for localStorage keys and tracking category. Defaults to "clearview". */
+  storagePrefix?: string;
+  /** If true, shows the survey immediately (with a short delay). Use for trigger-based display. */
+  ready?: boolean;
+  /** Delay in ms before showing. For timer mode (ready not provided), defaults to 5000. For ready mode, defaults to 2500. */
+  delayMs?: number;
+}
 
-export default function AttributionSurvey() {
+export default function AttributionSurvey({
+  storagePrefix = "clearview",
+  ready,
+  delayMs,
+}: AttributionSurveyProps) {
   const [visible, setVisible] = useState(false);
   const [showOtherInput, setShowOtherInput] = useState(false);
   const [otherText, setOtherText] = useState("");
   const [exiting, setExiting] = useState(false);
 
+  const lsAnswered = `${storagePrefix}-attribution-answered`;
+  const lsDismissed = `${storagePrefix}-attribution-dismissed`;
+
+  const isReadyMode = ready !== undefined;
+
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const answered = localStorage.getItem(LS_ANSWERED);
-    const dismissed = localStorage.getItem(LS_DISMISSED);
-    if (answered || dismissed) return;
+    if (localStorage.getItem(lsAnswered) || localStorage.getItem(lsDismissed)) return;
 
-    const timer = setTimeout(() => setVisible(true), 5000);
-    return () => clearTimeout(timer);
-  }, []);
+    if (isReadyMode) {
+      // Ready-based trigger: show when ready becomes true
+      if (!ready) return;
+      const timer = setTimeout(() => setVisible(true), delayMs ?? 2500);
+      return () => clearTimeout(timer);
+    } else {
+      // Timer-based trigger: show after delay
+      const timer = setTimeout(() => setVisible(true), delayMs ?? 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [ready, isReadyMode, delayMs, lsAnswered, lsDismissed]);
 
   const slideOut = () => {
     setExiting(true);
@@ -43,21 +64,21 @@ export default function AttributionSurvey() {
       setShowOtherInput(true);
       return;
     }
-    trackClearviewAttribution(source);
-    localStorage.setItem(LS_ANSWERED, "true");
+    trackAttribution(storagePrefix, source);
+    localStorage.setItem(lsAnswered, "true");
     slideOut();
   };
 
   const handleOtherSubmit = () => {
     const value = otherText.trim() || "Other";
-    trackClearviewAttribution(value);
-    localStorage.setItem(LS_ANSWERED, "true");
+    trackAttribution(storagePrefix, value);
+    localStorage.setItem(lsAnswered, "true");
     slideOut();
   };
 
   const handleDismiss = () => {
-    trackClearviewAttributionDismissed();
-    localStorage.setItem(LS_DISMISSED, "true");
+    trackAttributionDismissed(storagePrefix);
+    localStorage.setItem(lsDismissed, "true");
     slideOut();
   };
 

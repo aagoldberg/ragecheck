@@ -50,6 +50,7 @@ export async function GET() {
 
     return NextResponse.json({
       success: true,
+      id: cached.id,
       stories: cached.stories,
       generatedAt: cached.generatedAt,
       archived,

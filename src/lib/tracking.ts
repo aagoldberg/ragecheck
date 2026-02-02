@@ -301,14 +301,18 @@ export const trackClearviewShare = (context: string, platform: string) => {
   }
 };
 
-// ClearView attribution tracking
-export const trackClearviewAttribution = (source: string) => {
-  trackInteraction("clearview", "attribution", source);
+// Attribution tracking (generic — used by AttributionSurvey component)
+export const trackAttribution = (category: string, source: string) => {
+  trackInteraction(category, "attribution", source);
 };
 
-export const trackClearviewAttributionDismissed = () => {
-  trackInteraction("clearview", "attribution_dismissed");
+export const trackAttributionDismissed = (category: string) => {
+  trackInteraction(category, "attribution_dismissed");
 };
+
+// Legacy aliases for backward compat
+export const trackClearviewAttribution = (source: string) => trackAttribution("clearview", source);
+export const trackClearviewAttributionDismissed = () => trackAttributionDismissed("clearview");
 
 // DefenseCheck tracking
 export const trackDefenseCheckAnalysis = (score: number) => {

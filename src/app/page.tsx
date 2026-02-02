@@ -13,6 +13,7 @@ import {
 } from "@/lib/share/getShareText";
 import * as tracking from "@/lib/tracking";
 import { detectConversationShape, ConversationShape } from "@/lib/conversationShape";
+import AttributionSurvey from "@/components/AttributionSurvey";
 // import { HighRageHeadlines } from "@/components/HighRageHeadlines";
 
 interface Highlight {
@@ -2254,6 +2255,11 @@ function HomeContent() {
           animation: shimmer 2s infinite;
         }
       `}</style>
+
+      <AttributionSurvey
+        storagePrefix="ragecheck"
+        ready={!!result && !loading}
+      />
     </div>
   );
 }

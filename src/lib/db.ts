@@ -2389,6 +2389,93 @@ export async function getClearviewStoryById(storyId: string): Promise<{ story: C
   }
 }
 
+// ============================================
+// CLEARVIEW TRANSLATION CACHE
+// ============================================
+
+export async function initClearviewTranslationTable() {
+  try {
+    await getDb()`
+      CREATE TABLE IF NOT EXISTS ragecheck_clearview_translations (
+        id SERIAL PRIMARY KEY,
+        briefing_id INTEGER NOT NULL,
+        language VARCHAR(20) NOT NULL,
+        data JSONB NOT NULL,
+        generated_at TIMESTAMP NOT NULL,
+        created_at TIMESTAMP DEFAULT NOW(),
+        UNIQUE(briefing_id, language)
+      )
+    `;
+  } catch (error) {
+    console.error("Failed to create clearview translations table:", error);
+  }
+}
+
+export async function getCachedTranslation(briefingId: number, language: string): Promise<ClearviewStory[] | null> {
+  try {
+    const [row] = await getDb()`
+      SELECT data
+      FROM ragecheck_clearview_translations
+      WHERE briefing_id = ${briefingId} AND language = ${language}
+      LIMIT 1
+    `;
+    if (!row) return null;
+    const data = typeof row.data === "string" ? JSON.parse(row.data) : row.data;
+    return data.stories || null;
+  } catch (error) {
+    console.error("Failed to get cached translation:", error);
+    return null;
+  }
+}
+
+export async function saveClearviewTranslation(
+  briefingId: number,
+  language: string,
+  stories: ClearviewStory[],
+  generatedAt: string
+): Promise<void> {
+  try {
+    const data = JSON.stringify({ stories });
+    await withRetry(async () => {
+      // Upsert the translation
+      await getDb()`
+        INSERT INTO ragecheck_clearview_translations (briefing_id, language, data, generated_at)
+        VALUES (${briefingId}, ${language}, ${data}::jsonb, ${generatedAt})
+        ON CONFLICT (briefing_id, language)
+        DO UPDATE SET data = ${data}::jsonb, generated_at = ${generatedAt}
+      `;
+      // Clean up translations for old briefings (keep only current)
+      await getDb()`
+        DELETE FROM ragecheck_clearview_translations
+        WHERE briefing_id != ${briefingId}
+      `;
+    });
+  } catch (error) {
+    console.error("Failed to save clearview translation:", error);
+  }
+}
+
+export async function getClearviewBriefingById(briefingId: number): Promise<ClearviewCache | null> {
+  try {
+    const [row] = await getDb()`
+      SELECT id, data, generated_at
+      FROM ragecheck_clearview
+      WHERE id = ${briefingId}
+      LIMIT 1
+    `;
+    if (!row) return null;
+    const data = typeof row.data === "string" ? JSON.parse(row.data) : row.data;
+    return {
+      id: row.id,
+      stories: data.stories || [],
+      generatedAt: row.generated_at.toISOString(),
+    };
+  } catch (error) {
+    console.error("Failed to get clearview briefing by id:", error);
+    return null;
+  }
+}
+
 export async function getVisitorStats(): Promise<VisitorStats> {
   try {
     // Use EST timezone for "today" calculations

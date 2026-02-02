@@ -599,6 +599,12 @@ export default function ClearviewPage() {
   const [email, setEmail] = useState("");
   const [subscribeStatus, setSubscribeStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [subscribeMessage, setSubscribeMessage] = useState("");
+  const [language, setLanguage] = useState("");
+  const [translating, setTranslating] = useState(false);
+  const [briefingId, setBriefingId] = useState<number | null>(null);
+  const [translatedStories, setTranslatedStories] = useState<StoryCluster[] | null>(null);
+
+  const displayStories = translatedStories || stories;
 
   useEffect(() => {
     fetch("/api/clearview")
@@ -608,6 +614,7 @@ export default function ClearviewPage() {
           setStories(data.stories);
           setGeneratedAt(data.generatedAt);
           setArchived(data.archived || []);
+          if (data.id) setBriefingId(data.id);
         } else {
           setError(data.error || "Failed to load analysis");
         }
@@ -619,6 +626,45 @@ export default function ClearviewPage() {
         setLoading(false);
       });
   }, []);
+
+  // Auto-detect country on mount
+  useEffect(() => {
+    fetch("/api/clearview/detect-country")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.language) {
+          setLanguage(data.language);
+        }
+      })
+      .catch(() => {
+        // Silently fail — default to English
+      });
+  }, []);
+
+  // Fetch translation when language changes
+  useEffect(() => {
+    if (!language || !briefingId) {
+      setTranslatedStories(null);
+      return;
+    }
+
+    setTranslating(true);
+    fetch(`/api/clearview/translate?language=${encodeURIComponent(language)}&briefingId=${briefingId}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success && data.stories) {
+          setTranslatedStories(data.stories);
+        } else {
+          setTranslatedStories(null);
+        }
+      })
+      .catch(() => {
+        setTranslatedStories(null);
+      })
+      .finally(() => {
+        setTranslating(false);
+      });
+  }, [language, briefingId]);
 
   const handleSubscribe = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -747,6 +793,41 @@ export default function ClearviewPage() {
               </div>
             )}
 
+            {/* Language Selector */}
+            <div className="pt-6 flex items-center justify-center gap-2 text-sm">
+              <label htmlFor="cv-language-select" className="text-zinc-500 dark:text-zinc-400">
+                Language:
+              </label>
+              <select
+                id="cv-language-select"
+                value={language}
+                onChange={(e) => { setLanguage(e.target.value); tracking.trackLanguageSelected(e.target.value || "English"); }}
+                className="bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-1.5 text-zinc-700 dark:text-zinc-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+              >
+                <option value="">English</option>
+                <option value="Spanish">Español</option>
+                <option value="French">Français</option>
+                <option value="German">Deutsch</option>
+                <option value="Portuguese">Português</option>
+                <option value="Italian">Italiano</option>
+                <option value="Dutch">Nederlands</option>
+                <option value="Polish">Polski</option>
+                <option value="Russian">Русский</option>
+                <option value="Japanese">日本語</option>
+                <option value="Korean">한국어</option>
+                <option value="Chinese">中文</option>
+                <option value="Arabic">العربية</option>
+                <option value="Hindi">हिन्दी</option>
+                <option value="Turkish">Türkçe</option>
+              </select>
+              {translating && (
+                <svg className="animate-spin h-4 w-4 text-indigo-500" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+              )}
+            </div>
+
             {/* Email Subscription */}
             <div className="pt-8 max-w-md mx-auto">
               {subscribeStatus === "success" ? (
@@ -827,7 +908,16 @@ export default function ClearviewPage() {
 
         {!loading && !error && stories.length > 0 && (
           <div className="space-y-16">
-            {stories.map((story) => (
+            {translating && (
+              <div className="flex items-center justify-center gap-3 py-8">
+                <svg className="animate-spin h-5 w-5 text-indigo-500" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+                <span className="text-sm text-zinc-500 dark:text-zinc-400 font-medium">Translating...</span>
+              </div>
+            )}
+            {displayStories.map((story) => (
               <StoryCard key={story.id} story={story} />
             ))}
           </div>

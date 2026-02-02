@@ -725,6 +725,214 @@ export async function clusterHeadlinesBatch(
   };
 }
 
+// ============================================
+// CLEARVIEW TRANSLATION
+// ============================================
+
+import { ClearviewStory } from "./db";
+
+const TRANSLATION_SYSTEM_PROMPT = `You are an expert translator. Translate the provided JSON fields into the target language.
+Rules:
+- Translate ONLY the text values, never the JSON keys
+- Preserve all formatting, punctuation style, and sentence structure
+- Keep proper nouns (people, organizations, places) in their commonly used form in the target language
+- Return valid JSON only, no other text`;
+
+interface TranslatableFields {
+  id: string;
+  topic: string;
+  summary: string;
+  whatHappened?: string;
+  keyTakeaway: string;
+  sources: { name: string; framing: string; title: string; manipulationTechniques?: string[] }[];
+  perspectives: { lean: string; viewpoint: string }[];
+  expertConsensus?: { statement?: string; dissent?: string };
+  debateQuestion?: string;
+  commonGround?: string[];
+  factualDisputes?: { claim: string; leftPosition: string; rightPosition: string }[];
+  whyItMatters?: {
+    left: { coreValue: string; motivation: string; emotionalAppeal: string };
+    right: { coreValue: string; motivation: string; emotionalAppeal: string };
+    bottomLine: string;
+  };
+  deeperAnalysis?: {
+    unstatedConcerns: { left: string[]; right: string[] };
+    economicDimension?: string;
+    culturalDimension?: string;
+    politicalGame: string;
+    whatGetsIgnored?: string;
+  };
+}
+
+function extractTranslatableFields(story: ClearviewStory): TranslatableFields {
+  return {
+    id: story.id,
+    topic: story.topic,
+    summary: story.summary,
+    whatHappened: story.whatHappened,
+    keyTakeaway: story.keyTakeaway,
+    sources: story.sources.map(s => ({
+      name: s.name,
+      framing: s.framing,
+      title: s.title,
+      manipulationTechniques: s.manipulationTechniques,
+    })),
+    perspectives: story.perspectives.map(p => ({
+      lean: p.lean,
+      viewpoint: p.viewpoint,
+    })),
+    expertConsensus: story.expertConsensus ? {
+      statement: story.expertConsensus.statement,
+      dissent: story.expertConsensus.dissent,
+    } : undefined,
+    debateQuestion: story.debateQuestion,
+    commonGround: story.commonGround,
+    factualDisputes: story.factualDisputes?.map(d => ({
+      claim: d.claim,
+      leftPosition: d.leftPosition,
+      rightPosition: d.rightPosition,
+    })),
+    whyItMatters: story.whyItMatters ? {
+      left: {
+        coreValue: story.whyItMatters.left.coreValue,
+        motivation: story.whyItMatters.left.motivation,
+        emotionalAppeal: story.whyItMatters.left.emotionalAppeal,
+      },
+      right: {
+        coreValue: story.whyItMatters.right.coreValue,
+        motivation: story.whyItMatters.right.motivation,
+        emotionalAppeal: story.whyItMatters.right.emotionalAppeal,
+      },
+      bottomLine: story.whyItMatters.bottomLine,
+    } : undefined,
+    deeperAnalysis: story.deeperAnalysis ? {
+      unstatedConcerns: story.deeperAnalysis.unstatedConcerns,
+      economicDimension: story.deeperAnalysis.economicDimension,
+      culturalDimension: story.deeperAnalysis.culturalDimension,
+      politicalGame: story.deeperAnalysis.politicalGame,
+      whatGetsIgnored: story.deeperAnalysis.whatGetsIgnored,
+    } : undefined,
+  };
+}
+
+function mergeTranslatedFields(original: ClearviewStory, translated: TranslatableFields): ClearviewStory {
+  return {
+    ...original,
+    topic: translated.topic || original.topic,
+    summary: translated.summary || original.summary,
+    whatHappened: translated.whatHappened || original.whatHappened,
+    keyTakeaway: translated.keyTakeaway || original.keyTakeaway,
+    sources: original.sources.map((s, i) => ({
+      ...s,
+      framing: translated.sources?.[i]?.framing || s.framing,
+      title: translated.sources?.[i]?.title || s.title,
+      manipulationTechniques: translated.sources?.[i]?.manipulationTechniques || s.manipulationTechniques,
+    })),
+    perspectives: original.perspectives.map((p, i) => ({
+      ...p,
+      viewpoint: translated.perspectives?.[i]?.viewpoint || p.viewpoint,
+    })),
+    expertConsensus: original.expertConsensus ? {
+      ...original.expertConsensus,
+      statement: translated.expertConsensus?.statement || original.expertConsensus.statement,
+      dissent: translated.expertConsensus?.dissent || original.expertConsensus.dissent,
+    } : undefined,
+    debateQuestion: translated.debateQuestion || original.debateQuestion,
+    commonGround: translated.commonGround || original.commonGround,
+    factualDisputes: original.factualDisputes?.map((d, i) => ({
+      ...d,
+      claim: translated.factualDisputes?.[i]?.claim || d.claim,
+      leftPosition: translated.factualDisputes?.[i]?.leftPosition || d.leftPosition,
+      rightPosition: translated.factualDisputes?.[i]?.rightPosition || d.rightPosition,
+    })),
+    whyItMatters: original.whyItMatters ? {
+      ...original.whyItMatters,
+      left: {
+        ...original.whyItMatters.left,
+        coreValue: translated.whyItMatters?.left?.coreValue || original.whyItMatters.left.coreValue,
+        motivation: translated.whyItMatters?.left?.motivation || original.whyItMatters.left.motivation,
+        emotionalAppeal: translated.whyItMatters?.left?.emotionalAppeal || original.whyItMatters.left.emotionalAppeal,
+      },
+      right: {
+        ...original.whyItMatters.right,
+        coreValue: translated.whyItMatters?.right?.coreValue || original.whyItMatters.right.coreValue,
+        motivation: translated.whyItMatters?.right?.motivation || original.whyItMatters.right.motivation,
+        emotionalAppeal: translated.whyItMatters?.right?.emotionalAppeal || original.whyItMatters.right.emotionalAppeal,
+      },
+      bottomLine: translated.whyItMatters?.bottomLine || original.whyItMatters.bottomLine,
+    } : undefined,
+    deeperAnalysis: original.deeperAnalysis ? {
+      ...original.deeperAnalysis,
+      unstatedConcerns: translated.deeperAnalysis?.unstatedConcerns || original.deeperAnalysis.unstatedConcerns,
+      economicDimension: translated.deeperAnalysis?.economicDimension || original.deeperAnalysis.economicDimension,
+      culturalDimension: translated.deeperAnalysis?.culturalDimension || original.deeperAnalysis.culturalDimension,
+      politicalGame: translated.deeperAnalysis?.politicalGame || original.deeperAnalysis.politicalGame,
+      whatGetsIgnored: translated.deeperAnalysis?.whatGetsIgnored || original.deeperAnalysis.whatGetsIgnored,
+    } : undefined,
+  };
+}
+
+async function translateBatch(stories: ClearviewStory[], language: string): Promise<ClearviewStory[]> {
+  if (!client) return stories;
+
+  const translatableArray = stories.map(extractTranslatableFields);
+  const inputJson = JSON.stringify(translatableArray, null, 2);
+
+  try {
+    const response = await client.messages.create({
+      model: "claude-3-5-haiku-20241022",
+      max_tokens: 8000,
+      messages: [{
+        role: "user",
+        content: `Translate the following JSON text fields into ${language}. Return the same JSON structure with translated values.\n\n${inputJson}`,
+      }],
+      system: TRANSLATION_SYSTEM_PROMPT,
+    });
+
+    const content = response.content[0];
+    if (content.type !== "text") return stories;
+
+    const jsonMatch = content.text.match(/\[[\s\S]*\]/);
+    if (!jsonMatch) return stories;
+
+    const translated: TranslatableFields[] = JSON.parse(jsonMatch[0]);
+
+    return stories.map((story, i) => {
+      const t = translated.find(tr => tr.id === story.id) || translated[i];
+      if (!t) return story;
+      return mergeTranslatedFields(story, t);
+    });
+  } catch (error) {
+    console.error("Translation batch failed:", error);
+    return stories;
+  }
+}
+
+export async function translateClearviewStories(
+  stories: ClearviewStory[],
+  language: string
+): Promise<ClearviewStory[] | null> {
+  if (!client || stories.length === 0) return null;
+
+  try {
+    // Batch into groups of 4 to stay within Haiku output token limits
+    if (stories.length <= 4) {
+      const result = await translateBatch(stories, language);
+      return result;
+    }
+
+    const mid = Math.ceil(stories.length / 2);
+    const [batch1, batch2] = await Promise.all([
+      translateBatch(stories.slice(0, mid), language),
+      translateBatch(stories.slice(mid), language),
+    ]);
+    return [...batch1, ...batch2];
+  } catch (error) {
+    console.error("Translation failed:", error);
+    return null;
+  }
+}
+
 // Extract framing examples from headlines for an existing story
 const FRAMING_EXTRACTION_PROMPT = `You analyze news headlines to identify framing patterns. Extract ONLY words that ACTUALLY appear in the headlines provided.
 
