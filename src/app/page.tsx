@@ -597,6 +597,9 @@ function HomeContent() {
   const [subscribeStatus, setSubscribeStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [subscribeMessage, setSubscribeMessage] = useState("");
 
+  // Loading phase state for progress indicator
+  const [loadingPhase, setLoadingPhase] = useState(0);
+
   // Track current sessionId and start time for abandonment detection
   const currentSessionIdRef = useRef<string | null>(null);
   const analysisStartTimeRef = useRef<number | null>(null);
@@ -646,6 +649,28 @@ function HomeContent() {
       window.removeEventListener("beforeunload", handlePageLeave);
       window.removeEventListener("pagehide", handlePageLeave);
     };
+  }, [loading]);
+
+  // Loading phase timer - advances through phases while loading
+  useEffect(() => {
+    if (!loading) {
+      setLoadingPhase(0);
+      return;
+    }
+
+    // Phase timings (cumulative seconds): 0=fetch, 4=extract, 8=analyze, 15=AI, 25=long
+    const phaseTimings = [0, 4, 8, 15, 25];
+    let elapsed = 0;
+
+    const interval = setInterval(() => {
+      elapsed += 1;
+      // Find the highest phase we've reached
+      const newPhase = phaseTimings.reduce((phase, timing, idx) =>
+        elapsed >= timing ? idx : phase, 0);
+      setLoadingPhase(newPhase);
+    }, 1000);
+
+    return () => clearInterval(interval);
   }, [loading]);
 
   // Conversation shape detection
@@ -1382,6 +1407,48 @@ function HomeContent() {
               <option value="Turkish">Türkçe</option>
             </select>
           </div>
+
+          {/* Inline Loading Indicator - positioned near input for better UX */}
+          {loading && (
+            <div className="mt-6 animate-in fade-in slide-in-from-top-4 duration-300">
+              <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-4 shadow-lg max-w-md mx-auto">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="relative">
+                    <div className="absolute inset-0 bg-indigo-500 blur-md opacity-30 animate-pulse rounded-full"></div>
+                    <svg className="relative animate-spin h-5 w-5 text-indigo-600" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    </svg>
+                  </div>
+                  <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                    {loadingPhase === 0 && "Fetching article..."}
+                    {loadingPhase === 1 && "Extracting content..."}
+                    {loadingPhase === 2 && "Running pattern analysis..."}
+                    {loadingPhase === 3 && "AI is reviewing for nuance..."}
+                    {loadingPhase === 4 && "Complex content — almost there..."}
+                  </span>
+                </div>
+                {/* Stepped progress bar */}
+                <div className="flex gap-1">
+                  {[0, 1, 2, 3].map((step) => (
+                    <div
+                      key={step}
+                      className={`h-1.5 flex-1 rounded-full transition-colors duration-500 ${
+                        step < loadingPhase
+                          ? "bg-indigo-500"
+                          : step === loadingPhase
+                          ? "bg-indigo-500 animate-pulse"
+                          : "bg-zinc-200 dark:bg-zinc-700"
+                      }`}
+                    />
+                  ))}
+                </div>
+                <p className="text-xs text-zinc-500 mt-2 text-center">
+                  Step {Math.min(loadingPhase + 1, 4)} of 4
+                </p>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Live Headlines Section */}
@@ -1559,42 +1626,6 @@ function HomeContent() {
                   )}
                 </form>
               )}
-            </div>
-          </div>
-        )}
-
-        {/* Loading State */}
-        {loading && (
-          <div className="max-w-xl mx-auto mt-12 animate-in fade-in duration-500">
-            <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-10 shadow-2xl text-center">
-              <div className="inline-block relative mb-8">
-                 <div className="absolute inset-0 bg-indigo-500 blur-xl opacity-20 animate-pulse"></div>
-                 <svg className="relative animate-spin h-10 w-10 text-indigo-600 mx-auto" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                </svg>
-              </div>
-              
-              <h3 className="text-xl font-bold text-zinc-900 dark:text-zinc-100 mb-2">Analyzing Patterns</h3>
-              <p className="text-zinc-500 mb-8">Our models are scanning for manipulative framing...</p>
-
-              <div className="space-y-4 max-w-sm mx-auto">
-                {Object.entries(SIGNAL_LABELS).map(([key, label], index) => (
-                  <div key={key} className="flex items-center gap-4">
-                    <span className="text-xs font-medium text-zinc-400 w-32 text-right">{label}</span>
-                    <div className="flex-1 h-1.5 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-indigo-500 rounded-full animate-shimmer"
-                        style={{
-                          width: '100%',
-                          animationDelay: `${index * 150}ms`,
-                          opacity: 0.6
-                        }}
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
             </div>
           </div>
         )}
