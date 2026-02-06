@@ -484,7 +484,7 @@ function StoryCard({ story }: { story: StoryCluster }) {
             Sources
           </span>
           <span className="text-sm text-zinc-400">
-            {story.sources.length} articles analyzed
+            {(story.sources || []).length} articles analyzed
           </span>
         </div>
         <svg className={`w-4 h-4 text-zinc-400 transition-transform ${sourcesExpanded ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -495,7 +495,7 @@ function StoryCard({ story }: { story: StoryCluster }) {
       {sourcesExpanded && (
         <div className="p-6 md:p-8 bg-white dark:bg-zinc-950 border-t border-zinc-100 dark:border-zinc-800 animate-in slide-in-from-top-2">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {story.sources.map((source, i) => (
+            {(story.sources || []).map((source, i) => (
               <div
                 key={i}
                 className="group/source p-4 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl hover:border-zinc-400 dark:hover:border-zinc-600 transition-colors"
@@ -605,7 +605,7 @@ export default function ClearviewPage() {
   const [briefingId, setBriefingId] = useState<number | null>(null);
   const [translatedStories, setTranslatedStories] = useState<StoryCluster[] | null>(null);
 
-  const displayStories = translatedStories || stories;
+  const displayStories = translatedStories && translatedStories.length > 0 ? translatedStories : stories;
 
   useEffect(() => {
     fetch("/api/clearview")
@@ -932,7 +932,7 @@ export default function ClearviewPage() {
           // Filter archived briefings to only show unique stories
           const filteredArchived = archived.map(briefing => ({
             ...briefing,
-            stories: briefing.stories.filter(story =>
+            stories: (briefing.stories || []).filter(story =>
               !currentTopics.has(story.topic.toLowerCase().trim())
             )
           })).filter(briefing => briefing.stories.length > 0);
