@@ -116,7 +116,8 @@ function BiasBadge({ lean }: { lean: string }) {
   );
 }
 
-function BiasSpectrum({ sources }: { sources: SourceAnalysis[] }) {
+function BiasSpectrum({ sources }: { sources?: SourceAnalysis[] }) {
+  if (!sources || sources.length === 0) return null;
   const counts = { left: 0, center: 0, right: 0 };
   sources.forEach(s => {
     const lean = s.lean.toLowerCase();
@@ -291,7 +292,7 @@ function StoryCard({ story }: { story: StoryCluster }) {
             const sentences = leftPerspective.viewpoint.split(/(?<=[.!?])\s+/);
             const thesis = sentences[0] || "";
             const rest = sentences.slice(1).join(" ");
-            const leftSources = story.sources
+            const leftSources = (story.sources || [])
               .filter(s => s.lean.toLowerCase().includes("left"))
               .map(s => s.name);
             return (
@@ -319,7 +320,7 @@ function StoryCard({ story }: { story: StoryCluster }) {
             const sentences = rightPerspective.viewpoint.split(/(?<=[.!?])\s+/);
             const thesis = sentences[0] || "";
             const rest = sentences.slice(1).join(" ");
-            const rightSources = story.sources
+            const rightSources = (story.sources || [])
               .filter(s => s.lean.toLowerCase().includes("right"))
               .map(s => s.name);
             return (
