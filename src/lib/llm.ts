@@ -771,13 +771,13 @@ function extractTranslatableFields(story: ClearviewStory): TranslatableFields {
     summary: story.summary,
     whatHappened: story.whatHappened,
     keyTakeaway: story.keyTakeaway,
-    sources: story.sources.map(s => ({
+    sources: (story.sources || []).map(s => ({
       name: s.name,
       framing: s.framing,
       title: s.title,
       manipulationTechniques: s.manipulationTechniques,
     })),
-    perspectives: story.perspectives.map(p => ({
+    perspectives: (story.perspectives || []).map(p => ({
       lean: p.lean,
       viewpoint: p.viewpoint,
     })),
@@ -822,13 +822,13 @@ function mergeTranslatedFields(original: ClearviewStory, translated: Translatabl
     summary: translated.summary || original.summary,
     whatHappened: translated.whatHappened || original.whatHappened,
     keyTakeaway: translated.keyTakeaway || original.keyTakeaway,
-    sources: original.sources.map((s, i) => ({
+    sources: (original.sources || []).map((s, i) => ({
       ...s,
       framing: translated.sources?.[i]?.framing || s.framing,
       title: translated.sources?.[i]?.title || s.title,
       manipulationTechniques: translated.sources?.[i]?.manipulationTechniques || s.manipulationTechniques,
     })),
-    perspectives: original.perspectives.map((p, i) => ({
+    perspectives: (original.perspectives || []).map((p, i) => ({
       ...p,
       viewpoint: translated.perspectives?.[i]?.viewpoint || p.viewpoint,
     })),
