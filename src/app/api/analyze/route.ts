@@ -59,7 +59,7 @@ function getLabel(score: number): "Low" | "Medium" | "High" {
 export async function POST(request: NextRequest): Promise<NextResponse<AnalyzeResponse>> {
   try {
     const body = await request.json();
-    const { url, image, sessionId, language } = body;
+    const { url, image, sessionId, language, source } = body;
 
     // Capture visitor info from headers
     const ipAddress = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
@@ -339,6 +339,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<AnalyzeRe
         signalBreakdown: ruleAnalysis.signalBreakdown,
         highlights: ruleAnalysis.highlights,
         language,
+        useCompactModel: source === "extension",
       });
 
       if (llmResult) {

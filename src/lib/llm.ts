@@ -45,6 +45,7 @@ interface AnalysisRequest {
   signalBreakdown: SignalBreakdown;
   highlights: Highlight[];
   language?: string; // Optional language for response (e.g., "Spanish", "French")
+  useCompactModel?: boolean; // Use Sonnet instead of Opus (for extension calls)
 }
 
 export async function enhanceWithLLM(
@@ -87,6 +88,16 @@ Consider:
 2. Are there manipulation tactics the rules missed?
 3. What's the overall intent - to inform or to provoke?
 
+EXPANDED EMOTIONAL ANALYSIS:
+Beyond the 5 core signals, assess these emotional manipulation techniques:
+- Contempt: Does the content treat opponents as beneath consideration? (sneering, mocking, dismissal)
+- Moral disgust: Does it use contamination/pollution language about people?
+- Schadenfreude: Does it celebrate opponents' suffering or losses?
+- Epistemic arrogance: Does it claim false certainty, dismiss all disagreement? ("everyone knows", "not up for debate")
+- Cynicism induction: Does it frame all institutions/actors as irredeemably corrupt? ("rigged", "sham", "nothing matters")
+- Existential threat: Does it frame the stakes as civilization-ending?
+Include observations in your techniqueExplanations array.
+
 shareCardBullets format:
 - 5-10 words each, concise but descriptive
 - Describe the tactic or what makes the content good/bad
@@ -110,7 +121,7 @@ IMPORTANT: Write ALL text fields (reasons, contextNotes, sharingPatterns, techni
 
   try {
     const response = await client.messages.create({
-      model: "claude-opus-4-5-20251101",
+      model: request.useCompactModel ? "claude-sonnet-4-5-20250929" : "claude-opus-4-5-20251101",
       max_tokens: 800,
       messages: [
         {
