@@ -182,34 +182,43 @@ export async function POST(request: NextRequest): Promise<NextResponse<AnalyzeRe
       });
     }
 
-    // Handle URL analysis (existing logic)
-    if (!url || typeof url !== "string") {
+    // Handle URL analysis (existing logic) or direct text from extension
+    const directText = body.text && typeof body.text === "string" ? body.text.trim() : null;
+
+    if (!url && !directText) {
       return jsonResponse(
-        { success: false, error: "URL or image is required" },
+        { success: false, error: "URL, text, or image is required" },
         { status: 400 }
       );
+    }
+
+    // If we have a URL, validate it
+    if (url && typeof url === "string") {
+      try {
+        new URL(url);
+      } catch {
+        if (!directText) {
+          return jsonResponse(
+            { success: false, error: "Invalid URL format" },
+            { status: 400 }
+          );
+        }
+        // Invalid URL but we have text — continue with text-only
+      }
     }
 
     const forceReanalyze = body.force === true;
-
-    // Validate URL format
-    try {
-      new URL(url);
-    } catch {
-      return jsonResponse(
-        { success: false, error: "Invalid URL format" },
-        { status: 400 }
-      );
-    }
+    const effectiveUrl = (url && typeof url === "string") ? url : `text-${Date.now()}`;
 
     // Check cache first (results from last 24 hours) unless force re-analyze
-    const cached = !forceReanalyze ? await getCachedAnalysis(url) : null;
+    // Only cache by URL when we have one, skip cache for text-only
+    const cached = (!forceReanalyze && url) ? await getCachedAnalysis(url) : null;
     if (cached) {
       console.log(`Cache hit for ${url}`);
 
       // Log cache hit as a completion so funnel metrics are accurate
       await logAnalysis({
-        url,
+        url: effectiveUrl,
         sourceDomain: cached.sourceDomain,
         score: cached.score,
         label: cached.label,
@@ -252,40 +261,62 @@ export async function POST(request: NextRequest): Promise<NextResponse<AnalyzeRe
       });
     }
 
-    // Extract content from URL
-    const extracted = await extractContent(url);
+    // Get content: use direct text from extension, or extract from URL
+    let extractedText: string;
+    let extractedTitle: string;
+    let extractedSourceDomain: string;
+    let extractedImage: string | undefined;
 
-    if (!extracted.success) {
-      // Log failed extraction
-      await logAnalysis({
-        url,
-        sourceDomain: extracted.sourceDomain,
-        success: false,
-        error: extracted.error || "Failed to extract content",
-        ipAddress: ipAddress || undefined,
-        userAgent: userAgent || undefined,
-        country: country || undefined,
-        sessionId: sessionId || undefined,
-        language: language || undefined,
-      });
+    if (directText) {
+      // Text provided directly by browser extension (DOM-extracted)
+      extractedText = directText;
+      extractedTitle = directText.slice(0, 100);
+      try {
+        extractedSourceDomain = new URL(effectiveUrl).hostname;
+      } catch {
+        extractedSourceDomain = "extension";
+      }
+    } else {
+      // Extract content from URL (server-side fetch)
+      const extracted = await extractContent(url);
 
-      return jsonResponse(
-        {
+      if (!extracted.success) {
+        // Log failed extraction
+        await logAnalysis({
+          url: effectiveUrl,
+          sourceDomain: extracted.sourceDomain,
           success: false,
           error: extracted.error || "Failed to extract content",
-          sourceDomain: extracted.sourceDomain,
-        },
-        { status: 422 }
-      );
+          ipAddress: ipAddress || undefined,
+          userAgent: userAgent || undefined,
+          country: country || undefined,
+          sessionId: sessionId || undefined,
+          language: language || undefined,
+        });
+
+        return jsonResponse(
+          {
+            success: false,
+            error: extracted.error || "Failed to extract content",
+            sourceDomain: extracted.sourceDomain,
+          },
+          { status: 422 }
+        );
+      }
+
+      extractedText = extracted.text;
+      extractedTitle = extracted.title;
+      extractedSourceDomain = extracted.sourceDomain;
+      extractedImage = extracted.image;
     }
 
     // Analyze the text with rules
-    const ruleAnalysis = analyzeText(extracted.text);
+    const ruleAnalysis = analyzeText(extractedText);
 
     // Create a preview of the text (limit to 5000 chars to avoid payload issues)
-    const textPreview = extracted.text.length > 5000
-      ? extracted.text.substring(0, 5000) + "..."
-      : extracted.text;
+    const textPreview = extractedText.length > 5000
+      ? extractedText.substring(0, 5000) + "..."
+      : extractedText;
 
     // Try to enhance with LLM if available
     let finalScore = ruleAnalysis.score;
@@ -302,8 +333,8 @@ export async function POST(request: NextRequest): Promise<NextResponse<AnalyzeRe
 
     if (isLLMAvailable()) {
       const llmResult = await enhanceWithLLM({
-        text: extracted.text,
-        title: extracted.title,
+        text: extractedText,
+        title: extractedTitle,
         ruleBasedScore: ruleAnalysis.score,
         signalBreakdown: ruleAnalysis.signalBreakdown,
         highlights: ruleAnalysis.highlights,
@@ -329,8 +360,8 @@ export async function POST(request: NextRequest): Promise<NextResponse<AnalyzeRe
 
     // Log successful analysis with full data for caching
     await logAnalysis({
-      url,
-      sourceDomain: extracted.sourceDomain,
+      url: effectiveUrl,
+      sourceDomain: extractedSourceDomain,
       score: finalScore,
       label,
       llmEnhanced,
@@ -339,7 +370,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<AnalyzeRe
       ipAddress: ipAddress || undefined,
       userAgent: userAgent || undefined,
       country: country || undefined,
-      title: extracted.title,
+      title: extractedTitle,
       reasons: finalReasons,
       highlights: ruleAnalysis.highlights,
       contextNotes,
@@ -361,12 +392,12 @@ export async function POST(request: NextRequest): Promise<NextResponse<AnalyzeRe
       reasons: finalReasons,
       highlights: ruleAnalysis.highlights,
       signalBreakdown: ruleAnalysis.signalBreakdown,
-      title: extracted.title,
-      sourceDomain: extracted.sourceDomain,
+      title: extractedTitle,
+      sourceDomain: extractedSourceDomain,
       textPreview,
       llmEnhanced,
       contextNotes,
-      image: extracted.image,
+      image: extractedImage,
       sharingPatterns,
       techniqueExplanations,
       shareCardSummary,
