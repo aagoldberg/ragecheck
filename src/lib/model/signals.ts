@@ -36,7 +36,9 @@ export function detectEmotionLexicon(prep: PreprocessedText): SignalResult {
 }
 
 export function detectUrgencyWords(prep: PreprocessedText): SignalResult {
-  const matches = findPatternMatches(prep.original, lexicons.URGENCY_WORDS);
+  const termMatches = findPatternMatches(prep.original, lexicons.URGENCY_WORDS);
+  const patternMatches = findPatternMatches(prep.original, lexicons.URGENCY_PATTERNS);
+  const matches = [...termMatches, ...patternMatches];
   const score01 = scoreMatches(matches, prep.wordCount, 2);
 
   return {
@@ -126,7 +128,9 @@ export function detectMaliciousIntent(prep: PreprocessedText): SignalResult {
 }
 
 export function detectDehumanization(prep: PreprocessedText): SignalResult {
-  const matches = findPatternMatches(prep.original, lexicons.DEHUMANIZATION_TERMS);
+  const termMatches = findPatternMatches(prep.original, lexicons.DEHUMANIZATION_TERMS);
+  const patternMatches = findPatternMatches(prep.original, lexicons.DEHUMANIZATION_PATTERNS);
+  const matches = [...termMatches, ...patternMatches];
   // Dehumanization is very serious - any match is high
   const score01 = matches.length >= 2 ? 1.0 : matches.length >= 1 ? 0.7 : 0;
 
@@ -284,6 +288,78 @@ export function detectRhetoricalQuestionDensity(prep: PreprocessedText): SignalR
 export function detectSecondPersonProvocation(prep: PreprocessedText): SignalResult {
   const matches = findPatternMatches(prep.original, lexicons.SECOND_PERSON_PROVOCATION);
   const score01 = matches.length >= 2 ? 1.0 : matches.length >= 1 ? 0.6 : 0;
+
+  return {
+    score01,
+    evidence: matches.slice(0, 5),
+    debug: { matchCount: matches.length },
+  };
+}
+
+// ============================================
+// EXPANDED EMOTIONAL SIGNALS
+// ============================================
+
+export function detectContempt(prep: PreprocessedText): SignalResult {
+  const termMatches = findPatternMatches(prep.original, lexicons.CONTEMPT_TERMS);
+  const patternMatches = findPatternMatches(prep.original, lexicons.CONTEMPT_PATTERNS);
+  const allMatches = [...termMatches, ...patternMatches];
+  const score01 = allMatches.length >= 3 ? 1.0 : allMatches.length >= 2 ? 0.8 : allMatches.length >= 1 ? 0.5 : 0;
+
+  return {
+    score01,
+    evidence: allMatches.slice(0, 5),
+    debug: { matchCount: allMatches.length },
+  };
+}
+
+export function detectSchadenfreude(prep: PreprocessedText): SignalResult {
+  const matches = findPatternMatches(prep.original, lexicons.SCHADENFREUDE_PATTERNS);
+  const score01 = matches.length >= 2 ? 1.0 : matches.length >= 1 ? 0.6 : 0;
+
+  return {
+    score01,
+    evidence: matches.slice(0, 5),
+    debug: { matchCount: matches.length },
+  };
+}
+
+export function detectEpistemicArrogance(prep: PreprocessedText): SignalResult {
+  const matches = findPatternMatches(prep.original, lexicons.EPISTEMIC_ARROGANCE);
+  const score01 = scoreMatches(matches, prep.wordCount, 2);
+
+  return {
+    score01,
+    evidence: matches.slice(0, 5),
+    debug: { matchCount: matches.length },
+  };
+}
+
+export function detectCynicism(prep: PreprocessedText): SignalResult {
+  const matches = findPatternMatches(prep.original, lexicons.CYNICISM_TERMS);
+  const score01 = matches.length >= 3 ? 1.0 : matches.length >= 2 ? 0.7 : matches.length >= 1 ? 0.4 : 0;
+
+  return {
+    score01,
+    evidence: matches.slice(0, 5),
+    debug: { matchCount: matches.length },
+  };
+}
+
+export function detectExistentialThreat(prep: PreprocessedText): SignalResult {
+  const matches = findPatternMatches(prep.original, lexicons.EXISTENTIAL_THREAT_PATTERNS);
+  const score01 = matches.length >= 2 ? 1.0 : matches.length >= 1 ? 0.6 : 0;
+
+  return {
+    score01,
+    evidence: matches.slice(0, 5),
+    debug: { matchCount: matches.length },
+  };
+}
+
+export function detectPoliticalDisgust(prep: PreprocessedText): SignalResult {
+  const matches = findPatternMatches(prep.original, lexicons.POLITICAL_DISGUST);
+  const score01 = matches.length >= 2 ? 1.0 : matches.length >= 1 ? 0.5 : 0;
 
   return {
     score01,

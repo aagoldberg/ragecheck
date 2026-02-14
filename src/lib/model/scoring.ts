@@ -144,32 +144,42 @@ export function analyze(text: string): AnalysisResult {
   }
 
   // Apply non-linear boost when multiple bars are high
-  // This reflects that ragebait typically combines multiple tactics
-  const highBars = Object.values(barScores).filter(s => s >= 35).length;
-  const veryHighBars = Object.values(barScores).filter(s => s >= 55).length;
+  // Boosts are NON-STACKING: we take the highest applicable multiplier
+  // This prevents multiplicative explosion (e.g., 1.6 * 1.35 = 2.16x)
+  const highBars = Object.values(barScores).filter(s => s >= 20).length;
+  const veryHighBars = Object.values(barScores).filter(s => s >= 50).length;
 
+  let boost = 1.0;
+
+  // Multi-bar boosts
   if (veryHighBars >= 3) {
-    core = core * 1.6; // Strong boost for 3+ very high bars
+    boost = Math.max(boost, 1.6);
   } else if (veryHighBars >= 2 || highBars >= 4) {
-    core = core * 1.45; // Moderate boost for 2+ very high or 4+ high
+    boost = Math.max(boost, 1.45);
   } else if (highBars >= 3) {
-    core = core * 1.35; // Smaller boost for 3+ high bars
+    boost = Math.max(boost, 1.35);
   } else if (highBars >= 2) {
-    core = core * 1.25; // Minimal boost for 2+ high bars
+    boost = Math.max(boost, 1.25);
   }
 
   // Special boost for very high call_to_conflict (most ragebait-specific signal)
-  // This is the most distinctive signal for engagement bait
-  if (barScores.call_to_conflict >= 70) {
-    core = core * 1.8; // Very strong boost for extreme call-to-conflict
-  } else if (barScores.call_to_conflict >= 55) {
-    core = core * 1.35;
+  if (barScores.call_to_conflict >= 55) {
+    boost = Math.max(boost, 1.8);
+  } else if (barScores.call_to_conflict >= 40) {
+    boost = Math.max(boost, 1.4);
   }
 
   // Special boost for high enemy_construction + moral_condemnation combo
-  if (barScores.enemy_construction >= 40 && barScores.moral_condemnation >= 40) {
-    core = core * 1.15;
+  if (barScores.enemy_construction >= 30 && barScores.moral_condemnation >= 30) {
+    boost = Math.max(boost, 1.3);
   }
+
+  // Special boost for enemy_construction + call_to_conflict combo (contempt + engagement bait)
+  if (barScores.enemy_construction >= 30 && barScores.call_to_conflict >= 30) {
+    boost = Math.max(boost, 1.5);
+  }
+
+  core = core * boost;
 
   // Apply reporting/analysis discount
   // Formula: bait_score = core * (1 - reporting_discount/125)

@@ -10,7 +10,8 @@ export const EMOTION_ANGER_FEAR_DISGUST = [
   "furious", "enraged", "outraged", "livid", "seething", "infuriated",
   "incensed", "irate", "wrathful", "apoplectic", "angry", "rage", "raging",
   "hate", "hateful", "hatred", "despise", "loathe",
-  "frustrated", "frustrating", "frustration", "annoyed", "annoying",
+  // "frustrated/frustrating" removed — too common in legitimate personal venting
+  "annoyed", "annoying",
   "fed up", "sick of", "tired of", "had enough",
   // Fear
   "terrified", "terrifying", "horrified", "horrifying", "frightening",
@@ -27,13 +28,22 @@ export const EMOTION_ANGER_FEAR_DISGUST = [
 ];
 
 export const URGENCY_WORDS = [
-  "now", "immediately", "urgent", "urgently", "breaking", "just in",
+  // "now" and "right now" removed — too generic, causes false positives
+  "immediately", "urgent", "urgently", "breaking", "just in",
   "shocking", "unacceptable", "unbelievable", "incredible", "outrageous",
-  "must see", "must read", "must watch", "can't wait", "right now",
+  "must see", "must read", "must watch", "can't wait",
   "this just happened", "happening now", "developing",
   "act now", "before it's too late", "time is running out",
   "crisis", "emergency", "critical", "dire", "desperate",
   "spread the word", "share this", "share before",
+  "exposed", "exposed:",
+];
+
+// Context-dependent urgency (require surrounding manipulation context)
+export const URGENCY_PATTERNS = [
+  /\bNOW\b/, // Only match "NOW" in all caps (intentional emphasis)
+  /\bright now\b.*\b(?:share|act|fight|wake|stop)\b/i,
+  /\b(?:share|act|fight|wake|stop)\b.*\bright now\b/i,
 ];
 
 export const INTENSIFIERS = [
@@ -84,16 +94,35 @@ export const MALICIOUS_INTENT_PATTERNS = [
   /radical agenda/i,
   /hidden agenda/i,
   /their agenda/i,
+  // Conspiracy / suppression patterns
+  /doesn't want you to (?:see|know|hear)/i,
+  /don't want you to (?:see|know|hear)/i,
+  /they're hiding/i,
+  /they are hiding/i,
+  /cover(?:ing)? (?:it )?up/i,
+  /about to ban/i,
+  /trying to silence/i,
+  /trying to censor/i,
 ];
 
 export const DEHUMANIZATION_TERMS = [
   "vermin", "rats", "roaches", "cockroaches", "parasites", "pests",
   "infestation", "plague", "disease", "cancer", "tumor",
-  "animals", "beasts", "monsters", "demons", "devils",
-  "scum", "filth", "trash", "garbage", "waste",
+  // "animals" removed — too many false positives (pet posts, wildlife, etc.)
+  "beasts", "monsters", "demons", "devils",
+  "scum", "filth", "trash", "garbage",
+  // "waste" removed — too generic ("waste of time" is contempt, not dehumanization)
   "subhuman", "inhuman", "less than human",
-  "slaves", "sheep", "sheeple", "zombies", "puppets",
+  // "slaves" removed — too much legitimate historical/labor discussion
+  "sheep", "sheeple", "zombies", "puppets",
   "brainwashed", "mindless", "idiots", "morons", "fools",
+];
+
+// Context-dependent dehumanization patterns (require "they/them/these" + term)
+export const DEHUMANIZATION_PATTERNS = [
+  /\b(?:they|them|these|those) (?:are |are all )?(?:animals|savages|vermin|scum)\b/i,
+  /\blike (?:animals|rats|roaches|parasites|cockroaches)\b/i,
+  /\bthese (?:creatures|things)\b/i,
 ];
 
 export const SCAPEGOAT_PATTERNS = [
@@ -117,9 +146,13 @@ export const SCAPEGOAT_PATTERNS = [
 export const MORAL_JUDGMENT_TERMS = [
   "evil", "wicked", "sinful", "immoral", "corrupt", "corrupted",
   "traitor", "traitors", "treason", "treasonous", "treachery",
-  "disgrace", "disgraceful", "shameful", "shameless",
+  "disgrace", "disgraceful", "shameful", "shameless", "shamed",
   "despicable", "deplorable", "reprehensible", "inexcusable",
   "unforgivable", "criminal", "criminals", "villains",
+  // Social shaming
+  "publicly shamed", "name and shame", "cancel", "cancelled",
+  "should be fired", "should be arrested", "should be banned",
+  "no excuse", "no excuses", "inexcusable",
 ];
 
 export const PURITY_CONTAMINATION = [
@@ -154,7 +187,7 @@ export const ABSOLUTIST_TERMS = [
   "without exception", "in every case",
   "the only", "only way", "no other", "nothing else",
   "100%", "zero", "impossible", "guaranteed",
-  "everything", "nothing", "entire", "complete",
+  "everything", "entire", "complete",
   "forever", "won't stop", "can't stop", "don't stop",
   "totally", "completely", "absolutely", "entirely",
   "only choice", "no choice", "no alternative",
@@ -213,6 +246,20 @@ export const REPLY_BAIT_TEMPLATES = [
   "what they don't tell you",
   "what they won't tell you",
   "repost", "retweet", "share if you agree",
+  // Challenge templates (engagement bait)
+  "change my mind", "prove me wrong", "i'll wait",
+  "fight me", "come at me", "debate me",
+  "i said what i said", "did i stutter",
+  // Hot take openers
+  "unpopular opinion", "hot take", "controversial opinion",
+  "hear me out", "not sorry", "i don't care who this offends",
+  // Dunk culture / ratio bait
+  "ratio", "L take", "W take", "stay mad", "cry about it",
+  "die mad about it", "cope harder", "cope and seethe",
+  "nobody asked", "didn't ask", "who asked",
+  // Blocking/ultimatum bait
+  "block me", "unfollow me", "don't follow me if",
+  "unfriend me if", "delete me if",
 ];
 
 export const SECOND_PERSON_PROVOCATION = [
@@ -227,6 +274,10 @@ export const SECOND_PERSON_PROVOCATION = [
   "fight back", "stand up", "take action",
   "must fight", "must act", "must stand",
   "we must", "we need to", "we have to",
+  // Dismissive challenges directed at reader
+  "you clearly", "you obviously",
+  "if you disagree", "if you don't like it",
+  "you can't even", "you don't even",
 ];
 
 // ============================================
@@ -257,6 +308,87 @@ export const MULTI_PERSPECTIVE_MARKERS = [
   "some argue", "others say", "while others",
   "both sides", "different perspectives",
   "according to critics", "according to supporters",
+];
+
+// ============================================
+// CONTEMPT LEXICONS
+// ============================================
+
+export const CONTEMPT_TERMS = [
+  "pathetic", "laughable", "ridiculous", "absurd", "clueless",
+  "delusional", "imagine thinking", "these people", "so-called",
+  "pretend", "pretending", "joke", "clown", "clowns", "unserious",
+  "beneath", "not worth", "waste of time",
+  // Dismissiveness
+  "just lazy", "just stupid", "just ignorant", "just dumb",
+  "imagine being", "must be nice to",
+  "tell me you've never", "clearly never",
+  "touch grass", "go outside", "get a life",
+  "embarrassing", "cringe", "brain rot", "brain dead",
+];
+
+export const CONTEMPT_PATTERNS = [
+  /\b(?:imagine|imagine actually)\b.*\b(?:believing|thinking|being)\b/i,
+  /\b(?:how|why) (?:do|would|could) (?:anyone|they)\b/i,
+  /\b(?:nobody|no one) (?:with|who has) (?:a brain|any sense|half)\b/i,
+  /\bis just (?:lazy|stupid|ignorant|dumb|incompetent)\b/i,
+  /\byou're not (?:actually|really)\b.*\byou're\b/i,
+  /\bpretending to (?:be|care|work|know)\b/i,
+];
+
+// ============================================
+// POLITICAL DISGUST LEXICONS
+// ============================================
+
+export const POLITICAL_DISGUST = [
+  "sickening", "nauseating", "stomach-turning", "makes you sick",
+  "stench", "reeks", "festering", "putrid", "cesspool",
+  "repugnant", "vomit-inducing", "bile",
+];
+
+// ============================================
+// SCHADENFREUDE LEXICONS
+// ============================================
+
+export const SCHADENFREUDE_PATTERNS = [
+  /\b(?:love to see|you love to see|good riddance)\b/i,
+  /\b(?:get what (?:they|you) deserve)\b/i,
+  /\b(?:karma|comeuppance|poetic justice)\b/i,
+  /\b(?:crying|tears|meltdown|cope|seethe)\b/i,
+  /\b(?:how does it feel|taste of (?:their|your) own)\b/i,
+];
+
+// ============================================
+// EPISTEMIC ARROGANCE LEXICONS
+// ============================================
+
+export const EPISTEMIC_ARROGANCE = [
+  "everyone knows", "any reasonable person", "no serious person",
+  "settled science", "not up for debate", "end of story",
+  "period", "full stop", "wake up", "open your eyes",
+  "do your research", "educate yourself",
+];
+
+// ============================================
+// CYNICISM LEXICONS
+// ============================================
+
+export const CYNICISM_TERMS = [
+  "rigged", "sham", "theater", "puppet", "kabuki",
+  "smoke and mirrors", "facade", "charade", "circus",
+  "broken beyond repair", "both sides are the same",
+  "voting doesn't matter", "nothing will change",
+];
+
+// ============================================
+// EXISTENTIAL THREAT LEXICONS
+// ============================================
+
+export const EXISTENTIAL_THREAT_PATTERNS = [
+  /\b(?:end of|death of|destruction of) (?:democracy|freedom|america|the republic)\b/i,
+  /\b(?:existential|civilizational|generational) (?:threat|crisis|emergency)\b/i,
+  /\b(?:point of no return|last chance|now or never)\b/i,
+  /\bif we don't (?:act|stop)\b.*\b(?:everything|it's over|too late)\b/i,
 ];
 
 // Information Density signals are computed, not lexicon-based

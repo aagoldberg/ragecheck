@@ -5,6 +5,9 @@ import { BarResult, PreprocessedText, SignalBreakdownItem } from "./types";
 import * as signals from "./signals";
 
 // Helper to combine signals with weights
+// Uses weight-aware top-signal boosting: a strong signal pushes the bar
+// proportional to its importance weight, preventing dilution by inactive signals
+// while not over-amplifying minor signals
 function combineSignals(
   signalResults: { name: string; weight: number; result: ReturnType<typeof signals.detectEmotionLexicon> }[]
 ): BarResult {
@@ -12,6 +15,10 @@ function combineSignals(
   let weightedSum = 0;
   const allEvidence: string[] = [];
   const signalBreakdown: SignalBreakdownItem[] = [];
+
+  // Track top signals with their weights for boost calculation
+  let topScore = 0, topWeight = 0;
+  let secondScore = 0, secondWeight = 0;
 
   for (const { name, weight, result } of signalResults) {
     totalWeight += weight;
@@ -23,9 +30,34 @@ function combineSignals(
       score01: result.score01,
       evidence: result.evidence,
     });
+
+    if (result.score01 > topScore) {
+      secondScore = topScore;
+      secondWeight = topWeight;
+      topScore = result.score01;
+      topWeight = weight;
+    } else if (result.score01 > secondScore) {
+      secondScore = result.score01;
+      secondWeight = weight;
+    }
   }
 
-  const score01 = totalWeight > 0 ? weightedSum / totalWeight : 0;
+  const weightedAvg = totalWeight > 0 ? weightedSum / totalWeight : 0;
+
+  // Weight-aware top-signal boost:
+  // A signal's boost is proportional to its weight in the bar (2x multiplier)
+  // - Weight 0.15 (minor) signal at 100% → bar 30
+  // - Weight 0.20 signal at 100% → bar 40
+  // - Weight 0.25 signal at 100% → bar 50
+  // - Weight 0.30 (major) signal at 100% → bar 60
+  const topBoost = topScore * topWeight * 2.0;
+
+  // Dual boost: two signals firing together (1.5x their combined contribution)
+  const dualBoost = secondScore > 0.3
+    ? (topScore * topWeight + secondScore * secondWeight) * 1.5
+    : 0;
+
+  const score01 = Math.max(weightedAvg, topBoost, dualBoost);
   const score100 = Math.round(score01 * 100);
 
   return {
@@ -44,85 +76,97 @@ function combineSignals(
  * - Urgency words
  * - Punctuation intensity (!, ?, ALL CAPS)
  * - Intensifiers
+ * - Existential threat framing
  */
 export function computeArousal(prep: PreprocessedText): BarResult {
   return combineSignals([
-    { name: "Emotion Lexicon", weight: 0.30, result: signals.detectEmotionLexicon(prep) },
-    { name: "Urgency Words", weight: 0.25, result: signals.detectUrgencyWords(prep) },
-    { name: "Punctuation Intensity", weight: 0.25, result: signals.detectPunctuationIntensity(prep) },
-    { name: "Intensifiers", weight: 0.20, result: signals.detectIntensifiers(prep) },
+    { name: "Emotion Lexicon", weight: 0.25, result: signals.detectEmotionLexicon(prep) },
+    { name: "Urgency Words", weight: 0.20, result: signals.detectUrgencyWords(prep) },
+    { name: "Punctuation Intensity", weight: 0.20, result: signals.detectPunctuationIntensity(prep) },
+    { name: "Intensifiers", weight: 0.15, result: signals.detectIntensifiers(prep) },
+    { name: "Existential Threat", weight: 0.20, result: signals.detectExistentialThreat(prep) },
   ]);
 }
 
 /**
  * Bar 2: Enemy Construction
- * Detects othering, dehumanization, and scapegoating
+ * Detects othering, dehumanization, contempt, and scapegoating
  *
  * Signals:
  * - Group generalizations ("they all", "the left/right")
  * - Malicious intent attribution ("they want to destroy")
  * - Dehumanization terms (vermin, parasites)
  * - Scapegoat patterns ("X is to blame for Y")
+ * - Contempt (sneering, dismissal, moral superiority)
  */
 export function computeEnemyConstruction(prep: PreprocessedText): BarResult {
   return combineSignals([
-    { name: "Group Generalizations", weight: 0.25, result: signals.detectGroupGeneralizations(prep) },
-    { name: "Malicious Intent", weight: 0.25, result: signals.detectMaliciousIntent(prep) },
-    { name: "Dehumanization", weight: 0.30, result: signals.detectDehumanization(prep) },
-    { name: "Scapegoating", weight: 0.20, result: signals.detectScapegoating(prep) },
+    { name: "Group Generalizations", weight: 0.20, result: signals.detectGroupGeneralizations(prep) },
+    { name: "Malicious Intent", weight: 0.20, result: signals.detectMaliciousIntent(prep) },
+    { name: "Dehumanization", weight: 0.25, result: signals.detectDehumanization(prep) },
+    { name: "Scapegoating", weight: 0.15, result: signals.detectScapegoating(prep) },
+    { name: "Contempt", weight: 0.20, result: signals.detectContempt(prep) },
   ]);
 }
 
 /**
  * Bar 3: Moral Condemnation
- * Detects moral outrage and purity rhetoric
+ * Detects moral outrage, purity rhetoric, and cynicism
  *
  * Signals:
  * - Moral judgment terms (evil, corrupt, traitor)
  * - Purity/contamination metaphors (poison, infect, rot)
  * - Betrayal framing (sold out, backstab)
+ * - Political disgust (sickening, nauseating, cesspool)
+ * - Cynicism induction (rigged, sham, nothing matters)
  */
 export function computeMoralCondemnation(prep: PreprocessedText): BarResult {
   return combineSignals([
-    { name: "Moral Judgment", weight: 0.40, result: signals.detectMoralJudgment(prep) },
-    { name: "Purity/Contamination", weight: 0.35, result: signals.detectPurityContamination(prep) },
-    { name: "Betrayal Framing", weight: 0.25, result: signals.detectBetrayalFraming(prep) },
+    { name: "Moral Judgment", weight: 0.30, result: signals.detectMoralJudgment(prep) },
+    { name: "Purity/Contamination", weight: 0.25, result: signals.detectPurityContamination(prep) },
+    { name: "Betrayal Framing", weight: 0.15, result: signals.detectBetrayalFraming(prep) },
+    { name: "Political Disgust", weight: 0.15, result: signals.detectPoliticalDisgust(prep) },
+    { name: "Cynicism", weight: 0.15, result: signals.detectCynicism(prep) },
   ]);
 }
 
 /**
  * Bar 4: Simplification
- * Detects black-and-white thinking and oversimplification
+ * Detects black-and-white thinking, oversimplification, and epistemic arrogance
  *
  * Signals:
  * - Absolutist terms (always, never, everyone)
  * - False dilemma patterns (either/or)
  * - Causal oversimplification ("this is why")
  * - Slogan/repetition
+ * - Epistemic arrogance ("everyone knows", "not up for debate")
  */
 export function computeSimplification(prep: PreprocessedText): BarResult {
   return combineSignals([
-    { name: "Absolutist Terms", weight: 0.35, result: signals.detectAbsolutistTerms(prep) },
-    { name: "False Dilemma", weight: 0.25, result: signals.detectFalseDilemma(prep) },
-    { name: "Causal Oversimplification", weight: 0.25, result: signals.detectCausalOversimplification(prep) },
+    { name: "Absolutist Terms", weight: 0.25, result: signals.detectAbsolutistTerms(prep) },
+    { name: "False Dilemma", weight: 0.20, result: signals.detectFalseDilemma(prep) },
+    { name: "Causal Oversimplification", weight: 0.20, result: signals.detectCausalOversimplification(prep) },
     { name: "Repetition/Slogans", weight: 0.15, result: signals.detectRepetition(prep) },
+    { name: "Epistemic Arrogance", weight: 0.20, result: signals.detectEpistemicArrogance(prep) },
   ]);
 }
 
 /**
  * Bar 5: Call-to-Conflict
- * Detects engagement bait and provocation
+ * Detects engagement bait, provocation, and schadenfreude
  *
  * Signals:
  * - Reply bait templates ("how is this allowed")
  * - Rhetorical question density
  * - Second-person provocation ("you people", "if you support X")
+ * - Schadenfreude (celebrating outgroup suffering)
  */
 export function computeCallToConflict(prep: PreprocessedText): BarResult {
   return combineSignals([
-    { name: "Reply Bait", weight: 0.40, result: signals.detectReplyBait(prep) },
-    { name: "Rhetorical Questions", weight: 0.30, result: signals.detectRhetoricalQuestionDensity(prep) },
-    { name: "Second-Person Provocation", weight: 0.30, result: signals.detectSecondPersonProvocation(prep) },
+    { name: "Reply Bait", weight: 0.30, result: signals.detectReplyBait(prep) },
+    { name: "Rhetorical Questions", weight: 0.25, result: signals.detectRhetoricalQuestionDensity(prep) },
+    { name: "Second-Person Provocation", weight: 0.25, result: signals.detectSecondPersonProvocation(prep) },
+    { name: "Schadenfreude", weight: 0.20, result: signals.detectSchadenfreude(prep) },
   ]);
 }
 
