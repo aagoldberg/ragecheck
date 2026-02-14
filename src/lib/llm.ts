@@ -121,7 +121,7 @@ IMPORTANT: Write ALL text fields (reasons, contextNotes, sharingPatterns, techni
 
   try {
     const response = await client.messages.create({
-      model: request.useCompactModel ? "claude-haiku-4-5-20251001" : "claude-opus-4-5-20251101",
+      model: request.useCompactModel ? "claude-sonnet-4-5-20250929" : "claude-opus-4-5-20251101",
       max_tokens: 800,
       messages: [
         {
