@@ -4,6 +4,8 @@ import Anthropic from "@anthropic-ai/sdk";
 import { jsonrepair } from "jsonrepair";
 import { saveClearviewData, initClearviewTable, isDBAvailable, ClearviewStory } from "@/lib/db";
 import { extractContent } from "@/lib/extract";
+import { researchSurveyData, formatSurveyContext } from "@/lib/agents/survey";
+import type { StoryContext } from "@/lib/agents/survey";
 
 // This endpoint is called by Vercel Cron to refresh Clearview data
 // It bypasses the cache and always generates fresh content
@@ -290,6 +292,60 @@ function calculateScore(cluster: HeadlineCluster): number {
   return sourceCount * spectrumFactor * recencyFactor;
 }
 
+// Extract key entities from topic and headlines for survey research queries
+// Common title-case words that aren't meaningful entities
+const STOPWORDS = new Set([
+  "the", "a", "an", "and", "or", "but", "in", "on", "at", "to", "for", "of",
+  "with", "by", "from", "as", "into", "over", "after", "before", "between",
+  "new", "old", "big", "small", "first", "last", "next", "more", "most",
+  "how", "why", "what", "when", "where", "who", "which",
+  "says", "said", "say", "show", "shows", "finds", "found",
+  "could", "would", "should", "may", "might", "will", "can",
+  "amid", "amid", "over", "spark", "sparks", "faces", "face",
+  "leads", "lead", "ends", "moves", "calls", "push", "pulls",
+  "national", "political", "federal", "major", "growing", "latest",
+  "report", "reports", "investigation", "operations", "operation",
+  "backlash", "standoff", "crisis", "debate", "fight", "battle",
+]);
+
+function extractEntities(topic: string, headlines: string[]): string[] {
+  const combined = [topic, ...headlines].join(" ");
+
+  // Extract acronyms FIRST — ICE, FBI, NATO, EPA, TSA are almost always
+  // the most important and specific entities for search queries
+  const acronyms = (combined.match(/\b[A-Z]{2,6}\b/g) || [])
+    .filter(a => !["US", "AM", "PM"].includes(a));
+
+  // Extract proper nouns (multi-word capitalized phrases)
+  const properNouns = (combined.match(/\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)+\b/g) || [])
+    .filter(p => {
+      // Filter out title-case noise — at least one word must not be a stopword
+      const words = p.toLowerCase().split(/\s+/);
+      return words.some(w => !STOPWORDS.has(w));
+    });
+
+  // Extract quoted terms
+  const quoted = (combined.match(/"([^"]+)"/g) || []).map(q => q.replace(/"/g, ""));
+
+  // Extract single capitalized words that might be names (not at sentence start)
+  const singleNames = (combined.match(/(?<=\s)[A-Z][a-z]{2,}\b/g) || [])
+    .filter(n => !STOPWORDS.has(n.toLowerCase()) && n.length > 3);
+
+  const seen = new Set<string>();
+  const entities: string[] = [];
+
+  // Priority order: acronyms → quoted → proper nouns → single names
+  for (const term of [...acronyms, ...quoted, ...properNouns, ...singleNames]) {
+    const normalized = term.trim();
+    if (normalized.length > 1 && !seen.has(normalized.toLowerCase())) {
+      seen.add(normalized.toLowerCase());
+      entities.push(normalized);
+    }
+  }
+
+  return entities.slice(0, 10);
+}
+
 // Phase 2: Select tiers based on scoring
 function selectTiers(clusters: HeadlineCluster[]): TieredClusters {
   const deepDive: HeadlineCluster[] = [];
@@ -393,7 +449,8 @@ async function extractArticlesForClusters(
 async function analyzeDeepDive(
   clusters: HeadlineCluster[],
   headlines: RawHeadline[],
-  articleContent: Map<string, string>
+  articleContent: Map<string, string>,
+  pollingContext?: string
 ): Promise<ClearviewStory[]> {
   if (!client || clusters.length === 0) return [];
 
@@ -453,12 +510,27 @@ For each story, provide comprehensive analysis:
           "title": "Their headline",
           "url": "article url",
           "framing": "How they're framing/spinning this story",
-          "manipulationTechniques": ["technique1", "technique2"]
+          "manipulationTechniques": ["technique1", "technique2"],
+          "emotionalTechniques": [
+            { "type": "contempt|disgust|dehumanization|fear|schadenfreude|epistemic_arrogance|cynicism_induction|self_serving_outrage|anger", "label": "Brief description of technique", "severity": "low|moderate|high", "evidence": "brief quote or pattern" }
+          ]
         }
       ],
       "perspectives": [
-        { "lean": "Left", "viewpoint": "2 sentences max. First sentence is bold thesis, second adds context." },
-        { "lean": "Right", "viewpoint": "2 sentences max. First sentence is bold thesis, second adds context." }
+        {
+          "lean": "Left",
+          "viewpoint": "2 sentences max. First sentence is bold thesis, second adds context.",
+          "moralFoundations": [
+            { "foundation": "care", "label": "Protecting vulnerable communities", "strength": "primary" }
+          ]
+        },
+        {
+          "lean": "Right",
+          "viewpoint": "2 sentences max. First sentence is bold thesis, second adds context.",
+          "moralFoundations": [
+            { "foundation": "liberty", "label": "Preserving individual choice", "strength": "primary" }
+          ]
+        }
       ],
       "keyTakeaway": "One sentence helping reader understand without spin",
       "expertConsensus": {
@@ -504,10 +576,22 @@ For each story, provide comprehensive analysis:
         "culturalDimension": "Cultural/identity concerns beneath the surface",
         "politicalGame": "How politicians/media exploit this for tribal gain",
         "whatGetsIgnored": "Nuances or solutions ignored because they don't fit the narrative"
-      }
+      },
+      "perceptionGap": {
+        "claim": "What the public actually agrees on",
+        "actualAgreement": "Specific polling data with source, date, and percentages",
+        "mediaPortrayal": "How media frames it differently from reality",
+        "pollSource": "Pew Research Center",
+        "pollDate": "March 2024",
+        "crossPartisanBreakdown": "Democrats: 85%, Independents: 67%, Republicans: 54%"
+      },
+      "sharedValues": ["Specific values both sides genuinely share on this story"],
+      "moralFoundationsInPlay": ["care", "fairness", "loyalty", "authority", "sanctity", "liberty"]
     }
   ]
 }
+
+${pollingContext || ""}
 
 CRITICAL GUIDELINES:
 - Use the FULL ARTICLE CONTENT to understand the complete story
@@ -516,6 +600,45 @@ CRITICAL GUIDELINES:
 - REQUIRED: Every story MUST include expertConsensus, whyItMatters, and deeperAnalysis
 - Be empathetic to both sides - help readers understand WHY reasonable people disagree
 - expertConsensus.sources: ONLY cite expert/institutional positions that are directly quoted or referenced in the provided article content. Each source must include the articleUrl and articleName of the article where the reference appears. If no article references expert consensus, set type to "none".
+
+MORAL FOUNDATIONS ANALYSIS (Haidt's framework):
+- For each perspective, identify which moral foundations drive the viewpoint:
+  - care: concern about harm to vulnerable people
+  - fairness: concern about equality, proportionality, or justice
+  - loyalty: concern about group bonds, patriotism, or betrayal
+  - authority: concern about order, tradition, or legitimate institutions
+  - sanctity: concern about purity, degradation, or sacred values
+  - liberty: concern about autonomy, oppression, or government overreach
+- Most perspectives activate 1-2 primary and 0-2 secondary foundations
+- Don't force-fit — only tag foundations genuinely present
+
+EMOTIONAL MANIPULATION TECHNIQUES (per source):
+- Beyond existing manipulationTechniques, identify specific emotional techniques:
+  - contempt: sneering, mocking, treating opponents as beneath consideration
+  - disgust: contamination language, portraying opponents as pollutants
+  - dehumanization: denying opponents' full humanity, animal/disease metaphors
+  - fear: existential threat framing, catastrophizing, mortality salience
+  - schadenfreude: celebrating opponents' suffering or losses
+  - epistemic_arrogance: "everyone knows", "only an idiot would think"
+  - cynicism_induction: "nothing matters", "they're all corrupt", "the system is rigged"
+  - self_serving_outrage: performative outrage that serves identity rather than justice
+  - anger: direct rage mobilization
+- Rate severity: low (subtle), moderate (clear pattern), high (dominant technique)
+- Include specific evidence (brief quote or pattern)
+- If no emotional techniques are present, use an empty array
+
+PERCEPTION GAP (if applicable):
+- Where media framing suggests deeper division than public opinion data supports
+- CRITICAL: If GROUNDED SURVEY RESEARCH DATA is provided above for this story's topic, you MUST use THOSE exact numbers, sources, and dates. Do NOT substitute with your own knowledge. The grounded data was found via real web search and is more accurate and timely than your training data.
+- If no grounded data is provided, you may use your knowledge of major polling organizations, but ONLY if you can cite a specific poll with real numbers: organization name, date, and percentages.
+- Include actual percentages with source and date: e.g., "65% say ICE has gone too far (NPR/PBS News/Marist, January 2026)"
+- If you cannot cite a specific poll with real numbers on this topic, OMIT the perceptionGap field entirely. Do NOT include vague claims without data.
+
+SHARED VALUES:
+- Identify 1-3 values or goals that both perspectives genuinely share
+- These should be specific to this story, not generic platitudes
+- If no genuine shared values exist, use an empty array
+
 - IMPORTANT: Return ONLY valid JSON. No markdown, no code fences, no commentary. Escape all special characters in strings.`;
 
   let fullText = "";
@@ -703,18 +826,81 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Phase 4: Extract articles for Deep Dives
-    console.log(`Cron: [${Date.now() - startTime}ms] Starting Phase 4: Extract articles`);
-    const articleContent = await extractArticlesForClusters(deepDive, headlines);
-    console.log(`Cron: [${Date.now() - startTime}ms] Phase 4 complete: ${articleContent.size} articles extracted`);
+    // Phase 4: Extract articles + survey research pipeline in parallel
+    console.log(`Cron: [${Date.now() - startTime}ms] Starting Phase 4: Extract articles + survey research`);
+    const surveyStories: StoryContext[] = deepDive.map(c => {
+      const clusterHeadlines = c.headlineIndices.map(i => headlines[i]?.title || "").filter(Boolean);
+      return {
+        topic: c.topic,
+        category: c.category,
+        entities: extractEntities(c.topic, clusterHeadlines),
+        angle: clusterHeadlines.slice(0, 3).join(" | "),
+        summary: clusterHeadlines[0] || c.topic,
+      };
+    });
+    const [articleContent, surveyData] = await Promise.all([
+      extractArticlesForClusters(deepDive, headlines),
+      researchSurveyData(surveyStories),
+    ]);
+    const pollingContext = formatSurveyContext(surveyData);
+    // Log what the survey pipeline found for debugging
+    for (const [topic, result] of surveyData) {
+      console.log(`Cron: Survey data for "${topic}": ${result.rawPolls.length} polls, headline="${result.analysis.headlineInsight?.slice(0, 80) || 'none'}"`);
+      for (const poll of result.rawPolls) {
+        console.log(`  - ${poll.organization} (${poll.datesConducted}): ${poll.questions.length} questions`);
+      }
+    }
+    if (pollingContext) {
+      console.log(`Cron: Polling context length: ${pollingContext.length} chars`);
+    }
+    console.log(`Cron: [${Date.now() - startTime}ms] Phase 4 complete: ${articleContent.size} articles extracted, ${surveyData.size} topics with survey data`);
 
     // Phase 5: Analyze both tiers in parallel
     console.log(`Cron: [${Date.now() - startTime}ms] Starting Phase 5: LLM analysis`);
     const [deepDiveStories, quickTakeStories] = await Promise.all([
-      analyzeDeepDive(deepDive, headlines, articleContent),
+      analyzeDeepDive(deepDive, headlines, articleContent, pollingContext),
       analyzeQuickTake(quickTake, headlines),
     ]);
     console.log(`Cron: [${Date.now() - startTime}ms] Phase 5 complete`);
+
+    // Attach survey research data to stories (before saving)
+    for (const story of deepDiveStories) {
+      const survey = surveyData.get(story.topic);
+      if (survey) {
+        story.surveyResearch = {
+          analysis: survey.analysis,
+          vizSpecs: survey.vizSpecs,
+          rawPolls: survey.rawPolls,
+        };
+        // Override perceptionGap with grounded data from survey pipeline
+        if (survey.analysis?.headlineInsight) {
+          // Find the first key finding with valid numeric cross-partisan data
+          const cpFinding = survey.analysis.keyFindings.find(f =>
+            f.crossPartisan &&
+            typeof f.crossPartisan === "object" &&
+            typeof f.crossPartisan.dem === "number" &&
+            typeof f.crossPartisan.ind === "number" &&
+            typeof f.crossPartisan.rep === "number" &&
+            !isNaN(f.crossPartisan.dem) &&
+            !isNaN(f.crossPartisan.ind) &&
+            !isNaN(f.crossPartisan.rep)
+          );
+          const cp = cpFinding?.crossPartisan;
+
+          story.perceptionGap = {
+            claim: survey.analysis.perceptionGap?.claim || survey.analysis.headlineInsight,
+            actualAgreement: survey.analysis.keyFindings[0]?.finding || "",
+            mediaPortrayal: survey.analysis.perceptionGap?.mediaFraming || "",
+            pollSource: survey.rawPolls[0]?.organization || "",
+            pollDate: survey.rawPolls[0]?.datesConducted || "",
+            crossPartisanBreakdown: cp
+              ? `Dem: ${cp.dem}%, Ind: ${cp.ind}%, Rep: ${cp.rep}%`
+              : undefined,
+          };
+        }
+        console.log(`Cron: Attached survey research to "${story.topic}" (${survey.vizSpecs.length} charts, ${survey.rawPolls.length} polls)`);
+      }
+    }
 
     // Combine stories
     const allStories: ClearviewStory[] = [...deepDiveStories, ...quickTakeStories];

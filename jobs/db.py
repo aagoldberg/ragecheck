@@ -433,6 +433,7 @@ def insert_community_snapshots(snapshots: list[dict[str, Any]]) -> int:
                     s["baseline_arousal"],
                     s["spike"],
                     s["top_terms"],
+                    json.dumps(s["signals_agg"]) if s.get("signals_agg") else None,
                 )
                 for s in snapshots
             ]
@@ -441,7 +442,7 @@ def insert_community_snapshots(snapshots: list[dict[str, Any]]) -> int:
                 """INSERT INTO bluesky_community_snapshots
                    (community_id, window_start, window_end, post_count,
                     mean_arousal, max_arousal, p95_arousal, baseline_arousal,
-                    spike, top_terms)
+                    spike, top_terms, signals_agg)
                    VALUES %s""",
                 values,
                 page_size=500,
@@ -475,7 +476,7 @@ def get_snapshot_history(
     with get_conn() as conn:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute(
-                """SELECT window_end, mean_arousal, post_count, spike
+                """SELECT window_end, mean_arousal, post_count, spike, signals_agg
                    FROM bluesky_community_snapshots
                    WHERE community_id = %s
                      AND window_end > NOW() - INTERVAL '%s hours'
@@ -486,7 +487,7 @@ def get_snapshot_history(
 
 
 def get_pulse_global_stats() -> dict[str, Any]:
-    """Get global stats: total posts last hour, tracked users, overall mean arousal."""
+    """Get global stats: total posts last hour, tracked users, overall mean arousal, and signal aggregates."""
     with get_conn() as conn:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute(
@@ -502,11 +503,53 @@ def get_pulse_global_stats() -> dict[str, Any]:
             cur.execute("SELECT COUNT(*) AS total FROM bluesky_tracked_users")
             tracked = dict(cur.fetchone())
 
-    return {
+            # Global signal aggregates from transformer-scored posts in the last hour
+            cur.execute(
+                """SELECT
+                     COUNT(*) AS scored_count,
+                     AVG((signals_json->>'valence')::float) AS mean_valence,
+                     AVG((signals_json->'toxicity'->>'score')::float) AS mean_toxicity,
+                     AVG(CASE WHEN (signals_json->'toxicity'->>'score')::float > 0.5 THEN 1.0 ELSE 0.0 END) AS toxic_pct,
+                     AVG((signals_json->>'irony')::float) AS mean_irony,
+                     AVG(CASE WHEN (signals_json->>'irony')::float > 0.5 THEN 1.0 ELSE 0.0 END) AS ironic_pct,
+                     AVG((signals_json->'emotions'->>'anger')::float) AS anger,
+                     AVG((signals_json->'emotions'->>'disgust')::float) AS disgust,
+                     AVG((signals_json->'emotions'->>'fear')::float) AS fear,
+                     AVG((signals_json->'emotions'->>'joy')::float) AS joy,
+                     AVG((signals_json->'emotions'->>'neutral')::float) AS neutral,
+                     AVG((signals_json->'emotions'->>'sadness')::float) AS sadness,
+                     AVG((signals_json->'emotions'->>'surprise')::float) AS surprise
+                   FROM bluesky_posts
+                   WHERE created_at > NOW() - INTERVAL '1 hour'
+                     AND signals_json IS NOT NULL"""
+            )
+            sig_row = dict(cur.fetchone())
+
+    result: dict[str, Any] = {
         "posts_last_hour": int(post_stats["posts_last_hour"]),
         "mean_arousal": float(post_stats["mean_arousal"]),
         "tracked_users": int(tracked["total"]),
     }
+
+    scored_count = int(sig_row.get("scored_count") or 0)
+    if scored_count > 0:
+        emotions = {
+            e: round(float(sig_row.get(e) or 0), 4)
+            for e in ["anger", "disgust", "fear", "joy", "neutral", "sadness", "surprise"]
+        }
+        dominant = max(emotions, key=emotions.get)  # type: ignore[arg-type]
+        result["signals_agg"] = {
+            "emotions": emotions,
+            "mean_valence": round(float(sig_row.get("mean_valence") or 0.5), 4),
+            "mean_toxicity": round(float(sig_row.get("mean_toxicity") or 0), 4),
+            "toxic_pct": round(float(sig_row.get("toxic_pct") or 0), 4),
+            "mean_irony": round(float(sig_row.get("mean_irony") or 0), 4),
+            "ironic_pct": round(float(sig_row.get("ironic_pct") or 0), 4),
+            "dominant_emotion": dominant,
+            "scored_pct": round(scored_count / max(int(post_stats["posts_last_hour"]), 1), 4),
+        }
+
+    return result
 
 
 def get_network_graph_data(
@@ -634,7 +677,8 @@ def get_community_recent_posts(
                      p.created_at,
                      p.reply_parent_uri,
                      p.reply_root_uri,
-                     p.quote_uri
+                     p.quote_uri,
+                     p.signals_json
                    FROM bluesky_posts p
                    JOIN bluesky_community_members m ON m.user_did = p.author_did
                    LEFT JOIN bluesky_tracked_users t ON t.did = p.author_did
@@ -687,4 +731,50 @@ def upsert_topic_label(keywords_key: str, label: str) -> None:
                      label = EXCLUDED.label""",
                 (keywords_key, label),
             )
+        conn.commit()
+
+
+# =============================================================================
+# TRANSFORMER SCORING FUNCTIONS
+# =============================================================================
+
+
+def get_unscored_posts(limit: int = 500) -> list[dict[str, Any]]:
+    """Fetch posts that still have lexicon scoring from the last 10 minutes."""
+    with get_conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(
+                """SELECT uri, text
+                   FROM bluesky_posts
+                   WHERE scoring_method = 'lexicon'
+                     AND created_at > NOW() - INTERVAL '10 minutes'
+                     AND text != ''
+                   ORDER BY created_at DESC
+                   LIMIT %s""",
+                (limit,),
+            )
+            return [dict(r) for r in cur.fetchall()]
+
+
+def update_post_signals(
+    posts: list[dict[str, Any]], signals: list[dict[str, Any]]
+) -> None:
+    """Batch update arousal_score, signals_json, scoring_method for scored posts."""
+    if not posts or not signals:
+        return
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            for post, signal in zip(posts, signals):
+                cur.execute(
+                    """UPDATE bluesky_posts
+                       SET arousal_score = %s,
+                           signals_json = %s::jsonb,
+                           scoring_method = 'transformer'
+                       WHERE uri = %s""",
+                    (
+                        signal["arousal"],
+                        json.dumps(signal),
+                        post["uri"],
+                    ),
+                )
         conn.commit()

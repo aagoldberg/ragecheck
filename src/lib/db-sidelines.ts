@@ -237,6 +237,11 @@ export async function initSidelinesTables() {
   await getDb()`CREATE INDEX IF NOT EXISTS idx_bp_author ON bluesky_posts(author_did)`;
   await getDb()`CREATE INDEX IF NOT EXISTS idx_bp_created ON bluesky_posts(created_at)`;
 
+  // Transformer scoring columns (safe to run multiple times)
+  await getDb()`ALTER TABLE bluesky_posts ADD COLUMN IF NOT EXISTS scoring_method VARCHAR(20) DEFAULT 'lexicon'`;
+  await getDb()`ALTER TABLE bluesky_posts ADD COLUMN IF NOT EXISTS signals_json JSONB`;
+  await getDb()`CREATE INDEX IF NOT EXISTS idx_bp_scoring ON bluesky_posts(scoring_method, created_at)`;
+
   // Community pulse snapshots (rolling arousal windows per community)
   await getDb()`
     CREATE TABLE IF NOT EXISTS bluesky_community_snapshots (
@@ -255,6 +260,9 @@ export async function initSidelinesTables() {
     )
   `;
   await getDb()`CREATE INDEX IF NOT EXISTS idx_bcs_community_time ON bluesky_community_snapshots(community_id, window_end DESC)`;
+
+  // Aggregated transformer signal data per community snapshot
+  await getDb()`ALTER TABLE bluesky_community_snapshots ADD COLUMN IF NOT EXISTS signals_agg JSONB`;
 
   // Topic label cache (keyword-set → Haiku-generated label)
   await getDb()`

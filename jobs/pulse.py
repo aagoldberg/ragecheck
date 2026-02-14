@@ -65,6 +65,67 @@ def _percentile(values: list[float], p: float) -> float:
     return sorted_v[f] + (k - f) * (sorted_v[c] - sorted_v[f])
 
 
+EMOTION_NAMES = ["anger", "disgust", "fear", "joy", "neutral", "sadness", "surprise"]
+
+
+def _aggregate_signals(posts: list[dict]) -> dict | None:
+    """Aggregate signals_json across a set of posts.
+
+    Returns a signals_agg dict or None if no scored posts.
+    """
+    scored = [p for p in posts if p.get("signals_json")]
+    if not scored:
+        return None
+
+    total = len(posts)
+    n = len(scored)
+
+    # Accumulate emotion probabilities
+    emotion_sums: dict[str, float] = {e: 0.0 for e in EMOTION_NAMES}
+    valence_sum = 0.0
+    toxicity_sum = 0.0
+    toxic_count = 0
+    irony_sum = 0.0
+    ironic_count = 0
+
+    for p in scored:
+        sig = p["signals_json"]
+        if isinstance(sig, str):
+            import json as _json
+            sig = _json.loads(sig)
+
+        emotions = sig.get("emotions", {})
+        for e in EMOTION_NAMES:
+            emotion_sums[e] += emotions.get(e, 0.0)
+
+        valence_sum += sig.get("valence", 0.5)
+
+        tox = sig.get("toxicity", {})
+        tox_score = tox.get("score", 0.0) if isinstance(tox, dict) else 0.0
+        toxicity_sum += tox_score
+        if tox_score > 0.5:
+            toxic_count += 1
+
+        irony_val = sig.get("irony", 0.0)
+        irony_sum += irony_val
+        if irony_val > 0.5:
+            ironic_count += 1
+
+    mean_emotions = {e: round(emotion_sums[e] / n, 4) for e in EMOTION_NAMES}
+    dominant = max(mean_emotions, key=mean_emotions.get)  # type: ignore[arg-type]
+
+    return {
+        "emotions": mean_emotions,
+        "mean_valence": round(valence_sum / n, 4),
+        "mean_toxicity": round(toxicity_sum / n, 4),
+        "toxic_pct": round(toxic_count / n, 4),
+        "mean_irony": round(irony_sum / n, 4),
+        "ironic_pct": round(ironic_count / n, 4),
+        "dominant_emotion": dominant,
+        "scored_pct": round(n / total, 4) if total > 0 else 0.0,
+    }
+
+
 def compute_pulse() -> int:
     """
     Compute community pulse snapshots.
@@ -90,6 +151,7 @@ def compute_pulse() -> int:
                 """SELECT
                      p.arousal_score,
                      p.text,
+                     p.signals_json,
                      m.community_id
                    FROM bluesky_posts p
                    JOIN bluesky_community_members m ON m.user_did = p.author_did
@@ -142,16 +204,19 @@ def compute_pulse() -> int:
             and baseline > 0
         )
 
-        # Top terms from higher-arousal posts (arousal > 0.1)
-        # Threshold lowered from 0.5 to surface terms during normal activity
+        # Top terms from higher-arousal posts (arousal > 0.3)
+        # Threshold raised to match transformer score distribution
         high_arousal_texts = [
             p["text"] for p in posts
-            if float(p["arousal_score"]) > 0.1 and p.get("text")
+            if float(p["arousal_score"]) > 0.3 and p.get("text")
         ]
         term_counts: Counter[str] = Counter()
         for text in high_arousal_texts:
             term_counts.update(_tokenize_simple(text))
         top_terms = [term for term, _ in term_counts.most_common(10)]
+
+        # Aggregate transformer signals for this community
+        signals_agg = _aggregate_signals(posts)
 
         snapshots.append({
             "community_id": community_id,
@@ -164,6 +229,7 @@ def compute_pulse() -> int:
             "baseline_arousal": round(baseline, 4),
             "spike": spike,
             "top_terms": top_terms,
+            "signals_agg": signals_agg,
         })
 
     # Step 6: Write to DB

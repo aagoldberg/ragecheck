@@ -10,11 +10,23 @@ const NetworkGraph = dynamic(() => import("./NetworkGraph"), { ssr: false });
 // TYPES
 // =============================================================================
 
+interface SignalsAgg {
+  emotions: Record<string, number>;
+  mean_valence: number;
+  mean_toxicity: number;
+  toxic_pct: number;
+  mean_irony: number;
+  ironic_pct: number;
+  dominant_emotion: string;
+  scored_pct: number;
+}
+
 interface HistoryPoint {
   window_end: string;
   mean_arousal: number;
   post_count: number;
   spike: boolean;
+  signals_agg?: SignalsAgg;
 }
 
 interface CommunitySnapshot {
@@ -32,6 +44,7 @@ interface CommunitySnapshot {
   baseline_arousal: number;
   spike: boolean;
   top_terms: string[];
+  signals_agg?: SignalsAgg;
   history: HistoryPoint[];
 }
 
@@ -39,12 +52,22 @@ interface GlobalStats {
   posts_last_hour: number;
   tracked_users: number;
   mean_arousal: number;
+  signals_agg?: SignalsAgg;
 }
 
 interface PulseData {
   snapshots: CommunitySnapshot[];
   global_stats: GlobalStats;
   spikes: CommunitySnapshot[];
+}
+
+interface PostSignals {
+  arousal: number;
+  valence: number;
+  dominant_emotion: string;
+  emotions: Record<string, number>;
+  toxicity: { score: number; type: string | null; breakdown: Record<string, number> };
+  irony: number;
 }
 
 interface CommunityPost {
@@ -58,6 +81,7 @@ interface CommunityPost {
   reply_root_uri?: string;
   quote_uri?: string;
   post_type?: "original" | "reply";
+  signals_json?: PostSignals;
 }
 
 interface TopicThread {
@@ -81,8 +105,8 @@ interface TopicGroup {
 function ArousalBar({ value }: { value: number }) {
   const pct = Math.min(100, Math.round(value * 100));
   let color = "bg-emerald-500";
-  if (value >= 0.5) color = "bg-red-500";
-  else if (value >= 0.3) color = "bg-amber-500";
+  if (value >= 0.65) color = "bg-red-500";
+  else if (value >= 0.45) color = "bg-amber-500";
 
   return (
     <div className="w-full h-2 bg-zinc-200 dark:bg-zinc-700 rounded-full overflow-hidden">
@@ -115,6 +139,14 @@ function Sparkline({
     .map((v, i) => `${i * step},${height - (v / max) * height}`)
     .join(" ");
 
+  // Toxicity overlay: show dashed red line if any point has toxic_pct > 0.05
+  const toxValues = history.map((h) => h.signals_agg?.toxic_pct ?? 0);
+  const hasToxData = toxValues.some((v) => v > 0.05);
+  const toxMax = Math.max(...toxValues, 0.01);
+  const toxPoints = hasToxData
+    ? toxValues.map((v, i) => `${i * step},${height - (v / toxMax) * height}`).join(" ")
+    : "";
+
   return (
     <svg
       width={width}
@@ -131,6 +163,16 @@ function Sparkline({
         strokeWidth="1.5"
         className="text-emerald-500"
       />
+      {hasToxData && (
+        <polyline
+          points={toxPoints}
+          fill="none"
+          stroke="#ef4444"
+          strokeWidth="1"
+          strokeDasharray="3,3"
+          opacity="0.6"
+        />
+      )}
       {history.map((h, i) =>
         h.spike ? (
           <circle
@@ -176,10 +218,10 @@ function DeltaBadge({
 function TemperatureLabel({ value }: { value: number }) {
   let label = "Cool";
   let color = "text-emerald-600 dark:text-emerald-400";
-  if (value >= 0.5) {
+  if (value >= 0.55) {
     label = "Hot";
     color = "text-red-600 dark:text-red-400";
-  } else if (value >= 0.3) {
+  } else if (value >= 0.35) {
     label = "Warm";
     color = "text-amber-600 dark:text-amber-400";
   }
@@ -188,10 +230,187 @@ function TemperatureLabel({ value }: { value: number }) {
 
 function PostArousalDot({ score }: { score: number }) {
   let color = "bg-emerald-400";
-  if (score >= 0.5) color = "bg-red-400";
-  else if (score >= 0.3) color = "bg-amber-400";
-  else if (score >= 0.1) color = "bg-yellow-400";
+  if (score >= 0.65) color = "bg-red-400";
+  else if (score >= 0.45) color = "bg-amber-400";
+  else if (score >= 0.25) color = "bg-yellow-400";
   return <span className={`inline-block w-2 h-2 rounded-full ${color}`} />;
+}
+
+const EMOTION_COLORS: Record<string, string> = {
+  anger: "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300",
+  joy: "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300",
+  fear: "bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300",
+  sadness: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300",
+  surprise: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300",
+  disgust: "bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300",
+  neutral: "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400",
+};
+
+function PostSignalBadges({ signals }: { signals?: PostSignals }) {
+  if (!signals) return null;
+  return (
+    <>
+      {signals.dominant_emotion && signals.dominant_emotion !== "neutral" && (
+        <span
+          className={`px-1 py-0.5 rounded text-[10px] font-medium ${
+            EMOTION_COLORS[signals.dominant_emotion] || EMOTION_COLORS.neutral
+          }`}
+        >
+          {signals.dominant_emotion}
+        </span>
+      )}
+      {signals.toxicity && signals.toxicity.score > 0.5 && (
+        <span className="px-1 py-0.5 rounded text-[10px] font-medium bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300">
+          toxic
+        </span>
+      )}
+      {signals.irony > 0.5 && (
+        <span className="px-1 py-0.5 rounded text-[10px] font-medium bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300">
+          ironic
+        </span>
+      )}
+    </>
+  );
+}
+
+const EMOTION_BAR_COLORS: Record<string, string> = {
+  anger: "#ef4444",
+  joy: "#22c55e",
+  fear: "#a855f7",
+  sadness: "#3b82f6",
+  surprise: "#eab308",
+  disgust: "#f97316",
+  neutral: "#a1a1aa",
+};
+
+const EMOTION_BADGE_COLORS: Record<string, string> = {
+  anger: "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300",
+  joy: "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300",
+  fear: "bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300",
+  sadness: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300",
+  surprise: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300",
+  disgust: "bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300",
+  neutral: "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400",
+};
+
+function EmotionStrip({ signals }: { signals: SignalsAgg }) {
+  const emotions = signals.emotions;
+  const total = Object.values(emotions).reduce((a, b) => a + b, 0);
+  if (total === 0) return null;
+
+  return (
+    <div className="flex items-center gap-2">
+      <div className="flex-1 h-1.5 rounded-full overflow-hidden flex">
+        {["anger", "disgust", "fear", "joy", "neutral", "sadness", "surprise"].map((e) => {
+          const pct = (emotions[e] || 0) / total * 100;
+          if (pct < 0.5) return null;
+          return (
+            <div
+              key={e}
+              style={{ width: `${pct}%`, backgroundColor: EMOTION_BAR_COLORS[e] }}
+              className="h-full"
+              title={`${e}: ${(emotions[e] * 100).toFixed(1)}%`}
+            />
+          );
+        })}
+      </div>
+      <span
+        className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
+          EMOTION_BADGE_COLORS[signals.dominant_emotion] || EMOTION_BADGE_COLORS.neutral
+        }`}
+      >
+        {signals.dominant_emotion}
+      </span>
+      {signals.toxic_pct > 0.05 && (
+        <span className="text-[10px] text-red-600 dark:text-red-400 font-medium">
+          {Math.round(signals.toxic_pct * 100)}% toxic
+        </span>
+      )}
+    </div>
+  );
+}
+
+function EmotionBreakdown({ signals }: { signals: SignalsAgg }) {
+  const emotions = signals.emotions;
+  const maxVal = Math.max(...Object.values(emotions), 0.01);
+
+  return (
+    <div className="space-y-1">
+      <h5 className="text-xs font-semibold text-zinc-500 uppercase tracking-wide">Emotions</h5>
+      {["joy", "anger", "fear", "sadness", "surprise", "disgust", "neutral"].map((e) => {
+        const val = emotions[e] || 0;
+        const pct = (val / maxVal) * 100;
+        return (
+          <div key={e} className="flex items-center gap-2 text-xs">
+            <span className="w-16 text-zinc-500 capitalize">{e}</span>
+            <div className="flex-1 h-2 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+              <div
+                className="h-full rounded-full"
+                style={{ width: `${pct}%`, backgroundColor: EMOTION_BAR_COLORS[e] }}
+              />
+            </div>
+            <span className="w-10 text-right font-mono text-zinc-400">
+              {(val * 100).toFixed(1)}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function ValenceBar({ value }: { value: number }) {
+  const pct = Math.min(100, Math.max(0, value * 100));
+  return (
+    <div>
+      <div className="flex items-center justify-between text-xs text-zinc-500 mb-1">
+        <span>Negative</span>
+        <span className="font-mono font-semibold">{pct.toFixed(1)}</span>
+        <span>Positive</span>
+      </div>
+      <div className="w-full h-2 bg-gradient-to-r from-red-200 via-zinc-200 to-green-200 dark:from-red-900/40 dark:via-zinc-800 dark:to-green-900/40 rounded-full relative">
+        <div
+          className="absolute top-[-2px] w-3 h-3 bg-white dark:bg-zinc-200 border-2 border-zinc-400 rounded-full"
+          style={{ left: `calc(${pct}% - 6px)` }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function ToxicityIndicator({ signals }: { signals: SignalsAgg }) {
+  if (signals.mean_toxicity <= 0.1) return null;
+  const pct = Math.round(signals.toxic_pct * 100);
+  return (
+    <div className="flex items-center gap-2 text-xs">
+      <span className="text-red-600 dark:text-red-400 font-medium">{pct}% of posts flagged toxic</span>
+      <div className="flex-1 h-1.5 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden max-w-[120px]">
+        <div className="h-full bg-red-500 rounded-full" style={{ width: `${Math.min(100, pct)}%` }} />
+      </div>
+    </div>
+  );
+}
+
+function IronyIndicator({ signals }: { signals: SignalsAgg }) {
+  if (signals.mean_irony <= 0.1) return null;
+  const pct = Math.round(signals.ironic_pct * 100);
+  return (
+    <div className="flex items-center gap-2 text-xs">
+      <span className="text-violet-600 dark:text-violet-400 font-medium">{pct}% ironic posts</span>
+      <div className="flex-1 h-1.5 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden max-w-[120px]">
+        <div className="h-full bg-violet-500 rounded-full" style={{ width: `${Math.min(100, pct)}%` }} />
+      </div>
+    </div>
+  );
+}
+
+function ValenceArrow({ valence }: { valence?: number }) {
+  if (valence === undefined) return null;
+  if (valence > 0.6)
+    return <span className="text-green-600 dark:text-green-400 text-xs font-bold" title={`Valence: ${valence.toFixed(2)}`}>&#9650;</span>;
+  if (valence < 0.4)
+    return <span className="text-red-600 dark:text-red-400 text-xs font-bold" title={`Valence: ${valence.toFixed(2)}`}>&#9660;</span>;
+  return null;
 }
 
 function timeAgo(dateStr: string): string {
@@ -283,6 +502,11 @@ function CommunityCard({ snapshot }: { snapshot: CommunitySnapshot }) {
             </div>
           </div>
           <ArousalBar value={snapshot.mean_arousal} />
+          {snapshot.signals_agg && (
+            <div className="mt-1.5">
+              <EmotionStrip signals={snapshot.signals_agg} />
+            </div>
+          )}
         </div>
 
         {/* Stats row */}
@@ -298,6 +522,16 @@ function CommunityCard({ snapshot }: { snapshot: CommunitySnapshot }) {
             </>
           )}
         </div>
+
+        {/* Expanded: signal breakdown */}
+        {expanded && snapshot.signals_agg && (
+          <div className="mb-3 p-3 bg-zinc-50 dark:bg-zinc-800/50 rounded-lg space-y-3">
+            <EmotionBreakdown signals={snapshot.signals_agg} />
+            <ValenceBar value={snapshot.signals_agg.mean_valence} />
+            <ToxicityIndicator signals={snapshot.signals_agg} />
+            <IronyIndicator signals={snapshot.signals_agg} />
+          </div>
+        )}
 
         {/* Top terms */}
         {snapshot.top_terms && snapshot.top_terms.length > 0 && (
@@ -411,13 +645,15 @@ function CommunityCard({ snapshot }: { snapshot: CommunitySnapshot }) {
                                     ? thread.root.text.slice(0, 280) + "..."
                                     : thread.root.text}
                                 </p>
-                                <div className="flex gap-3 mt-0.5 text-xs text-zinc-400">
+                                <div className="flex gap-3 mt-0.5 text-xs text-zinc-400 items-center">
                                   {thread.root.author_handle && (
                                     <span className="text-zinc-500 font-medium">@{thread.root.author_handle}</span>
                                   )}
                                   <span className="font-mono">
                                     {(thread.root.arousal_score * 100).toFixed(1)}
                                   </span>
+                                  <PostSignalBadges signals={thread.root.signals_json} />
+                                  <ValenceArrow valence={thread.root.signals_json?.valence} />
                                   <span>{timeAgo(thread.root.created_at)}</span>
                                 </div>
                               </div>
@@ -442,13 +678,15 @@ function CommunityCard({ snapshot }: { snapshot: CommunitySnapshot }) {
                                       ? reply.text.slice(0, 280) + "..."
                                       : reply.text}
                                   </p>
-                                  <div className="flex gap-3 mt-0.5 text-xs text-zinc-400">
+                                  <div className="flex gap-3 mt-0.5 text-xs text-zinc-400 items-center">
                                     {reply.author_handle && (
                                       <span className="text-zinc-500 font-medium">@{reply.author_handle}</span>
                                     )}
                                     <span className="font-mono">
                                       {(reply.arousal_score * 100).toFixed(1)}
                                     </span>
+                                    <PostSignalBadges signals={reply.signals_json} />
+                                    <ValenceArrow valence={reply.signals_json?.valence} />
                                     <span>{timeAgo(reply.created_at)}</span>
                                   </div>
                                 </div>
@@ -473,13 +711,15 @@ function CommunityCard({ snapshot }: { snapshot: CommunitySnapshot }) {
                                   ? post.text.slice(0, 280) + "..."
                                   : post.text}
                               </p>
-                              <div className="flex gap-3 mt-0.5 text-xs text-zinc-400">
+                              <div className="flex gap-3 mt-0.5 text-xs text-zinc-400 items-center">
                                 {post.author_handle && (
                                   <span className="text-zinc-500 font-medium">@{post.author_handle}</span>
                                 )}
                                 <span className="font-mono">
                                   {(post.arousal_score * 100).toFixed(1)}
                                 </span>
+                                <PostSignalBadges signals={post.signals_json} />
+                                <ValenceArrow valence={post.signals_json?.valence} />
                                 <span>{timeAgo(post.created_at)}</span>
                               </div>
                             </div>
@@ -509,13 +749,15 @@ function CommunityCard({ snapshot }: { snapshot: CommunitySnapshot }) {
                           ? post.text.slice(0, 280) + "..."
                           : post.text}
                       </p>
-                      <div className="flex gap-3 mt-1 text-xs text-zinc-400">
+                      <div className="flex gap-3 mt-1 text-xs text-zinc-400 items-center">
                         {post.author_handle && (
                           <span className="text-zinc-500 font-medium">@{post.author_handle}</span>
                         )}
                         <span className="font-mono">
                           {(post.arousal_score * 100).toFixed(1)}
                         </span>
+                        <PostSignalBadges signals={post.signals_json} />
+                        <ValenceArrow valence={post.signals_json?.valence} />
                         <span>{timeAgo(post.created_at)}</span>
                       </div>
                     </div>
@@ -656,6 +898,36 @@ export default function PulsePage() {
                   {(data.global_stats.mean_arousal * 100).toFixed(1)}
                 </span>
               </div>
+              {data.global_stats.signals_agg && (
+                <div className="px-3 py-1.5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-full text-sm">
+                  <span className="text-zinc-500">Mood</span>{" "}
+                  <span
+                    className={`font-semibold ${
+                      EMOTION_BADGE_COLORS[data.global_stats.signals_agg.dominant_emotion]
+                        ? `px-1.5 py-0.5 rounded text-xs ${EMOTION_BADGE_COLORS[data.global_stats.signals_agg.dominant_emotion]}`
+                        : ""
+                    }`}
+                  >
+                    {data.global_stats.signals_agg.dominant_emotion}
+                  </span>
+                </div>
+              )}
+              {data.global_stats.signals_agg && (
+                <div className="px-3 py-1.5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-full text-sm">
+                  <span className="text-zinc-500">Toxicity</span>{" "}
+                  <span
+                    className={`font-semibold text-xs ${
+                      data.global_stats.signals_agg.toxic_pct > 0.15
+                        ? "text-red-600 dark:text-red-400"
+                        : data.global_stats.signals_agg.toxic_pct > 0.05
+                          ? "text-amber-600 dark:text-amber-400"
+                          : "text-emerald-600 dark:text-emerald-400"
+                    }`}
+                  >
+                    {Math.round(data.global_stats.signals_agg.toxic_pct * 100)}% toxic
+                  </span>
+                </div>
+              )}
               {lastUpdated && (
                 <div className="text-xs text-zinc-400">
                   Updated {lastUpdated.toLocaleTimeString()}

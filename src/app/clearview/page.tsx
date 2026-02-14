@@ -12,6 +12,29 @@ import AttributionSurvey from "@/components/AttributionSurvey";
 
 // --- Types ---
 
+interface EmotionalTechnique {
+  type: "contempt" | "disgust" | "dehumanization" | "fear" | "schadenfreude"
+      | "epistemic_arrogance" | "cynicism_induction" | "self_serving_outrage" | "anger";
+  label: string;
+  severity: "low" | "moderate" | "high";
+  evidence?: string;
+}
+
+interface MoralFoundation {
+  foundation: "care" | "fairness" | "loyalty" | "authority" | "sanctity" | "liberty";
+  label: string;
+  strength: "primary" | "secondary";
+}
+
+interface PerceptionGap {
+  claim: string;
+  actualAgreement?: string;
+  mediaPortrayal?: string;
+  pollSource?: string;
+  pollDate?: string;
+  crossPartisanBreakdown?: string;
+}
+
 interface SourceAnalysis {
   name: string;
   lean: string;
@@ -19,11 +42,13 @@ interface SourceAnalysis {
   url: string;
   framing: string;
   manipulationTechniques: string[];
+  emotionalTechniques?: EmotionalTechnique[];
 }
 
 interface Perspective {
   lean: string;
   viewpoint: string;
+  moralFoundations?: MoralFoundation[];
 }
 
 interface ExpertConsensus {
@@ -48,12 +73,14 @@ interface WhyItMatters {
     motivation: string;
     stance: "offensive" | "defensive" | "mobilizing";
     emotionalAppeal: string;
+    moralFoundations?: MoralFoundation[];
   };
   right: {
     coreValue: string;
     motivation: string;
     stance: "offensive" | "defensive" | "mobilizing";
     emotionalAppeal: string;
+    moralFoundations?: MoralFoundation[];
   };
   bottomLine: string;
 }
@@ -84,6 +111,34 @@ interface StoryCluster {
   factualDisputes?: FactualDispute[];
   whyItMatters?: WhyItMatters;
   deeperAnalysis?: DeeperAnalysis;
+  perceptionGap?: PerceptionGap;
+  sharedValues?: string[];
+  moralFoundationsInPlay?: string[];
+  surveyResearch?: {
+    analysis: {
+      headlineInsight: string;
+      perceptionGap: { claim: string; mediaFraming: string; gapMagnitude: string };
+      keyFindings: {
+        finding: string;
+        source: string;
+        questionWording?: string;
+        crossPartisan?: { dem: number; ind: number; rep: number };
+        trend?: { direction: "up" | "down" | "stable"; from: number; to: number; period: string };
+      }[];
+      dataQuality: "strong" | "moderate" | "limited";
+      sourceCount: number;
+    };
+    vizSpecs: {
+      chartType: "partisan-bars" | "perception-gap" | "trend" | "distribution";
+      title: string;
+      subtitle?: string;
+      data: { label: string; value: number; color?: string; secondary?: number; secondaryLabel?: string }[];
+      trendData?: { date: string; value: number; label?: string }[];
+      annotations?: string[];
+      sourceAttribution: string;
+      questionWording?: string;
+    }[];
+  };
 }
 
 interface ArchivedBriefing {
@@ -105,6 +160,19 @@ function getLeanConfig(lean: string) {
   return LEAN_CONFIG[lean] || LEAN_CONFIG["Center"];
 }
 
+const FOUNDATION_CONFIG: Record<string, { color: string; bg: string; border: string; icon: string; label: string }> = {
+  care:      { color: "text-rose-600 dark:text-rose-400", bg: "bg-rose-50 dark:bg-rose-900/20", border: "border-rose-200 dark:border-rose-800", icon: "\u2665", label: "Care" },
+  fairness:  { color: "text-indigo-600 dark:text-indigo-400", bg: "bg-indigo-50 dark:bg-indigo-900/20", border: "border-indigo-200 dark:border-indigo-800", icon: "\u2696", label: "Fairness" },
+  loyalty:   { color: "text-purple-600 dark:text-purple-400", bg: "bg-purple-50 dark:bg-purple-900/20", border: "border-purple-200 dark:border-purple-800", icon: "\u{1F91D}", label: "Loyalty" },
+  authority: { color: "text-amber-600 dark:text-amber-400", bg: "bg-amber-50 dark:bg-amber-900/20", border: "border-amber-200 dark:border-amber-800", icon: "\u{1F3DB}", label: "Authority" },
+  sanctity:  { color: "text-emerald-600 dark:text-emerald-400", bg: "bg-emerald-50 dark:bg-emerald-900/20", border: "border-emerald-200 dark:border-emerald-800", icon: "\u2726", label: "Sanctity" },
+  liberty:   { color: "text-orange-600 dark:text-orange-400", bg: "bg-orange-50 dark:bg-orange-900/20", border: "border-orange-200 dark:border-orange-800", icon: "\u{1F5FD}", label: "Liberty" },
+};
+
+function getFoundationConfig(foundation: string) {
+  return FOUNDATION_CONFIG[foundation] || FOUNDATION_CONFIG["fairness"];
+}
+
 // --- Components ---
 
 function BiasBadge({ lean }: { lean: string }) {
@@ -113,6 +181,367 @@ function BiasBadge({ lean }: { lean: string }) {
     <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${config.bg} ${config.color} border ${config.border}`}>
       {lean}
     </span>
+  );
+}
+
+// --- Survey Chart Components (inline SVG, no external dependencies) ---
+
+type VizSpecType = NonNullable<StoryCluster["surveyResearch"]>["vizSpecs"][number];
+
+const PARTISAN_COLORS: Record<string, string> = {
+  dem: "#3b82f6",      // blue-500
+  democrats: "#3b82f6",
+  ind: "#71717a",      // zinc-500
+  independents: "#71717a",
+  rep: "#f43f5e",      // rose-500
+  republicans: "#f43f5e",
+};
+
+function getBarColor(label: string, color?: string): string {
+  if (color) return color;
+  const key = label.toLowerCase();
+  for (const [k, v] of Object.entries(PARTISAN_COLORS)) {
+    if (key.includes(k)) return v;
+  }
+  return "#8b5cf6"; // violet-500 default
+}
+
+function PartisanBarsChart({ spec }: { spec: VizSpecType }) {
+  const validData = spec.data.filter(d => typeof d.value === "number" && !isNaN(d.value));
+  if (validData.length === 0) return null;
+
+  const maxValue = 100; // Full 0-100% scale per PMC research
+  const barHeight = 24;
+  const labelWidth = 110;
+  const valueWidth = 50;
+  const chartWidth = 300;
+  const totalWidth = labelWidth + chartWidth + valueWidth;
+  const gap = 8;
+  const totalHeight = validData.length * (barHeight + gap) - gap;
+
+  return (
+    <div className="w-full overflow-x-auto">
+      <svg
+        viewBox={`0 0 ${totalWidth} ${totalHeight}`}
+        className="w-full max-w-md"
+        role="img"
+        aria-label={spec.title}
+      >
+        {validData.map((d, i) => {
+          const y = i * (barHeight + gap);
+          const barWidth = (d.value / maxValue) * chartWidth;
+          const fill = getBarColor(d.label, d.color);
+          return (
+            <g key={i}>
+              <text
+                x={labelWidth - 8}
+                y={y + barHeight / 2 + 1}
+                textAnchor="end"
+                className="fill-zinc-600 dark:fill-zinc-400"
+                fontSize="11"
+                fontWeight="500"
+              >
+                {d.label}
+              </text>
+              <rect
+                x={labelWidth}
+                y={y + 2}
+                width={chartWidth}
+                height={barHeight - 4}
+                rx="3"
+                className="fill-zinc-100 dark:fill-zinc-800"
+              />
+              <rect
+                x={labelWidth}
+                y={y + 2}
+                width={Math.max(barWidth, 2)}
+                height={barHeight - 4}
+                rx="3"
+                fill={fill}
+                opacity="0.85"
+              />
+              <text
+                x={labelWidth + chartWidth + 8}
+                y={y + barHeight / 2 + 1}
+                textAnchor="start"
+                fontSize="12"
+                fontWeight="700"
+                fill={fill}
+              >
+                {d.value}%
+              </text>
+            </g>
+          );
+        })}
+      </svg>
+    </div>
+  );
+}
+
+function DistributionChart({ spec }: { spec: VizSpecType }) {
+  const validData = spec.data.filter(d => typeof d.value === "number" && !isNaN(d.value));
+  if (validData.length === 0) return null;
+
+  const maxValue = 100;
+  const barHeight = 24;
+  const labelWidth = 130;
+  const valueWidth = 50;
+  const chartWidth = 280;
+  const totalWidth = labelWidth + chartWidth + valueWidth;
+  const gap = 6;
+  const totalHeight = validData.length * (barHeight + gap) - gap;
+
+  const violetShades = ["#7c3aed", "#8b5cf6", "#a78bfa", "#c4b5fd"];
+
+  return (
+    <div className="w-full overflow-x-auto">
+      <svg
+        viewBox={`0 0 ${totalWidth} ${totalHeight}`}
+        className="w-full max-w-md"
+        role="img"
+        aria-label={spec.title}
+      >
+        {validData.map((d, i) => {
+          const y = i * (barHeight + gap);
+          const barWidth = (d.value / maxValue) * chartWidth;
+          const fill = d.color || violetShades[i % violetShades.length];
+          return (
+            <g key={i}>
+              <text
+                x={labelWidth - 8}
+                y={y + barHeight / 2 + 1}
+                textAnchor="end"
+                className="fill-zinc-600 dark:fill-zinc-400"
+                fontSize="10"
+                fontWeight="500"
+              >
+                {d.label}
+              </text>
+              <rect
+                x={labelWidth}
+                y={y + 2}
+                width={chartWidth}
+                height={barHeight - 4}
+                rx="3"
+                className="fill-zinc-100 dark:fill-zinc-800"
+              />
+              <rect
+                x={labelWidth}
+                y={y + 2}
+                width={Math.max(barWidth, 2)}
+                height={barHeight - 4}
+                rx="3"
+                fill={fill}
+                opacity="0.8"
+              />
+              <text
+                x={labelWidth + chartWidth + 8}
+                y={y + barHeight / 2 + 1}
+                textAnchor="start"
+                fontSize="12"
+                fontWeight="700"
+                fill={fill}
+              >
+                {d.value}%
+              </text>
+            </g>
+          );
+        })}
+      </svg>
+    </div>
+  );
+}
+
+function TrendChart({ spec }: { spec: VizSpecType }) {
+  const points = (spec.trendData || []).filter(p => typeof p.value === "number" && !isNaN(p.value));
+  if (points.length < 2) return null;
+
+  const padding = { top: 20, right: 50, bottom: 30, left: 50 };
+  const width = 400;
+  const height = 120;
+  const innerWidth = width - padding.left - padding.right;
+  const innerHeight = height - padding.top - padding.bottom;
+
+  const values = points.map(p => p.value);
+  const minVal = Math.max(0, Math.min(...values) - 10);
+  const maxVal = Math.min(100, Math.max(...values) + 10);
+  const range = maxVal - minVal || 1;
+
+  const coords = points.map((p, i) => ({
+    x: padding.left + (i / (points.length - 1)) * innerWidth,
+    y: padding.top + innerHeight - ((p.value - minVal) / range) * innerHeight,
+    ...p,
+  }));
+
+  const linePath = coords.map((c, i) => `${i === 0 ? "M" : "L"} ${c.x} ${c.y}`).join(" ");
+  const lastPoint = coords[coords.length - 1];
+  const firstPoint = coords[0];
+  const change = lastPoint.value - firstPoint.value;
+  const changeStr = change > 0 ? `+${change} pts` : `${change} pts`;
+
+  return (
+    <div className="w-full overflow-x-auto">
+      <svg
+        viewBox={`0 0 ${width} ${height}`}
+        className="w-full max-w-md"
+        role="img"
+        aria-label={spec.title}
+      >
+        <path d={linePath} fill="none" stroke="#8b5cf6" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+        {coords.map((c, i) => (
+          <g key={i}>
+            <circle cx={c.x} cy={c.y} r="4" fill="#8b5cf6" />
+            <text
+              x={c.x}
+              y={c.y - 10}
+              textAnchor="middle"
+              fontSize="12"
+              fontWeight="700"
+              className="fill-violet-600 dark:fill-violet-400"
+            >
+              {c.value}%
+            </text>
+            <text
+              x={c.x}
+              y={height - 4}
+              textAnchor="middle"
+              fontSize="9"
+              className="fill-zinc-500 dark:fill-zinc-400"
+            >
+              {c.label || c.date}
+            </text>
+          </g>
+        ))}
+        <text
+          x={lastPoint.x + 6}
+          y={lastPoint.y + 4}
+          textAnchor="start"
+          fontSize="10"
+          fontWeight="700"
+          className={change > 0 ? "fill-emerald-600 dark:fill-emerald-400" : "fill-rose-600 dark:fill-rose-400"}
+        >
+          {changeStr}
+        </text>
+      </svg>
+    </div>
+  );
+}
+
+function PerceptionGapChart({ spec }: { spec: VizSpecType }) {
+  const validData = spec.data.filter(d => typeof d.value === "number" && !isNaN(d.value));
+  if (validData.length === 0) return null;
+
+  // Paired bars: actual vs perceived/media framing
+  const maxValue = 100;
+  const barHeight = 18;
+  const pairGap = 4;
+  const groupGap = 14;
+  const labelWidth = 130;
+  const valueWidth = 50;
+  const chartWidth = 280;
+  const totalWidth = labelWidth + chartWidth + valueWidth;
+  const pairHeight = barHeight * 2 + pairGap;
+  const totalHeight = validData.length * (pairHeight + groupGap) - groupGap + 30; // extra for legend
+
+  return (
+    <div className="w-full overflow-x-auto">
+      <svg
+        viewBox={`0 0 ${totalWidth} ${totalHeight}`}
+        className="w-full max-w-md"
+        role="img"
+        aria-label={spec.title}
+      >
+        {/* Legend */}
+        <rect x={labelWidth} y="0" width="10" height="10" rx="2" fill="#8b5cf6" />
+        <text x={labelWidth + 14} y="9" fontSize="9" className="fill-zinc-500 dark:fill-zinc-400">Actual</text>
+        <rect x={labelWidth + 70} y="0" width="10" height="10" rx="2" fill="#c4b5fd" opacity="0.6" />
+        <text x={labelWidth + 84} y="9" fontSize="9" className="fill-zinc-500 dark:fill-zinc-400">{validData[0]?.secondaryLabel || "Perceived"}</text>
+
+        {validData.map((d, i) => {
+          const y = 24 + i * (pairHeight + groupGap);
+          const barWidth1 = (d.value / maxValue) * chartWidth;
+          const barWidth2 = d.secondary != null ? (d.secondary / maxValue) * chartWidth : 0;
+
+          return (
+            <g key={i}>
+              <text
+                x={labelWidth - 8}
+                y={y + barHeight / 2 + 1}
+                textAnchor="end"
+                className="fill-zinc-600 dark:fill-zinc-400"
+                fontSize="10"
+                fontWeight="500"
+              >
+                {d.label}
+              </text>
+              {/* Actual bar */}
+              <rect x={labelWidth} y={y} width={chartWidth} height={barHeight} rx="3" className="fill-zinc-100 dark:fill-zinc-800" />
+              <rect x={labelWidth} y={y} width={Math.max(barWidth1, 2)} height={barHeight} rx="3" fill="#8b5cf6" opacity="0.85" />
+              <text x={labelWidth + chartWidth + 8} y={y + barHeight / 2 + 1} textAnchor="start" fontSize="11" fontWeight="700" fill="#8b5cf6">
+                {d.value}%
+              </text>
+              {/* Perceived/secondary bar */}
+              {d.secondary != null && (
+                <>
+                  <rect x={labelWidth} y={y + barHeight + pairGap} width={chartWidth} height={barHeight} rx="3" className="fill-zinc-100 dark:fill-zinc-800" />
+                  <rect x={labelWidth} y={y + barHeight + pairGap} width={Math.max(barWidth2, 2)} height={barHeight} rx="3" fill="#c4b5fd" opacity="0.6" />
+                  <text x={labelWidth + chartWidth + 8} y={y + barHeight + pairGap + barHeight / 2 + 1} textAnchor="start" fontSize="11" fontWeight="600" fill="#a78bfa">
+                    {d.secondary}%
+                  </text>
+                </>
+              )}
+            </g>
+          );
+        })}
+      </svg>
+    </div>
+  );
+}
+
+function hasValidChartData(spec: VizSpecType): boolean {
+  if (spec.chartType === "trend") {
+    return (spec.trendData || []).filter(p => typeof p.value === "number" && !isNaN(p.value)).length >= 2;
+  }
+  return spec.data.some(d => typeof d.value === "number" && !isNaN(d.value));
+}
+
+function SurveyChart({ spec }: { spec: VizSpecType }) {
+  if (!hasValidChartData(spec)) return null;
+
+  const chartComponent = (() => {
+    switch (spec.chartType) {
+      case "partisan-bars": return <PartisanBarsChart spec={spec} />;
+      case "distribution": return <DistributionChart spec={spec} />;
+      case "trend": return <TrendChart spec={spec} />;
+      case "perception-gap": return <PerceptionGapChart spec={spec} />;
+      default: return null;
+    }
+  })();
+
+  if (!chartComponent) return null;
+
+  return (
+    <div className="space-y-2">
+      <h4 className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">{spec.title}</h4>
+      {chartComponent}
+      {spec.questionWording && (
+        <p className="text-[10px] text-zinc-400 dark:text-zinc-500 italic leading-snug">
+          Q: &ldquo;{spec.questionWording}&rdquo;
+        </p>
+      )}
+      <p className="text-[9px] text-zinc-400 dark:text-zinc-500">
+        {spec.sourceAttribution}
+      </p>
+      {(spec.annotations || []).length > 0 && (
+        <div className="flex flex-wrap gap-1.5 mt-1">
+          {(spec.annotations || []).map((a, i) => (
+            <span key={i} className="text-[10px] bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300 px-2 py-0.5 rounded-full">
+              {a}
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -241,6 +670,8 @@ function StoryCard({ story }: { story: StoryCluster }) {
       topic: story.topic,
       leftViewpoint: leftPerspective?.viewpoint,
       rightViewpoint: rightPerspective?.viewpoint,
+      moralFoundationsInPlay: story.moralFoundationsInPlay,
+      sharedValues: story.sharedValues,
     },
     typeof window !== "undefined" ? `${window.location.origin}${shareUrl}` : shareUrl
   );
@@ -286,65 +717,230 @@ function StoryCard({ story }: { story: StoryCluster }) {
           </ul>
         </div>
 
-        {/* The Divide - Left | Right */}
-        <div className="grid md:grid-cols-2 gap-4">
-          {leftPerspective && (() => {
-            const sentences = leftPerspective.viewpoint.split(/(?<=[.!?])\s+/);
-            const thesis = sentences[0] || "";
-            const rest = sentences.slice(1).join(" ");
-            const leftSources = (story.sources || [])
-              .filter(s => s.lean.toLowerCase().includes("left"))
-              .map(s => s.name);
-            return (
-              <div className="pl-4 py-2 border-l-4 border-blue-500">
-                <h4 className="text-[10px] font-bold uppercase tracking-widest text-blue-600 dark:text-blue-300 mb-2">
-                  Left View
-                </h4>
-                <p className="text-sm font-semibold text-blue-900 dark:text-blue-100 mb-1">
-                  {thesis}
-                </p>
-                {rest && (
-                  <p className="text-xs text-blue-800/70 dark:text-blue-300/70 leading-relaxed">
-                    {rest}
+        {/* Shared Values + Common Ground — promoted to main view */}
+        {((story.sharedValues && story.sharedValues.length > 0) || (story.commonGround && story.commonGround.length > 0)) && (
+          <div className="p-4 bg-emerald-50/30 dark:bg-emerald-900/10 rounded-xl border border-emerald-100 dark:border-emerald-900/30">
+            <h3 className="text-[10px] font-bold uppercase tracking-widest text-emerald-600 dark:text-emerald-400 mb-2">
+              What Both Sides Share
+            </h3>
+            <ul className="space-y-1.5">
+              {(story.sharedValues || []).concat(story.commonGround || []).map((item, i) => (
+                <li key={i} className="flex gap-2 text-sm text-zinc-700 dark:text-zinc-300">
+                  <span className="text-emerald-500 font-bold flex-shrink-0">{"\u2713"}</span>
+                  {item}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {/* Perception Gap — with survey charts when available, text fallback otherwise */}
+        {(story.perceptionGap || story.surveyResearch) && (
+          <div className="p-4 bg-violet-50/30 dark:bg-violet-900/10 rounded-xl border border-violet-100 dark:border-violet-900/30">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-[10px] font-bold uppercase tracking-widest text-violet-600 dark:text-violet-400">
+                Perception vs. Reality
+              </h3>
+              {story.perceptionGap?.pollSource && (
+                <span className="text-[9px] font-medium text-violet-400 dark:text-violet-500 uppercase tracking-wide">
+                  {story.perceptionGap.pollSource}{story.perceptionGap.pollDate ? `, ${story.perceptionGap.pollDate}` : ""}
+                </span>
+              )}
+            </div>
+
+            {/* Survey research charts */}
+            {story.surveyResearch?.vizSpecs && story.surveyResearch.vizSpecs.some(hasValidChartData) ? (
+              <div className="space-y-4">
+                {story.surveyResearch.analysis?.headlineInsight && (
+                  <p className="text-sm text-zinc-700 dark:text-zinc-300 font-medium leading-relaxed">
+                    {story.surveyResearch.analysis.headlineInsight}
                   </p>
                 )}
-                {leftSources.length > 0 && (
-                  <p className="text-[10px] text-blue-500/70 dark:text-blue-400/50 mt-2">
-                    {leftSources.join(", ")}
+                {story.surveyResearch.vizSpecs.map((spec, i) => (
+                  <SurveyChart key={i} spec={spec} />
+                ))}
+                {story.surveyResearch.analysis?.perceptionGap?.mediaFraming && (
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400 pt-2 border-t border-violet-100 dark:border-violet-900/30">
+                    <span className="font-semibold">Media framing:</span> {story.surveyResearch.analysis.perceptionGap.mediaFraming}
+                  </p>
+                )}
+                {story.surveyResearch.analysis?.dataQuality && (
+                  <span className={`inline-block text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${
+                    story.surveyResearch.analysis.dataQuality === "strong"
+                      ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
+                      : story.surveyResearch.analysis.dataQuality === "moderate"
+                      ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                      : "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400"
+                  }`}>
+                    {story.surveyResearch.analysis.dataQuality} data ({story.surveyResearch.analysis.sourceCount} source{story.surveyResearch.analysis.sourceCount !== 1 ? "s" : ""})
+                  </span>
+                )}
+              </div>
+            ) : story.perceptionGap ? (
+              /* Text-only fallback for stories without survey research */
+              <div>
+                <p className="text-sm text-zinc-700 dark:text-zinc-300 font-medium">{story.perceptionGap.claim}</p>
+                {story.perceptionGap.actualAgreement && (
+                  <p className="text-xs text-violet-600 dark:text-violet-400 mt-2 leading-relaxed">{story.perceptionGap.actualAgreement}</p>
+                )}
+                {story.perceptionGap.crossPartisanBreakdown && !story.perceptionGap.crossPartisanBreakdown.includes("undefined") && (
+                  <div className="mt-2 flex gap-3">
+                    {story.perceptionGap.crossPartisanBreakdown.split(",").map((item, i) => {
+                      const trimmed = item.trim();
+                      const isLeft = /dem/i.test(trimmed);
+                      const isRight = /rep/i.test(trimmed);
+                      return (
+                        <span key={i} className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                          isLeft ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" :
+                          isRight ? "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400" :
+                          "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400"
+                        }`}>
+                          {trimmed}
+                        </span>
+                      );
+                    })}
+                  </div>
+                )}
+                {story.perceptionGap.mediaPortrayal && (
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-2 pt-2 border-t border-violet-100 dark:border-violet-900/30">
+                    <span className="font-semibold">Media framing:</span> {story.perceptionGap.mediaPortrayal}
                   </p>
                 )}
               </div>
-            );
-          })()}
-          {rightPerspective && (() => {
-            const sentences = rightPerspective.viewpoint.split(/(?<=[.!?])\s+/);
-            const thesis = sentences[0] || "";
-            const rest = sentences.slice(1).join(" ");
-            const rightSources = (story.sources || [])
-              .filter(s => s.lean.toLowerCase().includes("right"))
-              .map(s => s.name);
+            ) : null}
+          </div>
+        )}
+
+        {/* Perspectives — moral foundations layout when available, else legacy Left/Right */}
+        {(() => {
+          const hasFoundations = (story.perspectives || []).some(p => p.moralFoundations && p.moralFoundations.length > 0);
+
+          if (hasFoundations) {
             return (
-              <div className="pl-4 py-2 border-l-4 border-rose-500">
-                <h4 className="text-[10px] font-bold uppercase tracking-widest text-rose-600 dark:text-rose-300 mb-2">
-                  Right View
-                </h4>
-                <p className="text-sm font-semibold text-rose-900 dark:text-rose-100 mb-1">
-                  {thesis}
-                </p>
-                {rest && (
-                  <p className="text-xs text-rose-800/70 dark:text-rose-300/70 leading-relaxed">
-                    {rest}
-                  </p>
-                )}
-                {rightSources.length > 0 && (
-                  <p className="text-[10px] text-rose-500/70 dark:text-rose-400/50 mt-2">
-                    {rightSources.join(", ")}
-                  </p>
-                )}
+              <div className="space-y-3">
+                <h3 className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">
+                  Different Values, Different Emphasis
+                </h3>
+                {(story.perspectives || []).map((perspective, i) => {
+                  const primaryFoundation = (perspective.moralFoundations || []).find(f => f.strength === "primary");
+                  const secondaryFoundations = (perspective.moralFoundations || []).filter(f => f.strength === "secondary");
+                  const fConfig = primaryFoundation ? getFoundationConfig(primaryFoundation.foundation) : null;
+                  const sentences = perspective.viewpoint.split(/(?<=[.!?])\s+/);
+                  const thesis = sentences[0] || "";
+                  const rest = sentences.slice(1).join(" ");
+                  const leanLower = perspective.lean.toLowerCase();
+                  const perspectiveSources = (story.sources || [])
+                    .filter(s => s.lean.toLowerCase().includes(leanLower.includes("left") ? "left" : leanLower.includes("right") ? "right" : "center"))
+                    .map(s => s.name);
+
+                  return (
+                    <div key={i} className={`p-4 rounded-xl border ${fConfig ? `${fConfig.bg} ${fConfig.border}` : "bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800"}`}>
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          {fConfig && <span className="text-lg">{fConfig.icon}</span>}
+                          <span className={`text-[10px] font-bold uppercase tracking-widest ${fConfig ? fConfig.color : "text-zinc-500"}`}>
+                            {primaryFoundation ? `${fConfig?.label} Concern` : perspective.lean}
+                          </span>
+                          {secondaryFoundations.map((sf, j) => {
+                            const sfConfig = getFoundationConfig(sf.foundation);
+                            return (
+                              <span key={j} className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${sfConfig.bg} ${sfConfig.color}`}>
+                                {sfConfig.label}
+                              </span>
+                            );
+                          })}
+                        </div>
+                        <span className="text-[9px] font-medium text-zinc-400 dark:text-zinc-500 uppercase tracking-wide">
+                          {perspective.lean}
+                        </span>
+                      </div>
+                      {primaryFoundation && (
+                        <p className={`text-xs ${fConfig ? fConfig.color : "text-zinc-500"} mb-2`}>
+                          {primaryFoundation.label}
+                        </p>
+                      )}
+                      <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 mb-1">
+                        {thesis}
+                      </p>
+                      {rest && (
+                        <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed">
+                          {rest}
+                        </p>
+                      )}
+                      {perspectiveSources.length > 0 && (
+                        <p className="text-[10px] text-zinc-400 dark:text-zinc-500 mt-2">
+                          {perspectiveSources.join(", ")}
+                        </p>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             );
-          })()}
-        </div>
+          }
+
+          // Legacy Left/Right layout for old data
+          return (
+            <div className="grid md:grid-cols-2 gap-4">
+              {leftPerspective && (() => {
+                const sentences = leftPerspective.viewpoint.split(/(?<=[.!?])\s+/);
+                const thesis = sentences[0] || "";
+                const rest = sentences.slice(1).join(" ");
+                const leftSources = (story.sources || [])
+                  .filter(s => s.lean.toLowerCase().includes("left"))
+                  .map(s => s.name);
+                return (
+                  <div className="pl-4 py-2 border-l-4 border-blue-500">
+                    <h4 className="text-[10px] font-bold uppercase tracking-widest text-blue-600 dark:text-blue-300 mb-2">
+                      Left View
+                    </h4>
+                    <p className="text-sm font-semibold text-blue-900 dark:text-blue-100 mb-1">
+                      {thesis}
+                    </p>
+                    {rest && (
+                      <p className="text-xs text-blue-800/70 dark:text-blue-300/70 leading-relaxed">
+                        {rest}
+                      </p>
+                    )}
+                    {leftSources.length > 0 && (
+                      <p className="text-[10px] text-blue-500/70 dark:text-blue-400/50 mt-2">
+                        {leftSources.join(", ")}
+                      </p>
+                    )}
+                  </div>
+                );
+              })()}
+              {rightPerspective && (() => {
+                const sentences = rightPerspective.viewpoint.split(/(?<=[.!?])\s+/);
+                const thesis = sentences[0] || "";
+                const rest = sentences.slice(1).join(" ");
+                const rightSources = (story.sources || [])
+                  .filter(s => s.lean.toLowerCase().includes("right"))
+                  .map(s => s.name);
+                return (
+                  <div className="pl-4 py-2 border-l-4 border-rose-500">
+                    <h4 className="text-[10px] font-bold uppercase tracking-widest text-rose-600 dark:text-rose-300 mb-2">
+                      Right View
+                    </h4>
+                    <p className="text-sm font-semibold text-rose-900 dark:text-rose-100 mb-1">
+                      {thesis}
+                    </p>
+                    {rest && (
+                      <p className="text-xs text-rose-800/70 dark:text-rose-300/70 leading-relaxed">
+                        {rest}
+                      </p>
+                    )}
+                    {rightSources.length > 0 && (
+                      <p className="text-[10px] text-rose-500/70 dark:text-rose-400/50 mt-2">
+                        {rightSources.join(", ")}
+                      </p>
+                    )}
+                  </div>
+                );
+              })()}
+            </div>
+          );
+        })()}
 
         {/* Factual Disputes - Promoted to primary view */}
         {story.factualDisputes && story.factualDisputes.length > 0 && (
@@ -420,41 +1016,53 @@ function StoryCard({ story }: { story: StoryCluster }) {
       {deeperExpanded && (
         <div className="p-6 md:p-8 bg-zinc-50/50 dark:bg-zinc-900/30 border-t border-zinc-100 dark:border-zinc-800 space-y-6 animate-in slide-in-from-top-2">
 
-          {/* Why Each Side Cares - Simplified */}
+          {/* Why Each Side Cares - Foundation-labeled when available */}
           {story.whyItMatters && (
             <div className="space-y-4">
               <h4 className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Why Each Side Cares</h4>
               <div className="grid md:grid-cols-2 gap-4">
-                <div className="p-4 bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800">
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="text-blue-500">♥</span>
-                    <span className="text-xs font-bold text-blue-600 dark:text-blue-400">{story.whyItMatters.left.coreValue}</span>
-                  </div>
-                  <p className="text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed">
-                    {story.whyItMatters.left.motivation}
-                  </p>
-                </div>
-                <div className="p-4 bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800">
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="text-rose-500">♥</span>
-                    <span className="text-xs font-bold text-rose-600 dark:text-rose-400">{story.whyItMatters.right.coreValue}</span>
-                  </div>
-                  <p className="text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed">
-                    {story.whyItMatters.right.motivation}
-                  </p>
-                </div>
+                {(() => {
+                  const leftFoundation = story.whyItMatters!.left.moralFoundations?.find(f => f.strength === "primary");
+                  const leftConfig = leftFoundation ? getFoundationConfig(leftFoundation.foundation) : null;
+                  return (
+                    <div className={`p-4 rounded-xl border ${leftConfig ? `${leftConfig.bg} ${leftConfig.border}` : "bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800"}`}>
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className={leftConfig ? leftConfig.color : "text-blue-500"}>{leftConfig ? leftConfig.icon : "\u2665"}</span>
+                        <span className={`text-xs font-bold ${leftConfig ? leftConfig.color : "text-blue-600 dark:text-blue-400"}`}>{story.whyItMatters!.left.coreValue}</span>
+                      </div>
+                      <p className="text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed">
+                        {story.whyItMatters!.left.motivation}
+                      </p>
+                    </div>
+                  );
+                })()}
+                {(() => {
+                  const rightFoundation = story.whyItMatters!.right.moralFoundations?.find(f => f.strength === "primary");
+                  const rightConfig = rightFoundation ? getFoundationConfig(rightFoundation.foundation) : null;
+                  return (
+                    <div className={`p-4 rounded-xl border ${rightConfig ? `${rightConfig.bg} ${rightConfig.border}` : "bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800"}`}>
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className={rightConfig ? rightConfig.color : "text-rose-500"}>{rightConfig ? rightConfig.icon : "\u2665"}</span>
+                        <span className={`text-xs font-bold ${rightConfig ? rightConfig.color : "text-rose-600 dark:text-rose-400"}`}>{story.whyItMatters!.right.coreValue}</span>
+                      </div>
+                      <p className="text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed">
+                        {story.whyItMatters!.right.motivation}
+                      </p>
+                    </div>
+                  );
+                })()}
               </div>
             </div>
           )}
 
-          {/* Common Ground */}
-          {story.commonGround && story.commonGround.length > 0 && (
+          {/* Common Ground — only show here if not already promoted above (no sharedValues) */}
+          {!story.sharedValues?.length && story.commonGround && story.commonGround.length > 0 && (
             <div className="space-y-3">
               <h4 className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Common Ground</h4>
               <ul className="space-y-2">
                 {story.commonGround.map((item, i) => (
                   <li key={i} className="text-sm text-zinc-600 dark:text-zinc-400 flex gap-2">
-                    <span className="text-emerald-500 font-bold">✓</span>
+                    <span className="text-emerald-500 font-bold">{"\u2713"}</span>
                     {item}
                   </li>
                 ))}
@@ -514,9 +1122,22 @@ function StoryCard({ story }: { story: StoryCluster }) {
                     {source.title}
                   </p>
                 </a>
-                <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed mb-3 line-clamp-2">
+                <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed mb-2 line-clamp-2">
                   <span className="text-zinc-400 font-medium">Framing:</span> {source.framing}
                 </p>
+                {source.emotionalTechniques && source.emotionalTechniques.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mb-3">
+                    {source.emotionalTechniques.map((tech, j) => (
+                      <span key={j} title={tech.evidence || tech.label} className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-tight ${
+                        tech.severity === "high" ? "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400" :
+                        tech.severity === "moderate" ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" :
+                        "bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400"
+                      }`}>
+                        {tech.type.replace(/_/g, " ")}
+                      </span>
+                    ))}
+                  </div>
+                )}
                 <a
                   href={`/?url=${encodeURIComponent(source.url)}`}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 rounded-lg hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors"

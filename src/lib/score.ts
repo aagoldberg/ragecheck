@@ -43,20 +43,20 @@ const CATEGORY_WEIGHTS: Record<SignalCategory, number> = {
 
 // Descriptions for generating reasons
 const CATEGORY_DESCRIPTIONS: Record<SignalCategory, string> = {
-  arousal: "High emotional intensity and urgency signals",
-  enemy_construction: "Othering and dehumanization patterns",
-  moral_condemnation: "Moral outrage and purity rhetoric",
-  simplification: "Black-and-white thinking and oversimplification",
-  call_to_conflict: "Engagement bait and provocation",
+  arousal: "High emotional intensity, urgency, and existential threat framing",
+  enemy_construction: "Othering, dehumanization, and contempt patterns",
+  moral_condemnation: "Moral outrage, purity rhetoric, and cynicism induction",
+  simplification: "Black-and-white thinking, oversimplification, and epistemic arrogance",
+  call_to_conflict: "Engagement bait, provocation, and schadenfreude",
 };
 
 // Canonical signal labels for UI display
 export const SIGNAL_LABELS: Record<SignalCategory, string> = {
-  arousal: "Emotional Heat",
-  enemy_construction: "Us vs Them",
-  moral_condemnation: "Moral Outrage",
-  simplification: "Black & White Thinking",
-  call_to_conflict: "Fight-Picking",
+  arousal: "Emotional Heat & Threat",
+  enemy_construction: "Us vs Them & Contempt",
+  moral_condemnation: "Moral Outrage & Cynicism",
+  simplification: "Black & White & Arrogance",
+  call_to_conflict: "Fight-Picking & Schadenfreude",
 };
 
 /**

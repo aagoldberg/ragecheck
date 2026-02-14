@@ -2,6 +2,8 @@ export interface ClearviewStoryShareInput {
   topic: string;
   leftViewpoint?: string;
   rightViewpoint?: string;
+  moralFoundationsInPlay?: string[];
+  sharedValues?: string[];
 }
 
 export interface ClearviewShareTexts {
@@ -16,6 +18,15 @@ function getFirstSentence(text: string): string {
   return match ? match[0].trim() : text.trim();
 }
 
+const FOUNDATION_LABELS: Record<string, string> = {
+  care: "care",
+  fairness: "fairness",
+  loyalty: "loyalty",
+  authority: "authority",
+  sanctity: "sanctity",
+  liberty: "liberty",
+};
+
 export function getClearviewStoryShareText(
   story: ClearviewStoryShareInput,
   url: string
@@ -27,14 +38,27 @@ export function getClearviewStoryShareText(
     ? getFirstSentence(story.rightViewpoint)
     : "";
 
-  const xText =
-    leftSentence && rightSentence
-      ? `Left sees: ${leftSentence} Right sees: ${rightSentence}\n\nThe full breakdown:`
-      : `${story.topic}\n\nSee how Left, Right, and Center frame this differently:`;
+  // Use moral foundations framing when available
+  const foundations = story.moralFoundationsInPlay || [];
+  const hasFoundations = foundations.length >= 2;
 
-  const blueskyText = `This story looks different depending on where you read it.\n\n${story.topic}\n\n${url}`;
+  let xText: string;
+  if (hasFoundations) {
+    const labels = foundations.slice(0, 2).map(f => FOUNDATION_LABELS[f] || f);
+    xText = `A ${labels[0]} vs. ${labels[1]} debate: ${story.topic}\n\n${story.sharedValues?.[0] ? `Both sides agree: ${story.sharedValues[0]}` : "See what both sides actually share."}`;
+  } else if (leftSentence && rightSentence) {
+    xText = `Left sees: ${leftSentence} Right sees: ${rightSentence}\n\nThe full breakdown:`;
+  } else {
+    xText = `${story.topic}\n\nSee how different values shape the debate:`;
+  }
 
-  const nativeText = `${story.topic} - See how Left, Right, and Center frame this differently.\n\n${url}`;
+  const blueskyText = hasFoundations
+    ? `Same story, different values. ${story.topic}\n\n${url}`
+    : `This story looks different depending on where you read it.\n\n${story.topic}\n\n${url}`;
+
+  const nativeText = hasFoundations
+    ? `${story.topic} - See the different values driving this debate.\n\n${url}`
+    : `${story.topic} - See how Left, Right, and Center frame this differently.\n\n${url}`;
 
   return {
     xText,
@@ -48,11 +72,11 @@ export function getClearviewBriefingShareText(
   storyCount: number,
   url: string
 ): ClearviewShareTexts {
-  const xText = `Today's news, minus the spin. ${storyCount} stories analyzed from Left, Center, and Right.`;
+  const xText = `Today's news, minus the spin. ${storyCount} stories analyzed through moral foundations, not tribal teams.`;
 
-  const blueskyText = `ClearView shows the same news from every angle. Today: ${storyCount} stories.\n\n${url}`;
+  const blueskyText = `ClearView: understand WHY people disagree, not just WHO. Today: ${storyCount} stories.\n\n${url}`;
 
-  const nativeText = `Today's news analyzed from Left, Center, and Right. ${storyCount} stories without the spin.\n\n${url}`;
+  const nativeText = `Today's news analyzed through values and moral foundations. ${storyCount} stories without the spin.\n\n${url}`;
 
   return {
     xText,

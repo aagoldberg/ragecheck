@@ -78,10 +78,12 @@ export default function ClearviewMethodology() {
             <div className="flex gap-4 items-start">
               <div className="w-8 h-8 bg-indigo-100 dark:bg-indigo-900/30 rounded-full flex items-center justify-center text-indigo-600 dark:text-indigo-400 font-bold text-sm flex-shrink-0">5</div>
               <div>
-                <h3 className="font-bold text-lg mb-1">Perspective Synthesis</h3>
+                <h3 className="font-bold text-lg mb-1">Moral Foundations & Perspective Synthesis</h3>
                 <p className="text-zinc-600 dark:text-zinc-400">
-                  We distill the dominant left and right perspectives, identifying common ground
-                  and genuine points of disagreement.
+                  We identify the moral foundations (care, fairness, loyalty, authority, sanctity, liberty)
+                  driving each perspective, then synthesize viewpoints organized by values rather than
+                  political team. We identify shared values and common ground first, then genuine
+                  points of disagreement.
                 </p>
               </div>
             </div>
@@ -231,6 +233,146 @@ export default function ClearviewMethodology() {
           <p className="text-zinc-600 dark:text-zinc-400 leading-relaxed mt-4">
             We note confidence levels (high, moderate, low, contested) and significant dissent
             when it exists.
+          </p>
+        </section>
+
+        {/* Moral Foundations Theory */}
+        <section className="mb-12">
+          <h2 className="text-2xl font-bold mb-6">Moral Foundations Analysis</h2>
+          <p className="text-zinc-600 dark:text-zinc-400 leading-relaxed mb-6">
+            Rather than framing every disagreement as &ldquo;Left vs. Right,&rdquo; ClearView identifies the
+            underlying <strong>moral foundations</strong> driving each perspective. This framework, developed by
+            social psychologist Jonathan Haidt, helps explain <em>why</em> reasonable people disagree &mdash; they&apos;re
+            prioritizing different values, not just picking different teams.
+          </p>
+
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
+            <div className="p-4 bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 rounded-xl">
+              <div className="text-lg mb-1">{"\u2665"}</div>
+              <h3 className="font-bold text-rose-700 dark:text-rose-400 mb-1">Care</h3>
+              <p className="text-xs text-zinc-600 dark:text-zinc-400">Concern about harm to vulnerable people. Compassion, protection, nurturing.</p>
+            </div>
+            <div className="p-4 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 rounded-xl">
+              <div className="text-lg mb-1">{"\u2696"}</div>
+              <h3 className="font-bold text-indigo-700 dark:text-indigo-400 mb-1">Fairness</h3>
+              <p className="text-xs text-zinc-600 dark:text-zinc-400">Concern about equality, proportionality, or justice. Rights, reciprocity.</p>
+            </div>
+            <div className="p-4 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-xl">
+              <div className="text-lg mb-1">{"\u{1F91D}"}</div>
+              <h3 className="font-bold text-purple-700 dark:text-purple-400 mb-1">Loyalty</h3>
+              <p className="text-xs text-zinc-600 dark:text-zinc-400">Concern about group bonds, patriotism, or betrayal. In-group solidarity.</p>
+            </div>
+            <div className="p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl">
+              <div className="text-lg mb-1">{"\u{1F3DB}"}</div>
+              <h3 className="font-bold text-amber-700 dark:text-amber-400 mb-1">Authority</h3>
+              <p className="text-xs text-zinc-600 dark:text-zinc-400">Concern about order, tradition, or legitimate institutions. Hierarchy, respect.</p>
+            </div>
+            <div className="p-4 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-xl">
+              <div className="text-lg mb-1">{"\u2726"}</div>
+              <h3 className="font-bold text-emerald-700 dark:text-emerald-400 mb-1">Sanctity</h3>
+              <p className="text-xs text-zinc-600 dark:text-zinc-400">Concern about purity, degradation, or sacred values. Moral cleanliness.</p>
+            </div>
+            <div className="p-4 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-xl">
+              <div className="text-lg mb-1">{"\u{1F5FD}"}</div>
+              <h3 className="font-bold text-orange-700 dark:text-orange-400 mb-1">Liberty</h3>
+              <p className="text-xs text-zinc-600 dark:text-zinc-400">Concern about autonomy, oppression, or government overreach. Individual freedom.</p>
+            </div>
+          </div>
+
+          <p className="text-zinc-600 dark:text-zinc-400 leading-relaxed">
+            Research shows that left-leaning perspectives tend to emphasize Care and Fairness, while
+            right-leaning perspectives draw more evenly from all six foundations. Neither side is
+            &ldquo;missing&rdquo; empathy &mdash; they&apos;re applying different moral palettes to the same situation.
+          </p>
+        </section>
+
+        {/* Emotional Manipulation Taxonomy */}
+        <section className="mb-12">
+          <h2 className="text-2xl font-bold mb-6">Emotional Manipulation Taxonomy</h2>
+          <p className="text-zinc-600 dark:text-zinc-400 leading-relaxed mb-6">
+            Beyond anger and outrage, we detect a range of emotional manipulation techniques that
+            research shows are more structurally dangerous to democratic discourse:
+          </p>
+
+          <div className="space-y-3">
+            <div className="p-4 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl">
+              <h3 className="font-bold text-lg mb-1 text-rose-600 dark:text-rose-400">Contempt</h3>
+              <p className="text-zinc-600 dark:text-zinc-400 text-sm">
+                Sneering, mocking, treating opponents as beneath consideration. Anger says &ldquo;you&apos;re
+                wrong&rdquo;; contempt says &ldquo;you&apos;re not worth engaging.&rdquo; Forecloses dialogue entirely.
+              </p>
+            </div>
+            <div className="p-4 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl">
+              <h3 className="font-bold text-lg mb-1 text-amber-600 dark:text-amber-400">Moral Disgust</h3>
+              <p className="text-zinc-600 dark:text-zinc-400 text-sm">
+                Contamination language, portraying opponents as pollutants. Treats people as things
+                to be expelled rather than argued with.
+              </p>
+            </div>
+            <div className="p-4 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl">
+              <h3 className="font-bold text-lg mb-1 text-purple-600 dark:text-purple-400">Schadenfreude</h3>
+              <p className="text-zinc-600 dark:text-zinc-400 text-sm">
+                Celebrating opponents&apos; suffering or losses. Neural reward activation from a rival&apos;s
+                pain. No resolution condition &mdash; predicts support for cruel policies.
+              </p>
+            </div>
+            <div className="p-4 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl">
+              <h3 className="font-bold text-lg mb-1 text-indigo-600 dark:text-indigo-400">Epistemic Arrogance</h3>
+              <p className="text-zinc-600 dark:text-zinc-400 text-sm">
+                &ldquo;Everyone knows,&rdquo; &ldquo;not up for debate,&rdquo; &ldquo;do your research.&rdquo; False certainty that
+                forecloses inquiry and makes disagreement feel like ignorance.
+              </p>
+            </div>
+            <div className="p-4 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl">
+              <h3 className="font-bold text-lg mb-1 text-zinc-600 dark:text-zinc-400">Cynicism Induction</h3>
+              <p className="text-zinc-600 dark:text-zinc-400 text-sm">
+                &ldquo;It&apos;s all rigged,&rdquo; &ldquo;both sides are the same,&rdquo; &ldquo;nothing will change.&rdquo; Drives
+                disengagement that amplifies extremist voices by removing the moderating middle.
+              </p>
+            </div>
+            <div className="p-4 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl">
+              <h3 className="font-bold text-lg mb-1 text-orange-600 dark:text-orange-400">Existential Threat</h3>
+              <p className="text-zinc-600 dark:text-zinc-400 text-sm">
+                &ldquo;The end of democracy,&rdquo; &ldquo;point of no return.&rdquo; Frames stakes as civilization-ending
+                to activate fear-driven authoritarianism and outgroup aggression.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        {/* Perception Gap */}
+        <section className="mb-12">
+          <h2 className="text-2xl font-bold mb-6">Perception Gap Detection</h2>
+          <p className="text-zinc-600 dark:text-zinc-400 leading-relaxed mb-4">
+            Research from More in Common shows that Americans imagine roughly twice as many opponents
+            hold &ldquo;extreme&rdquo; views as actually do. The most news-engaged people are roughly 3x less
+            accurate about opponents&apos; views than those who follow news casually.
+          </p>
+          <p className="text-zinc-600 dark:text-zinc-400 leading-relaxed mb-4">
+            When we detect that media framing suggests deeper division than public opinion data supports,
+            we flag this as a <strong>Perception Gap</strong>. This helps readers distinguish between
+            genuinely contested issues and manufactured controversy.
+          </p>
+        </section>
+
+        {/* Why Common Ground First */}
+        <section className="mb-12">
+          <h2 className="text-2xl font-bold mb-6">Why We Lead with Common Ground</h2>
+          <p className="text-zinc-600 dark:text-zinc-400 leading-relaxed mb-4">
+            ClearView intentionally shows shared values and common ground <em>before</em> showing
+            disagreements. This is based on research from:
+          </p>
+          <ul className="list-disc list-inside text-zinc-600 dark:text-zinc-400 space-y-2 ml-4 mb-4">
+            <li><strong>Braver Angels workshops</strong> &mdash; RCTs show that reciprocal group reflection reduces
+              affective polarization and stereotyping</li>
+            <li><strong>Putnam&apos;s bridging capital</strong> &mdash; Cross-group ties (&ldquo;sociological WD-40&rdquo;) matter
+              more for democracy than in-group bonding</li>
+            <li><strong>Haidt&apos;s &ldquo;elephant and rider&rdquo;</strong> &mdash; Presenting opposing arguments often backfires;
+              starting with shared identity creates emotional openness to difference</li>
+          </ul>
+          <p className="text-zinc-600 dark:text-zinc-400 leading-relaxed">
+            The goal is not to find watered-down &ldquo;common ground&rdquo; positions, but to help each side see
+            the other&apos;s concerns as real &mdash; what Haidt calls the &ldquo;Asteroids Club&rdquo; approach.
           </p>
         </section>
 

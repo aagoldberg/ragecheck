@@ -335,15 +335,22 @@ export default function SideLinesMethodology() {
           </div>
         </section>
 
-        {/* Arousal Scoring */}
+        {/* Post Scoring Models */}
         <section className="mb-12">
-          <h2 className="text-2xl font-bold mb-6">Arousal Scoring</h2>
+          <h2 className="text-2xl font-bold mb-6">Post Scoring Models</h2>
+          <p className="text-zinc-600 dark:text-zinc-400 leading-relaxed mb-6">
+            Each post is scored by a two-stage pipeline: a fast lexicon pre-score at ingestion time,
+            followed by transformer-based multi-model scoring that runs every 2 minutes and overwrites
+            the lexicon score with richer signals.
+          </p>
+
+          <h3 className="text-xl font-bold mb-4">Stage 1: Lexicon Pre-Score (instant)</h3>
           <p className="text-zinc-600 dark:text-zinc-400 leading-relaxed mb-4">
-            Each post receives an arousal score (0&ndash;1) based on lexicon matching across seven
+            At ingestion, each post receives an arousal score (0&ndash;1) based on lexicon matching across seven
             dimensions, using the same curated word lists as RageCheck:
           </p>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
             {[
               { name: "Emotion (Anger/Fear/Disgust)", weight: "25%" },
               { name: "Urgency", weight: "15%" },
@@ -363,10 +370,79 @@ export default function SideLinesMethodology() {
             ))}
           </div>
 
-          <p className="text-zinc-600 dark:text-zinc-400 leading-relaxed mt-4">
+          <p className="text-zinc-600 dark:text-zinc-400 leading-relaxed mb-6">
             Additional boosts for heavy punctuation (!!!) and ALL CAPS words.
-            No LLM is involved&mdash;scoring is pure lexicon matching for speed (~5000 posts/sec).
+            This stage is pure lexicon matching for speed (~5000 posts/sec) and serves as a fast
+            fallback when transformer scoring is unavailable.
           </p>
+
+          <h3 className="text-xl font-bold mb-4">Stage 2: Transformer Models (batch, every 2 min)</h3>
+          <p className="text-zinc-600 dark:text-zinc-400 leading-relaxed mb-6">
+            A background task in the FastAPI worker batch-scores recent lexicon-scored posts using three
+            ONNX transformer models. Models are loaded once at startup (~240 MB total RAM) and reused
+            across all scoring cycles. If model inference fails, lexicon scores remain as fallback.
+          </p>
+
+          <div className="space-y-4 mb-6">
+            <div className="p-4 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl">
+              <h4 className="font-bold text-lg mb-2 text-emerald-600 dark:text-emerald-400">Model 1: Emotion Detection</h4>
+              <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-2">
+                <code className="text-xs bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded">j-hartmann/emotion-english-distilroberta-base</code>
+              </p>
+              <p className="text-zinc-600 dark:text-zinc-400 mb-2">
+                Classifies each post into 7 emotion categories: anger, disgust, fear, joy, neutral, sadness,
+                surprise. From these probabilities, we derive:
+              </p>
+              <ul className="text-sm text-zinc-600 dark:text-zinc-400 space-y-1 ml-4 list-disc">
+                <li><strong>Arousal</strong> &mdash; Weighted sum using Russell&apos;s circumplex model (anger=0.95, fear=0.85, surprise=0.80, joy=0.70, disgust=0.60, sadness=0.20, neutral=0.05)</li>
+                <li><strong>Valence</strong> &mdash; P(joy) + P(surprise)*0.5 - P(anger) - P(fear) - P(disgust) - P(sadness)*0.5, normalized to 0&ndash;1</li>
+                <li><strong>Dominant emotion</strong> &mdash; The emotion with highest probability</li>
+              </ul>
+            </div>
+
+            <div className="p-4 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl">
+              <h4 className="font-bold text-lg mb-2 text-red-600 dark:text-red-400">Model 2: Toxicity Detection</h4>
+              <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-2">
+                <code className="text-xs bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded">unitary/toxic-bert</code>
+              </p>
+              <p className="text-zinc-600 dark:text-zinc-400">
+                Multi-label classification across 6 toxicity categories: toxic, severe_toxic, obscene,
+                threat, insult, identity_hate. The toxicity score is the maximum across all categories.
+                Posts with toxicity &gt; 0.5 are flagged with a &ldquo;toxic&rdquo; badge.
+              </p>
+            </div>
+
+            <div className="p-4 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl">
+              <h4 className="font-bold text-lg mb-2 text-violet-600 dark:text-violet-400">Model 3: Irony Detection</h4>
+              <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-2">
+                <code className="text-xs bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded">cardiffnlp/twitter-roberta-base-irony</code>
+              </p>
+              <p className="text-zinc-600 dark:text-zinc-400">
+                Binary classification (ironic vs. non-ironic). Flags posts where surface text may not match
+                intent. Posts with irony probability &gt; 0.5 are flagged with an &ldquo;ironic&rdquo; badge.
+                This helps identify cases where lexicon-based arousal may be misleading.
+              </p>
+            </div>
+          </div>
+
+          <h3 className="text-xl font-bold mb-4">Signal Storage</h3>
+          <p className="text-zinc-600 dark:text-zinc-400 leading-relaxed mb-4">
+            All model outputs are stored in a <code className="text-xs bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded">signals_json</code> JSONB
+            column per post, containing the full emotion probability distribution, derived arousal and
+            valence, dominant emotion, toxicity breakdown, and irony score. The transformer-derived
+            arousal overwrites the lexicon score in the <code className="text-xs bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded">arousal_score</code> column,
+            keeping existing pulse queries working without changes.
+          </p>
+
+          <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+            <p className="text-sm text-blue-700 dark:text-blue-300">
+              <strong>Why a two-stage pipeline?</strong> The Jetstream ingestion container stays lean and
+              focused on real-time data collection. Transformer inference runs in the separate FastAPI
+              worker container, which already has heavier dependencies. The 2-minute scoring delay is
+              invisible on a dashboard that uses 30-minute windows. If model inference fails, ingestion
+              continues unaffected with lexicon scores.
+            </p>
+          </div>
         </section>
 
         {/* Topic Grouping */}
@@ -471,6 +547,7 @@ export default function SideLinesMethodology() {
                 <li>igraph (graph construction)</li>
                 <li>leidenalg (community detection)</li>
                 <li>NumPy (centrality, statistics)</li>
+                <li>ONNX Runtime (transformer model inference)</li>
                 <li>Claude Haiku (community labeling)</li>
               </ul>
             </div>
@@ -539,7 +616,7 @@ export default function SideLinesMethodology() {
             <li>The tracked user set starts from a seed and grows via snowball sampling, which may underrepresent communities not well-connected to the seed</li>
             <li>Follow-based communities are stable but may lag behind rapid realignment events</li>
             <li>Community characterization depends on LLM interpretation of top-followed handles, which may oversimplify</li>
-            <li>Lexicon-based arousal scoring misses sarcasm, irony, and context-dependent tone</li>
+            <li>While transformer models improve on lexicon scoring, irony and sarcasm detection remains imperfect&mdash;the irony model flags likely cases but does not adjust scores automatically</li>
             <li>Search API sampling may miss relevant posts, especially in high-volume events</li>
             <li>Community detection is sensitive to the Jaccard similarity threshold and minimum shared follow count</li>
             <li>Bridge node identification uses heuristics, not ground-truth moderation labels</li>

@@ -197,9 +197,9 @@ def score_component(text: str, tokens: list[str], lexicon: list[str]) -> float:
     return min(1.0, 0.7 + density * 5)
 
 
-def compute_arousal(text: str) -> dict[str, Any]:
+def compute_arousal_lexicon(text: str) -> dict[str, Any]:
     """
-    Compute arousal score for a single text.
+    Compute arousal score using lexicon matching.
     Returns {"score": float, "breakdown": dict} matching TypeScript output.
     """
     if not text or not text.strip():
@@ -256,3 +256,16 @@ def compute_arousal(text: str) -> dict[str, Any]:
         "score": round(score * 10000) / 10000,
         "breakdown": breakdown,
     }
+
+
+def compute_arousal(text: str) -> dict[str, Any]:
+    """
+    Compute arousal score for a single text.
+
+    Uses lexicon scoring (fast, synchronous). Transformer-based scoring
+    runs asynchronously via the background scoring loop in main.py and
+    overwrites the lexicon score after ~2 minutes.
+
+    Returns {"score": float, "breakdown": dict}.
+    """
+    return compute_arousal_lexicon(text)

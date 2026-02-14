@@ -7,14 +7,19 @@ Deployed on Railway, triggered by Vercel API routes.
 
 from __future__ import annotations
 
+import asyncio
+import logging
 import os
 import time
+from contextlib import asynccontextmanager
 from datetime import date, datetime
 from typing import Any
 
 import numpy as np
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
+
+log = logging.getLogger(__name__)
 
 from analysis import (
     build_graph,
@@ -64,10 +69,234 @@ from db import (
     get_community_recent_posts,
     get_network_graph_data,
     get_latest_snapshot_terms,
+    get_unscored_posts,
+    update_post_signals,
 )
 from starter_packs import crawl_starter_packs, backfill_follows, refresh_stale_follows, snowball_expand
 
-app = FastAPI(title="SideLines Analysis Worker")
+
+# =============================================================================
+# BACKGROUND LOOP CONSTANTS
+# =============================================================================
+
+MAINTENANCE_INTERVAL_S = 6 * 3600       # 6 hours
+COMMUNITY_RECOMPUTE_INTERVAL_S = 24 * 3600  # 24 hours
+MAINTENANCE_INITIAL_DELAY_S = 60        # wait 60s after startup
+BACKFILL_BATCH_SIZE = 200
+REFRESH_STALE_DAYS = 7
+SNOWBALL_MIN_FOLLOWERS = 50
+
+
+# =============================================================================
+# BACKGROUND SCORING LOOP
+# =============================================================================
+
+
+async def scoring_loop():
+    """Every 2 minutes, batch-score recent posts with transformer models."""
+    try:
+        from scoring_models import score_batch, MODELS_LOADED
+    except ImportError:
+        log.warning("scoring_models not available, background scoring disabled")
+        return
+
+    if not MODELS_LOADED:
+        log.warning("Scoring models not loaded, background scoring disabled")
+        return
+
+    log.info("Background scoring loop started")
+
+    while True:
+        await asyncio.sleep(120)  # 2 minutes
+        try:
+            posts = get_unscored_posts(limit=500)
+            if not posts:
+                continue
+
+            texts = [p["text"] for p in posts]
+            signals = score_batch(texts)
+
+            update_post_signals(posts, signals)
+
+            log.info(f"Transformer-scored {len(posts)} posts")
+        except Exception as e:
+            log.warning(f"Scoring loop error: {e}")
+
+
+# =============================================================================
+# BACKGROUND MAINTENANCE LOOP
+# =============================================================================
+
+
+async def maintenance_loop():
+    """Every 6 hours: snowball expand, backfill follows, refresh stale follows."""
+    log.info("Maintenance loop started")
+    await asyncio.sleep(MAINTENANCE_INITIAL_DELAY_S)
+
+    while True:
+        # --- Step 1: Snowball expand ---
+        try:
+            result = snowball_expand(
+                min_followers=SNOWBALL_MIN_FOLLOWERS, limit=10000
+            )
+            log.info(
+                f"Snowball expand: {result['new_users_added']} new users "
+                f"({result['candidates']} candidates, {result['total_tracked']} total tracked)"
+            )
+        except Exception as e:
+            log.warning(f"Maintenance: snowball_expand failed: {e}")
+
+        # --- Step 2: Backfill follows until done ---
+        try:
+            total_backfilled = 0
+            while True:
+                result = backfill_follows(batch_size=BACKFILL_BATCH_SIZE)
+                total_backfilled += result["processed"]
+                if result["done"]:
+                    break
+            log.info(f"Backfill follows: processed {total_backfilled} users")
+        except Exception as e:
+            log.warning(f"Maintenance: backfill_follows failed: {e}")
+
+        # --- Step 3: Refresh stale follows until done ---
+        try:
+            total_refreshed = 0
+            while True:
+                result = refresh_stale_follows(
+                    stale_days=REFRESH_STALE_DAYS, batch_size=BACKFILL_BATCH_SIZE
+                )
+                total_refreshed += result["processed"]
+                if result["done"]:
+                    break
+            log.info(f"Refresh stale follows: refreshed {total_refreshed} users")
+        except Exception as e:
+            log.warning(f"Maintenance: refresh_stale_follows failed: {e}")
+
+        await asyncio.sleep(MAINTENANCE_INTERVAL_S)
+
+
+# =============================================================================
+# BACKGROUND COMMUNITY RECOMPUTE LOOP
+# =============================================================================
+
+
+async def community_recompute_loop():
+    """Every 24 hours: recompute global communities from the follow graph."""
+    log.info("Community recompute loop started")
+    # Offset from maintenance: wait initial delay + 3 hours so they don't overlap
+    await asyncio.sleep(MAINTENANCE_INITIAL_DELAY_S + 3 * 3600)
+
+    while True:
+        try:
+            import leidenalg
+
+            follows = get_all_global_follows()
+            if not follows:
+                log.info("Community recompute: no follows data, skipping")
+                await asyncio.sleep(COMMUNITY_RECOMPUTE_INTERVAL_S)
+                continue
+
+            cofollow_graph, idx_to_did = build_global_cofollow_graph(
+                follows, min_shared=3
+            )
+            if cofollow_graph.vcount() < 2:
+                log.info("Community recompute: graph too small, skipping")
+                await asyncio.sleep(COMMUNITY_RECOMPUTE_INTERVAL_S)
+                continue
+
+            partition = leidenalg.find_partition(
+                cofollow_graph,
+                leidenalg.ModularityVertexPartition,
+                weights="weight" if "weight" in cofollow_graph.es.attributes() else None,
+                n_iterations=10,
+                seed=42,
+            )
+
+            if partition is None:
+                log.info("Community recompute: partition failed, skipping")
+                await asyncio.sleep(COMMUNITY_RECOMPUTE_INTERVAL_S)
+                continue
+
+            community_profiles = characterize_communities(
+                cofollow_graph, partition, follows, min_size=5
+            )
+
+            if not community_profiles:
+                log.info("Community recompute: no communities found, skipping")
+                await asyncio.sleep(COMMUNITY_RECOMPUTE_INTERVAL_S)
+                continue
+
+            community_records = []
+            for profile in community_profiles:
+                llm_summary = summarize_community_llm(
+                    profile["topFollowedHandles"],
+                    [],
+                    profile["memberCount"],
+                    0.0,
+                )
+
+                name = f"Community {profile['clusterId']}"
+                description = llm_summary
+                if ": " in llm_summary:
+                    parts = llm_summary.split(": ", 1)
+                    name = parts[0]
+                    description = parts[1]
+
+                community_records.append({
+                    "name": name,
+                    "description": description,
+                    "top_followed_handles": profile["topFollowedHandles"],
+                    "member_count": profile["memberCount"],
+                    "member_dids": profile["memberDids"],
+                })
+
+            community_ids = upsert_communities([
+                {
+                    "name": c["name"],
+                    "description": c["description"],
+                    "top_followed_handles": c["top_followed_handles"],
+                    "member_count": c["member_count"],
+                }
+                for c in community_records
+            ])
+
+            all_assignments = []
+            for cid, record in zip(community_ids, community_records):
+                for did in record["member_dids"]:
+                    all_assignments.append({
+                        "user_did": did,
+                        "community_id": cid,
+                    })
+            upsert_community_members(all_assignments)
+
+            total_members = sum(c["member_count"] for c in community_records)
+            log.info(
+                f"Community recompute: {len(community_records)} communities, "
+                f"{total_members} total members"
+            )
+
+        except Exception as e:
+            log.warning(f"Community recompute failed: {e}")
+
+        await asyncio.sleep(COMMUNITY_RECOMPUTE_INTERVAL_S)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Start background loops on startup."""
+    scoring_task = asyncio.create_task(scoring_loop())
+    maintenance_task = asyncio.create_task(maintenance_loop())
+    community_task = asyncio.create_task(community_recompute_loop())
+    yield
+    for task in (scoring_task, maintenance_task, community_task):
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+
+
+app = FastAPI(title="SideLines Analysis Worker", lifespan=lifespan)
 
 
 class AnalyzeRequest(BaseModel):
@@ -959,6 +1188,14 @@ async def get_pulse_network():
                 node["x"] = (coords[i][0] - min_x) / range_x
                 node["y"] = (coords[i][1] - min_y) / range_y
 
+        # Fetch latest signals_agg per community from snapshots
+        snapshots = get_latest_snapshots()
+        community_signals: dict[int, Any] = {}
+        for snap in snapshots:
+            sig = snap.get("signals_agg")
+            if sig:
+                community_signals[snap["community_id"]] = sig
+
         # Build community color index
         community_id_order = [c["id"] for c in communities_meta]
         community_color_map = {
@@ -966,12 +1203,15 @@ async def get_pulse_network():
         }
         community_list = []
         for c in communities_meta:
-            community_list.append({
+            entry: dict[str, Any] = {
                 "id": c["id"],
                 "name": c["name"],
                 "member_count": c["member_count"],
                 "color_index": community_color_map[c["id"]],
-            })
+            }
+            if c["id"] in community_signals:
+                entry["signals_agg"] = community_signals[c["id"]]
+            community_list.append(entry)
 
         result = {
             "nodes": [

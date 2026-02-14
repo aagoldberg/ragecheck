@@ -30,12 +30,26 @@ interface NetworkEdge {
   target: string;
 }
 
+interface SignalsAgg {
+  emotions: Record<string, number>;
+  mean_valence: number;
+  mean_toxicity: number;
+  toxic_pct: number;
+  mean_irony: number;
+  ironic_pct: number;
+  dominant_emotion: string;
+  scored_pct: number;
+}
+
 interface CommunityMeta {
   id: number;
   name: string;
   member_count: number;
   color_index: number;
+  signals_agg?: SignalsAgg;
 }
+
+type ColorMode = "community" | "emotion" | "toxicity";
 
 interface NetworkStats {
   total_nodes: number;
@@ -74,6 +88,22 @@ function getCommunityColor(colorIndex: number): string {
   return COMMUNITY_COLORS[colorIndex % COMMUNITY_COLORS.length];
 }
 
+const EMOTION_NODE_COLORS: Record<string, string> = {
+  anger: "#ef4444",
+  joy: "#22c55e",
+  fear: "#a855f7",
+  sadness: "#3b82f6",
+  surprise: "#eab308",
+  disgust: "#f97316",
+  neutral: "#71717a",
+};
+
+function getToxicityColor(meanToxicity: number): string {
+  if (meanToxicity > 0.3) return "#ef4444"; // red
+  if (meanToxicity > 0.1) return "#eab308"; // yellow
+  return "#22c55e"; // green
+}
+
 // =============================================================================
 // COMPONENT
 // =============================================================================
@@ -85,6 +115,7 @@ export default function NetworkGraph() {
   const [highlightCommunity, setHighlightCommunity] = useState<number | null>(
     null
   );
+  const [colorMode, setColorMode] = useState<ColorMode>("community");
   const [dimensions, setDimensions] = useState({ width: 0, height: 650 });
   const containerRef = useRef<HTMLDivElement>(null);
   const fgRef = useRef<ForceGraphMethods | undefined>(undefined);
@@ -133,15 +164,21 @@ export default function NetworkGraph() {
     return () => window.removeEventListener("resize", measure);
   }, []);
 
-  // Build color lookup
+  // Build color lookup based on current color mode
   const communityColorMap = useMemo(() => {
     if (!data) return new Map<number, string>();
     const m = new Map<number, string>();
     for (const c of data.communities) {
-      m.set(c.id, getCommunityColor(c.color_index));
+      if (colorMode === "emotion" && c.signals_agg) {
+        m.set(c.id, EMOTION_NODE_COLORS[c.signals_agg.dominant_emotion] || "#71717a");
+      } else if (colorMode === "toxicity" && c.signals_agg) {
+        m.set(c.id, getToxicityColor(c.signals_agg.mean_toxicity));
+      } else {
+        m.set(c.id, getCommunityColor(c.color_index));
+      }
     }
     return m;
-  }, [data]);
+  }, [data, colorMode]);
 
   // Determine label threshold: top ~5 per community
   const labelSet = useMemo(() => {
@@ -366,6 +403,22 @@ export default function NetworkGraph() {
               {data.stats.total_nodes.toLocaleString()} nodes &middot;{" "}
               {data.stats.total_edges.toLocaleString()} edges
             </p>
+            {/* Color mode toggle */}
+            <div className="flex gap-1 mt-2 pointer-events-auto">
+              {(["community", "emotion", "toxicity"] as ColorMode[]).map((mode) => (
+                <button
+                  key={mode}
+                  onClick={() => setColorMode(mode)}
+                  className={`px-2 py-0.5 rounded text-[11px] font-medium transition-colors ${
+                    colorMode === mode
+                      ? "bg-zinc-700 text-zinc-100"
+                      : "bg-zinc-900 text-zinc-500 hover:text-zinc-300"
+                  }`}
+                >
+                  {mode.charAt(0).toUpperCase() + mode.slice(1)}
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Legend */}

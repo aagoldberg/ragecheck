@@ -2246,6 +2246,64 @@ export interface ClearviewStory {
     politicalGame: string;
     whatGetsIgnored?: string;
   };
+  perceptionGap?: {
+    claim: string;
+    actualAgreement?: string;
+    mediaPortrayal?: string;
+    pollSource?: string;
+    pollDate?: string;
+    crossPartisanBreakdown?: string;
+  };
+  sharedValues?: string[];
+  moralFoundationsInPlay?: string[];
+  // Survey research data (from 3-agent pipeline)
+  surveyResearch?: {
+    analysis: {
+      headlineInsight: string;
+      perceptionGap: {
+        claim: string;
+        mediaFraming: string;
+        gapMagnitude: string;
+      };
+      keyFindings: {
+        finding: string;
+        source: string;
+        questionWording?: string;
+        crossPartisan?: { dem: number; ind: number; rep: number };
+        trend?: { direction: "up" | "down" | "stable"; from: number; to: number; period: string };
+      }[];
+      dataQuality: "strong" | "moderate" | "limited";
+      sourceCount: number;
+    };
+    vizSpecs: {
+      chartType: "partisan-bars" | "perception-gap" | "trend" | "distribution";
+      title: string;
+      subtitle?: string;
+      data: { label: string; value: number; color?: string; secondary?: number; secondaryLabel?: string }[];
+      trendData?: { date: string; value: number; label?: string }[];
+      annotations?: string[];
+      sourceAttribution: string;
+      questionWording?: string;
+    }[];
+    rawPolls: {
+      organization: string;
+      datesConducted: string;
+      sampleSize?: number;
+      marginOfError?: string;
+      mode?: string;
+      url: string;
+      questions: {
+        questionWording: string;
+        responses: {
+          option: string;
+          overall: number;
+          byParty?: { dem: number; ind: number; rep: number };
+          byDemographic?: Record<string, number>;
+        }[];
+        trendData?: { date: string; values: Record<string, number> }[];
+      }[];
+    }[];
+  };
 }
 
 export interface ClearviewCache {
